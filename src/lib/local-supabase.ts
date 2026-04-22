@@ -157,7 +157,36 @@ const createAuthClient = () => {
       // Ensure default accounts exist
       initDefaultData();
       
+      // Force check if default accounts exist, recreate if missing
       const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.users) || '[]');
+      const profiles = JSON.parse(localStorage.getItem(STORAGE_KEYS.profiles) || '[]');
+      
+      Object.values(DEFAULT_ACCOUNTS).forEach(account => {
+        const userExists = users.some((u: any) => u.email === account.email);
+        if (!userExists) {
+          const id = crypto.randomUUID();
+          users.push({
+            id,
+            email: account.email,
+            password: account.password,
+            created_at: new Date().toISOString(),
+          });
+          
+          const profileExists = profiles.some((p: any) => p.email === account.email);
+          if (!profileExists) {
+            profiles.push({
+              id,
+              email: account.email,
+              role: account.role,
+              full_name: account.fullName,
+            });
+          }
+        }
+      });
+      
+      localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(users));
+      localStorage.setItem(STORAGE_KEYS.profiles, JSON.stringify(profiles));
+      
       const user = users.find((u: any) => u.email === email && u.password === password);
       
       if (!user) {
