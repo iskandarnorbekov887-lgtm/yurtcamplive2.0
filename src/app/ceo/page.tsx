@@ -19,12 +19,13 @@ export default function CEOPage() {
 }
 
 function CEODashboard() {
-  const { user, signOut } = useAuth();
+  const { user, session, signOut } = useAuth();
   const currentUserId = user?.id;
   const userRole = user?.role as UserRole;
   const { t } = useLanguage();
   const [yurts, setYurts] = useState<Yurt[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [googleCalendarEvents, setGoogleCalendarEvents] = useState<Booking[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [staff, setStaff] = useState<Profile[]>([]);
   const [activeTab, setActiveTab] = useState<'checkin' | 'finance' | 'team'>('checkin');
@@ -67,8 +68,76 @@ function CEODashboard() {
     }
   }, []);
 
+  // Fetch Google Calendar events using provider_token from Supabase session
+  const fetchGoogleCalendarEvents = async () => {
+    const provider_token = session?.provider_token;
+    if (!provider_token || calendarPreference !== 'google') return;
+    
+    try {
+      const calendarId = googleCalendarConfig.calendarId || 'primary';
+      const timeMin = new Date(new Date().getFullYear(), 0, 1).toISOString(); // Start of year
+      const timeMax = new Date(new Date().getFullYear() + 1, 11, 31).toISOString(); // End of next year
+      
+      const response = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime`,
+        {
+          headers: {
+            'Authorization': `Bearer ${provider_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('📅 Google Calendar events fetched:', data.items?.length || 0);
+        
+        // Convert Google Calendar events to Booking format
+        const mappedEvents: Booking[] = (data.items || []).map((event: any, index: number) => {
+          const startDate = event.start?.date || event.start?.dateTime?.split('T')[0];
+          const endDate = event.end?.date || event.end?.dateTime?.split('T')[0];
+          
+          return {
+            id: 10000 + index, // Offset to avoid collision with Supabase IDs
+            yurt_id: 1, // Default yurt
+            guest_name: event.summary || 'Google Calendar Event',
+            check_in: startDate,
+            check_out: endDate,
+            total_price: 0,
+            number_of_people: 1,
+            payment_status: 'Paid',
+            source: 'Manual',
+            status: 'confirmed',
+            notes: event.description || 'Imported from Google Calendar',
+            meal_notes: null,
+            approved_by_manager: true,
+            created_by_id: currentUserId || '',
+            last_edited_by_id: null,
+          };
+        });
+        
+        setGoogleCalendarEvents(mappedEvents);
+      } else {
+        const error = await response.json();
+        console.error('❌ Failed to fetch Google Calendar events:', error);
+        setGoogleCalendarEvents([]);
+      }
+    } catch (err) {
+      console.error('❌ Error fetching Google Calendar events:', err);
+      setGoogleCalendarEvents([]);
+    }
+  };
+
+  // Fetch Google Calendar events when preference changes or on mount
+  useEffect(() => {
+    if (calendarPreference === 'google' && session?.provider_token) {
+      fetchGoogleCalendarEvents();
+    }
+  }, [calendarPreference, session?.provider_token]);
+
   const syncToGoogleCalendar = async (booking: Booking) => {
-    if (calendarPreference !== 'google' || !googleCalendarConfig.apiKey) return;
+    const provider_token = session?.provider_token;
+    if (calendarPreference !== 'google' || !provider_token) return;
     
     try {
       const event = {
@@ -82,11 +151,13 @@ function CEODashboard() {
         },
       };
 
+      const calendarId = googleCalendarConfig.calendarId || 'primary';
       const response = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/${googleCalendarConfig.calendarId || 'primary'}/events?key=${googleCalendarConfig.apiKey}`,
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
         {
           method: 'POST',
           headers: {
+            'Authorization': `Bearer ${provider_token}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(event),
@@ -334,7 +405,7 @@ function CEODashboard() {
         {activeTab === 'checkin' && (
           <div className="animate-in fade-in duration-500">
             <OccupancyCalendar 
-              bookings={bookings} 
+              bookings={calendarPreference === 'google' ? [...bookings, ...googleCalendarEvents] : bookings} 
               yurts={yurts} 
               userRole={userRole}
               currentUserId={currentUserId}
