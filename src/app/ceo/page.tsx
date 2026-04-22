@@ -9,6 +9,7 @@ import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { OccupancyCalendar } from '@/components/occupancy-calendar';
 import type { UserRole } from '@/lib/supabase';
+import ICAL from 'ical.js';
 
 export default function CEOPage() {
   return (
@@ -25,18 +26,16 @@ function CEODashboard() {
   const { t } = useLanguage();
   const [yurts, setYurts] = useState<Yurt[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [googleCalendarEvents, setGoogleCalendarEvents] = useState<Booking[]>([]);
+  const [icalEvents, setIcalEvents] = useState<Booking[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [staff, setStaff] = useState<Profile[]>([]);
   const [activeTab, setActiveTab] = useState<'checkin' | 'finance' | 'team'>('checkin');
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [calendarPreference, setCalendarPreference] = useState<'internal' | 'google'>('internal');
-  const [googleCalendarConfig, setGoogleCalendarConfig] = useState({
-    apiKey: '',
-    clientId: '',
-    calendarId: '',
+  const [calendarPreference, setCalendarPreference] = useState<'internal' | 'ical'>('internal');
+  const [icalConfig, setIcalConfig] = useState({
+    url: '',
   });
   const [formData, setFormData] = useState({
     yurt_id: '',
@@ -57,123 +56,76 @@ function CEODashboard() {
 
   useEffect(() => {
     // Load calendar preference from localStorage
-    const savedPreference = localStorage.getItem('ceo_calendar_preference') as 'internal' | 'google' | null;
-    if (savedPreference) {
+    const savedPreference = localStorage.getItem('ceo_calendar_preference') as 'internal' | 'ical' | 'google' | null;
+    if (savedPreference && (savedPreference === 'internal' || savedPreference === 'ical')) {
       setCalendarPreference(savedPreference);
+    } else if (savedPreference === 'google') {
+      // Migrate old 'google' preference to 'ical'
+      setCalendarPreference('ical');
+      localStorage.setItem('ceo_calendar_preference', 'ical');
     }
-    // Load Google Calendar config
-    const savedConfig = localStorage.getItem('google_calendar_config');
+    // Load iCal config
+    const savedConfig = localStorage.getItem('ical_config');
     if (savedConfig) {
-      setGoogleCalendarConfig(JSON.parse(savedConfig));
+      setIcalConfig(JSON.parse(savedConfig));
     }
   }, []);
 
-  // Fetch Google Calendar events using provider_token from Supabase session
-  const fetchGoogleCalendarEvents = async () => {
-    const provider_token = session?.provider_token;
-    if (!provider_token || calendarPreference !== 'google') return;
+  // Fetch and parse iCal events
+  const fetchIcalEvents = async () => {
+    if (!icalConfig.url || calendarPreference !== 'ical') return;
     
     try {
-      const calendarId = googleCalendarConfig.calendarId || 'primary';
-      const timeMin = new Date(new Date().getFullYear(), 0, 1).toISOString(); // Start of year
-      const timeMax = new Date(new Date().getFullYear() + 1, 11, 31).toISOString(); // End of next year
+      const response = await fetch(icalConfig.url);
+      if (!response.ok) {
+        console.error('❌ Failed to fetch iCal:', response.statusText);
+        setIcalEvents([]);
+        return;
+      }
       
-      const response = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime`,
-        {
-          headers: {
-            'Authorization': `Bearer ${provider_token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('📅 Google Calendar events fetched:', data.items?.length || 0);
+      const icalData = await response.text();
+      const jcalData = ICAL.parse(icalData);
+      const comp = new ICAL.Component(jcalData);
+      const vevents = comp.getAllSubcomponents('vevent');
+      
+      const mappedEvents: Booking[] = vevents.map((vevent, index) => {
+        const event = new ICAL.Event(vevent);
+        const startDate = event.startDate.toJSDate().toISOString().split('T')[0];
+        const endDate = event.endDate.toJSDate().toISOString().split('T')[0];
         
-        // Convert Google Calendar events to Booking format
-        const mappedEvents: Booking[] = (data.items || []).map((event: any, index: number) => {
-          const startDate = event.start?.date || event.start?.dateTime?.split('T')[0];
-          const endDate = event.end?.date || event.end?.dateTime?.split('T')[0];
-          
-          return {
-            id: 10000 + index, // Offset to avoid collision with Supabase IDs
-            yurt_id: 1, // Default yurt
-            guest_name: event.summary || 'Google Calendar Event',
-            check_in: startDate,
-            check_out: endDate,
-            total_price: 0,
-            number_of_people: 1,
-            payment_status: 'Paid',
-            source: 'Manual',
-            status: 'confirmed',
-            notes: event.description || 'Imported from Google Calendar',
-            meal_notes: null,
-            approved_by_manager: true,
-            created_by_id: currentUserId || '',
-            last_edited_by_id: null,
-          };
-        });
-        
-        setGoogleCalendarEvents(mappedEvents);
-      } else {
-        const error = await response.json();
-        console.error('❌ Failed to fetch Google Calendar events:', error);
-        setGoogleCalendarEvents([]);
-      }
+        return {
+          id: 10000 + index, // Offset to avoid collision with Supabase IDs
+          yurt_id: 1, // Default yurt
+          guest_name: event.summary || 'iCal Event',
+          check_in: startDate,
+          check_out: endDate,
+          total_price: 0,
+          number_of_people: 1,
+          payment_status: 'Paid',
+          source: 'Manual',
+          status: 'confirmed',
+          notes: event.description || 'Imported from iCal',
+          meal_notes: null,
+          approved_by_manager: true,
+          created_by_id: currentUserId || '',
+          last_edited_by_id: null,
+        };
+      });
+      
+      console.log('📅 iCal events fetched:', mappedEvents.length);
+      setIcalEvents(mappedEvents);
     } catch (err) {
-      console.error('❌ Error fetching Google Calendar events:', err);
-      setGoogleCalendarEvents([]);
+      console.error('❌ Error fetching iCal events:', err);
+      setIcalEvents([]);
     }
   };
 
-  // Fetch Google Calendar events when preference changes or on mount
+  // Fetch iCal events when preference changes or on mount
   useEffect(() => {
-    if (calendarPreference === 'google' && session?.provider_token) {
-      fetchGoogleCalendarEvents();
+    if (calendarPreference === 'ical' && icalConfig.url) {
+      fetchIcalEvents();
     }
-  }, [calendarPreference, session?.provider_token]);
-
-  const syncToGoogleCalendar = async (booking: Booking) => {
-    const provider_token = session?.provider_token;
-    if (calendarPreference !== 'google' || !provider_token) return;
-    
-    try {
-      const event = {
-        summary: `${booking.guest_name} - Isky Camp Yurt Booking`,
-        description: `Guest: ${booking.guest_name}\nYurt: ${booking.yurt?.name || 'TBD'}\nParty Size: ${booking.number_of_people}\nPrice: $${booking.total_price}\nNotes: ${booking.notes || ''}`,
-        start: {
-          date: booking.check_in,
-        },
-        end: {
-          date: booking.check_out,
-        },
-      };
-
-      const calendarId = googleCalendarConfig.calendarId || 'primary';
-      const response = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${provider_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(event),
-        }
-      );
-
-      if (response.ok) {
-        console.log('✅ Booking synced to Google Calendar');
-      } else {
-        const error = await response.json();
-        console.error('❌ Failed to sync to Google Calendar:', error);
-      }
-    } catch (err) {
-      console.error('❌ Error syncing to Google Calendar:', err);
-    }
-  };
+  }, [calendarPreference, icalConfig.url]);
 
   useEffect(() => {
     fetchData();
@@ -329,10 +281,6 @@ function CEODashboard() {
       }]).select().single();
       if (error) throw error;
       
-      // Sync to Google Calendar if enabled
-      if (calendarPreference === 'google' && data) {
-        await syncToGoogleCalendar(data);
-      }
       
       setShowAddModal(false);
       fetchData();
@@ -404,33 +352,32 @@ function CEODashboard() {
 
         {activeTab === 'checkin' && (
           <div className="animate-in fade-in duration-500">
-            {/* Sync Google Calendar Button */}
-            {calendarPreference === 'google' && googleCalendarConfig.clientId && (
+            {/* Sync iCal Button */}
+            {calendarPreference === 'ical' && icalConfig.url && (
               <div className="mb-4 flex items-center justify-between bg-blue-50 p-4 rounded-xl border border-blue-200">
                 <div className="flex items-center gap-3">
                   <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                    <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2zm-7 5h5v5h-5z"/>
                   </svg>
                   <span className="text-sm text-blue-800">
-                    {googleCalendarEvents.length > 0 
-                      ? `${googleCalendarEvents.length} Google Calendar events loaded` 
-                      : 'Google Calendar connected'}
+                    {icalEvents.length > 0 
+                      ? `${icalEvents.length} iCal events loaded` 
+                      : 'iCal connected'}
                   </span>
                 </div>
                 <button
-                  onClick={fetchGoogleCalendarEvents}
-                  disabled={!session?.provider_token}
-                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                  onClick={fetchIcalEvents}
+                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-all flex items-center gap-2"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                  {session?.provider_token ? 'Sync Now' : 'Sign in with Google to Sync'}
+                  Sync Now
                 </button>
               </div>
             )}
             <OccupancyCalendar 
-              bookings={calendarPreference === 'google' ? [...bookings, ...googleCalendarEvents] : bookings} 
+              bookings={calendarPreference === 'ical' ? [...bookings, ...icalEvents] : bookings} 
               yurts={yurts} 
               userRole={userRole}
               currentUserId={currentUserId}
@@ -605,72 +552,55 @@ function CEODashboard() {
                   
                   <button
                     onClick={() => {
-                      setCalendarPreference('google');
-                      localStorage.setItem('ceo_calendar_preference', 'google');
+                      setCalendarPreference('ical');
+                      localStorage.setItem('ceo_calendar_preference', 'ical');
                     }}
                     className={`w-full p-4 rounded-xl border-2 transition-all flex items-center gap-4 ${
-                      calendarPreference === 'google' 
+                      calendarPreference === 'ical' 
                         ? 'border-indigo-600 bg-indigo-50' 
                         : 'border-slate-200 hover:border-slate-300'
                     }`}
                   >
-                    <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                      <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                    <div className="p-2 bg-blue-50 rounded-xl">
+                      <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2zm-7 5h5v5h-5z"/></svg>
                     </div>
                     <div className="text-left">
-                      <p className="font-bold text-slate-800">Google Calendar</p>
-                      <p className="text-xs text-slate-500">Sync with your Google Calendar</p>
+                      <p className="font-bold text-slate-800">iCal Calendar</p>
+                      <p className="text-xs text-slate-500">Sync with iCal feed URL</p>
                     </div>
-                    {calendarPreference === 'google' && (
+                    {calendarPreference === 'ical' && (
                       <svg className="w-6 h-6 text-indigo-600 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                     )}
                   </button>
                 </div>
               </div>
               
-              {calendarPreference === 'google' && (
+              {calendarPreference === 'ical' && (
                 <div className="space-y-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
                   <p className="text-sm text-blue-800 mb-4">
-                    <strong>Setup Instructions:</strong> Create a Google Cloud project, enable Google Calendar API, and get your credentials from Google Cloud Console.
+                    <strong>Setup Instructions:</strong> Get your iCal feed URL from Google Calendar, Outlook, or any calendar app.
                   </p>
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">API Key</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">iCal URL</label>
                     <input
                       type="text"
-                      value={googleCalendarConfig.apiKey}
-                      onChange={(e) => setGoogleCalendarConfig({ ...googleCalendarConfig, apiKey: e.target.value })}
-                      placeholder="Enter your Google Calendar API Key"
+                      value={icalConfig.url}
+                      onChange={(e) => setIcalConfig({ ...icalConfig, url: e.target.value })}
+                      placeholder="https://calendar.google.com/calendar/ical/..."
                       className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Client ID</label>
-                    <input
-                      type="text"
-                      value={googleCalendarConfig.clientId}
-                      onChange={(e) => setGoogleCalendarConfig({ ...googleCalendarConfig, clientId: e.target.value })}
-                      placeholder="Enter your OAuth Client ID"
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Calendar ID</label>
-                    <input
-                      type="text"
-                      value={googleCalendarConfig.calendarId}
-                      onChange={(e) => setGoogleCalendarConfig({ ...googleCalendarConfig, calendarId: e.target.value })}
-                      placeholder="primary or your calendar ID"
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                    />
-                  </div>
+                  <p className="text-xs text-slate-600">
+                    <strong>To get iCal URL from Google Calendar:</strong> Settings → Share with specific people → Get shareable link → Copy the iCal URL
+                  </p>
                 </div>
               )}
             </div>
             
             <button
               onClick={() => {
-                if (calendarPreference === 'google') {
-                  localStorage.setItem('google_calendar_config', JSON.stringify(googleCalendarConfig));
+                if (calendarPreference === 'ical') {
+                  localStorage.setItem('ical_config', JSON.stringify(icalConfig));
                 }
                 setShowSettingsModal(false);
               }}
