@@ -153,6 +153,10 @@ const createAuthClient = () => {
     
     signInWithPassword: async ({ email, password }: { email: string; password: string }) => {
       if (!isClient) return { data: null, error: { message: 'Client-side only' } };
+      
+      // Ensure default accounts exist
+      initDefaultData();
+      
       const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.users) || '[]');
       const user = users.find((u: any) => u.email === email && u.password === password);
       
