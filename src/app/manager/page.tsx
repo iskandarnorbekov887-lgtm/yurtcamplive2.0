@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { ProtectedRoute } from '@/components/protected-route';
-import { supabase, type Yurt, type Booking, type Expense } from '@/lib/supabase';
+import { supabase, type Yurt, type Booking } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
@@ -24,7 +24,7 @@ function ManagerPortal() {
   const { t } = useLanguage();
   const [yurts, setYurts] = useState<Yurt[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [activeTab, setActiveTab] = useState<'checkin' | 'expenses' | 'bookings'>('checkin');
+  const [activeTab, setActiveTab] = useState<'checkin' | 'bookings'>('checkin');
   const [pendingBookings, setPendingBookings] = useState<Booking[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [formData, setFormData] = useState({
@@ -44,30 +44,18 @@ function ManagerPortal() {
     special_requests: '',
   });
   
-  // Expense form state
-  const [category, setCategory] = useState<'Grocery' | 'Maintenance' | 'Freelance'>('Grocery');
-  const [itemName, setItemName] = useState('');
-  const [quantity, setQuantity] = useState('');
-  const [unitPrice, setUnitPrice] = useState('');
-  const [receiptFile, setReceiptFile] = useState<File | null>(null);
-  const [recentPrices, setRecentPrices] = useState<Record<string, number>>({});
-  const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState('');
 
   useEffect(() => {
     fetchData();
-    fetchRecentPrices();
     // Poll for updates every 5 seconds for real-time sync
     const interval = setInterval(() => {
       fetchData();
-      fetchRecentPrices();
     }, 5000);
     
     // Listen for localStorage changes from other tabs for instant sync
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'camp_bookings' || e.key === 'camp_yurts' || e.key === 'camp_expenses') {
+      if (e.key === 'camp_bookings' || e.key === 'camp_yurts') {
         fetchData();
-        fetchRecentPrices();
       }
     };
     window.addEventListener('storage', handleStorageChange);
@@ -154,76 +142,6 @@ function ManagerPortal() {
     }
   };
 
-  const fetchRecentPrices = async () => {
-    const { data } = await supabase
-      .from('expenses')
-      .select('item_name, unit_price')
-      .order('created_at', { ascending: false });
-    
-    if (data) {
-      const prices: Record<string, number> = {};
-      data.forEach((expense: Expense) => {
-        if (!prices[expense.item_name]) {
-          prices[expense.item_name] = expense.unit_price;
-        }
-      });
-      setRecentPrices(prices);
-    }
-  };
-
-  const handleItemNameChange = (value: string) => {
-    setItemName(value);
-    if (recentPrices[value]) {
-      setUnitPrice(recentPrices[value].toString());
-    }
-  };
-
-  const handleSubmitExpense = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!receiptFile || !user) return;
-
-    setSubmitting(true);
-    setMessage('');
-
-    try {
-      // Upload receipt
-      const fileExt = receiptFile.name.split('.').pop();
-      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('receipts')
-        .upload(fileName, receiptFile);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('receipts')
-        .getPublicUrl(fileName);
-
-      // Create expense record
-      const { error: expenseError } = await supabase.from('expenses').insert({
-        category,
-        item_name: itemName,
-        quantity: parseFloat(quantity),
-        unit_price: parseFloat(unitPrice),
-        receipt_url: publicUrl,
-        created_by: user.id,
-      });
-
-      if (expenseError) throw expenseError;
-
-      setMessage('Expense logged successfully!');
-      setItemName('');
-      setQuantity('');
-      setUnitPrice('');
-      setReceiptFile(null);
-      fetchRecentPrices();
-    } catch (err: any) {
-      setMessage(`Error: ${err.message}`);
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const updateYurtStatus = async (yurtId: number, status: string) => {
     await supabase.from('yurts').update({ status }).eq('id', yurtId);
@@ -262,7 +180,7 @@ function ManagerPortal() {
 
       <div className="max-w-7xl mx-auto p-6">
         <div className="flex gap-4 mb-6">
-          {(['checkin', 'expenses', 'bookings'] as const).map((tab) => (
+          {(['checkin', 'bookings'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -291,107 +209,6 @@ function ManagerPortal() {
           </div>
         )}
 
-        {activeTab === 'expenses' && (
-          <div className="bg-white rounded-xl shadow p-6 max-w-2xl">
-            <h2 className="text-xl font-bold mb-4 text-gray-900">{t('manager.expenses')}</h2>
-            
-            {message && (
-              <div className={`mb-4 p-3 rounded ${message.includes('Error') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                {message}
-              </div>
-            )}
-
-            <form onSubmit={handleSubmitExpense} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('table.category')}</label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value as any)}
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-                >
-                  <option value="Grocery">Grocery</option>
-                  <option value="Maintenance">Maintenance</option>
-                  <option value="Freelance">Freelance</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('table.item')}</label>
-                <input
-                  type="text"
-                  list="recent-items"
-                  value={itemName}
-                  onChange={(e) => handleItemNameChange(e.target.value)}
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-                  required
-                />
-                <datalist id="recent-items">
-                  {Object.keys(recentPrices).map((item) => (
-                    <option key={item} value={item} />
-                  ))}
-                </datalist>
-                {recentPrices[itemName] && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Last price: ${recentPrices[itemName]}
-                  </p>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('table.valuation')}</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={unitPrice}
-                    onChange={(e) => setUnitPrice(e.target.value)}
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Receipt Photo (Required)</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
-                  className="w-full px-4 py-2 border rounded-lg text-gray-900 bg-white"
-                  required
-                />
-                {receiptFile && (
-                  <p className="text-xs text-green-600 mt-1">✓ Receipt selected: {receiptFile.name}</p>
-                )}
-              </div>
-
-              <div className="pt-4 border-t">
-                <p className="text-sm text-gray-600">
-                  Total: ${quantity && unitPrice ? (parseFloat(quantity) * parseFloat(unitPrice)).toFixed(2) : '0.00'}
-                </p>
-              </div>
-
-              <button
-                type="submit"
-                disabled={!receiptFile || submitting}
-                className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-              >
-                {submitting ? 'Submitting...' : 'Submit Expense'}
-              </button>
-            </form>
-          </div>
-        )}
 
         {activeTab === 'bookings' && (
           <div className="grid md:grid-cols-2 gap-6">
