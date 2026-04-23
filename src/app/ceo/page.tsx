@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { ProtectedRoute } from '@/components/protected-route';
-import { supabase, type Yurt, type Booking, type Expense, type Profile } from '@/lib/supabase';
+import { supabase, type Yurt, type Booking, type Profile } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
-import jsPDF from 'jspdf';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { OccupancyCalendar } from '@/components/occupancy-calendar';
@@ -27,9 +26,8 @@ function CEODashboard() {
   const [yurts, setYurts] = useState<Yurt[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [icalEvents, setIcalEvents] = useState<Booking[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [staff, setStaff] = useState<Profile[]>([]);
-  const [activeTab, setActiveTab] = useState<'checkin' | 'finance' | 'team'>('checkin');
+  const [activeTab, setActiveTab] = useState<'checkin' | 'team'>('checkin');
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -186,7 +184,7 @@ function CEODashboard() {
     // Listen for localStorage changes from other tabs for instant sync
     const handleStorageChange = (e: StorageEvent) => {
       console.log('🔔 CEO Storage event:', e.key);
-      if (e.key === 'camp_bookings' || e.key === 'camp_yurts' || e.key === 'camp_expenses' || e.key === 'camp_profiles') {
+      if (e.key === 'camp_bookings' || e.key === 'camp_yurts' || e.key === 'camp_profiles') {
         fetchData();
       }
     };
@@ -201,10 +199,9 @@ function CEODashboard() {
 
   const fetchData = async () => {
     try {
-      const [{ data: yurtsData }, { data: bookingsData }, { data: expensesData }, { data: staffData }] = await Promise.all([
+      const [{ data: yurtsData }, { data: bookingsData }, { data: staffData }] = await Promise.all([
         supabase.from('yurts').select('*'),
         supabase.from('bookings').select('*'),
-        supabase.from('expenses').select('*').order('created_at', { ascending: false }),
         supabase.from('profiles').select('*'),
       ]);
 
@@ -223,7 +220,6 @@ function CEODashboard() {
 
       setYurts(deDuplicate(yurtsData || []));
       setBookings(deDuplicate(bookingsData || []));
-      setExpenses(deDuplicate(expensesData || []));
       setStaff(deDuplicate(staffData || []));
     } catch (error) {
       console.error('Error fetching CEO data:', error);
@@ -232,31 +228,6 @@ function CEODashboard() {
     }
   };
 
-  const generatePDF = (period: 'weekly' | 'monthly' | 'yearly') => {
-    const doc = new jsPDF();
-    doc.setFontSize(22);
-    doc.setTextColor(30, 58, 138);
-    doc.text('ISKY CAMP FLOW - EXECUTIVE REPORT', 20, 25);
-    doc.setDrawColor(200, 200, 200);
-    doc.line(20, 30, 190, 30);
-    doc.setFontSize(14);
-    doc.setTextColor(75, 85, 99);
-    doc.text(`Period: ${period.charAt(0).toUpperCase() + period.slice(1)}`, 20, 45);
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 55);
-    
-    const totalRevenue = bookings.reduce((sum, b) => sum + (b.total_price || 0), 0);
-    const totalExpenses = expenses.reduce((sum, e) => sum + (e.total_amount || 0), 0);
-    const profit = totalRevenue - totalExpenses;
-    
-    doc.setFontSize(12);
-    doc.setTextColor(31, 41, 55);
-    doc.text(`Total Revenue: $${totalRevenue.toLocaleString()}`, 20, 75);
-    doc.text(`Total Expenses: $${totalExpenses.toLocaleString()}`, 20, 85);
-    doc.setFontSize(14);
-    doc.setTextColor(profit >= 0 ? 22 : 153, profit >= 0 ? 101 : 27, profit >= 0 ? 52 : 27);
-    doc.text(`Net Profit: $${profit.toLocaleString()}`, 20, 100);
-    doc.save(`camp-report-${period}.pdf`);
-  };
 
   const handleUpdateBooking = async (id: number, updates: Partial<Booking>) => {
     await supabase.from('bookings').update({ ...updates, last_edited_by_id: currentUserId || '', last_edited_by_role: userRole }).eq('id', id);
@@ -326,14 +297,6 @@ function CEODashboard() {
             </div>
           </div>
           <div className="flex gap-3">
-            <div className="hidden md:flex gap-2 mr-4 border-r border-white/10 pr-4">
-              <button onClick={() => generatePDF('weekly')} className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-bold transition-all border border-white/10 flex items-center gap-2">
-                WEEKLY REPORT
-              </button>
-              <button onClick={() => generatePDF('monthly')} className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-bold transition-all border border-white/10 flex items-center gap-2">
-                MONTHLY REPORT
-              </button>
-            </div>
             <button onClick={() => setShowSettingsModal(true)} className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-bold transition-all border border-white/10 flex items-center gap-2">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
               SETTINGS
@@ -349,7 +312,7 @@ function CEODashboard() {
 
       <main className="max-w-7xl mx-auto p-6 md:p-8">
         <div className="flex bg-white/50 p-1.5 rounded-2xl mb-8 border border-slate-200 shadow-sm w-fit">
-          {(['checkin', 'finance', 'team'] as const).map((tab) => (
+          {(['checkin', 'team'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -402,7 +365,6 @@ function CEODashboard() {
             />
           </div>
         )}
-        {activeTab === 'finance' && <StrategicFinanceCalendar expenses={expenses} bookings={bookings} />}
         {activeTab === 'team' && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
              <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/60 border border-slate-100 overflow-hidden">
@@ -626,175 +588,3 @@ function CEODashboard() {
     </div>
   );
 }
-
-
-
-function StrategicFinanceCalendar({ expenses, bookings }: { expenses: Expense[], bookings: Booking[] }) {
-  const { t } = useLanguage();
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-
-  const year = currentDate.getFullYear();
-  const month = currentDate.getMonth();
-  const monthName = t(`month.${month}`);
-
-  const daysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
-  const firstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay();
-
-  const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
-  const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
-
-  const days = [];
-  for (let i = 0; i < firstDayOfMonth(year, month); i++) days.push(null);
-  for (let i = 1; i <= daysInMonth(year, month); i++) days.push(i);
-
-  const getFinancialsForDate = (day: number) => {
-    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    
-    // Expenses
-    const dayExpenses = expenses.filter(e => e.created_at.startsWith(dateStr));
-    const totalSpent = dayExpenses.reduce((sum, e) => sum + e.total_amount, 0);
-    
-    // Income (Bookings that check in on this day)
-    const dayIncome = bookings.filter(b => b.check_in === dateStr && b.status === 'confirmed');
-    const totalIncome = dayIncome.reduce((sum, b) => sum + (b.total_price || 0), 0);
-    
-    return { dayExpenses, dayIncome, totalSpent, totalIncome, dateStr };
-  };
-
-  const selectedDayData = selectedDate ? getFinancialsForDate(parseInt(selectedDate.split('-')[2])) : null;
-  
-  const totalMonthExpenses = expenses
-    .filter(e => new Date(e.created_at).getMonth() === month && new Date(e.created_at).getFullYear() === year)
-    .reduce((sum, e) => sum + e.total_amount, 0);
-    
-  const totalMonthIncome = bookings
-    .filter(b => b.status === 'confirmed' && new Date(b.check_in).getMonth() === month && new Date(b.check_in).getFullYear() === year)
-    .reduce((sum, b) => sum + (b.total_price || 0), 0);
-
-  const netProfit = totalMonthIncome - totalMonthExpenses;
-
-  return (
-    <div className="space-y-6 animate-in fade-in duration-700">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 gap-4">
-        <div className="flex items-center gap-4">
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight">{t('cal.fiscal_ledger')}</h2>
-          <div className="flex gap-2">
-            <button onClick={prevMonth} className="p-2 hover:bg-slate-100 rounded-xl transition-all border border-slate-100"><svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg></button>
-            <button onClick={nextMonth} className="p-2 hover:bg-slate-100 rounded-xl transition-all border border-slate-100"><svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg></button>
-          </div>
-          <span className="text-xl font-bold text-slate-400 ml-2">{monthName} {year}</span>
-        </div>
-        <div className="flex gap-10 items-center">
-          <div className="text-right">
-            <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em] mb-1">TOTAL INCOME</p>
-            <p className="text-lg font-black text-emerald-400/80">+${totalMonthIncome.toLocaleString()}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em] mb-1">TOTAL EXPENSES</p>
-            <p className="text-lg font-black text-rose-600">-${totalMonthExpenses.toLocaleString()}</p>
-          </div>
-          <div className="text-right bg-emerald-50/50 px-6 py-3 rounded-2xl border border-emerald-100 shadow-sm">
-            <p className="text-[10px] font-black text-emerald-700 uppercase tracking-[0.2em] mb-1">NET PROFIT</p>
-            <p className={`text-2xl font-black ${netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-              {netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString()}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-7 gap-4">
-        {[0,1,2,3,4,5,6].map(d => (
-          <div key={d} className="text-center py-2 text-[10px] font-black text-slate-400 tracking-widest">{t(`day.${d}`)}</div>
-        ))}
-        {days.map((day, i) => {
-          if (day === null) return <div key={`empty-${i}`} className="h-32 bg-slate-50/30 rounded-[1.5rem] border border-dashed border-slate-100"></div>;
-          const { totalSpent, totalIncome, dateStr } = getFinancialsForDate(day);
-          const isToday = new Date().toISOString().split('T')[0] === dateStr;
-          
-          return (
-            <div 
-              key={day} 
-              onClick={() => setSelectedDate(dateStr)} 
-              className={`h-36 p-4 rounded-[2rem] border-2 cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-2xl bg-white border-slate-100 flex flex-col justify-between ${isToday ? 'ring-4 ring-indigo-500/20 !border-indigo-500' : ''}`}
-            >
-              <div className="flex justify-between items-start">
-                <span className={`text-2xl font-black ${isToday ? 'text-indigo-600' : 'text-slate-700'}`}>{day}</span>
-                <div className="flex gap-1.5 mt-1">
-                  {totalIncome > 0 && <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-lg shadow-emerald-200 animate-pulse"></div>}
-                  {totalSpent > 0 && <div className="w-3 h-3 rounded-full bg-rose-500 shadow-lg shadow-rose-200 animate-pulse"></div>}
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1 items-end">
-                {totalIncome > 0 && (
-                  <div className="flex flex-col items-end">
-                    <p className="text-[9px] font-black text-emerald-500 uppercase tracking-tighter leading-none">INCOME</p>
-                    <p className="text-sm font-black text-emerald-600 leading-tight">+${totalIncome.toLocaleString()}</p>
-                  </div>
-                )}
-                {totalSpent > 0 && (
-                  <div className="flex flex-col items-end">
-                    <p className="text-[9px] font-black text-rose-500 uppercase tracking-tighter leading-none">EXPENSES</p>
-                    <p className="text-sm font-black text-rose-600 leading-tight">-${totalSpent.toLocaleString()}</p>
-                  </div>
-                )}
-                {totalIncome === 0 && totalSpent === 0 && (
-                  <div className="w-full text-center">
-                    <p className="text-[10px] font-black text-slate-300 italic tracking-tighter">{t('cal.no_expenses')}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Financial Drill-Down Panel */}
-      {selectedDate && (
-        <div className="fixed inset-0 z-[100] flex justify-end animate-in fade-in duration-300">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setSelectedDate(null)}></div>
-          <div className="relative w-full max-w-lg bg-white h-full shadow-2xl border-l border-slate-100 flex flex-col animate-in slide-in-from-right duration-500">
-            <div className="p-8 border-b border-slate-50 bg-slate-50/30">
-              <div className="flex justify-between items-start mb-6">
-                <button onClick={() => setSelectedDate(null)} className="p-2 hover:bg-slate-200 rounded-xl transition-all"><svg className="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
-                <span className="text-[10px] font-black bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full tracking-widest uppercase">{t('manifest.financial')}</span>
-              </div>
-              <h3 className="text-3xl font-black text-slate-800">{new Date(selectedDate).toLocaleDateString()}</h3>
-              <div className="grid grid-cols-2 gap-4 mt-6">
-                <div className="p-4 bg-emerald-50 rounded-[1.5rem] border border-emerald-100">
-                  <p className="text-[10px] font-black text-emerald-400 uppercase mb-1">INCOME</p>
-                  <p className="text-xl font-black text-emerald-700">+${selectedDayData?.totalIncome.toLocaleString()}</p>
-                </div>
-                <div className="p-4 bg-rose-50 rounded-[1.5rem] border border-rose-100">
-                  <p className="text-[10px] font-black text-rose-400 uppercase mb-1">EXPENSES</p>
-                  <p className="text-xl font-black text-rose-700">-${selectedDayData?.totalSpent.toLocaleString()}</p>
-                </div>
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto p-8 space-y-6">
-              {/* Income Items */}
-              {selectedDayData?.dayIncome.map((booking) => (
-                <div key={booking.id} className="p-6 rounded-[2rem] border border-emerald-100 bg-emerald-50/30 shadow-sm transition-all">
-                  <p className="text-[10px] font-black uppercase tracking-widest mb-1 text-emerald-500">Booking Revenue</p>
-                  <h4 className="text-xl font-black text-slate-800">{booking.guest_name}</h4>
-                  <p className="text-lg font-black text-emerald-600 mt-2">+${booking.total_price?.toLocaleString()}</p>
-                </div>
-              ))}
-              
-              {/* Expense Items */}
-              {selectedDayData?.dayExpenses.map((expense) => (
-                <div key={expense.id} className="p-6 rounded-[2rem] border border-slate-100 bg-white shadow-sm hover:shadow-xl transition-all">
-                  <p className="text-[10px] font-black uppercase tracking-widest mb-1 text-rose-400">{expense.category}</p>
-                  <h4 className="text-xl font-black text-slate-800">{expense.item_name}</h4>
-                  <p className="text-lg font-black text-rose-600 mt-2">-${expense.total_amount.toLocaleString()}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
