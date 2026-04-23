@@ -29,27 +29,10 @@ function CEODashboard() {
   const [staff, setStaff] = useState<Profile[]>([]);
   const [activeTab, setActiveTab] = useState<'checkin' | 'team'>('checkin');
   const [loading, setLoading] = useState(true);
-  const [showAddModal, setShowAddModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [calendarPreference, setCalendarPreference] = useState<'internal' | 'ical'>('internal');
   const [icalConfig, setIcalConfig] = useState({
     url: '',
-  });
-  const [formData, setFormData] = useState({
-    yurt_id: '',
-    guest_name: '',
-    check_in: '',
-    check_out: '',
-    total_price: '',
-    source: 'Manual',
-    notes: '',
-    meal_notes: '',
-    num_people: '1',
-    payment_status: 'Unpaid' as any,
-    transportation: '',
-    meal_preference: '',
-    guide_required: false,
-    special_requests: '',
   });
 
   useEffect(() => {
@@ -249,28 +232,6 @@ function CEODashboard() {
     fetchData();
   };
 
-  const handleAddBooking = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const { data, error } = await supabase.from('bookings').insert([{
-        ...formData,
-        total_price: parseFloat(formData.total_price),
-        number_of_people: parseInt(formData.num_people),
-        num_people: parseInt(formData.num_people),
-        status: 'confirmed',
-        created_by_role: 'CEO',
-        created_by_id: currentUserId || '',
-        last_edited_by_id: currentUserId || ''
-      }]).select().single();
-      if (error) throw error;
-      
-      
-      setShowAddModal(false);
-      fetchData();
-    } catch (err) {
-      alert('Error creating booking');
-    }
-  };
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -361,7 +322,6 @@ function CEODashboard() {
               onCheckIn={handleCheckIn}
               onCheckOut={handleCheckOut}
               onUpdateBooking={handleUpdateBooking}
-              onAddBooking={() => setShowAddModal(true)}
             />
           </div>
         )}
@@ -417,73 +377,6 @@ function CEODashboard() {
         )}
       </main>
 
-      {showAddModal && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowAddModal(false)}></div>
-          <div className="relative bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-8 bg-indigo-900 text-white flex justify-between items-center">
-              <h2 className="text-2xl font-black">{t('btn.new_booking')}</h2>
-              <button onClick={() => setShowAddModal(false)} className="p-2 hover:bg-white/10 rounded-xl transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
-            </div>
-            <form onSubmit={handleAddBooking} className="p-8 grid grid-cols-2 gap-6 bg-white overflow-y-auto max-h-[70vh]">
-              <div className="col-span-2">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t('form.guest_name')}</label>
-                <input type="text" value={formData.guest_name} onChange={(e) => setFormData({...formData, guest_name: e.target.value})} className="w-full px-5 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 transition-all font-bold text-slate-700" required />
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t('form.check_in')}</label>
-                <input type="date" value={formData.check_in} onChange={(e) => setFormData({...formData, check_in: e.target.value})} className="w-full px-5 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 transition-all font-bold text-slate-700" required />
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t('form.check_out')}</label>
-                <input type="date" value={formData.check_out} onChange={(e) => setFormData({...formData, check_out: e.target.value})} className="w-full px-5 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 transition-all font-bold text-slate-700" required />
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t('form.yurt_select')}</label>
-                <select value={formData.yurt_id} onChange={(e) => setFormData({...formData, yurt_id: e.target.value})} className="w-full px-5 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 transition-all font-bold text-slate-700" required>
-                  <option value="">-- {t('form.yurt_select')} --</option>
-                  {yurts.map(y => <option key={y.id} value={y.id}>{y.name} ({y.type})</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t('form.num_people')}</label>
-                <input type="number" value={formData.num_people} onChange={(e) => setFormData({...formData, num_people: e.target.value})} className="w-full px-5 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 transition-all font-bold text-slate-700" required />
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t('table.status')}</label>
-                <select value={formData.payment_status} onChange={(e) => setFormData({...formData, payment_status: e.target.value as any})} className="w-full px-5 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 transition-all font-bold text-slate-700" required>
-                  <option value="Unpaid">Unpaid</option>
-                  <option value="Partial">Partial</option>
-                  <option value="Paid">Paid</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t('form.total_price')}</label>
-                <input type="number" value={formData.total_price} onChange={(e) => setFormData({...formData, total_price: e.target.value})} className="w-full px-5 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 transition-all font-bold text-slate-700" required />
-              </div>
-              <div className="col-span-2">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t('form.transportation')}</label>
-                <input type="text" value={formData.transportation} onChange={(e) => setFormData({...formData, transportation: e.target.value})} className="w-full px-5 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 transition-all font-bold text-slate-700" placeholder="Flight info, pickup point..." />
-              </div>
-              <div className="col-span-2">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t('form.meal_preference')}</label>
-                <textarea value={formData.meal_preference} onChange={(e) => setFormData({...formData, meal_preference: e.target.value})} className="w-full px-5 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 transition-all font-bold text-slate-700" placeholder="Allergies, Halal, Vegetarian..." />
-              </div>
-              <div className="flex items-center gap-4">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('form.guide_required')}</label>
-                <input type="checkbox" checked={formData.guide_required} onChange={(e) => setFormData({...formData, guide_required: e.target.checked})} className="w-6 h-6 text-indigo-600 border-2 border-slate-100 rounded focus:ring-indigo-500" />
-              </div>
-              <div className="col-span-2">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t('form.special_requests')}</label>
-                <textarea value={formData.special_requests} onChange={(e) => setFormData({...formData, special_requests: e.target.value})} className="w-full px-5 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 transition-all font-bold text-slate-700" />
-              </div>
-              <div className="col-span-2 pt-4">
-                <button type="submit" className="w-full py-4 bg-indigo-900 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-indigo-950 transition-all shadow-xl shadow-indigo-200">{t('btn.new_booking')}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Settings Modal */}
       {showSettingsModal && (

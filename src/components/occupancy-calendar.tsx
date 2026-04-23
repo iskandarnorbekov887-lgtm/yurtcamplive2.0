@@ -13,7 +13,6 @@ interface Props {
   onCancelBooking?: (id: number) => Promise<void>;
   onCheckIn?: (id: number) => Promise<void>;
   onCheckOut?: (id: number) => Promise<void>;
-  onAddBooking?: () => void;
   onUpdateBooking?: (id: number, updates: Partial<Booking>) => Promise<void>;
 }
 interface EventInfo { booking: Booking; colStart: number; colEnd: number; lane: number; }
@@ -88,7 +87,7 @@ function color(b: Booking, today: string) {
   }
 }
 
-export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, staff, onCancelBooking, onCheckIn, onCheckOut, onAddBooking, onUpdateBooking }: Props) {
+export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, staff, onCancelBooking, onCheckIn, onCheckOut, onUpdateBooking }: Props) {
   const { t } = useLanguage();
   const [cur, setCur]   = useState(new Date());
   const [sel, setSel]   = useState<Booking | null>(null);
@@ -227,15 +226,6 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
           <h2 className="text-xl font-bold text-slate-800">
             {t(`month.${month}`)} <span className="text-slate-400 font-normal">{year}</span>
           </h2>
-          {onAddBooking && (
-            <button
-              onClick={onAddBooking}
-              className="px-4 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 flex items-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-              {t('btn.new_booking')}
-            </button>
-          )}
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setCur(new Date())}
