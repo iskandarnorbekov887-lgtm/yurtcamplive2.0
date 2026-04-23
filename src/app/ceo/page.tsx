@@ -377,7 +377,7 @@ function CEODashboard() {
               </div>
             )}
             <OccupancyCalendar 
-              bookings={calendarPreference === 'ical' ? [...bookings, ...icalEvents] : bookings} 
+              bookings={calendarPreference === 'ical' ? icalEvents : bookings} 
               yurts={yurts} 
               userRole={userRole}
               currentUserId={currentUserId}
