@@ -110,7 +110,6 @@ function CheckinPortal() {
           onCancelBooking={userRole !== 'Cook' ? cancelBooking : undefined}
           onCheckIn={userRole === 'Manager' || userRole === 'CEO' ? checkIn : undefined}
           onCheckOut={userRole === 'Manager' || userRole === 'CEO' ? checkOut : undefined}
-          onAddBooking={userRole === 'Manager' || userRole === 'CEO' ? () => {} : undefined}
           onUpdateBooking={userRole !== 'Cook' ? handleUpdateBooking : undefined}
         />
       </main>

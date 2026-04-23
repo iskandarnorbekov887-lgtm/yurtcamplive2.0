@@ -164,7 +164,6 @@ function ReserverPortal() {
           userRole={userRole}
           currentUserId={currentUserId}
           onCancelBooking={cancelBooking}
-          onAddBooking={() => setShowAddModal(true)}
           onUpdateBooking={handleUpdateBooking}
         />
         
