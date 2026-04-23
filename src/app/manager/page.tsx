@@ -24,7 +24,7 @@ function ManagerPortal() {
   const { t } = useLanguage();
   const [yurts, setYurts] = useState<Yurt[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [activeTab, setActiveTab] = useState<'checkin' | 'bookings'>('checkin');
+  const [activeTab, setActiveTab] = useState<'checkin' | 'bookings' | 'financials'>('checkin');
   const [pendingBookings, setPendingBookings] = useState<Booking[]>([]);
   
 
@@ -135,7 +135,7 @@ function ManagerPortal() {
 
       <div className="max-w-7xl mx-auto p-6">
         <div className="flex gap-4 mb-6">
-          {(['checkin', 'bookings'] as const).map((tab) => (
+          {(['checkin', 'bookings', 'financials'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -163,6 +163,19 @@ function ManagerPortal() {
           </div>
         )}
 
+
+        {activeTab === 'financials' && (
+          <div className="bg-white rounded-xl shadow p-6">
+            <h2 className="text-xl font-bold mb-4 text-emerald-800">Financial Tracking</h2>
+            <p className="text-gray-600 mb-4">Record income and expenses with multi-currency support.</p>
+            <a
+              href="/financials"
+              className="inline-block px-6 py-3 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition-all"
+            >
+              Go to Financial Tracker
+            </a>
+          </div>
+        )}
 
         {activeTab === 'bookings' && (
           <div className="grid md:grid-cols-2 gap-6">

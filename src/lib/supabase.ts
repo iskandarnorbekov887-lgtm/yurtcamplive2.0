@@ -55,14 +55,18 @@ export interface Booking {
   yurt?: Yurt;
 }
 
-export interface Expense {
+export interface Finance {
   id: number;
-  category: 'Grocery' | 'Maintenance' | 'Freelance';
-  item_name: string;
-  quantity: number;
-  unit_price: number;
-  total_amount: number;
-  receipt_url: string;
-  created_at: string;
+  date: string;
+  type: 'income' | 'expense';
+  category: string;
+  currency: 'UZS' | 'USD' | 'EUR';
+  original_amount: number;
+  exchange_rate: number;
+  amount_uzs: number;
+  description: string | null;
+  guest_name: string | null;
+  receipt_url: string | null;
   created_by: string;
+  created_at: string;
 }

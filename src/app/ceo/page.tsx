@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ProtectedRoute } from '@/components/protected-route';
-import { supabase, type Yurt, type Booking, type Profile } from '@/lib/supabase';
+import { supabase, type Yurt, type Booking, type Profile, type Finance } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
@@ -27,9 +27,13 @@ function CEODashboard() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [icalEvents, setIcalEvents] = useState<Booking[]>([]);
   const [staff, setStaff] = useState<Profile[]>([]);
-  const [activeTab, setActiveTab] = useState<'checkin' | 'team'>('checkin');
+  const [activeTab, setActiveTab] = useState<'checkin' | 'team' | 'financials'>('checkin');
   const [loading, setLoading] = useState(true);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showFinancialModal, setShowFinancialModal] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [dayFinances, setDayFinances] = useState<Finance[]>([]);
+  const [loadingFinances, setLoadingFinances] = useState(false);
   const [calendarPreference, setCalendarPreference] = useState<'internal' | 'ical'>('internal');
   const [icalConfig, setIcalConfig] = useState({
     url: '',
@@ -232,6 +236,27 @@ function CEODashboard() {
     fetchData();
   };
 
+  const handleDayClick = async (date: string) => {
+    setSelectedDate(date);
+    setShowFinancialModal(true);
+    setLoadingFinances(true);
+    
+    try {
+      const { data } = await supabase
+        .from('camp_finances')
+        .select('*')
+        .eq('date', date)
+        .order('created_at', { ascending: false });
+      
+      setDayFinances(data || []);
+    } catch (error) {
+      console.error('Error fetching finances:', error);
+      setDayFinances([]);
+    } finally {
+      setLoadingFinances(false);
+    }
+  };
+
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -273,7 +298,7 @@ function CEODashboard() {
 
       <main className="max-w-7xl mx-auto p-6 md:p-8">
         <div className="flex bg-white/50 p-1.5 rounded-2xl mb-8 border border-slate-200 shadow-sm w-fit">
-          {(['checkin', 'team'] as const).map((tab) => (
+          {(['checkin', 'team', 'financials'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -322,7 +347,20 @@ function CEODashboard() {
               onCheckIn={handleCheckIn}
               onCheckOut={handleCheckOut}
               onUpdateBooking={handleUpdateBooking}
+              onDayClick={handleDayClick}
             />
+          </div>
+        )}
+        {activeTab === 'financials' && (
+          <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/60 border border-slate-100 p-8 animate-in fade-in duration-500">
+            <h2 className="text-2xl font-black text-slate-800 mb-4">Financial Tracking</h2>
+            <p className="text-slate-600 mb-6">Record income and expenses with multi-currency support.</p>
+            <a
+              href="/financials"
+              className="inline-block px-8 py-4 bg-indigo-600 text-white rounded-2xl font-bold uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200"
+            >
+              Go to Financial Tracker
+            </a>
           </div>
         )}
         {activeTab === 'team' && (
@@ -475,6 +513,88 @@ function CEODashboard() {
             >
               Save Settings
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Financial Summary Modal */}
+      {showFinancialModal && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4" onClick={() => setShowFinancialModal(false)}>
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="p-6 bg-gradient-to-r from-emerald-600 to-teal-700 text-white flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-black">Financial Summary</h2>
+                <p className="text-emerald-100">{selectedDate}</p>
+              </div>
+              <button onClick={() => setShowFinancialModal(false)} className="p-2 hover:bg-white/10 rounded-xl transition-all">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            {loadingFinances ? (
+              <div className="p-12 flex items-center justify-center">
+                <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : (
+              <div className="p-6 overflow-y-auto max-h-[70vh]">
+                <div className="bg-slate-50 rounded-xl p-6 mb-6 border-2 border-slate-200">
+                  <p className="text-sm text-slate-600 mb-1">Net Profit for the Day</p>
+                  <p className="text-3xl font-black">
+                    {(() => {
+                      const income = dayFinances.filter(f => f.type === 'income').reduce((sum, f) => sum + f.amount_uzs, 0);
+                      const expenses = dayFinances.filter(f => f.type === 'expense').reduce((sum, f) => sum + f.amount_uzs, 0);
+                      const net = income - expenses;
+                      return `${net.toLocaleString('uz-UZ', { minimumFractionDigits: 2 })} UZS`;
+                    })()}
+                  </p>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div>
+                    <h3 className="text-lg font-black text-emerald-700 mb-4">Income</h3>
+                    {dayFinances.filter(f => f.type === 'income').length === 0 ? (
+                      <p className="text-slate-500 italic">No income recorded</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {dayFinances.filter(f => f.type === 'income').map((finance) => (
+                          <div key={finance.id} className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
+                            <div className="flex justify-between items-start mb-2">
+                              <p className="font-bold text-slate-800">{finance.guest_name || 'Unknown'}</p>
+                              <p className="font-black text-emerald-700">{finance.original_amount.toLocaleString()} {finance.currency}</p>
+                            </div>
+                            <p className="text-xs text-slate-600 mb-1">Rate: {finance.exchange_rate} {finance.currency}/UZS</p>
+                            <p className="text-sm text-slate-700">{finance.description || ''}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <h3 className="text-lg font-black text-rose-700 mb-4">Expenses</h3>
+                    {dayFinances.filter(f => f.type === 'expense').length === 0 ? (
+                      <p className="text-slate-500 italic">No expenses recorded</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {dayFinances.filter(f => f.type === 'expense').map((finance) => (
+                          <div key={finance.id} className="bg-rose-50 rounded-xl p-4 border border-rose-100">
+                            <p className="font-bold text-slate-800 mb-1">{finance.description || 'Items'}</p>
+                            <p className="text-sm text-slate-700 mb-2">{finance.category}</p>
+                            <p className="font-black text-rose-700 mb-2">{finance.original_amount.toLocaleString()} {finance.currency}</p>
+                            {finance.receipt_url && (
+                              <a href={finance.receipt_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
+                                View Receipt
+                              </a>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
