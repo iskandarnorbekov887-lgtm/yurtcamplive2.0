@@ -73,25 +73,37 @@ function CEODashboard() {
 
   // Fetch and parse iCal events
   const fetchIcalEvents = async () => {
-    if (!icalConfig.url || calendarPreference !== 'ical') return;
+    if (!icalConfig.url || calendarPreference !== 'ical') {
+      console.log('⚠️ iCal fetch skipped - URL:', icalConfig.url, 'Preference:', calendarPreference);
+      return;
+    }
+    
+    console.log('🔄 Fetching iCal from:', icalConfig.url);
     
     try {
       const response = await fetch(icalConfig.url);
+      console.log('📡 Response status:', response.status, response.statusText);
+      
       if (!response.ok) {
-        console.error('❌ Failed to fetch iCal:', response.statusText);
+        console.error('❌ Failed to fetch iCal:', response.status, response.statusText);
         setIcalEvents([]);
         return;
       }
       
       const icalData = await response.text();
+      console.log('📄 iCal data length:', icalData.length);
+      
       const jcalData = ICAL.parse(icalData);
       const comp = new ICAL.Component(jcalData);
       const vevents = comp.getAllSubcomponents('vevent');
+      console.log('📋 Number of vevents:', vevents.length);
       
       const mappedEvents: Booking[] = vevents.map((vevent, index) => {
         const event = new ICAL.Event(vevent);
         const startDate = event.startDate.toJSDate().toISOString().split('T')[0];
         const endDate = event.endDate.toJSDate().toISOString().split('T')[0];
+        
+        console.log(`📅 Event ${index}: ${event.summary} (${startDate} - ${endDate})`);
         
         return {
           id: 10000 + index, // Offset to avoid collision with Supabase IDs
@@ -112,7 +124,7 @@ function CEODashboard() {
         };
       });
       
-      console.log('📅 iCal events fetched:', mappedEvents.length);
+      console.log('✅ iCal events fetched:', mappedEvents.length);
       setIcalEvents(mappedEvents);
     } catch (err) {
       console.error('❌ Error fetching iCal events:', err);
