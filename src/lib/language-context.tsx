@@ -102,7 +102,7 @@ const translations = {
     // Manager Specific
     'manager.checkin': 'Check-in / Check-out',
     'manager.expenses': 'Log Expenses',
-    'manager.bookings': 'Booking Requests',
+    'manager.bookings': 'Attention Needed',
     'manager.today_checkins': "Today's Check-ins",
     'manager.today_checkouts': "Today's Check-outs",
     'manager.yurt_overview': 'Yurt Status Overview',
@@ -218,7 +218,7 @@ const translations = {
     // Manager Specific
     'manager.checkin': 'Kelish / Ketish',
     'manager.expenses': 'Xarajatlarni kiritish',
-    'manager.bookings': 'Band qilish soʻrovlari',
+    'manager.bookings': 'E\'tibor kerak',
     'manager.today_checkins': 'Bugungi kelishlar',
     'manager.today_checkouts': 'Bugungi ketishlar',
     'manager.yurt_overview': 'Yurtlar holati',

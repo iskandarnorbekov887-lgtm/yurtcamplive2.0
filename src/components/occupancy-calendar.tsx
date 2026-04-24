@@ -59,12 +59,17 @@ const PALETTE = [
   { bg: '#06B6D4', text: '#164E63' },
 ];
 
-function getBookingStatus(b: Booking, today: string): 'checked-in' | 'checked-out' | 'upcoming' | 'overdue-checkin' | 'cancelled' {
+function getBookingStatus(b: Booking, today: string): 'checked-in' | 'checked-out' | 'upcoming' | 'overdue-checkin' | 'neglected-checkin' | 'cancelled' {
   if (b.status === 'cancelled') return 'cancelled';
   if (b.status === 'checked_in') return 'checked-in';
   if (b.status === 'completed') return 'checked-out';
   if (b.status === 'confirmed') {
     if (b.check_in < today) return 'overdue-checkin';
+    // Check if it's the check-in day and after 6PM
+    if (b.check_in === today) {
+      const now = new Date();
+      if (now.getHours() >= 18) return 'neglected-checkin';
+    }
     return 'upcoming';
   }
   return 'upcoming';
@@ -81,6 +86,8 @@ function color(b: Booking, today: string) {
       return { bg: '#F59E0B', text: '#78350F' }; // Yellow
     case 'overdue-checkin':
       return { bg: '#F59E0B', text: '#78350F' }; // Yellow
+    case 'neglected-checkin':
+      return { bg: '#EF4444', text: '#7F1D1D' }; // Red (attention)
     case 'cancelled':
       return { bg: '#EF4444', text: '#7F1D1D' }; // Red
     default:
@@ -316,18 +323,15 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                   const isCancelled = ev.booking.status === 'cancelled';
                   const isCheckedIn = ev.booking.status === 'checked_in';
                   const isCompleted = ev.booking.status === 'completed';
+                  const bookingStatus = getBookingStatus(ev.booking, today);
 
-                  // Check for neglected check-in (after 6 PM on check-in date)
-                  const checkInDate = new Date(ev.booking.check_in);
-                  const checkInDateStr = checkInDate.toISOString().split('T')[0];
-                  const now = new Date();
-                  const isNeglectedCheckIn = ev.booking.status === 'confirmed' &&
-                    checkInDateStr === today &&
-                    now.getHours() >= 18;
+                  // Check for neglected check-in (after 6 PM on check-in date or overdue)
+                  const isNeglectedCheckIn = bookingStatus === 'neglected-checkin' || bookingStatus === 'overdue-checkin';
 
                   // Check for neglected checkout (after 12 PM on checkout date)
                   const checkOutDate = new Date(ev.booking.check_out);
                   const checkOutDateStr = checkOutDate.toISOString().split('T')[0];
+                  const now = new Date();
                   const isNeglectedCheckout = ev.booking.status === 'checked_in' &&
                     checkOutDateStr === today &&
                     now.getHours() >= 12;
@@ -653,14 +657,19 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                 ) : (
                   <div className="flex flex-col gap-3">
                     <div className="flex gap-3">
-                      {onCheckIn && sel.status !== 'checked_in' && (
+                      {onCheckIn && sel.status !== 'checked_in' && sel.check_in === today && (
                         <button
                           onClick={handleCheckIn}
-                          disabled={!!loadingAction || sel.check_in !== today}
-                          className={`flex-1 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${sel.check_in === today ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-300 text-slate-500 cursor-not-allowed'}`}
+                          disabled={!!loadingAction}
+                          className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2"
                         >
                           {loadingAction === 'checkin' ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : t('btn.check_in')}
                         </button>
+                      )}
+                      {onCheckIn && sel.status !== 'checked_in' && sel.check_in !== today && (
+                        <div className="flex-1 py-3 bg-amber-100 text-amber-700 rounded-xl font-bold text-center flex items-center justify-center">
+                          Upcoming Guest
+                        </div>
                       )}
                       {onCheckOut && sel.status === 'checked_in' && (
                         <button onClick={handleCheckOut} disabled={!!loadingAction} className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2">

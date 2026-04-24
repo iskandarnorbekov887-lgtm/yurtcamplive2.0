@@ -104,6 +104,20 @@ function ManagerPortal() {
   };
 
   const today = new Date().toISOString().split('T')[0];
+  const now = new Date();
+  const currentHour = now.getHours();
+
+  // Filter neglected bookings (confirmed, check-in day is today or past, and after 6PM or overdue)
+  const neglectedBookings = bookings.filter(b => {
+    if (b.status !== 'confirmed') return false;
+    const checkInDate = new Date(b.check_in);
+    const checkInDateStr = checkInDate.toISOString().split('T')[0];
+    // Neglected if check-in day is today and after 6PM, or check-in day is in the past
+    if (checkInDateStr === today && currentHour >= 18) return true;
+    if (checkInDateStr < today) return true;
+    return false;
+  });
+
   const todaysCheckins = bookings.filter(b => b.check_in === today);
   const todaysCheckouts = bookings.filter(b => b.check_out === today);
 
@@ -180,6 +194,44 @@ function ManagerPortal() {
         {activeTab === 'bookings' && (
           <div className="grid md:grid-cols-2 gap-6">
             <div className="bg-white rounded-xl shadow p-6">
+              <h2 className="text-xl font-bold mb-4 text-red-800 flex items-center gap-2">
+                <svg className="w-6 h-6 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/>
+                </svg>
+                Attention Needed ({neglectedBookings.length})
+              </h2>
+              {neglectedBookings.length === 0 ? (
+                <p className="text-gray-600">No bookings needing attention</p>
+              ) : (
+                <div className="space-y-3">
+                  {neglectedBookings.map((booking, idx) => (
+                    <button
+                      key={`neglected-${booking.id}-${idx}`}
+                      onClick={() => {
+                        // Scroll to calendar and highlight booking (simplified - just switch to checkin tab)
+                        setActiveTab('checkin');
+                      }}
+                      className="w-full text-left border-2 border-red-200 rounded-lg p-4 bg-red-50 hover:bg-red-100 transition-all"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-bold text-gray-900">{booking.guest_name}</p>
+                          <p className="text-sm text-gray-700">{booking.yurt?.name || `Yurt ${booking.yurt_id}`}</p>
+                          <p className="text-sm text-red-600 font-medium">
+                            Check-in: {booking.check_in}
+                          </p>
+                        </div>
+                        <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded font-medium animate-pulse">
+                          NOT CHECKED IN
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white rounded-xl shadow p-6">
               <h2 className="text-xl font-bold mb-4 text-yellow-800">
                 Pending Bookings ({pendingBookings.length})
               </h2>
@@ -204,21 +256,21 @@ function ManagerPortal() {
                           PENDING
                         </span>
                       </div>
-                      
+
                       {booking.notes && (
                         <div className="mt-3 p-2 bg-white rounded border">
                           <p className="text-xs font-medium text-gray-600">Internal Notes:</p>
                           <p className="text-sm text-gray-800">{booking.notes}</p>
                         </div>
                       )}
-                      
+
                       {booking.meal_notes && (
                         <div className="mt-2 p-2 bg-orange-50 rounded border border-orange-200">
                           <p className="text-xs font-medium text-orange-600">Meal Notes for Cook:</p>
                           <p className="text-sm text-gray-800">{booking.meal_notes}</p>
                         </div>
                       )}
-                      
+
                       <div className="flex gap-2 mt-4">
                         <button
                           onClick={() => approveBooking(booking.id)}
@@ -233,37 +285,6 @@ function ManagerPortal() {
                           ✗ Reject
                         </button>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="bg-white rounded-xl shadow p-6">
-              <h2 className="text-xl font-bold mb-4 text-green-800">
-                Confirmed Bookings ({bookings.length})
-              </h2>
-              {bookings.length === 0 ? (
-                <p className="text-gray-600">No confirmed bookings</p>
-              ) : (
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {bookings.map((booking, idx) => (
-                    <div key={`confirmed-${booking.id}-${idx}`} className="border rounded-lg p-3">
-                      <div className="flex justify-between">
-                        <p className="font-medium text-gray-900">{booking.guest_name}</p>
-                        <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded">
-                          CONFIRMED
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-700">{booking.yurt?.name}</p>
-                      <p className="text-xs text-gray-600">
-                        {booking.check_in} → {booking.check_out}
-                      </p>
-                      {booking.meal_notes && (
-                        <p className="text-xs text-orange-600 mt-1">
-                          🍽️ {booking.meal_notes.substring(0, 50)}...
-                        </p>
-                      )}
                     </div>
                   ))}
                 </div>
