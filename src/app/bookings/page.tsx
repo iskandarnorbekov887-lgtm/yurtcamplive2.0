@@ -26,25 +26,8 @@ function ReserverPortal() {
   const [yurts, setYurts] = useState<Yurt[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddModal, setShowAddModal] = useState(false);
   const [showIncomeForm, setShowIncomeForm] = useState(false);
   const [selectedBookingDate, setSelectedBookingDate] = useState('');
-  const [formData, setFormData] = useState({
-    yurt_id: '',
-    guest_name: '',
-    check_in: '',
-    check_out: '',
-    total_price: '',
-    source: 'Manual',
-    notes: '',
-    meal_notes: '',
-    num_people: '1',
-    payment_status: 'Unpaid' as any,
-    transportation: '',
-    meal_preference: '',
-    guide_required: false,
-    special_requests: '',
-  });
 
   const openIncomeForm = (date: string) => {
     setSelectedBookingDate(date);
@@ -86,44 +69,6 @@ function ReserverPortal() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const { error } = await supabase.from('bookings').insert([{
-        ...formData,
-        total_price: parseFloat(formData.total_price),
-        number_of_people: parseInt(formData.num_people),
-        num_people: parseInt(formData.num_people),
-        status: 'confirmed',
-        created_by_role: 'Reserver',
-        created_by_id: currentUserId || '',
-        last_edited_by_id: currentUserId || ''
-      }]);
-      if (error) throw error;
-      
-      setShowAddModal(false);
-      fetchData();
-      setFormData({
-        yurt_id: '',
-        guest_name: '',
-        check_in: '',
-        check_out: '',
-        total_price: '',
-        source: 'Manual',
-        notes: '',
-        meal_notes: '',
-        num_people: '1',
-        payment_status: 'Unpaid' as any,
-        transportation: '',
-        meal_preference: '',
-        guide_required: false,
-        special_requests: '',
-      });
-    } catch (err: any) {
-      alert(err.message || 'Error creating booking');
-    }
-  };
-
   const cancelBooking = async (id: number) => {
     await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', id);
     fetchData();
@@ -153,10 +98,6 @@ function ReserverPortal() {
             <h1 className="text-xl font-black text-slate-800 uppercase tracking-tight">{t('portal.reserver')}</h1>
           </div>
           <div className="flex items-center gap-4">
-            <button onClick={() => setShowAddModal(true)} className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-              {t('btn.new_booking')}
-            </button>
             <LanguageSwitcher variant="light" />
             <button onClick={signOut} className="px-4 py-2.5 text-slate-500 hover:text-rose-600 font-bold text-sm transition-all flex items-center gap-2">
               {t('btn.logout')}
@@ -212,109 +153,6 @@ function ReserverPortal() {
           </table>
         </div>
       </main>
-
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowAddModal(false)}>
-          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-8 animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
-            <h2 className="text-2xl font-black text-slate-800 mb-6">{t('btn.new_booking')}</h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">{t('form.guest_name')}</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.guest_name}
-                  onChange={e => setFormData({ ...formData, guest_name: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">{t('form.yurt_select')}</label>
-                <select
-                  required
-                  value={formData.yurt_id}
-                  onChange={e => setFormData({ ...formData, yurt_id: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                >
-                  <option value="">Select Yurt</option>
-                  {yurts.map(yurt => (
-                    <option key={yurt.id} value={yurt.id}>{yurt.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">{t('form.check_in')}</label>
-                  <input
-                    type="date"
-                    required
-                    value={formData.check_in}
-                    onChange={e => setFormData({ ...formData, check_in: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">{t('form.check_out')}</label>
-                  <input
-                    type="date"
-                    required
-                    value={formData.check_out}
-                    onChange={e => setFormData({ ...formData, check_out: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">{t('form.total_price')}</label>
-                  <input
-                    type="number"
-                    required
-                    value={formData.total_price}
-                    onChange={e => setFormData({ ...formData, total_price: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">{t('form.num_people')}</label>
-                  <input
-                    type="number"
-                    required
-                    value={formData.num_people}
-                    onChange={e => setFormData({ ...formData, num_people: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">{t('form.notes')}</label>
-                <textarea
-                  value={formData.notes}
-                  onChange={e => setFormData({ ...formData, notes: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  rows={3}
-                />
-              </div>
-              <div className="flex gap-4 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="flex-1 px-6 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all"
-                >
-                  Create Booking
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {showIncomeForm && (
         <ReserverIncomeForm
