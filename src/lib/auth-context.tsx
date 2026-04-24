@@ -8,7 +8,7 @@ interface AuthContextType {
   session: any | null;
   loading: boolean;
   configError: string | null;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<Profile | null>;
   signUp: (email: string, password: string, fullName: string, phone: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -98,7 +98,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setSession(data.session);
       setUser(profile);
+      return profile; // Return profile for immediate use
     }
+    return null;
   };
 
   const signUp = async (email: string, password: string, fullName: string, phone: string) => {

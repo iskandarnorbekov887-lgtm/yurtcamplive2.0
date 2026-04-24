@@ -28,6 +28,7 @@ export default function LoginPage() {
         'Manager': '/manager',
         'Cook': '/cook',
         'Reserver': '/bookings',
+        'Observer': '/observer',
       };
       router.push(rolePaths[user.role] || '/login');
     }
@@ -47,7 +48,18 @@ export default function LoginPage() {
         await signUp(email, password, fullName, phone);
         setError('Account created! Please wait for CEO approval.');
       } else {
-        await signIn(email, password);
+        const profile = await signIn(email, password);
+        // Manual redirect after successful login using returned profile
+        if (profile) {
+          const rolePaths: Record<string, string> = {
+            'CEO': '/ceo',
+            'Manager': '/manager',
+            'Cook': '/cook',
+            'Reserver': '/bookings',
+            'Observer': '/observer',
+          };
+          router.push(rolePaths[profile.role] || '/login');
+        }
       }
     } catch (err: any) {
       setError(err.message || 'An error occurred');
