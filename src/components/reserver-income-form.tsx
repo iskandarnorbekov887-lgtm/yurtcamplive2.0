@@ -22,8 +22,10 @@ export function ReserverIncomeForm({ selectedDate, onClose, onSuccess }: Props) 
   const [nights, setNights] = useState('');
   const [lunch, setLunch] = useState(false);
   const [lunchCount, setLunchCount] = useState(0);
+  const [lunchDietary, setLunchDietary] = useState('');
   const [dinner, setDinner] = useState(false);
   const [dinnerCount, setDinnerCount] = useState(0);
+  const [dinnerDietary, setDinnerDietary] = useState('');
   const [drinks, setDrinks] = useState(false);
   const [drinksCount, setDrinksCount] = useState(0);
   const [laundry, setLaundry] = useState(false);
@@ -32,6 +34,8 @@ export function ReserverIncomeForm({ selectedDate, onClose, onSuccess }: Props) 
   const [guideService, setGuideService] = useState(false);
   const [guideNames, setGuideNames] = useState<string[]>(['']);
   const [guideAmount, setGuideAmount] = useState('');
+  const [cookingClass, setCookingClass] = useState(false);
+  const [cookingClassDescription, setCookingClassDescription] = useState('');
   const [transportation, setTransportation] = useState(false);
   const [transportationEntries, setTransportationEntries] = useState([{
     driver: '', organized: false, date: selectedDate, time: '', from: '', to: '', arrivalTime: '', price: '', description: ''
@@ -104,11 +108,13 @@ export function ReserverIncomeForm({ selectedDate, onClose, onSuccess }: Props) 
         guide_names: guideService ? `${guideNames.filter((n) => n.trim()).join(', ')}${guideAmount ? ` (Amount: ${guideAmount} USD)` : ''}` : null,
         guide_amount: guideAmount,
         has_transportation: transportation,
-        transportation_details: transportation ? transportationEntries.map((entry, index) => `Trip ${index + 1}: Driver: ${entry.driver || 'N/A'}${entry.organized ? ' (Need to organize driver)' : ''} | Date: ${entry.date ? new Date(entry.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'N/A'} | Time: ${entry.time || 'N/A'} | From: ${entry.from || 'N/A'} | To: ${entry.to || 'N/A'} | Arrival Time: ${entry.arrivalTime || 'N/A'}${entry.price ? ` | Price: ${entry.price} USD` : ''}${entry.description ? ` | Description: ${entry.description}` : ''}`).join(' | ') : null,
+        transportation_details: transportation ? transportationEntries.map((entry, index) => `Trip ${index + 1}: Driver: ${entry.driver || 'N/A'} | Date: ${entry.date ? new Date(entry.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'N/A'} | Time: ${entry.time || 'N/A'} | From: ${entry.from || 'N/A'} | To: ${entry.to || 'N/A'} | Arrival Time: ${entry.arrivalTime || 'N/A'}${entry.price ? ` | Price: ${entry.price} USD` : ''}${entry.description ? ` | Description: ${entry.description}` : ''}`).join(' | ') : null,
         lunch: lunch,
         lunch_count: lunchCount,
+        lunch_dietary: lunchDietary || null,
         dinner: dinner,
         dinner_count: dinnerCount,
+        dinner_dietary: dinnerDietary || null,
         drinks: drinks,
         drinks_count: drinksCount,
         laundry: laundry,
@@ -119,6 +125,8 @@ export function ReserverIncomeForm({ selectedDate, onClose, onSuccess }: Props) 
         exchange_rate: rateValue,
         amount: amountValue,
         description: description,
+        cooking_class: cookingClass,
+        cooking_class_description: cookingClassDescription || null,
       }]);
       if (error) throw error;
       setMessage('Booking saved successfully!'); setTimeout(() => { onSuccess(); resetForm(); }, 1000);
@@ -128,7 +136,8 @@ export function ReserverIncomeForm({ selectedDate, onClose, onSuccess }: Props) 
   const resetForm = () => {
     setGuestNames(['']); setGuestCount(1); setChildrenUnder12(0); setNights(''); setGuideService(false); setGuideNames(['']); setGuideAmount('');
     setTransportation(false); setTransportationEntries([{ driver: '', organized: false, date: selectedDate, time: '', from: '', to: '', arrivalTime: '', price: '', description: '' }]);
-    setLunch(false); setLunchCount(0); setDinner(false); setDinnerCount(0); setDrinks(false); setDrinksCount(0); setLaundry(false); setLaundryPrice(''); setLaundryCurrency('UZS');
+    setLunch(false); setLunchCount(0); setLunchDietary(''); setDinner(false); setDinnerCount(0); setDinnerDietary(''); setDrinks(false); setDrinksCount(0); setLaundry(false); setLaundryPrice(''); setLaundryCurrency('UZS');
+    setCookingClass(false); setCookingClassDescription('');
     setCurrency('UZS'); setExchangeRate('1'); setPaymentMethod('cash'); setAmount(''); setDescription('');
   };
 
@@ -169,16 +178,38 @@ export function ReserverIncomeForm({ selectedDate, onClose, onSuccess }: Props) 
           <div className="border-2 border-slate-200 rounded-xl p-4 space-y-3">
             <h3 className="font-black text-slate-900 text-sm">Services and Food</h3>
             <div className="grid grid-cols-2 gap-4">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input type="checkbox" checked={lunch} onChange={(e) => { setLunch(e.target.checked); if (e.target.checked && lunchCount === 0) setLunchCount(1); }} className="w-5 h-5 rounded border-2 border-slate-300 text-emerald-600" />
-                <span className="text-slate-900 font-semibold text-sm">Lunch</span>
-                {lunch && <input type="number" min="1" value={lunchCount} onChange={(e) => setLunchCount(parseInt(e.target.value) || 1)} className="w-16 px-2 py-1 border-2 border-slate-300 rounded-lg text-sm font-semibold" />}
-              </label>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input type="checkbox" checked={dinner} onChange={(e) => { setDinner(e.target.checked); if (e.target.checked && dinnerCount === 0) setDinnerCount(1); }} className="w-5 h-5 rounded border-2 border-slate-300 text-emerald-600" />
-                <span className="text-slate-900 font-semibold text-sm">Dinner</span>
-                {dinner && <input type="number" min="1" value={dinnerCount} onChange={(e) => setDinnerCount(parseInt(e.target.value) || 1)} className="w-16 px-2 py-1 border-2 border-slate-300 rounded-lg text-sm font-semibold" />}
-              </label>
+              <div>
+                <label className="flex items-center gap-3 cursor-pointer mb-2">
+                  <input type="checkbox" checked={lunch} onChange={(e) => { setLunch(e.target.checked); if (e.target.checked && lunchCount === 0) setLunchCount(1); }} className="w-5 h-5 rounded border-2 border-slate-300 text-emerald-600" />
+                  <span className="text-slate-900 font-semibold text-sm">Lunch</span>
+                  {lunch && <input type="number" min="1" value={lunchCount} onChange={(e) => setLunchCount(parseInt(e.target.value) || 1)} className="w-16 px-2 py-1 border-2 border-slate-300 rounded-lg text-sm font-semibold" />}
+                </label>
+                {lunch && (
+                  <input
+                    type="text"
+                    value={lunchDietary}
+                    onChange={(e) => setLunchDietary(e.target.value)}
+                    placeholder="Dietary request (vegetarian, special request)"
+                    className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black"
+                  />
+                )}
+              </div>
+              <div>
+                <label className="flex items-center gap-3 cursor-pointer mb-2">
+                  <input type="checkbox" checked={dinner} onChange={(e) => { setDinner(e.target.checked); if (e.target.checked && dinnerCount === 0) setDinnerCount(1); }} className="w-5 h-5 rounded border-2 border-slate-300 text-emerald-600" />
+                  <span className="text-slate-900 font-semibold text-sm">Dinner</span>
+                  {dinner && <input type="number" min="1" value={dinnerCount} onChange={(e) => setDinnerCount(parseInt(e.target.value) || 1)} className="w-16 px-2 py-1 border-2 border-slate-300 rounded-lg text-sm font-semibold" />}
+                </label>
+                {dinner && (
+                  <input
+                    type="text"
+                    value={dinnerDietary}
+                    onChange={(e) => setDinnerDietary(e.target.value)}
+                    placeholder="Dietary request (vegetarian, special request)"
+                    className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black"
+                  />
+                )}
+              </div>
               <label className="flex items-center gap-3 cursor-pointer">
                 <input type="checkbox" checked={drinks} onChange={(e) => { setDrinks(e.target.checked); if (e.target.checked && drinksCount === 0) setDrinksCount(1); }} className="w-5 h-5 rounded border-2 border-slate-300 text-emerald-600" />
                 <span className="text-slate-900 font-semibold text-sm">Drinks</span>
@@ -217,6 +248,23 @@ export function ReserverIncomeForm({ selectedDate, onClose, onSuccess }: Props) 
                 <div><label className="block text-xs font-bold text-slate-600 mb-1">Guide Amount (USD)</label>
                   <input type="number" min="0" step="0.01" value={guideAmount} onChange={(e) => setGuideAmount(e.target.value)} placeholder="Enter guide amount in USD" className="w-full px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm" /></div>
               </div>
+            )}
+          </div>
+
+          {/* Cooking Class */}
+          <div className="border-2 border-slate-200 rounded-xl p-4 space-y-3">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input type="checkbox" checked={cookingClass} onChange={(e) => setCookingClass(e.target.checked)} className="w-5 h-5 rounded border-2 border-slate-300 text-emerald-600" />
+              <span className="text-slate-900 font-semibold text-sm">Cooking Class</span>
+            </label>
+            {cookingClass && (
+              <textarea
+                value={cookingClassDescription}
+                onChange={(e) => setCookingClassDescription(e.target.value)}
+                placeholder="Description (optional)"
+                rows={2}
+                className="w-full px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm"
+              />
             )}
           </div>
 

@@ -510,9 +510,19 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                   {/* Food Services */}
                   <div className="col-span-2 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100">
                     <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block mb-2">Food Services</label>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      {sel.lunch && <div className="flex items-center gap-2"><span className="w-2 h-2 bg-emerald-500 rounded-full"></span><span className="font-bold text-black">Lunch x{sel.lunch_count || 1}</span></div>}
-                      {sel.dinner && <div className="flex items-center gap-2"><span className="w-2 h-2 bg-emerald-500 rounded-full"></span><span className="font-bold text-black">Dinner x{sel.dinner_count || 1}</span></div>}
+                    <div className="space-y-2 text-xs">
+                      {sel.lunch && (
+                        <div>
+                          <div className="flex items-center gap-2"><span className="w-2 h-2 bg-emerald-500 rounded-full"></span><span className="font-bold text-black">Lunch x{sel.lunch_count || 1}</span></div>
+                          {sel.lunch_dietary && <p className="ml-4 text-black italic">Dietary: {sel.lunch_dietary}</p>}
+                        </div>
+                      )}
+                      {sel.dinner && (
+                        <div>
+                          <div className="flex items-center gap-2"><span className="w-2 h-2 bg-emerald-500 rounded-full"></span><span className="font-bold text-black">Dinner x{sel.dinner_count || 1}</span></div>
+                          {sel.dinner_dietary && <p className="ml-4 text-black italic">Dietary: {sel.dinner_dietary}</p>}
+                        </div>
+                      )}
                       {!sel.lunch && !sel.dinner && <p className="text-black italic">No food services</p>}
                     </div>
                   </div>
@@ -550,7 +560,7 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                         )}
                       </div>
                     ) : (
-                      <p className="text-sm font-bold text-black">{sel.guide_service ? `Yes - ${sel.guide_names || 'No names specified'}` : 'No guide service'}</p>
+                      <p className="text-sm font-bold text-black">{sel.guide_service ? (sel.guide_names || 'Find a guide') : 'No guide service'}</p>
                     )}
                   </div>
 
@@ -582,6 +592,22 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                       <p className="text-sm font-bold text-black">{sel.has_transportation ? `Yes - ${sel.transportation_details || 'No details'}` : 'No transportation'}</p>
                     )}
                   </div>
+
+                  {/* Cooking Class */}
+                  {sel.cooking_class && (
+                    <div className="col-span-2 p-4 bg-pink-50/50 rounded-2xl border border-pink-100">
+                      <label className="text-[10px] font-black text-pink-400 uppercase tracking-widest block mb-1">Cooking Class</label>
+                      {isEditing && canEdit(sel) ? (
+                        <textarea
+                          value={editData.cooking_class_description || ''}
+                          onChange={e => setEditData({...editData, cooking_class_description: e.target.value})}
+                          placeholder="Description (optional)"
+                          className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black"
+                          rows={2}
+                        />
+                      ) : <p className="text-sm font-bold text-black">{sel.cooking_class_description || 'No description'}</p>}
+                    </div>
+                  )}
 
                   {/* Drinks Tab */}
                   <div className="col-span-2 p-4 bg-rose-50/50 rounded-2xl border border-rose-100">
