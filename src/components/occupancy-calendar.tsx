@@ -711,7 +711,7 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                         </div>
                       )}
 
-                      {userRole === 'Manager' && (sel.status === 'checked_in' || sel.status === 'completed') && (
+                      {userRole === 'Manager' && sel.status === 'completed' && (
                         <button
                           onClick={() => {
                             setEditRequestData(sel);
