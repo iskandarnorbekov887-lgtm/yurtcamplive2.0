@@ -654,7 +654,11 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                   <div className="flex flex-col gap-3">
                     <div className="flex gap-3">
                       {onCheckIn && sel.status !== 'checked_in' && (
-                        <button onClick={handleCheckIn} disabled={!!loadingAction} className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
+                        <button
+                          onClick={handleCheckIn}
+                          disabled={!!loadingAction || sel.check_in !== today}
+                          className={`flex-1 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${sel.check_in === today ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-300 text-slate-500 cursor-not-allowed'}`}
+                        >
                           {loadingAction === 'checkin' ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : t('btn.check_in')}
                         </button>
                       )}
