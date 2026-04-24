@@ -14,6 +14,7 @@ interface Props {
   onCheckIn?: (id: number) => Promise<void>;
   onCheckOut?: (id: number) => Promise<void>;
   onUpdateBooking?: (id: number, updates: Partial<Booking>) => Promise<void>;
+  onAddNewBooking?: (date: string) => void;
 }
 interface EventInfo { booking: Booking; colStart: number; colEnd: number; lane: number; }
 
@@ -83,11 +84,11 @@ function color(b: Booking, today: string) {
     case 'cancelled':
       return { bg: '#F87171', text: '#7F1D1D' }; // Light Red/Pink
     default:
-      return PALETTE[b.yurt_id % PALETTE.length];
+      return PALETTE[(b.yurt_id || 0) % PALETTE.length];
   }
 }
 
-export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, staff, onCancelBooking, onCheckIn, onCheckOut, onUpdateBooking }: Props) {
+export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, staff, onCancelBooking, onCheckIn, onCheckOut, onUpdateBooking, onAddNewBooking }: Props) {
   const { t } = useLanguage();
   const [cur, setCur]   = useState(new Date());
   const [sel, setSel]   = useState<Booking | null>(null);
@@ -136,9 +137,11 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
 
   const handleCheckIn = async () => {
     if (!sel || !onCheckIn) return;
+    if (!confirm('Confirm check-in for ' + sel.guest_name + '? This action is permanent.')) return;
     setLoadingAction('checkin');
     try {
       await onCheckIn(sel.id);
+      alert('Check-in successful!');
       setSel(null);
     } catch (err) {
       alert('Failed to check in');
@@ -149,9 +152,11 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
 
   const handleCheckOut = async () => {
     if (!sel || !onCheckOut) return;
+    if (!confirm('Confirm check-out for ' + sel.guest_name + '? This action is permanent.')) return;
     setLoadingAction('checkout');
     try {
       await onCheckOut(sel.id);
+      alert('Check-out successful!');
       setSel(null);
     } catch (err) {
       alert('Failed to check out');
@@ -174,9 +179,10 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
     setLoadingAction('update');
     try {
       await onUpdateBooking(sel.id, editData);
-      syncToGoogleCalendar({ ...sel, ...editData } as Booking);
-      setSel(null);
+      alert('Changes saved successfully!');
       setIsEditing(false);
+      setSel(null);
+      syncToGoogleCalendar({ ...sel, ...editData } as Booking);
     } catch (err) {
       alert('Failed to update booking');
     } finally {
@@ -272,7 +278,13 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                   <div 
                     key={di} 
                     className={`min-h-[40px] px-2 pt-2 border-r border-slate-100 last:border-r-0 cursor-pointer hover:bg-indigo-50 transition-colors ${!isCurrentMonth ? 'bg-slate-50/60' : ''}`}
-                    onClick={() => setSelectedDay(ds)}
+                    onClick={() => {
+                      if (ds < today) {
+                        alert('You cannot schedule a trip on a past date');
+                        return;
+                      }
+                      setSelectedDay(ds);
+                    }}
                   >
                     <div className="flex items-center justify-between">
                       <span className={`text-sm font-semibold w-7 h-7 flex items-center justify-center rounded-full
@@ -296,6 +308,24 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                   const isStart = ev.booking.check_in >= dateToStr(week[ev.colStart]);
                   const isEnd   = ev.booking.check_out <= dateToStr(week[ev.colEnd]);
                   const isCancelled = ev.booking.status === 'cancelled';
+                  const isCheckedIn = ev.booking.status === 'checked_in';
+                  const isCompleted = ev.booking.status === 'completed';
+
+                  // Check for neglected check-in (after 6 PM on check-in date)
+                  const checkInDate = new Date(ev.booking.check_in);
+                  const checkInDateStr = checkInDate.toISOString().split('T')[0];
+                  const now = new Date();
+                  const isNeglectedCheckIn = ev.booking.status === 'confirmed' &&
+                    checkInDateStr === today &&
+                    now.getHours() >= 18;
+
+                  // Check for neglected checkout (after 12 PM on checkout date)
+                  const checkOutDate = new Date(ev.booking.check_out);
+                  const checkOutDateStr = checkOutDate.toISOString().split('T')[0];
+                  const isNeglectedCheckout = ev.booking.status === 'checked_in' &&
+                    checkOutDateStr === today &&
+                    now.getHours() >= 12;
+
                   return (
                     <button
                       key={ei}
@@ -316,7 +346,27 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                       }}
                       className="text-[11px] font-semibold px-2 truncate text-left flex items-center h-[20px] hover:brightness-90 transition-all"
                     >
-                      {isStart ? (isCancelled ? `${ev.booking.guest_name} (CANCELLED)` : ev.booking.guest_name) : ''}
+                      <span className="flex-1 truncate">
+                        {isStart ? (isCancelled ? `${ev.booking.guest_name} (CANCELLED)` : ev.booking.guest_name) : ''}
+                      </span>
+                      {/* Status indicators */}
+                      <span className="flex items-center gap-1 ml-1">
+                        {isCheckedIn && (
+                          <svg className="w-3 h-3 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                        {isCompleted && (
+                          <svg className="w-3 h-3 text-slate-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M20 12H4" />
+                          </svg>
+                        )}
+                        {(isNeglectedCheckIn || isNeglectedCheckout) && (
+                          <svg className="w-3 h-3 text-red-600 flex-shrink-0 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/>
+                          </svg>
+                        )}
+                      </span>
                     </button>
                   );
                 })}
@@ -394,8 +444,20 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
               <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 space-y-3">
                 <div>
                   <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block mb-1">{t('form.num_people')}</label>
-                  <p className="font-bold text-indigo-900">{sel.num_people || sel.number_of_people}</p>
+                  <p className="font-bold text-indigo-900">{sel.num_people || sel.number_of_people || sel.guest_count}</p>
                 </div>
+                {sel.children_under_12 !== undefined && sel.children_under_12 > 0 && (
+                  <div>
+                    <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block mb-1">Children Under 12</label>
+                    <p className="font-bold text-indigo-900">{sel.children_under_12}</p>
+                  </div>
+                )}
+                {sel.nights && (
+                  <div>
+                    <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block mb-1">Nights</label>
+                    <p className="font-bold text-indigo-900">{sel.nights}</p>
+                  </div>
+                )}
                 <div>
                   <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block mb-1">{t('form.meal_preference')}</label>
                   {isEditing && canEdit(sel) ? (
@@ -403,6 +465,26 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                   ) : <p className="text-sm font-medium text-indigo-800 italic">{sel.meal_preference || 'No preference'}</p>}
                 </div>
               </div>
+
+              {/* Services Section */}
+              {(sel.lunch || sel.dinner || sel.drinks || sel.laundry || sel.guide_service || sel.has_transportation) && (
+                <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 space-y-3">
+                  <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block mb-2">Services</label>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    {sel.lunch && <div className="flex items-center gap-2"><span className="w-2 h-2 bg-emerald-500 rounded-full"></span><span className="font-semibold text-emerald-900">Lunch x{sel.lunch_count || 1}</span></div>}
+                    {sel.dinner && <div className="flex items-center gap-2"><span className="w-2 h-2 bg-emerald-500 rounded-full"></span><span className="font-semibold text-emerald-900">Dinner x{sel.dinner_count || 1}</span></div>}
+                    {sel.drinks && <div className="flex items-center gap-2"><span className="w-2 h-2 bg-emerald-500 rounded-full"></span><span className="font-semibold text-emerald-900">Drinks x{sel.drinks_count || 1}</span></div>}
+                    {sel.laundry && <div className="flex items-center gap-2"><span className="w-2 h-2 bg-emerald-500 rounded-full"></span><span className="font-semibold text-emerald-900">Laundry {sel.laundry_price ? `(${sel.laundry_price} ${sel.laundry_currency || 'UZS'})` : ''}</span></div>}
+                    {sel.guide_service && <div className="flex items-center gap-2"><span className="w-2 h-2 bg-emerald-500 rounded-full"></span><span className="font-semibold text-emerald-900">Guide {sel.guide_names ? `(${sel.guide_names})` : ''}</span></div>}
+                    {sel.has_transportation && <div className="flex items-center gap-2"><span className="w-2 h-2 bg-emerald-500 rounded-full"></span><span className="font-semibold text-emerald-900">Transportation</span></div>}
+                  </div>
+                  {sel.transportation_details && (
+                    <div className="mt-2 text-xs text-emerald-700 italic max-h-20 overflow-y-auto">
+                      {sel.transportation_details}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-3">
                 <div>
@@ -413,10 +495,16 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                 </div>
                 <div className="flex items-center gap-2">
                   <label className="text-[10px] font-black text-blue-400 uppercase tracking-widest">{t('form.guide_required')}</label>
-                  <div className={`w-10 h-5 rounded-full p-1 transition-all ${sel.guide_required ? 'bg-blue-600' : 'bg-slate-300'}`}>
-                    <div className={`w-3 h-3 bg-white rounded-full transition-all ${sel.guide_required ? 'translate-x-5' : ''}`} />
+                  <div className={`w-10 h-5 rounded-full p-1 transition-all ${sel.guide_required || sel.guide_service ? 'bg-blue-600' : 'bg-slate-300'}`}>
+                    <div className={`w-3 h-3 bg-white rounded-full transition-all ${sel.guide_required || sel.guide_service ? 'translate-x-5' : ''}`} />
                   </div>
                 </div>
+                {sel.payment_method && (
+                  <div>
+                    <label className="text-[10px] font-black text-blue-400 uppercase tracking-widest block mb-1">Payment Method</label>
+                    <p className="text-sm font-bold text-blue-900">{sel.payment_method}</p>
+                  </div>
+                )}
               </div>
 
               {/* Special Requests */}
@@ -426,6 +514,124 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                   <textarea value={editData.special_requests || ''} onChange={e => setEditData({...editData, special_requests: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm" rows={3} />
                 ) : <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-sm text-slate-600 italic">"{sel.special_requests || 'No special requests'}"</div>}
               </div>
+
+              {/* Service Editing (for Cook and Manager) */}
+              {isEditing && canEdit(sel) && (
+                <div className="col-span-2 p-4 bg-amber-50/50 rounded-2xl border border-amber-100 space-y-4">
+                  <label className="text-[10px] font-black text-amber-400 uppercase tracking-widest block mb-2">
+                    {userRole === 'Cook' ? 'Cook Services' : 'Service Management'}
+                  </label>
+
+                  {/* Cook can edit drinks and laundry */}
+                  {userRole === 'Cook' && (
+                    <div className="space-y-3">
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editData.drinks || false}
+                          onChange={e => setEditData({...editData, drinks: e.target.checked, drinks_count: e.target.checked ? (editData.drinks_count || 1) : 0})}
+                          className="w-5 h-5 rounded border-2 border-slate-300 text-amber-600"
+                        />
+                        <span className="text-slate-900 font-semibold text-sm">Drinks</span>
+                        {editData.drinks && (
+                          <input
+                            type="number"
+                            min="1"
+                            value={editData.drinks_count || 1}
+                            onChange={e => setEditData({...editData, drinks_count: parseInt(e.target.value) || 1})}
+                            className="w-16 px-2 py-1 border-2 border-slate-300 rounded-lg text-sm font-semibold"
+                          />
+                        )}
+                      </label>
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editData.laundry || false}
+                          onChange={e => setEditData({...editData, laundry: e.target.checked})}
+                          className="w-5 h-5 rounded border-2 border-slate-300 text-amber-600"
+                        />
+                        <span className="text-slate-900 font-semibold text-sm">Laundry</span>
+                      </label>
+                      {editData.laundry && (
+                        <div className="flex gap-2 items-center pl-8">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={editData.laundry_price || ''}
+                            onChange={e => setEditData({...editData, laundry_price: e.target.value})}
+                            placeholder="Price"
+                            className="flex-1 px-4 py-2 border-2 border-slate-300 rounded-xl text-sm font-semibold"
+                          />
+                          <select
+                            value={editData.laundry_currency || 'UZS'}
+                            onChange={e => setEditData({...editData, laundry_currency: e.target.value as 'UZS' | 'USD'})}
+                            className="px-4 py-2 border-2 border-slate-300 rounded-xl text-sm font-semibold"
+                          >
+                            <option value="UZS">UZS</option>
+                            <option value="USD">USD</option>
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Manager can edit transportation, guide, dates */}
+                  {userRole === 'Manager' && (
+                    <div className="space-y-3">
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editData.guide_required || editData.guide_service || false}
+                          onChange={e => setEditData({...editData, guide_required: e.target.checked, guide_service: e.target.checked})}
+                          className="w-5 h-5 rounded border-2 border-slate-300 text-amber-600"
+                        />
+                        <span className="text-slate-900 font-semibold text-sm">Guide Service</span>
+                      </label>
+                      {(editData.guide_required || editData.guide_service) && (
+                        <div className="pl-8 space-y-2">
+                          <input
+                            type="text"
+                            value={editData.guide_names || ''}
+                            onChange={e => setEditData({...editData, guide_names: e.target.value})}
+                            placeholder="Guide names (comma-separated)"
+                            className="w-full px-4 py-2 border-2 border-slate-300 rounded-xl text-sm font-semibold"
+                          />
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={editData.guide_amount || ''}
+                            onChange={e => setEditData({...editData, guide_amount: e.target.value})}
+                            placeholder="Guide amount (USD)"
+                            className="w-full px-4 py-2 border-2 border-slate-300 rounded-xl text-sm font-semibold"
+                          />
+                        </div>
+                      )}
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editData.has_transportation || false}
+                          onChange={e => setEditData({...editData, has_transportation: e.target.checked})}
+                          className="w-5 h-5 rounded border-2 border-slate-300 text-amber-600"
+                        />
+                        <span className="text-slate-900 font-semibold text-sm">Transportation</span>
+                      </label>
+                      {editData.has_transportation && (
+                        <div className="pl-8">
+                          <textarea
+                            value={editData.transportation_details || ''}
+                            onChange={e => setEditData({...editData, transportation_details: e.target.value})}
+                            placeholder="Transportation details (driver, time, from/to, etc.)"
+                            rows={3}
+                            className="w-full px-4 py-2 border-2 border-slate-300 rounded-xl text-sm font-semibold"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             
             {!isCook && (
@@ -452,9 +658,9 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                     
                     <div className="flex gap-3">
                       <div className="flex-1 group relative">
-                        <button 
-                          onClick={() => setIsEditing(true)} 
-                          disabled={!canEdit(sel)} 
+                        <button
+                          onClick={() => setIsEditing(true)}
+                          disabled={!canEdit(sel)}
                           className={`w-full py-3 rounded-xl font-bold transition-all ${canEdit(sel) ? 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100' : 'bg-slate-50 text-slate-300 cursor-not-allowed'}`}
                         >
                           Edit Details
@@ -465,12 +671,12 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                           </div>
                         )}
                       </div>
-                      
+
                       {onCancelBooking && (
                         <div className="flex-1 group relative">
-                          <button 
-                            onClick={handleCancel} 
-                            disabled={!!loadingAction || !canCancel(sel)} 
+                          <button
+                            onClick={handleCancel}
+                            disabled={!!loadingAction || !canCancel(sel)}
                             className={`w-full py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${canCancel(sel) ? 'bg-rose-50 text-rose-600 hover:bg-rose-100' : 'bg-slate-50 text-slate-300 cursor-not-allowed'}`}
                           >
                             {loadingAction === 'cancel' ? <div className="w-4 h-4 border-2 border-rose-600 border-t-transparent rounded-full animate-spin" /> : 'Cancel Trip'}
@@ -483,6 +689,28 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                         </div>
                       )}
                     </div>
+
+                    {/* No Arrival button - appears after 1 day of supposed check-in */}
+                    {(() => {
+                      const checkInDate = new Date(sel.check_in);
+                      const checkInDateStr = checkInDate.toISOString().split('T')[0];
+                      const now = new Date();
+                      const nowDateStr = now.toISOString().split('T')[0];
+                      const daysSinceCheckIn = Math.floor((now.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24));
+
+                      if (sel.status === 'confirmed' && daysSinceCheckIn >= 1 && onCancelBooking) {
+                        return (
+                          <button
+                            onClick={handleCancel}
+                            disabled={!!loadingAction}
+                            className="w-full py-2 bg-amber-100 text-amber-700 rounded-lg text-xs font-bold hover:bg-amber-200 transition-all"
+                          >
+                            No Arrival
+                          </button>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 )}
               </div>
@@ -546,6 +774,21 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                 </div>
               );
             })()}
+
+            {userRole === 'Reserver' && selectedDay >= today && onAddNewBooking && (
+              <div className="mt-6 pt-6 border-t border-slate-100">
+                <button
+                  onClick={() => {
+                    setSelectedDay(null);
+                    onAddNewBooking(selectedDay);
+                  }}
+                  className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                  Add New Booking
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

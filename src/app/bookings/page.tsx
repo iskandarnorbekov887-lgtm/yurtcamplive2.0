@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { OccupancyCalendar } from '@/components/occupancy-calendar';
+import { ReserverIncomeForm } from '@/components/reserver-income-form';
 import type { UserRole } from '@/lib/supabase';
 
 export default function BookingsPage() {
@@ -26,6 +27,8 @@ function ReserverPortal() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showIncomeForm, setShowIncomeForm] = useState(false);
+  const [selectedBookingDate, setSelectedBookingDate] = useState('');
   const [formData, setFormData] = useState({
     yurt_id: '',
     guest_name: '',
@@ -42,6 +45,11 @@ function ReserverPortal() {
     guide_required: false,
     special_requests: '',
   });
+
+  const openIncomeForm = (date: string) => {
+    setSelectedBookingDate(date);
+    setShowIncomeForm(true);
+  };
 
   useEffect(() => {
     fetchData();
@@ -165,6 +173,7 @@ function ReserverPortal() {
           currentUserId={currentUserId}
           onCancelBooking={cancelBooking}
           onUpdateBooking={handleUpdateBooking}
+          onAddNewBooking={(date) => openIncomeForm(date)}
         />
         
         <div className="bg-white rounded-[2rem] border border-slate-100 shadow-xl overflow-hidden">
@@ -305,6 +314,17 @@ function ReserverPortal() {
             </form>
           </div>
         </div>
+      )}
+
+      {showIncomeForm && (
+        <ReserverIncomeForm
+          selectedDate={selectedBookingDate}
+          onClose={() => setShowIncomeForm(false)}
+          onSuccess={() => {
+            setShowIncomeForm(false);
+            fetchData();
+          }}
+        />
       )}
     </div>
   );

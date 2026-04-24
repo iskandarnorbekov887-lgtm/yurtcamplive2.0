@@ -31,13 +31,13 @@ export interface Yurt {
 
 export interface Booking {
   id: number;
-  yurt_id: number;
+  yurt_id?: number;
   guest_name: string;
   check_in: string;
   check_out: string;
   total_price: number;
   number_of_people: number;
-  num_people?: number; // Alias for backward compatibility or specific schema request
+  num_people?: number;
   payment_status: 'Paid' | 'Partial' | 'Unpaid';
   source: 'Manual' | 'Booking.com' | 'TripAdvisor';
   status: 'confirmed' | 'cancelled' | 'completed' | 'pending' | 'checked_in';
@@ -53,6 +53,29 @@ export interface Booking {
   last_edited_by_id: string | null;
   last_edited_by_role?: UserRole;
   yurt?: Yurt;
+  // Service fields (from income form)
+  guest_count?: number;
+  children_under_12?: number;
+  nights?: string;
+  guide_service?: boolean;
+  guide_names?: string;
+  guide_amount?: string;
+  has_transportation?: boolean;
+  transportation_details?: string;
+  lunch?: boolean;
+  lunch_count?: number;
+  dinner?: boolean;
+  dinner_count?: number;
+  drinks?: boolean;
+  drinks_count?: number;
+  laundry?: boolean;
+  laundry_price?: string;
+  laundry_currency?: 'UZS' | 'USD';
+  payment_method?: string;
+  currency?: 'UZS' | 'USD' | 'EUR';
+  exchange_rate?: number;
+  amount?: number;
+  description?: string;
 }
 
 export interface Finance {
@@ -83,7 +106,10 @@ export interface Finance {
   dinner_count?: number | null;
   laundry?: boolean | null;
   laundry_price?: string | null;
-  payment_method?: 'in_camp' | 'online' | null;
+  laundry_currency?: 'UZS' | 'USD' | null;
+  drinks?: boolean | null;
+  drinks_count?: number | null;
+  payment_method?: 'cash' | 'online' | 'already_paid' | 'partially_paid' | 'in_camp' | null;
 }
 
 export interface Notification {

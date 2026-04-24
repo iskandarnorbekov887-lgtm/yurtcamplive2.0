@@ -233,6 +233,46 @@ function CEODashboard() {
   };
 
   const handleCheckOut = async (id: number) => {
+    // First get the booking data
+    const { data: booking } = await supabase.from('bookings').select('*').eq('id', id).single();
+    if (!booking) return;
+
+    // Create camp_finances record from booking data
+    const amountValue = booking.amount || booking.total_price || 0;
+    const rateValue = booking.exchange_rate || 1;
+    const amountUZS = booking.currency === 'UZS' ? amountValue : amountValue * rateValue;
+
+    await supabase.from('camp_finances').insert([{
+      date: booking.check_out,
+      type: 'income',
+      category: 'Booking',
+      currency: booking.currency || 'UZS',
+      original_amount: amountValue,
+      exchange_rate: rateValue,
+      amount_uzs: amountUZS,
+      description: booking.description || `Booking: ${booking.guest_name} (${booking.check_in} - ${booking.check_out})`,
+      guest_name: booking.guest_name,
+      guest_count: booking.guest_count || booking.number_of_people,
+      children_under_12: booking.children_under_12,
+      nights: booking.nights,
+      guide_service: booking.guide_service || booking.guide_required,
+      guide_names: booking.guide_names,
+      transportation: booking.has_transportation,
+      transportation_details: booking.transportation_details,
+      lunch: booking.lunch,
+      lunch_count: booking.lunch_count,
+      dinner: booking.dinner,
+      dinner_count: booking.dinner_count,
+      drinks: booking.drinks,
+      drinks_count: booking.drinks_count,
+      laundry: booking.laundry,
+      laundry_price: booking.laundry_price,
+      laundry_currency: booking.laundry_currency,
+      payment_method: booking.payment_method,
+      created_by: booking.created_by_role || 'System',
+    }]);
+
+    // Then mark booking as completed
     await supabase.from('bookings').update({ status: 'completed' }).eq('id', id);
     fetchData();
   };

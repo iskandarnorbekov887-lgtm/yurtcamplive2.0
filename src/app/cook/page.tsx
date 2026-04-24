@@ -173,7 +173,7 @@ function CookPortal() {
                     <div key={booking.id} className="bg-white rounded-lg p-4 border border-yellow-200">
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="font-bold text-gray-900">{getYurtName(booking.yurt_id)} - {booking.guest_name}</p>
+                          <p className="font-bold text-gray-900">{getYurtName(booking.yurt_id || 0)} - {booking.guest_name}</p>
                           <p className="text-sm text-gray-600 mt-1">{booking.meal_notes}</p>
                         </div>
                       </div>
@@ -188,18 +188,18 @@ function CookPortal() {
               <h2 className="text-2xl font-bold mb-4 capitalize text-orange-800">
                 {currentMeal} Orders
               </h2>
-              
+
               {activeBookings.length === 0 ? (
                 <p className="text-gray-600 text-lg">{t('cook.no_guests')}</p>
               ) : (
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {activeBookings.map((booking) => (
-                    <div 
-                      key={booking.id} 
+                    <div
+                      key={booking.id}
                       className={`border-2 rounded-xl p-6 ${booking.meal_notes ? 'border-yellow-300 bg-yellow-50' : 'border-orange-200 bg-orange-50'}`}
                     >
                       <div className="text-4xl font-bold text-orange-800 mb-2">
-                        {getYurtName(booking.yurt_id)}
+                        {getYurtName(booking.yurt_id || 0)}
                       </div>
                       <p className="text-gray-900 font-medium text-lg">{booking.guest_name}</p>
                       <p className="text-sm text-gray-700 mt-2">
