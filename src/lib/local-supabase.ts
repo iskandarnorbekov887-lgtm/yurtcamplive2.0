@@ -328,18 +328,28 @@ class QueryBuilder {
     return { data: inserted, error: null };
   };
 
-  update = async (updates: any) => {
-    if (!isClient) return { data: null, error: null };
-    let items = JSON.parse(localStorage.getItem((STORAGE_KEYS as any)[this.table]) || '[]');
-    const updatedItems = items.map((item: any) => {
-      if (this.filters.every(f => f(item))) {
-        return { ...item, ...updates };
-      }
-      return item;
-    });
-    localStorage.setItem((STORAGE_KEYS as any)[this.table], JSON.stringify(updatedItems));
-    this.filters = []; // Reset filters after update
-    return { data: null, error: null };
+  update = (updates: any) => {
+    return {
+      eq: (column: string, value: any) => {
+        this.filters.push(item => item[column] === value);
+        return {
+          then: async (resolve: any) => {
+            if (!isClient) return resolve({ data: null, error: null });
+            let items = JSON.parse(localStorage.getItem((STORAGE_KEYS as any)[this.table]) || '[]');
+            const updatedItems = items.map((item: any) => {
+              if (this.filters.every(f => f(item))) {
+                return { ...item, ...updates };
+              }
+              return item;
+            });
+            localStorage.setItem((STORAGE_KEYS as any)[this.table], JSON.stringify(updatedItems));
+            console.log(`🔄 UPDATED ${this.table}:`, updatedItems.filter((item: any) => this.filters.every(f => f(item))));
+            this.filters = []; // Reset filters after update
+            resolve({ data: null, error: null });
+          },
+        };
+      },
+    };
   };
 
   delete = () => {

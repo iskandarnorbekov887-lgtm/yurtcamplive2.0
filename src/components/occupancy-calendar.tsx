@@ -137,10 +137,12 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
 
   const handleCheckIn = async () => {
     if (!sel || !onCheckIn) return;
-    if (!confirm('Confirm check-in for ' + sel.guest_name + '? This action is permanent.')) return;
+    if (!confirm('Are you sure you want to check in ' + sel.guest_name + '?')) return;
     setLoadingAction('checkin');
     try {
       await onCheckIn(sel.id);
+      // Immediately update local state to show checkmark
+      setSel({ ...sel, status: 'checked_in' });
       alert('Check-in successful!');
       setSel(null);
     } catch (err) {
@@ -152,10 +154,12 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
 
   const handleCheckOut = async () => {
     if (!sel || !onCheckOut) return;
-    if (!confirm('Confirm check-out for ' + sel.guest_name + '? This action is permanent.')) return;
+    if (!confirm('Are you sure you want to check out ' + sel.guest_name + '?')) return;
     setLoadingAction('checkout');
     try {
       await onCheckOut(sel.id);
+      // Immediately update local state to show completed status
+      setSel({ ...sel, status: 'completed' });
       alert('Check-out successful!');
       setSel(null);
     } catch (err) {
