@@ -76,11 +76,6 @@ function ManagerPortal() {
     fetchData();
   };
 
-  const cancelBooking = async (id: number) => {
-    await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', id);
-    fetchData();
-  };
-
   const checkIn = async (id: number) => {
     await supabase.from('bookings').update({ status: 'checked_in' }).eq('id', id);
     fetchData();
@@ -169,7 +164,6 @@ function ManagerPortal() {
               yurts={yurts}
               userRole={userRole}
               currentUserId={currentUserId}
-              onCancelBooking={cancelBooking}
               onCheckIn={checkIn}
               onCheckOut={checkOut}
               onUpdateBooking={handleUpdateBooking}
