@@ -443,13 +443,13 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                 <div>
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">{t('form.check_in')}</label>
                   {isEditing && canEdit(sel) ? (
-                    <input type="date" value={editData.check_in} onChange={e => setEditData({...editData, check_in: e.target.value})} className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm font-bold" />
+                    <input type="date" value={editData.check_in} onChange={e => setEditData({...editData, check_in: e.target.value})} className="w-full bg-white border border-slate-300 rounded-lg p-2 text-sm font-bold text-black" />
                   ) : <p className="font-bold text-slate-700">{sel.check_in}</p>}
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">{t('form.check_out')}</label>
                   {isEditing && canEdit(sel) ? (
-                    <input type="date" value={editData.check_out} onChange={e => setEditData({...editData, check_out: e.target.value})} className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm font-bold" />
+                    <input type="date" value={editData.check_out} onChange={e => setEditData({...editData, check_out: e.target.value})} className="w-full bg-white border border-slate-300 rounded-lg p-2 text-sm font-bold text-black" />
                   ) : <p className="font-bold text-slate-700">{sel.check_out}</p>}
                 </div>
               </div>
@@ -490,7 +490,7 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                 <div>
                   <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block mb-1">{t('form.meal_preference')}</label>
                   {isEditing && canEdit(sel) ? (
-                    <textarea value={editData.meal_preference || ''} onChange={e => setEditData({...editData, meal_preference: e.target.value})} className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs" />
+                    <textarea value={editData.meal_preference || ''} onChange={e => setEditData({...editData, meal_preference: e.target.value})} className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-bold text-black" />
                   ) : <p className="text-sm font-medium text-indigo-800 italic">{sel.meal_preference || 'No preference'}</p>}
                 </div>
               </div>
@@ -519,7 +519,7 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                 <div>
                   <label className="text-[10px] font-black text-blue-400 uppercase tracking-widest block mb-1">{t('form.transportation')}</label>
                   {isEditing && canEdit(sel) ? (
-                    <input type="text" value={editData.transportation || ''} onChange={e => setEditData({...editData, transportation: e.target.value})} className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs" />
+                    <input type="text" value={editData.transportation || ''} onChange={e => setEditData({...editData, transportation: e.target.value})} className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-bold text-black" />
                   ) : <p className="text-sm font-bold text-blue-900">{sel.transportation || 'Self transport'}</p>}
                 </div>
                 <div className="flex items-center gap-2">
@@ -540,7 +540,7 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
               <div className="col-span-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">{t('form.special_requests')}</label>
                 {isEditing && canEdit(sel) ? (
-                  <textarea value={editData.special_requests || ''} onChange={e => setEditData({...editData, special_requests: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm" rows={3} />
+                  <textarea value={editData.special_requests || ''} onChange={e => setEditData({...editData, special_requests: e.target.value})} className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-sm font-bold text-black" rows={3} />
                 ) : <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-sm text-slate-600 italic">"{sel.special_requests || 'No special requests'}"</div>}
               </div>
 
@@ -568,7 +568,7 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                             min="1"
                             value={editData.drinks_count || 1}
                             onChange={e => setEditData({...editData, drinks_count: parseInt(e.target.value) || 1})}
-                            className="w-16 px-2 py-1 border-2 border-slate-300 rounded-lg text-sm font-semibold"
+                            className="w-16 px-2 py-1 border-2 border-slate-300 rounded-lg text-sm font-bold text-black"
                           />
                         )}
                       </label>
@@ -590,12 +590,12 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                             value={editData.laundry_price || ''}
                             onChange={e => setEditData({...editData, laundry_price: e.target.value})}
                             placeholder="Price"
-                            className="flex-1 px-4 py-2 border-2 border-slate-300 rounded-xl text-sm font-semibold"
+                            className="flex-1 px-4 py-2 border-2 border-slate-300 rounded-xl text-sm font-bold text-black"
                           />
                           <select
                             value={editData.laundry_currency || 'UZS'}
                             onChange={e => setEditData({...editData, laundry_currency: e.target.value as 'UZS' | 'USD'})}
-                            className="px-4 py-2 border-2 border-slate-300 rounded-xl text-sm font-semibold"
+                            className="px-4 py-2 border-2 border-slate-300 rounded-xl text-sm font-bold text-black"
                           >
                             <option value="UZS">UZS</option>
                             <option value="USD">USD</option>
@@ -624,7 +624,7 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                             value={editData.guide_names || ''}
                             onChange={e => setEditData({...editData, guide_names: e.target.value})}
                             placeholder="Guide names (comma-separated)"
-                            className="w-full px-4 py-2 border-2 border-slate-300 rounded-xl text-sm font-semibold"
+                            className="w-full px-4 py-2 border-2 border-slate-300 rounded-xl text-sm font-bold text-black"
                           />
                           <input
                             type="number"
@@ -632,8 +632,8 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                             step="0.01"
                             value={editData.guide_amount || ''}
                             onChange={e => setEditData({...editData, guide_amount: e.target.value})}
-                            placeholder="Guide amount (USD)"
-                            className="w-full px-4 py-2 border-2 border-slate-300 rounded-xl text-sm font-semibold"
+                            placeholder="Amount"
+                            className="w-full px-4 py-2 border-2 border-slate-300 rounded-xl text-sm font-bold text-black"
                           />
                         </div>
                       )}
