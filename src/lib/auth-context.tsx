@@ -9,7 +9,7 @@ interface AuthContextType {
   loading: boolean;
   configError: string | null;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, fullName: string) => Promise<void>;
+  signUp: (email: string, password: string, fullName: string, phone: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -84,35 +84,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw new Error(error.message);
-    
+
     // Fetch profile after successful login
     if (data.session?.user) {
-      setSession(data.session);
       const { data: profile } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', data.session.user.id)
         .single();
+
+      if (!profile) throw new Error('Profile not found');
+      if (!profile.approved) throw new Error('Your account is pending approval from the CEO. Please wait for approval.');
+
+      setSession(data.session);
       setUser(profile);
     }
   };
 
-  const signUp = async (email: string, password: string, fullName: string) => {
+  const signUp = async (email: string, password: string, fullName: string, phone: string) => {
     const { data: { user: newUser }, error } = await supabase.auth.signUp({
       email,
       password,
     });
-    
+
     if (error) throw new Error(error.message);
-    
+
     if (newUser) {
       const { error: insertError } = await supabase.from('profiles').insert({
         id: newUser.id,
         email,
         full_name: fullName,
+        phone,
         role: 'Manager',
+        approved: false,
+        created_at: new Date().toISOString(),
       });
-      
+
       if (insertError) throw new Error(insertError.message);
     }
   };
