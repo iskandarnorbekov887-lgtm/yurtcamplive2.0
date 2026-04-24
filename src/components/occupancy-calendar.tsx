@@ -707,7 +707,7 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                         </button>
                       )}
 
-                      {onCancelBooking && (
+                      {onCancelBooking && sel.status !== 'completed' && (
                         <div className="flex-1 group relative">
                           <button
                             onClick={handleCancel}

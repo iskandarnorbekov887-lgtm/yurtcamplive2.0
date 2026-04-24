@@ -48,14 +48,9 @@ function CheckinPortal() {
       supabase.from('bookings').select('*'),
       supabase.from('yurts').select('*'),
     ]);
-    
+
     setBookings(bookingsData || []);
     setYurts(yurtsData || []);
-  };
-
-  const cancelBooking = async (id: number) => {
-    await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', id);
-    fetchData();
   };
 
   const checkIn = async (id: number) => {
@@ -142,12 +137,11 @@ function CheckinPortal() {
       </header>
 
       <main className="p-8 max-w-7xl mx-auto">
-        <OccupancyCalendar 
-          bookings={bookings} 
-          yurts={yurts} 
+        <OccupancyCalendar
+          bookings={bookings}
+          yurts={yurts}
           userRole={userRole}
           currentUserId={currentUserId}
-          onCancelBooking={userRole !== 'Cook' ? cancelBooking : undefined}
           onCheckIn={userRole === 'Manager' || userRole === 'CEO' ? checkIn : undefined}
           onCheckOut={userRole === 'Manager' || userRole === 'CEO' ? checkOut : undefined}
           onUpdateBooking={userRole !== 'Cook' ? handleUpdateBooking : undefined}

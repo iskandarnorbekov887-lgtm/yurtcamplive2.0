@@ -553,13 +553,12 @@ function CEODashboard() {
                 </button>
               </div>
             )}
-            <OccupancyCalendar 
-              bookings={calendarPreference === 'ical' ? icalEvents : bookings} 
-              yurts={yurts} 
+            <OccupancyCalendar
+              bookings={calendarPreference === 'ical' ? icalEvents : bookings}
+              yurts={yurts}
               userRole={userRole}
               currentUserId={currentUserId}
               staff={staff}
-              onCancelBooking={handleCancelBooking}
               onCheckIn={handleCheckIn}
               onCheckOut={handleCheckOut}
               onUpdateBooking={handleUpdateBooking}

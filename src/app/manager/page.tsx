@@ -70,14 +70,9 @@ function ManagerPortal() {
   };
 
   const rejectBooking = async (id: number) => {
-    await supabase.from('bookings').update({ 
-      status: 'cancelled' 
+    await supabase.from('bookings').update({
+      status: 'cancelled'
     }).eq('id', id);
-    fetchData();
-  };
-
-  const cancelBooking = async (id: number) => {
-    await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', id);
     fetchData();
   };
 
@@ -164,12 +159,11 @@ function ManagerPortal() {
 
         {activeTab === 'checkin' && (
           <div className="animate-in fade-in duration-500">
-            <OccupancyCalendar 
-              bookings={bookings} 
-              yurts={yurts} 
+            <OccupancyCalendar
+              bookings={bookings}
+              yurts={yurts}
               userRole={userRole}
               currentUserId={currentUserId}
-              onCancelBooking={cancelBooking}
               onCheckIn={checkIn}
               onCheckOut={checkOut}
               onUpdateBooking={handleUpdateBooking}
