@@ -40,10 +40,11 @@ export function ReserverIncomeForm({ selectedDate, onClose, onSuccess }: Props) 
   const [transportationEntries, setTransportationEntries] = useState([{
     driver: '', organized: false, date: selectedDate, time: '', from: '', to: '', arrivalTime: '', price: '', description: ''
   }]);
-  const [currency, setCurrency] = useState<'UZS' | 'USD' | 'EUR'>('UZS');
+  const [currency, setCurrency] = useState<'UZS' | 'USD' | 'EUR'>('USD');
   const [exchangeRate, setExchangeRate] = useState('1');
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'online' | 'already_paid' | 'partially_paid'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'in_camp' | 'all_paid' | 'partially_paid'>('in_camp');
   const [amount, setAmount] = useState('');
+  const [paymentNote, setPaymentNote] = useState('');
   const [description, setDescription] = useState('');
 
   useEffect(() => {
@@ -121,6 +122,7 @@ export function ReserverIncomeForm({ selectedDate, onClose, onSuccess }: Props) 
         laundry_price: laundryPrice,
         laundry_currency: laundryCurrency,
         payment_method: paymentMethod,
+        payment_note: paymentNote || null,
         currency: currency,
         exchange_rate: rateValue,
         amount: amountValue,
@@ -138,7 +140,7 @@ export function ReserverIncomeForm({ selectedDate, onClose, onSuccess }: Props) 
     setTransportation(false); setTransportationEntries([{ driver: '', organized: false, date: selectedDate, time: '', from: '', to: '', arrivalTime: '', price: '', description: '' }]);
     setLunch(false); setLunchCount(0); setLunchDietary(''); setDinner(false); setDinnerCount(0); setDinnerDietary(''); setDrinks(false); setDrinksCount(0); setLaundry(false); setLaundryPrice(''); setLaundryCurrency('UZS');
     setCookingClass(false); setCookingClassDescription('');
-    setCurrency('UZS'); setExchangeRate('1'); setPaymentMethod('cash'); setAmount(''); setDescription('');
+    setCurrency('USD'); setExchangeRate('1'); setPaymentMethod('in_camp'); setAmount(''); setPaymentNote(''); setDescription('');
   };
 
   return (
@@ -334,58 +336,106 @@ export function ReserverIncomeForm({ selectedDate, onClose, onSuccess }: Props) 
           </div>
 
           {/* Payment Method */}
-          <div className="border-2 border-slate-200 rounded-xl p-4 space-y-3">
-            <label className="block text-sm font-black text-slate-900 mb-2">Payment Method *</label>
-            <div className="flex gap-4 flex-wrap">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input type="radio" name="paymentMethod" checked={paymentMethod === 'cash'} onChange={() => setPaymentMethod('cash')} className="w-5 h-5 border-2 border-slate-300 text-emerald-600" />
-                <span className="text-slate-900 font-semibold">Cash</span>
-              </label>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input type="radio" name="paymentMethod" checked={paymentMethod === 'online'} onChange={() => setPaymentMethod('online')} className="w-5 h-5 border-2 border-slate-300 text-emerald-600" />
-                <span className="text-slate-900 font-semibold">Online</span>
-              </label>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input type="radio" name="paymentMethod" checked={paymentMethod === 'already_paid'} onChange={() => setPaymentMethod('already_paid')} className="w-5 h-5 border-2 border-slate-300 text-emerald-600" />
-                <span className="text-slate-900 font-semibold">Already paid</span>
-              </label>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input type="radio" name="paymentMethod" checked={paymentMethod === 'partially_paid'} onChange={() => setPaymentMethod('partially_paid')} className="w-5 h-5 border-2 border-slate-300 text-emerald-600" />
-                <span className="text-slate-900 font-semibold">Partially paid</span>
-              </label>
+          <div className="border-2 border-slate-200 rounded-xl p-4 space-y-4">
+            <label className="block text-sm font-black text-slate-900">Payment Method *</label>
+            <div className="space-y-3">
+
+              {/* Option 1: To be paid in the camp */}
+              <div className={`rounded-xl border-2 p-3 transition-all ${paymentMethod === 'in_camp' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200'}`}>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="radio" name="paymentMethod" checked={paymentMethod === 'in_camp'} onChange={() => setPaymentMethod('in_camp')} className="w-5 h-5 border-2 border-slate-300 text-emerald-600" />
+                  <span className="text-slate-900 font-bold">To be paid in the camp</span>
+                </label>
+                {paymentMethod === 'in_camp' && (
+                  <div className="mt-3 space-y-3">
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <label className="block text-xs font-bold text-slate-600 mb-1">Amount *</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={amount}
+                          onChange={(e) => setAmount(e.target.value)}
+                          placeholder="Enter amount"
+                          className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black focus:border-emerald-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">Currency *</label>
+                        <select
+                          value={currency}
+                          onChange={(e) => { setCurrency(e.target.value as 'UZS' | 'USD' | 'EUR'); setExchangeRate(e.target.value === 'UZS' ? '1' : exchangeRate); }}
+                          className="px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black focus:border-emerald-500"
+                        >
+                          <option value="USD">USD</option>
+                          <option value="UZS">UZS</option>
+                          <option value="EUR">EUR</option>
+                        </select>
+                      </div>
+                    </div>
+                    {currency !== 'UZS' && (
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">Exchange Rate (to UZS)</label>
+                        <div className="flex gap-2">
+                          <input type="number" step="0.01" value={exchangeRate} onChange={(e) => setExchangeRate(e.target.value)} placeholder={`1 ${currency} = ? UZS`} className="flex-1 px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black" />
+                          <button type="button" onClick={getTodayRate} className="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold text-xs whitespace-nowrap">Get Today's Rate</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Option 2: All paid */}
+              <div className={`rounded-xl border-2 p-3 transition-all ${paymentMethod === 'all_paid' ? 'border-blue-500 bg-blue-50' : 'border-slate-200'}`}>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="radio" name="paymentMethod" checked={paymentMethod === 'all_paid'} onChange={() => setPaymentMethod('all_paid')} className="w-5 h-5 border-2 border-slate-300 text-blue-600" />
+                  <span className="text-slate-900 font-bold">All paid</span>
+                </label>
+                {paymentMethod === 'all_paid' && (
+                  <div className="mt-3">
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Message (optional)</label>
+                    <textarea
+                      value={paymentNote}
+                      onChange={(e) => setPaymentNote(e.target.value)}
+                      placeholder="Optional note..."
+                      rows={2}
+                      className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black focus:border-blue-500"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Option 3: Partially paid */}
+              <div className={`rounded-xl border-2 p-3 transition-all ${paymentMethod === 'partially_paid' ? 'border-amber-500 bg-amber-50' : 'border-slate-200'}`}>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="radio" name="paymentMethod" checked={paymentMethod === 'partially_paid'} onChange={() => setPaymentMethod('partially_paid')} className="w-5 h-5 border-2 border-slate-300 text-amber-600" />
+                  <span className="text-slate-900 font-bold">Partially paid</span>
+                </label>
+                {paymentMethod === 'partially_paid' && (
+                  <div className="mt-3">
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Message <span className="text-red-500">*</span></label>
+                    <textarea
+                      value={paymentNote}
+                      onChange={(e) => setPaymentNote(e.target.value)}
+                      placeholder="Describe what has been paid and what is remaining..."
+                      rows={2}
+                      className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black focus:border-amber-500"
+                      required
+                    />
+                  </div>
+                )}
+              </div>
+
             </div>
           </div>
 
-          {/* Currency, Exchange, Amount */}
-          {paymentMethod !== 'already_paid' && (
-            <>
-              <div>
-                <label className="block text-sm font-black text-slate-900 mb-2">Currency {(paymentMethod === 'online' || paymentMethod === 'partially_paid') ? '(Optional)' : '*'}</label>
-                <select value={currency} onChange={(e) => { setCurrency(e.target.value as 'UZS' | 'USD' | 'EUR'); setExchangeRate(e.target.value === 'UZS' ? '1' : exchangeRate); }}
-                  className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold" required={paymentMethod === 'cash'}>
-                  <option value="UZS">Uzbek Sum (UZS)</option><option value="USD">US Dollar (USD)</option><option value="EUR">Euro (EUR)</option>
-                </select>
-              </div>
-              {currency !== 'UZS' && (
-                <div>
-                  <label className="block text-sm font-black text-slate-900 mb-2">Exchange Rate (to UZS)</label>
-                  <div className="flex gap-2">
-                    <input type="number" step="0.01" value={exchangeRate} onChange={(e) => setExchangeRate(e.target.value)} placeholder={`1 ${currency} = ? UZS`} className="flex-1 px-4 py-3 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold" />
-                    <button type="button" onClick={getTodayRate} className="px-4 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-bold whitespace-nowrap text-sm">Get Today's Rate</button>
-                  </div>
-                </div>
-              )}
-              <div>
-                <label className="block text-sm font-black text-slate-900 mb-2">Total Amount ({currency}) {(paymentMethod === 'online' || paymentMethod === 'partially_paid') ? '(Optional)' : '*'}</label>
-                <input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={`Enter amount in ${currency}`} className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold" required={paymentMethod === 'cash'} />
-              </div>
-            </>
-          )}
-
           {/* Description */}
           <div>
-            <label className="block text-sm font-black text-slate-900 mb-2">Description {paymentMethod === 'cash' ? '*' : '(Optional)'}</label>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Additional notes..." rows={3} className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold" required={paymentMethod === 'cash'} />
+            <label className="block text-sm font-black text-slate-900 mb-2">Additional Notes (optional)</label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Additional notes..." rows={3} className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-bold text-black" />
           </div>
 
           {/* Submit */}

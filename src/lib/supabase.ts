@@ -75,7 +75,8 @@ export interface Booking {
   laundry?: boolean;
   laundry_price?: string;
   laundry_currency?: 'UZS' | 'USD';
-  payment_method?: string;
+  payment_method?: 'in_camp' | 'all_paid' | 'partially_paid';
+  payment_note?: string; // Optional message for all_paid, required for partially_paid
   currency?: 'UZS' | 'USD' | 'EUR';
   exchange_rate?: number;
   amount?: number;
