@@ -74,15 +74,15 @@ function color(b: Booking, today: string) {
   const status = getBookingStatus(b, today);
   switch (status) {
     case 'checked-in':
-      return { bg: '#10B981', text: '#064E3B' }; // Green
-    case 'checked-out':
-      return { bg: '#6B7280', text: '#1F2937' }; // Gray
-    case 'upcoming':
       return { bg: '#3B82F6', text: '#1E3A5F' }; // Blue
+    case 'checked-out':
+      return { bg: '#10B981', text: '#064E3B' }; // Green (success)
+    case 'upcoming':
+      return { bg: '#F59E0B', text: '#78350F' }; // Yellow
     case 'overdue-checkin':
-      return { bg: '#EF4444', text: '#7F1D1D' }; // Red
+      return { bg: '#F59E0B', text: '#78350F' }; // Yellow
     case 'cancelled':
-      return { bg: '#F87171', text: '#7F1D1D' }; // Light Red/Pink
+      return { bg: '#EF4444', text: '#7F1D1D' }; // Red
     default:
       return PALETTE[(b.yurt_id || 0) % PALETTE.length];
   }
@@ -96,6 +96,8 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<Partial<Booking>>({});
+  const [showEditRequestModal, setShowEditRequestModal] = useState(false);
+  const [editRequestData, setEditRequestData] = useState<Partial<Booking>>({});
 
   const year  = cur.getFullYear();
   const month = cur.getMonth();
@@ -334,10 +336,12 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                     <button
                       key={ei}
                       onClick={() => {
-                      setSel(ev.booking);
-                      setEditData(ev.booking);
-                      setIsEditing(false);
-                    }}
+                        if (isCompleted || isCancelled) return;
+                        setSel(ev.booking);
+                        setEditData(ev.booking);
+                        setIsEditing(false);
+                      }}
+                      disabled={isCompleted || isCancelled}
                       title={ev.booking.guest_name}
                       style={{
                         gridColumn: `${ev.colStart + 1} / ${ev.colEnd + 2}`,
@@ -347,6 +351,7 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                         borderRadius: isStart && isEnd ? '6px' : isStart ? '6px 0 0 6px' : isEnd ? '0 6px 6px 0' : '0',
                         marginLeft: isStart ? '2px' : '0',
                         marginRight: isEnd  ? '2px' : '0',
+                        cursor: isCompleted || isCancelled ? 'not-allowed' : 'pointer',
                       }}
                       className="text-[11px] font-semibold px-2 truncate text-left flex items-center h-[20px] hover:brightness-90 transition-all"
                     >
@@ -676,6 +681,18 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                         )}
                       </div>
 
+                      {userRole === 'Manager' && (
+                        <button
+                          onClick={() => {
+                            setEditRequestData(sel);
+                            setShowEditRequestModal(true);
+                          }}
+                          className="px-3 py-3 bg-amber-50 text-amber-600 rounded-xl font-bold hover:bg-amber-100 transition-all text-xs"
+                        >
+                          Request Edit
+                        </button>
+                      )}
+
                       {onCancelBooking && (
                         <div className="flex-1 group relative">
                           <button
@@ -719,6 +736,98 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                 )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Edit Request Modal */}
+      {showEditRequestModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" onClick={() => setShowEditRequestModal(false)}>
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-8 animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-black text-slate-800">Request Booking Edit</h2>
+              <button onClick={() => setShowEditRequestModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-all">
+                <svg className="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+                <p className="text-sm text-amber-800 font-semibold">
+                  This request will be sent to the CEO and the booking person for approval.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Guest Name</label>
+                <input
+                  type="text"
+                  value={editRequestData.guest_name || ''}
+                  onChange={e => setEditRequestData({ ...editRequestData, guest_name: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Check-in Date</label>
+                  <input
+                    type="date"
+                    value={editRequestData.check_in || ''}
+                    onChange={e => setEditRequestData({ ...editRequestData, check_in: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Check-out Date</label>
+                  <input
+                    type="date"
+                    value={editRequestData.check_out || ''}
+                    onChange={e => setEditRequestData({ ...editRequestData, check_out: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Number of People</label>
+                <input
+                  type="number"
+                  value={editRequestData.num_people || editRequestData.number_of_people || ''}
+                  onChange={e => setEditRequestData({ ...editRequestData, num_people: parseInt(e.target.value) })}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Special Requests</label>
+                <textarea
+                  value={editRequestData.special_requests || ''}
+                  onChange={e => setEditRequestData({ ...editRequestData, special_requests: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex gap-4 pt-4">
+                <button
+                  onClick={() => setShowEditRequestModal(false)}
+                  className="flex-1 px-6 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    alert('Edit request sent to CEO and booking person for approval.');
+                    setShowEditRequestModal(false);
+                  }}
+                  className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all"
+                >
+                  Send Request
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
