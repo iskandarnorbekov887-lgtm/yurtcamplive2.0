@@ -657,7 +657,7 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                 ) : (
                   <div className="flex flex-col gap-3">
                     <div className="flex gap-3">
-                      {onCheckIn && sel.status !== 'checked_in' && sel.check_in === today && (
+                      {onCheckIn && sel.status === 'confirmed' && sel.check_in === today && (
                         <button
                           onClick={handleCheckIn}
                           disabled={!!loadingAction}
@@ -666,7 +666,7 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                           {loadingAction === 'checkin' ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : t('btn.check_in')}
                         </button>
                       )}
-                      {onCheckIn && sel.status !== 'checked_in' && sel.check_in !== today && (
+                      {onCheckIn && sel.status === 'confirmed' && sel.check_in !== today && (
                         <div className="flex-1 py-3 bg-amber-100 text-amber-700 rounded-xl font-bold text-center flex items-center justify-center">
                           Upcoming Guest
                         </div>
@@ -677,8 +677,8 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                         </button>
                       )}
                       {sel.status === 'completed' && (
-                        <div className="flex-1 py-3 bg-slate-200 text-slate-500 rounded-xl font-bold text-center flex items-center justify-center cursor-not-allowed">
-                          Checked Out
+                        <div className="flex-1 py-3 bg-blue-500 text-white rounded-xl font-bold text-center flex items-center justify-center cursor-not-allowed">
+                          Successful Check Out
                         </div>
                       )}
                     </div>
