@@ -69,4 +69,31 @@ export interface Finance {
   receipt_url: string | null;
   created_by: string;
   created_at: string;
+  // Income-specific fields
+  guest_count?: number | null;
+  children_under_12?: number | null;
+  nights?: string | null;
+  guide_service?: boolean | null;
+  guide_names?: string | null;
+  transportation?: boolean | null;
+  transportation_details?: string | null;
+  lunch?: boolean | null;
+  lunch_count?: number | null;
+  dinner?: boolean | null;
+  dinner_count?: number | null;
+  laundry?: boolean | null;
+  laundry_price?: string | null;
+  payment_method?: 'in_camp' | 'online' | null;
+}
+
+export interface Notification {
+  id: number;
+  user_id: string;
+  type: string;
+  title: string;
+  message: string;
+  related_id: number | null;
+  status?: string;
+  read: boolean;
+  created_at: string;
 }

@@ -9,7 +9,11 @@ const STORAGE_KEYS = {
   yurts: 'camp_yurts',
   bookings: 'camp_bookings',
   expenses: 'camp_expenses',
+  camp_finances: 'camp_finances',
   session: 'camp_session',
+  service_pricing: 'camp_service_pricing',
+  deleted_records: 'camp_deleted_records',
+  notifications: 'camp_notifications',
 };
 
 // Check if we're on client
@@ -336,6 +340,24 @@ class QueryBuilder {
     localStorage.setItem((STORAGE_KEYS as any)[this.table], JSON.stringify(updatedItems));
     this.filters = []; // Reset filters after update
     return { data: null, error: null };
+  };
+
+  delete = () => {
+    return {
+      eq: (column: string, value: any) => {
+        this.filters.push(item => item[column] === value);
+        return {
+          then: async (resolve: any) => {
+            if (!isClient) return resolve({ data: null, error: null });
+            let items = JSON.parse(localStorage.getItem((STORAGE_KEYS as any)[this.table]) || '[]');
+            const filteredItems = items.filter((item: any) => !this.filters.every(f => f(item)));
+            localStorage.setItem((STORAGE_KEYS as any)[this.table], JSON.stringify(filteredItems));
+            this.filters = []; // Reset filters after delete
+            resolve({ data: null, error: null });
+          },
+        };
+      },
+    };
   };
 }
 

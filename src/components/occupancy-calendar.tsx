@@ -14,7 +14,6 @@ interface Props {
   onCheckIn?: (id: number) => Promise<void>;
   onCheckOut?: (id: number) => Promise<void>;
   onUpdateBooking?: (id: number, updates: Partial<Booking>) => Promise<void>;
-  onDayClick?: (date: string) => void;
 }
 interface EventInfo { booking: Booking; colStart: number; colEnd: number; lane: number; }
 
@@ -88,7 +87,7 @@ function color(b: Booking, today: string) {
   }
 }
 
-export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, staff, onCancelBooking, onCheckIn, onCheckOut, onUpdateBooking, onDayClick }: Props) {
+export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, staff, onCancelBooking, onCheckIn, onCheckOut, onUpdateBooking }: Props) {
   const { t } = useLanguage();
   const [cur, setCur]   = useState(new Date());
   const [sel, setSel]   = useState<Booking | null>(null);
@@ -273,10 +272,7 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                   <div 
                     key={di} 
                     className={`min-h-[40px] px-2 pt-2 border-r border-slate-100 last:border-r-0 cursor-pointer hover:bg-indigo-50 transition-colors ${!isCurrentMonth ? 'bg-slate-50/60' : ''}`}
-                    onClick={() => {
-                      setSelectedDay(ds);
-                      if (onDayClick) onDayClick(ds);
-                    }}
+                    onClick={() => setSelectedDay(ds)}
                   >
                     <div className="flex items-center justify-between">
                       <span className={`text-sm font-semibold w-7 h-7 flex items-center justify-center rounded-full

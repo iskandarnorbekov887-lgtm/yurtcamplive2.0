@@ -166,13 +166,13 @@ function ManagerPortal() {
 
         {activeTab === 'financials' && (
           <div className="bg-white rounded-xl shadow p-6">
-            <h2 className="text-xl font-bold mb-4 text-emerald-800">Financial Tracking</h2>
-            <p className="text-gray-600 mb-4">Record income and expenses with multi-currency support.</p>
+            <h2 className="text-xl font-bold mb-4 text-emerald-800">Financial Recording</h2>
+            <p className="text-gray-600 mb-4">Record income and expenses. Date is automatically set to today.</p>
             <a
               href="/financials"
               className="inline-block px-6 py-3 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition-all"
             >
-              Go to Financial Tracker
+              Go to Financial Recording
             </a>
           </div>
         )}
