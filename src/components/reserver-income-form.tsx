@@ -92,7 +92,9 @@ export function ReserverIncomeForm({ selectedDate, onClose, onSuccess }: Props) 
         created_by_role: 'Reserver',
         approved_by_manager: false,
         created_by_id: currentUserId || '',
+        created_at: new Date().toISOString(),
         last_edited_by_id: currentUserId || '',
+        last_edited_at: new Date().toISOString(),
         // Service fields
         guest_count: guestCount,
         children_under_12: childrenUnder12,

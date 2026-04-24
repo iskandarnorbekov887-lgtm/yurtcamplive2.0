@@ -27,8 +27,7 @@ function CEODashboard() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [icalEvents, setIcalEvents] = useState<Booking[]>([]);
   const [staff, setStaff] = useState<Profile[]>([]);
-  const [pendingUsers, setPendingUsers] = useState<Profile[]>([]);
-  const [activeTab, setActiveTab] = useState<'checkin' | 'team' | 'financials' | 'approvals'>('checkin');
+  const [activeTab, setActiveTab] = useState<'checkin' | 'team' | 'financials'>('checkin');
   const [loading, setLoading] = useState(true);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [calendarPreference, setCalendarPreference] = useState<'internal' | 'ical'>('internal');
@@ -186,12 +185,11 @@ function CEODashboard() {
 
   const fetchData = async () => {
     try {
-      const [yurtsData, bookingsData, staffData, notificationsData, pendingUsersData] = await Promise.all([
+      const [yurtsData, bookingsData, staffData, notificationsData] = await Promise.all([
         supabase.from('yurts').select('*'),
         supabase.from('bookings').select('*'),
         supabase.from('profiles').select('*'),
-        supabase.from('notifications').select('*').eq('user_id', currentUserId || '').order('created_at', { ascending: false }),
-        supabase.from('profiles').select('*').eq('approved', false)
+        supabase.from('notifications').select('*').eq('user_id', currentUserId || '').order('created_at', { ascending: false })
       ]);
 
       console.log('🔄 CEO Fetched bookings:', bookingsData.data?.length);
@@ -211,7 +209,6 @@ function CEODashboard() {
       setBookings(deDuplicate(bookingsData.data));
       setStaff(staffData.data || []);
       setNotifications((notificationsData.data || []).slice(0, 10));
-      setPendingUsers(pendingUsersData.data || []);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -221,7 +218,7 @@ function CEODashboard() {
 
 
   const handleUpdateBooking = async (id: number, updates: Partial<Booking>) => {
-    await supabase.from('bookings').update({ ...updates, last_edited_by_id: currentUserId || '', last_edited_by_role: userRole }).eq('id', id);
+    await supabase.from('bookings').update({ ...updates, last_edited_by_id: currentUserId || '', last_edited_by_role: userRole, last_edited_at: new Date().toISOString() }).eq('id', id);
     fetchData();
   };
 
@@ -278,18 +275,6 @@ function CEODashboard() {
     // Then mark booking as completed
     await supabase.from('bookings').update({ status: 'completed' }).eq('id', id);
     fetchData();
-  };
-
-  const handleApproveUser = async (userId: string, role: UserRole) => {
-    await supabase.from('profiles').update({ approved: true, role }).eq('id', userId);
-    fetchData();
-  };
-
-  const handleRejectUser = async (userId: string) => {
-    if (confirm('Are you sure you want to reject this user?')) {
-      await supabase.from('profiles').delete().eq('id', userId);
-      fetchData();
-    }
   };
 
 
@@ -519,15 +504,6 @@ function CEODashboard() {
                 </div>
               )}
             </div>
-            <a
-              href="/messages"
-              className="p-2.5 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-all relative"
-              title="Messages"
-            >
-              <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-            </a>
             <button onClick={signOut} className="px-5 py-2.5 bg-rose-600/90 hover:bg-rose-600 rounded-xl text-xs font-black transition-all shadow-lg hover:shadow-rose-500/20 active:scale-95 flex items-center gap-2">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
               {t('btn.logout')}
@@ -538,7 +514,7 @@ function CEODashboard() {
 
       <main className="max-w-7xl mx-auto p-6 md:p-8">
         <div className="flex bg-white/50 p-1.5 rounded-2xl mb-8 border border-slate-200 shadow-sm w-fit">
-          {(['checkin', 'team', 'financials', 'approvals'] as const).map((tab) => (
+          {(['checkin', 'team', 'financials'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -546,14 +522,7 @@ function CEODashboard() {
                 activeTab === tab ? 'bg-white text-indigo-700 shadow-lg border border-slate-100 scale-105' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
               }`}
             >
-              {tab === 'approvals' ? (
-                <>
-                  Approvals
-                  {pendingUsers.length > 0 && (
-                    <span className="bg-rose-500 text-white text-xs px-2 py-0.5 rounded-full">{pendingUsers.length}</span>
-                  )}
-                </>
-              ) : t(`tab.${tab}`)}
+              {t(`tab.${tab}`)}
             </button>
           ))}
         </div>
@@ -607,80 +576,6 @@ function CEODashboard() {
             >
               Go to Financial Calendar
             </a>
-          </div>
-        )}
-        {activeTab === 'approvals' && (
-          <div className="animate-in fade-in duration-500">
-            <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/60 border border-slate-100 overflow-hidden">
-              <div className="p-8 border-b border-slate-50 bg-gradient-to-r from-amber-50/50 to-white">
-                <h3 className="text-xl font-black text-slate-800 flex items-center gap-3">
-                  <span className="p-2 bg-amber-50 text-amber-600 rounded-xl">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                  </span>
-                  Pending User Approvals
-                </h3>
-                <p className="text-sm text-slate-500 mt-2">Review and approve new user registration requests</p>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-50/50 border-b border-slate-100">
-                    <tr>
-                      <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Name</th>
-                      <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Email</th>
-                      <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Phone</th>
-                      <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Requested Role</th>
-                      <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {pendingUsers.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="px-8 py-12 text-center text-slate-400">
-                          No pending approvals
-                        </td>
-                      </tr>
-                    ) : pendingUsers.map((user) => (
-                      <tr key={user.id} className="hover:bg-amber-50/30 transition-colors group">
-                        <td className="px-8 py-5">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-600 font-black shadow-inner">
-                              {user.full_name?.charAt(0) || 'N'}
-                            </div>
-                            <span className="font-bold text-slate-800">{user.full_name}</span>
-                          </div>
-                        </td>
-                        <td className="px-8 py-5 text-sm text-slate-600">{user.email}</td>
-                        <td className="px-8 py-5 text-sm text-slate-600">{user.phone || 'N/A'}</td>
-                        <td className="px-8 py-5">
-                          <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold uppercase">{user.role}</span>
-                        </td>
-                        <td className="px-8 py-5">
-                          <div className="flex gap-2">
-                            <select
-                              onChange={(e) => handleApproveUser(user.id, e.target.value as UserRole)}
-                              className="px-3 py-2 border border-slate-300 rounded-lg text-sm font-bold text-black bg-white"
-                              defaultValue=""
-                            >
-                              <option value="" disabled>Approve as...</option>
-                              <option value="Manager">Manager</option>
-                              <option value="Cook">Cook</option>
-                              <option value="Reserver">Reserver</option>
-                              <option value="Observer">Observer</option>
-                            </select>
-                            <button
-                              onClick={() => handleRejectUser(user.id)}
-                              className="px-3 py-2 bg-rose-100 text-rose-600 rounded-lg text-sm font-bold hover:bg-rose-200 transition-all"
-                            >
-                              Reject
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
           </div>
         )}
         {activeTab === 'team' && (

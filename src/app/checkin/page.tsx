@@ -104,7 +104,7 @@ function CheckinPortal() {
   };
 
   const handleUpdateBooking = async (id: number, updates: Partial<Booking>) => {
-    await supabase.from('bookings').update({ ...updates, last_edited_by_id: currentUserId || '' }).eq('id', id);
+    await supabase.from('bookings').update({ ...updates, last_edited_by_id: currentUserId || '', last_edited_at: new Date().toISOString() }).eq('id', id);
     fetchData();
   };
 

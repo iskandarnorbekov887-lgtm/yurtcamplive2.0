@@ -14,7 +14,6 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { signIn, signUp, user, configError } = useAuth();
@@ -28,7 +27,6 @@ export default function LoginPage() {
         'Manager': '/manager',
         'Cook': '/cook',
         'Reserver': '/bookings',
-        'Observer': '/observer',
       };
       router.push(rolePaths[user.role] || '/login');
     }
@@ -45,21 +43,10 @@ export default function LoginPage() {
 
     try {
       if (isSignUp) {
-        await signUp(email, password, fullName, phone);
-        setError('Account created! Please wait for CEO approval.');
+        await signUp(email, password, fullName);
+        setError('Account created! Please check your email to confirm.');
       } else {
-        const profile = await signIn(email, password);
-        // Manual redirect after successful login using returned profile
-        if (profile) {
-          const rolePaths: Record<string, string> = {
-            'CEO': '/ceo',
-            'Manager': '/manager',
-            'Cook': '/cook',
-            'Reserver': '/bookings',
-            'Observer': '/observer',
-          };
-          router.push(rolePaths[profile.role] || '/login');
-        }
+        await signIn(email, password);
       }
     } catch (err: any) {
       setError(err.message || 'An error occurred');
@@ -125,33 +112,18 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {isSignUp && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Full Name
-                </label>
-                <input
-                  type="text"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
-                  required={isSignUp}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Phone Number
-                </label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
-                  required={isSignUp}
-                  placeholder="+998 90 123 45 67"
-                />
-              </div>
-            </>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Full Name
+              </label>
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+                required={isSignUp}
+              />
+            </div>
           )}
 
           <div>
