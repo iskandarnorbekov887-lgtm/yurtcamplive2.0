@@ -340,12 +340,12 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                     <button
                       key={ei}
                       onClick={() => {
-                        if (isCompleted || isCancelled) return;
+                        if (isCancelled) return;
                         setSel(ev.booking);
                         setEditData(ev.booking);
                         setIsEditing(false);
                       }}
-                      disabled={isCompleted || isCancelled}
+                      disabled={isCancelled}
                       title={ev.booking.guest_name}
                       style={{
                         gridColumn: `${ev.colStart + 1} / ${ev.colEnd + 2}`,
@@ -355,7 +355,7 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                         borderRadius: isStart && isEnd ? '6px' : isStart ? '6px 0 0 6px' : isEnd ? '0 6px 6px 0' : '0',
                         marginLeft: isStart ? '2px' : '0',
                         marginRight: isEnd  ? '2px' : '0',
-                        cursor: isCompleted || isCancelled ? 'not-allowed' : 'pointer',
+                        cursor: isCancelled ? 'not-allowed' : 'pointer',
                       }}
                       className="text-[11px] font-semibold px-2 truncate text-left flex items-center h-[20px] hover:brightness-90 transition-all"
                     >
@@ -690,7 +690,7 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                         </div>
                       )}
 
-                      {userRole === 'Manager' && sel.status === 'checked_in' && (
+                      {userRole === 'Manager' && (sel.status === 'checked_in' || sel.status === 'completed') && (
                         <button
                           onClick={() => {
                             setEditRequestData(sel);
@@ -698,7 +698,7 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                           }}
                           className="px-3 py-3 bg-amber-50 text-amber-600 rounded-xl font-bold hover:bg-amber-100 transition-all text-xs"
                         >
-                          Request Edit
+                          Request Change
                         </button>
                       )}
 
