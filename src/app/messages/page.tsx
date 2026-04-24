@@ -307,6 +307,7 @@ function MessagesDashboard() {
                         <div className="flex-1 min-w-0">
                           <p className="font-bold text-slate-800 truncate">{contact.full_name}</p>
                           <p className="text-xs text-slate-500 truncate">{contact.role}</p>
+                          <p className="text-[10px] text-slate-400 truncate">ID: {contact.id}</p>
                         </div>
                       </div>
                     </button>
