@@ -146,6 +146,7 @@ export function useRoleRedirect() {
     'Manager': '/manager',
     'Cook': '/cook',
     'Reserver': '/bookings',
+    'Observer': '/observer',
   };
   
   return { redirecting: false, path: rolePaths[user.role] || '/login' };

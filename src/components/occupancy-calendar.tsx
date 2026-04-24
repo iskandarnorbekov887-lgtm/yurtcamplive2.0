@@ -194,7 +194,11 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
     if (!sel || !onUpdateBooking) return;
     setLoadingAction('update');
     try {
-      await onUpdateBooking(sel.id, editData);
+      await onUpdateBooking(sel.id, {
+        ...editData,
+        last_edited_by_id: currentUserId,
+        last_edited_at: new Date().toISOString()
+      });
       alert('Changes saved successfully!');
       setIsEditing(false);
       setSel(null);
@@ -401,19 +405,39 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                 <div>
                   <h3 className="text-2xl font-black text-slate-800">{sel.guest_name}</h3>
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{t('manifest.guest')} • Booking ID: {sel.id}</p>
-                  <p className="text-[9px] text-slate-300 mt-1">
+                  <p className="text-[9px] text-slate-300 flex items-center gap-2">
                     Created by: <span className="font-semibold text-slate-600">
-                      {sel.created_by_role === 'Reserver' 
-                        ? `Reserver: ${staff?.find(s => s.id === sel.created_by_id)?.full_name || 'Unknown'}`
-                        : sel.created_by_role || 'System'}
+                      {staff?.find(s => s.id === sel.created_by_id)?.full_name || 'Unknown'}
                     </span>
+                    {sel.created_at && (
+                      <span className="ml-2 text-slate-400">
+                        {new Date(sel.created_at).toLocaleString()}
+                      </span>
+                    )}
+                    {(userRole === 'Manager' || userRole === 'Cook') && sel.created_by_id !== currentUserId && (
+                      <button
+                        onClick={() => {
+                          // TODO: Open messaging chat with original reserver
+                          alert('Messaging feature coming soon');
+                        }}
+                        className="p-1 hover:bg-blue-100 rounded transition-all"
+                        title="Message"
+                      >
+                        <svg className="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                      </button>
+                    )}
                   </p>
                   <p className="text-[9px] text-slate-300">
                     Last edited by: <span className="font-semibold text-slate-600">
-                      {sel.last_edited_by_role === 'Reserver'
-                        ? `Reserver: ${staff?.find(s => s.id === sel.last_edited_by_id)?.full_name || 'Unknown'}`
-                        : sel.last_edited_by_role || 'System'}
+                      {sel.last_edited_by_id ? staff?.find(s => s.id === sel.last_edited_by_id)?.full_name || 'Unknown' : 'None'}
                     </span>
+                    {sel.last_edited_at && (
+                      <span className="ml-2 text-slate-400">
+                        {new Date(sel.last_edited_at).toLocaleString()}
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>

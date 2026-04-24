@@ -12,13 +12,16 @@ export const supabase = isConfigured
 
 export const isUsingLocalStorage = !isConfigured;
 
-export type UserRole = 'CEO' | 'Manager' | 'Cook' | 'Reserver';
+export type UserRole = 'CEO' | 'Manager' | 'Cook' | 'Reserver' | 'Observer';
 
 export interface Profile {
   id: string;
   email: string;
   role: UserRole;
   full_name: string;
+  phone: string;
+  approved: boolean;
+  created_at: string;
 }
 
 export interface Yurt {
@@ -50,8 +53,10 @@ export interface Booking {
   created_by_role?: UserRole;
   approved_by_manager: boolean;
   created_by_id: string;
+  created_at?: string;
   last_edited_by_id: string | null;
   last_edited_by_role?: UserRole;
+  last_edited_at?: string | null;
   yurt?: Yurt;
   // Service fields (from income form)
   guest_count?: number;
@@ -122,4 +127,22 @@ export interface Notification {
   status?: string;
   read: boolean;
   created_at: string;
+}
+
+export interface Message {
+  id: number;
+  thread_id: number;
+  sender_id: string;
+  receiver_id: string;
+  content: string;
+  read: boolean;
+  created_at: string;
+}
+
+export interface MessageThread {
+  id: number;
+  booking_id: number | null;
+  participants: string[];
+  created_at: string;
+  updated_at: string;
 }
