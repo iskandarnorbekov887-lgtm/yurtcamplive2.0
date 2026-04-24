@@ -95,6 +95,7 @@ export function ReserverIncomeForm({ selectedDate, onClose, onSuccess }: Props) 
         created_at: new Date().toISOString(),
         last_edited_by_id: currentUserId || '',
         last_edited_at: new Date().toISOString(),
+        yurt_requests: null, // Will be added as a separate input field
         // Service fields
         guest_count: guestCount,
         children_under_12: childrenUnder12,

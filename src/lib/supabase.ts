@@ -78,6 +78,21 @@ export interface Booking {
   exchange_rate?: number;
   amount?: number;
   description?: string;
+  // New fields for manager UI
+  yurt_requests?: string; // Special requests for yurts (separate/together beds, how many yurts)
+  drinks_tab?: Array<{ drink_id: number; drink_name: string; quantity: number; price: number; currency: 'UZS' | 'USD' | 'EUR' }>;
+  extra_services?: Array<{ name: string; price: number; currency: 'UZS' | 'USD' | 'EUR' }>;
+  collected_amount?: number;
+  collected_currency?: 'UZS' | 'USD' | 'EUR';
+}
+
+export interface Drink {
+  id: number;
+  name: string;
+  original_price: number;
+  sold_price: number;
+  currency: 'UZS' | 'USD' | 'EUR';
+  available: boolean;
 }
 
 export interface Finance {
