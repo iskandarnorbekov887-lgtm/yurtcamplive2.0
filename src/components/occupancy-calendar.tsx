@@ -679,22 +679,18 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                     </div>
                     
                     <div className="flex gap-3">
-                      <div className="flex-1 group relative">
-                        <button
-                          onClick={() => setIsEditing(true)}
-                          disabled={!canEdit(sel)}
-                          className={`w-full py-3 rounded-xl font-bold transition-all ${canEdit(sel) ? 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100' : 'bg-slate-50 text-slate-300 cursor-not-allowed'}`}
-                        >
-                          Edit Details
-                        </button>
-                        {!canEdit(sel) && (
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-                            You do not have permission to modify this booking
-                          </div>
-                        )}
-                      </div>
+                      {sel.status === 'checked_in' && (
+                        <div className="flex-1 group relative">
+                          <button
+                            onClick={() => setIsEditing(true)}
+                            className="w-full py-3 bg-indigo-50 text-indigo-600 rounded-xl font-bold hover:bg-indigo-100 transition-all"
+                          >
+                            Add Details
+                          </button>
+                        </div>
+                      )}
 
-                      {userRole === 'Manager' && (
+                      {userRole === 'Manager' && sel.status === 'checked_in' && (
                         <button
                           onClick={() => {
                             setEditRequestData(sel);
