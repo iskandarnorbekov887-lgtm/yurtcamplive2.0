@@ -559,6 +559,7 @@ function CEODashboard() {
               userRole={userRole}
               currentUserId={currentUserId}
               staff={staff}
+              onCancelBooking={handleCancelBooking}
               onCheckIn={handleCheckIn}
               onCheckOut={handleCheckOut}
               onUpdateBooking={handleUpdateBooking}

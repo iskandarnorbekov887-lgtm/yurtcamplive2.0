@@ -59,8 +59,9 @@ const PALETTE = [
   { bg: '#06B6D4', text: '#164E63' },
 ];
 
-function getBookingStatus(b: Booking, today: string): 'checked-in' | 'checked-out' | 'upcoming' | 'overdue-checkin' | 'neglected-checkin' | 'cancelled' {
+function getBookingStatus(b: Booking, today: string): 'checked-in' | 'checked-out' | 'upcoming' | 'overdue-checkin' | 'neglected-checkin' | 'cancelled' | 'no-arrival' {
   if (b.status === 'cancelled') return 'cancelled';
+  if (b.status === 'no_arrival') return 'no-arrival';
   if (b.status === 'checked_in') return 'checked-in';
   if (b.status === 'completed') return 'checked-out';
   if (b.status === 'confirmed') {
@@ -90,6 +91,8 @@ function color(b: Booking, today: string) {
       return { bg: '#EF4444', text: '#7F1D1D' }; // Red (attention)
     case 'cancelled':
       return { bg: '#EF4444', text: '#7F1D1D' }; // Red
+    case 'no-arrival':
+      return { bg: '#9CA3AF', text: '#374151' }; // Gray
     default:
       return PALETTE[(b.yurt_id || 0) % PALETTE.length];
   }
@@ -340,12 +343,10 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                     <button
                       key={ei}
                       onClick={() => {
-                        if (isCancelled) return;
                         setSel(ev.booking);
                         setEditData(ev.booking);
                         setIsEditing(false);
                       }}
-                      disabled={isCancelled}
                       title={ev.booking.guest_name}
                       style={{
                         gridColumn: `${ev.colStart + 1} / ${ev.colEnd + 2}`,
@@ -355,7 +356,7 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                         borderRadius: isStart && isEnd ? '6px' : isStart ? '6px 0 0 6px' : isEnd ? '0 6px 6px 0' : '0',
                         marginLeft: isStart ? '2px' : '0',
                         marginRight: isEnd  ? '2px' : '0',
-                        cursor: isCancelled ? 'not-allowed' : 'pointer',
+                        cursor: 'pointer',
                       }}
                       className="text-[11px] font-semibold px-2 truncate text-left flex items-center h-[20px] hover:brightness-90 transition-all"
                     >
@@ -416,9 +417,24 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                   </p>
                 </div>
               </div>
-              <button onClick={() => setSel(null)} className="p-2 hover:bg-slate-100 rounded-xl transition-all">
-                <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Small cancel button in top-left corner after check-in */}
+                {sel.status === 'checked_in' && onCancelBooking && (
+                  <button
+                    onClick={handleCancel}
+                    disabled={!!loadingAction}
+                    className="p-1.5 hover:bg-rose-100 rounded-lg transition-all"
+                    title="Cancel Trip"
+                  >
+                    <svg className="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+                <button onClick={() => setSel(null)} className="p-2 hover:bg-slate-100 rounded-xl transition-all">
+                  <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-6 mb-8">
@@ -442,8 +458,8 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">{t('table.status')}</label>
                 <div className="flex flex-wrap gap-2">
-                  <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase ${sel.payment_status === 'Paid' ? 'bg-emerald-100 text-emerald-700' : sel.payment_status === 'Partial' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>
-                    {sel.payment_status}
+                  <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase ${sel.status === 'cancelled' ? 'bg-red-100 text-red-700' : sel.status === 'no_arrival' ? 'bg-gray-200 text-gray-700' : sel.payment_status === 'Paid' ? 'bg-emerald-100 text-emerald-700' : sel.payment_status === 'Partial' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>
+                    {sel.status === 'cancelled' ? 'CANCELLED' : sel.status === 'no_arrival' ? 'NO ARRIVAL' : sel.payment_status}
                   </span>
                   {sel.status === 'checked_in' && <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-[10px] font-black uppercase">IN</span>}
                 </div>
@@ -707,7 +723,23 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                         </button>
                       )}
 
-                      {onCancelBooking && sel.status !== 'completed' && (
+                      {/* Restore button for cancelled/no-arrival bookings (creator or CEO only) */}
+                      {(sel.status === 'cancelled' || sel.status === 'no_arrival') && onUpdateBooking && (userRole === 'CEO' || currentUserId === sel.created_by_id) && (
+                        <button
+                          onClick={async () => {
+                            setLoadingAction('restore');
+                            await onUpdateBooking(sel.id, { status: 'confirmed' });
+                            setLoadingAction(null);
+                            setSel(null);
+                          }}
+                          disabled={!!loadingAction}
+                          className="flex-1 py-3 bg-emerald-50 text-emerald-600 rounded-xl font-bold hover:bg-emerald-100 transition-all"
+                        >
+                          {loadingAction === 'restore' ? <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto" /> : 'Restore Booking'}
+                        </button>
+                      )}
+
+                      {onCancelBooking && sel.status !== 'completed' && sel.status !== 'cancelled' && sel.status !== 'no_arrival' && sel.status !== 'checked_in' && (
                         <div className="flex-1 group relative">
                           <button
                             onClick={handleCancel}
@@ -733,14 +765,19 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                       const nowDateStr = now.toISOString().split('T')[0];
                       const daysSinceCheckIn = Math.floor((now.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24));
 
-                      if (sel.status === 'confirmed' && daysSinceCheckIn >= 1 && onCancelBooking) {
+                      if (sel.status === 'confirmed' && daysSinceCheckIn >= 1 && onUpdateBooking) {
                         return (
                           <button
-                            onClick={handleCancel}
+                            onClick={async () => {
+                              setLoadingAction('no-arrival');
+                              await onUpdateBooking(sel.id, { status: 'no_arrival' });
+                              setLoadingAction(null);
+                              setSel(null);
+                            }}
                             disabled={!!loadingAction}
-                            className="w-full py-2 bg-amber-100 text-amber-700 rounded-lg text-xs font-bold hover:bg-amber-200 transition-all"
+                            className="w-full py-2 bg-gray-200 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-300 transition-all"
                           >
-                            No Arrival
+                            Mark as No Arrival
                           </button>
                         );
                       }

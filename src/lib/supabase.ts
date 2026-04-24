@@ -40,7 +40,7 @@ export interface Booking {
   num_people?: number;
   payment_status: 'Paid' | 'Partial' | 'Unpaid';
   source: 'Manual' | 'Booking.com' | 'TripAdvisor';
-  status: 'confirmed' | 'cancelled' | 'completed' | 'pending' | 'checked_in';
+  status: 'confirmed' | 'cancelled' | 'completed' | 'pending' | 'checked_in' | 'no_arrival';
   notes: string | null;
   meal_notes: string | null;
   transportation?: string;
