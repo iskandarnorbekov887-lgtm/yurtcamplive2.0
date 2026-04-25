@@ -11,6 +11,8 @@ interface CalEvent {
   end: string;
   description?: string | null;
   location?: string | null;
+  colorId?: string | null;
+  status?: string | null;
 }
 
 interface ListItem {
@@ -46,8 +48,6 @@ export function GoogleGuestAgenda({
   const [gcEvents, setGcEvents] = useState<CalEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [eventsError, setEventsError] = useState('');
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<'all' | 'today' | 'arriving' | 'checked_in'>('all');
   const [selectedItem, setSelectedItem] = useState<ListItem | null>(null);
 
   const [loadingAction, setLoadingAction] = useState('');
@@ -99,44 +99,84 @@ export function GoogleGuestAgenda({
   const getYurtName = (b: Booking) =>
     yurts.find(y => y.id === b.yurt_id)?.name || (b.yurt_id ? `Yurt #${b.yurt_id}` : '—');
 
-  const mergedItems = (): ListItem[] => {
-    const items: ListItem[] = [];
-    const usedBookingIds = new Set<number>();
+  const isGcCancelled = (ev: CalEvent) =>
+    ev.status === 'cancelled' || ev.colorId === '11' || ev.colorId === '4' ||
+    ev.summary.toLowerCase().includes('cancel');
 
-    gcEvents.forEach(ev => {
-      const matched = bookings.find(b =>
-        b.guest_name.toLowerCase().includes(ev.summary.toLowerCase()) ||
-        ev.summary.toLowerCase().includes(b.guest_name.toLowerCase()) ||
-        b.check_in === ev.start
-      );
-      if (matched) usedBookingIds.add(matched.id);
-      items.push({
-        key: `ev-${ev.id}`,
-        name: matched ? matched.guest_name : ev.summary,
-        start: ev.start,
-        end: ev.end,
-        source: matched ? 'both' : 'calendar',
-        booking: matched || null,
-        event: ev,
-      });
-    });
+  const calendarOnlyItems: ListItem[] = gcEvents
+    .filter(ev => !bookings.some(b => b.google_event_id === ev.id))
+    .map(ev => ({ key: `ev-${ev.id}`, name: ev.summary, start: ev.start, end: ev.end, source: 'calendar' as const, booking: null, event: ev }));
 
-    bookings
-      .filter(b => !usedBookingIds.has(b.id) && !['cancelled', 'completed'].includes(b.status) && b.check_out >= today)
-      .forEach(b => items.push({ key: `db-${b.id}`, name: b.guest_name, start: b.check_in, end: b.check_out, source: 'db', booking: b, event: null }));
+  const bookingItems: ListItem[] = bookings.map(b => ({
+    key: `db-${b.id}`, name: b.guest_name, start: b.check_in, end: b.check_out,
+    source: 'db' as const, booking: b, event: gcEvents.find(e => e.id === b.google_event_id) || null,
+  }));
 
-    items.sort((a, b) => a.start.localeCompare(b.start));
-    return items;
+  const sevenDaysAgo = localDateStr(new Date(Date.now() - 7 * 86400000));
+  const thirtyDaysAgo = localDateStr(new Date(Date.now() - 30 * 86400000));
+
+  const arrivingItems = [
+    ...bookingItems.filter(i => i.booking!.status === 'confirmed' && i.booking!.check_in <= today && i.booking!.check_out > today),
+    ...calendarOnlyItems.filter(i => i.event!.start <= today && i.event!.end > today && !isGcCancelled(i.event!)),
+  ].sort((a, b) => a.start.localeCompare(b.start));
+
+  const checkedInItems = bookingItems.filter(i => i.booking!.status === 'checked_in')
+    .sort((a, b) => a.start.localeCompare(b.start));
+
+  const checkedOutItems = bookingItems
+    .filter(i => i.booking!.status === 'completed' && i.booking!.check_out >= sevenDaysAgo)
+    .sort((a, b) => b.start.localeCompare(a.start));
+
+  const cancelledItems = [
+    ...bookingItems.filter(i => i.booking!.status === 'cancelled' && i.booking!.check_in >= thirtyDaysAgo),
+    ...calendarOnlyItems.filter(i => isGcCancelled(i.event!) && i.event!.start >= thirtyDaysAgo),
+  ].sort((a, b) => b.start.localeCompare(a.start));
+
+  const renderCard = (item: ListItem, isCancelled: boolean) => {
+    const isSelected = selectedItem?.key === item.key;
+    const booking = item.booking;
+    return (
+      <button
+        key={item.key}
+        onClick={() => handleSelect(item)}
+        className={`w-full text-left px-4 py-3 transition-all border-l-4 ${
+          isCancelled
+            ? 'border-red-300 bg-red-50/50'
+            : isSelected
+            ? 'bg-indigo-50 border-indigo-400'
+            : booking?.status === 'checked_in'
+            ? 'border-emerald-400 hover:bg-emerald-50'
+            : booking?.status === 'confirmed'
+            ? 'border-amber-400 hover:bg-amber-50'
+            : booking?.status === 'completed'
+            ? 'border-blue-300 hover:bg-blue-50'
+            : 'border-slate-200 hover:bg-slate-50'
+        }`}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className={`font-bold text-sm truncate ${isCancelled ? 'text-red-600 line-through' : 'text-slate-900'}`}>
+              {item.name}
+            </p>
+            <p className="text-xs text-slate-400 mt-0.5">{item.start} → {item.end}</p>
+            {booking ? <p className="text-xs text-slate-500">{getYurtName(booking)}</p> : <p className="text-xs text-slate-400">calendar only</p>}
+          </div>
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            {isCancelled
+              ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600 border border-red-200">cancelled</span>
+              : booking && <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${statusColor(booking.status)}`}>{booking.status.replace('_', ' ')}</span>
+            }
+            {booking && syncWarnings[booking.id] === 'deleted' && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 border border-red-200">⚠ removed</span>
+            )}
+            {booking && syncWarnings[booking.id] === 'dates_changed' && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">⚠ dates ≠</span>
+            )}
+          </div>
+        </div>
+      </button>
+    );
   };
-
-  const filteredItems = mergedItems().filter(item => {
-    const nameMatch = !search.trim() || item.name.toLowerCase().includes(search.toLowerCase());
-    const status = item.booking?.status;
-    if (filter === 'today') return nameMatch && (item.start === today || (item.start <= today && item.end >= today));
-    if (filter === 'arriving') return nameMatch && item.start >= today;
-    if (filter === 'checked_in') return nameMatch && status === 'checked_in';
-    return nameMatch;
-  });
 
   const statusColor = (s?: string) => ({
     checked_in: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
@@ -228,7 +268,7 @@ export function GoogleGuestAgenda({
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-2xl border border-slate-200 px-5 py-4 shadow-sm">
         <div>
           <h2 className="text-lg font-black text-slate-900">Guest Agenda</h2>
-          <p className="text-xs text-slate-500">Next 30 days · synced from Google Calendar</p>
+          <p className="text-xs text-slate-500">Today’s guests · synced from Google Calendar</p>
         </div>
         <div className="flex items-center gap-2">
           {loadingEvents && <span className="text-xs text-slate-400 flex items-center gap-1"><span className="w-3 h-3 border-2 border-slate-300 border-t-indigo-500 rounded-full animate-spin inline-block" />Syncing...</span>}
@@ -238,78 +278,46 @@ export function GoogleGuestAgenda({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-4">
-        {/* Left — List */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-          <div className="p-4 border-b border-slate-100 space-y-3">
-            <div className="relative">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                type="text" value={search} onChange={e => setSearch(e.target.value)}
-                placeholder="Search guest name..."
-                className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 text-black bg-slate-50"
-              />
-            </div>
-            <div className="flex gap-1 flex-wrap">
-              {(['all', 'today', 'arriving', 'checked_in'] as const).map(f => (
-                <button key={f} onClick={() => setFilter(f)}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all capitalize ${filter === f ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
-                  {f.replace('_', ' ')}
-                </button>
-              ))}
-            </div>
+        {/* Left — Today's Guest List */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col max-h-[680px]">
+          <div className="px-5 py-3 border-b border-slate-100 bg-slate-50">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Today</p>
+            <h3 className="text-sm font-black text-slate-900">
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+            </h3>
           </div>
 
-          <div className="divide-y divide-slate-100 overflow-y-auto flex-1 max-h-[520px]">
-            {filteredItems.length === 0 ? (
-              <div className="px-4 py-8 text-center text-slate-400 text-sm">No guests found</div>
-            ) : (
-              filteredItems.map(item => {
-                const isSelected = selectedItem?.key === item.key;
-                const statusKey = item.booking?.status;
-                const rowBg = statusKey === 'checked_in' ? 'border-l-4 border-emerald-400' : statusKey === 'confirmed' ? 'border-l-4 border-amber-400' : '';
-                return (
-                  <button key={item.key} onClick={() => handleSelect(item)}
-                    className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-all ${isSelected ? 'bg-indigo-50' : ''} ${rowBg}`}>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="font-bold text-slate-900 text-sm truncate">{item.name}</p>
-                        <p className="text-xs text-slate-400 mt-0.5">{item.start} → {item.end}</p>
-                        {item.booking && <p className="text-xs text-slate-500">{getYurtName(item.booking)}</p>}
-                      </div>
-                      <div className="flex flex-col items-end gap-1 shrink-0">
-                        {statusKey ? (
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${statusColor(statusKey)}`}>
-                            {statusKey.replace('_', ' ')}
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-400 border border-slate-200">calendar only</span>
-                        )}
-                        {item.booking && syncWarnings[item.booking.id] === 'deleted' && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 border border-red-200">⚠ removed from calendar</span>
-                        )}
-                        {item.booking && syncWarnings[item.booking.id] === 'dates_changed' && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">⚠ dates changed</span>
-                        )}
-                        {item.source === 'both' && !syncWarnings[item.booking?.id ?? -1] && <span className="text-[9px] text-indigo-400">● synced</span>}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })
+          <div className="flex-1 overflow-y-auto">
+            {arrivingItems.length > 0 && (
+              <div>
+                <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-700 bg-amber-50 border-b border-amber-100">◐ Arriving · {arrivingItems.length}</p>
+                {arrivingItems.map(item => renderCard(item, false))}
+              </div>
+            )}
+            {checkedInItems.length > 0 && (
+              <div>
+                <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 border-b border-emerald-100">● Checked In · {checkedInItems.length}</p>
+                {checkedInItems.map(item => renderCard(item, false))}
+              </div>
+            )}
+            {checkedOutItems.length > 0 && (
+              <div>
+                <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-blue-700 bg-blue-50 border-b border-blue-100">✓ Checked Out · {checkedOutItems.length}</p>
+                {checkedOutItems.map(item => renderCard(item, false))}
+              </div>
+            )}
+            {cancelledItems.length > 0 && (
+              <div>
+                <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-red-700 bg-red-50 border-b border-red-100">✕ Cancelled · {cancelledItems.length}</p>
+                {cancelledItems.map(item => renderCard(item, true))}
+              </div>
+            )}
+            {arrivingItems.length === 0 && checkedInItems.length === 0 && checkedOutItems.length === 0 && cancelledItems.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                <p className="text-sm font-medium">No guests today</p>
+              </div>
             )}
           </div>
-
-          {onAddNewBooking && (
-            <div className="p-3 border-t border-slate-100">
-              <button onClick={() => onAddNewBooking('')}
-                className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black tracking-wide transition-all flex items-center justify-center gap-2">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                New Booking
-              </button>
-            </div>
-          )}
         </div>
 
         <PrivateCalendarView bookings={bookings} gcEvents={gcEvents} />

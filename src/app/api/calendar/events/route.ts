@@ -45,6 +45,7 @@ export async function GET() {
       description: event.description || null,
       location: event.location || null,
       colorId: event.colorId || null,
+      status: event.status || null,
     }));
 
     return NextResponse.json(items);
