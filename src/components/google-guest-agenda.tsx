@@ -350,20 +350,6 @@ export function GoogleGuestAgenda({
               <p className="text-sm text-slate-500">{selectedItem.start} → {selectedItem.end}</p>
               {selectedItem.event?.description && <p className="text-sm text-black bg-slate-50 rounded-xl p-3">{selectedItem.event.description}</p>}
               {selectedItem.event?.location && <p className="text-sm text-slate-500">📍 {selectedItem.event.location}</p>}
-              {(() => {
-                const days = Math.ceil((new Date(selectedItem.start + 'T00:00:00').getTime() - new Date(today + 'T00:00:00').getTime()) / 86400000);
-                return days <= 2 ? (
-                  <button onClick={handleCreateFromEvent} disabled={loadingAction === 'creating'}
-                    className="w-full py-2.5 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 transition-all disabled:opacity-60 flex items-center justify-center gap-2">
-                    {loadingAction === 'creating' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '→'}
-                    Check In
-                  </button>
-                ) : (
-                  <div className="w-full py-2.5 bg-sky-50 border border-sky-200 rounded-xl text-sm font-bold text-sky-700 text-center">
-                    ⏰ Coming in {days} day{days !== 1 ? 's' : ''}
-                  </div>
-                );
-              })()}
             </div>
           ) : (
             <div className="p-5 space-y-4">
