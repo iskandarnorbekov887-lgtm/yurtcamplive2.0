@@ -22,6 +22,7 @@ function pad(n: number) { return String(n).padStart(2, '0'); }
 export function PrivateCalendarView({ bookings }: Props) {
   const [gcEvents, setGcEvents] = useState<CalEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState('');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
@@ -32,8 +33,10 @@ export function PrivateCalendarView({ bookings }: Props) {
     fetch('/api/calendar/events')
       .then(r => r.json())
       .then((data: CalEvent[] | { error: string }) => {
-        if (!('error' in data)) setGcEvents(data);
+        if ('error' in data) setApiError(data.error);
+        else setGcEvents(data);
       })
+      .catch(e => setApiError(String(e)))
       .finally(() => setLoading(false));
   }, []);
 
@@ -66,6 +69,8 @@ export function PrivateCalendarView({ bookings }: Props) {
         </div>
         <div className="flex items-center gap-2">
           {loading && <span className="text-xs text-slate-400 animate-pulse">Syncing…</span>}
+          {!loading && !apiError && <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200">{gcEvents.length} Google events</span>}
+          {apiError && <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded-lg border border-red-200 max-w-xs truncate" title={apiError}>⚠ {apiError}</span>}
           <button onClick={() => setCurrentDate(new Date(year, month - 1, 1))}
             className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-600 font-bold text-lg transition-all">‹</button>
           <span className="text-sm font-black text-slate-800 min-w-[130px] text-center">{MONTHS[month]} {year}</span>
