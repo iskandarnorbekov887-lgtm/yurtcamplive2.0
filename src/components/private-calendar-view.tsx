@@ -92,17 +92,17 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelect
     const bars: EventBar[] = [];
 
     bookings
-      .filter(b => b.status !== 'cancelled' && b.check_in <= weekEnd && (b.check_out > weekStart || b.check_in >= weekStart))
+      .filter(b => b.status !== 'cancelled' && b.check_in <= weekEnd && b.check_out >= weekStart)
       .forEach(b => {
         let startCol = 0, endCol = -1;
         for (let i = 0; i <= 6; i++) { if (days[i] !== null && days[i]! >= b.check_in) { startCol = i; break; } }
-        for (let i = 6; i >= 0; i--) { if (days[i] !== null && days[i]! < b.check_out) { endCol = i; break; } }
+        for (let i = 6; i >= 0; i--) { if (days[i] !== null && days[i]! <= b.check_out) { endCol = i; break; } }
         if (endCol < startCol) endCol = startCol;
         bars.push({
           startCol, endCol, label: b.guest_name, type: 'bk', id: b.id,
           status: b.status, raw: b,
           startsThisWeek: b.check_in >= weekStart,
-          endsThisWeek: endCol < 6 || b.check_out <= (days[6] ? days[6]! + '0' : weekEnd + '0'),
+          endsThisWeek: b.check_out <= weekEnd,
         });
       });
 
