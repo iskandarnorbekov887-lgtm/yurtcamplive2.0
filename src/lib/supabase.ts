@@ -89,6 +89,7 @@ export interface Booking {
   extra_services?: Array<{ name: string; price: number; currency: 'UZS' | 'USD' | 'EUR' }>;
   collected_amount?: number;
   collected_currency?: 'UZS' | 'USD' | 'EUR';
+  google_event_id?: string;
 }
 
 export interface Drink {

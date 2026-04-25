@@ -172,6 +172,7 @@ function ManagerPortal() {
                 await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', id);
                 fetchData();
               }}
+              onRefresh={fetchData}
             />
 
           </div>

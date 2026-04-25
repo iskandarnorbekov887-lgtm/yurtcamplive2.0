@@ -33,6 +33,7 @@ interface Props {
   onUpdateBooking?: (id: number, updates: Partial<Booking>) => Promise<void> | void;
   onCancelBooking?: (id: number) => Promise<void> | void;
   onAddNewBooking?: (date: string) => void;
+  onRefresh?: () => void;
 }
 
 function localDateStr(d: Date) {
@@ -40,7 +41,7 @@ function localDateStr(d: Date) {
 }
 
 export function GoogleGuestAgenda({
-  bookings, yurts, userRole, onCheckIn, onCheckOut, onUpdateBooking, onCancelBooking, onAddNewBooking,
+  bookings, yurts, userRole, currentUserId, onCheckIn, onCheckOut, onUpdateBooking, onCancelBooking, onAddNewBooking, onRefresh,
 }: Props) {
   const [gcEvents, setGcEvents] = useState<CalEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
@@ -59,6 +60,7 @@ export function GoogleGuestAgenda({
   const [newExtraName, setNewExtraName] = useState('');
   const [newExtraPrice, setNewExtraPrice] = useState('');
   const [actionMsg, setActionMsg] = useState('');
+  const [syncWarnings, setSyncWarnings] = useState<Record<number, 'deleted' | 'dates_changed'>>({});
 
   const today = localDateStr(new Date());
 
@@ -67,7 +69,18 @@ export function GoogleGuestAgenda({
       .then(r => r.json())
       .then((data: CalEvent[] | { error: string }) => {
         if ('error' in data) { setEventsError(data.error); setGcEvents([]); }
-        else setGcEvents(data);
+        else {
+          const events = data as CalEvent[];
+          setGcEvents(events);
+          const cutoff = localDateStr(new Date(Date.now() - 7 * 86400000));
+          const warnings: Record<number, 'deleted' | 'dates_changed'> = {};
+          bookings.filter(b => b.google_event_id && b.check_in >= cutoff).forEach(b => {
+            const ev = events.find(e => e.id === b.google_event_id);
+            if (!ev) warnings[b.id] = 'deleted';
+            else if (ev.start !== b.check_in || ev.end !== b.check_out) warnings[b.id] = 'dates_changed';
+          });
+          setSyncWarnings(warnings);
+        }
       })
       .catch(e => setEventsError(String(e)))
       .finally(() => setLoadingEvents(false));
@@ -134,6 +147,33 @@ export function GoogleGuestAgenda({
   }[s ?? ''] ?? 'bg-slate-100 text-slate-500');
 
   const flash = (msg: string) => { setActionMsg(msg); setTimeout(() => setActionMsg(''), 4000); };
+
+  const handleCreateFromEvent = async () => {
+    if (!selectedItem?.event || !currentUserId) return;
+    const ev = selectedItem.event;
+    setLoadingAction('creating');
+    try {
+      const { error } = await supabase.from('bookings').insert({
+        guest_name: ev.summary,
+        check_in: ev.start,
+        check_out: ev.end || ev.start,
+        status: 'confirmed',
+        source: 'Manual',
+        google_event_id: ev.id,
+        total_price: 0,
+        number_of_people: 1,
+        payment_status: 'Unpaid',
+        approved_by_manager: true,
+        created_by_id: currentUserId,
+        notes: ev.description || null,
+      });
+      if (error) throw error;
+      flash('✓ Booking created from calendar event.');
+      setSelectedItem(null);
+      onRefresh?.();
+    } catch { flash('⚠ Failed to create booking.'); }
+    finally { setLoadingAction(''); }
+  };
 
   const handleSelect = (item: ListItem) => {
     setSelectedItem(item);
@@ -246,7 +286,13 @@ export function GoogleGuestAgenda({
                         ) : (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-400 border border-slate-200">calendar only</span>
                         )}
-                        {item.source === 'both' && <span className="text-[9px] text-indigo-400">● synced</span>}
+                        {item.booking && syncWarnings[item.booking.id] === 'deleted' && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 border border-red-200">⚠ removed from calendar</span>
+                        )}
+                        {item.booking && syncWarnings[item.booking.id] === 'dates_changed' && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">⚠ dates changed</span>
+                        )}
+                        {item.source === 'both' && !syncWarnings[item.booking?.id ?? -1] && <span className="text-[9px] text-indigo-400">● synced</span>}
                       </div>
                     </div>
                   </button>
@@ -287,11 +333,12 @@ export function GoogleGuestAgenda({
               <p className="text-sm text-slate-500">{selectedItem.start} → {selectedItem.end}</p>
               {selectedItem.event?.description && <p className="text-sm text-black bg-slate-50 rounded-xl p-3">{selectedItem.event.description}</p>}
               {selectedItem.event?.location && <p className="text-sm text-slate-500">📍 {selectedItem.event.location}</p>}
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-800">No matching booking in Supabase.</div>
-              {onAddNewBooking && (
-                <button onClick={() => { onAddNewBooking(selectedItem.start); setSelectedItem(null); }}
-                  className="px-4 py-2 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 transition-all">Create Booking for this date</button>
-              )}
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-800">No matching booking in Supabase — click below to create one.</div>
+              <button onClick={handleCreateFromEvent} disabled={loadingAction === 'creating'}
+                className="w-full py-2.5 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 transition-all disabled:opacity-60 flex items-center justify-center gap-2">
+                {loadingAction === 'creating' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '+'}
+                Create Booking from this Calendar Event
+              </button>
             </div>
           ) : (
             <div className="p-5 space-y-4">
