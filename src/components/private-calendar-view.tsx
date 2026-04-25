@@ -94,7 +94,7 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelect
     bookings
       .filter(b => b.status !== 'cancelled' && b.check_in <= weekEnd && (b.check_out > weekStart || b.check_in >= weekStart))
       .forEach(b => {
-        let startCol = 0, endCol = 6;
+        let startCol = 0, endCol = -1;
         for (let i = 0; i <= 6; i++) { if (days[i] !== null && days[i]! >= b.check_in) { startCol = i; break; } }
         for (let i = 6; i >= 0; i--) { if (days[i] !== null && days[i]! < b.check_out) { endCol = i; break; } }
         if (endCol < startCol) endCol = startCol;
@@ -109,7 +109,7 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelect
     gcEvents
       .filter(e => !bookings.some(b => b.google_event_id === e.id) && e.start <= weekEnd && e.end > weekStart)
       .forEach(e => {
-        let startCol = 0, endCol = 6;
+        let startCol = 0, endCol = -1;
         for (let i = 0; i <= 6; i++) { if (days[i] !== null && days[i]! >= e.start) { startCol = i; break; } }
         for (let i = 6; i >= 0; i--) { if (days[i] !== null && days[i]! < e.end) { endCol = i; break; } }
         if (endCol < startCol) endCol = startCol;
