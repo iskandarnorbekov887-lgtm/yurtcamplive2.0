@@ -54,7 +54,7 @@ export function PrivateCalendarView({ bookings }: Props) {
   const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
 
   const eventsOnDay = (d: string) => ({
-    gc: gcEvents.filter(e => e.start <= d && e.end > d),
+    gc: gcEvents.filter(e => e.start <= d && (e.end > d || e.start === d)),
     bk: bookings.filter(b => b.check_in <= d && b.check_out > d && b.status !== 'cancelled'),
   });
 
