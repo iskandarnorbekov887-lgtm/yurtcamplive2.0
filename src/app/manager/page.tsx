@@ -172,6 +172,21 @@ function ManagerPortal() {
                 fetchData();
               }}
             />
+
+            <div className="mt-6 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-100">
+                <h2 className="text-lg font-black text-slate-900">Google Calendar</h2>
+                <p className="text-xs text-slate-500">Full calendar view</p>
+              </div>
+              <iframe
+                src={`https://calendar.google.com/calendar/embed?src=${encodeURIComponent('ganisherappelsris@gmail.com')}&ctz=Asia%2FTashkent&mode=MONTH&showTitle=0&showNav=1&showDate=1&showPrint=0&showTabs=0&showCalendars=0`}
+                style={{ border: 0 }}
+                width="100%"
+                height="600"
+                frameBorder="0"
+                scrolling="no"
+              />
+            </div>
           </div>
         )}
 
