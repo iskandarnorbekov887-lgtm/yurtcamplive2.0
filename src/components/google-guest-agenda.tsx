@@ -214,7 +214,7 @@ export function GoogleGuestAgenda({
         return;
       }
 
-      const { data, error } = await supabase.from('bookings').insert({
+      const payload = {
         guest_name: ev.summary,
         check_in: ev.start,
         check_out: ev.end || ev.start,
@@ -227,10 +227,19 @@ export function GoogleGuestAgenda({
         approved_by_manager: true,
         created_by_id: currentUserId,
         notes: (ev.description && !ev.description.includes('tasks.google.com')) ? ev.description : null,
-      }).select('id').single();
-      if (error) throw error;
-      if (doCheckIn && data?.id && onCheckIn) await onCheckIn(data.id);
-      if (doCheckIn && data?.id) await updateCalendarColor({ google_event_id: ev.id } as Booking, GC_COLORS.checked_in);
+      };
+      const insertResp: { data: unknown; error: unknown } = await supabase.from('bookings').insert(payload);
+      if (insertResp?.error) throw insertResp.error;
+      // Resolve inserted id — local fallback returns it; real Supabase needs a follow-up query
+      let insertedId: number | undefined;
+      const d = insertResp?.data as Array<{ id?: number }> | { id?: number } | null;
+      insertedId = Array.isArray(d) ? d[0]?.id : d?.id;
+      if (!insertedId) {
+        const findResp: { data: Array<{ id: number }> | null } = await supabase.from('bookings').select('id').eq('google_event_id', ev.id);
+        insertedId = findResp?.data?.[0]?.id;
+      }
+      if (doCheckIn && insertedId && onCheckIn) await onCheckIn(insertedId);
+      if (doCheckIn && insertedId) await updateCalendarColor({ google_event_id: ev.id } as Booking, GC_COLORS.checked_in);
       flash(doCheckIn ? '✓ Guest checked in from calendar event.' : '✓ Booking created from calendar event.');
       setSelectedItem(null);
       onRefresh?.();
