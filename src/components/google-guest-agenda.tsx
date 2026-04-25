@@ -201,7 +201,8 @@ export function GoogleGuestAgenda({
   const flash = (msg: string) => { setActionMsg(msg); setTimeout(() => setActionMsg(''), 4000); };
 
   const handleCreateFromEvent = async (doCheckIn = false) => {
-    if (!selectedItem?.event || !currentUserId) return;
+    if (!selectedItem?.event) { flash('⚠ No event selected.'); return; }
+    if (!currentUserId) { flash('⚠ Not logged in — please refresh and try again.'); return; }
     const ev = selectedItem.event;
     setLoadingAction('creating');
     try {
@@ -237,7 +238,7 @@ export function GoogleGuestAgenda({
       flash(doCheckIn ? '✓ Guest checked in from calendar event.' : '✓ Booking created from calendar event.');
       setSelectedItem(null);
       onRefresh?.();
-    } catch { flash('⚠ Failed.'); }
+    } catch (e: unknown) { const msg = e instanceof Error ? e.message : String(e); console.error('Create from event:', msg); flash(`⚠ ${msg.slice(0, 100)}`); }
     finally { setLoadingAction(''); }
   };
 
@@ -409,6 +410,9 @@ export function GoogleGuestAgenda({
               <p className="text-sm text-slate-500">{selectedItem.start} → {selectedItem.end}</p>
               {selectedItem.event?.description && !selectedItem.event.description.includes('tasks.google.com') && <p className="text-sm text-black bg-slate-50 rounded-xl p-3">{selectedItem.event.description}</p>}
               {selectedItem.event?.location && <p className="text-sm text-slate-500">📍 {selectedItem.event.location}</p>}
+              {actionMsg && (
+                <div className={`text-sm font-medium px-3 py-2 rounded-lg ${actionMsg.startsWith('⚠') ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>{actionMsg}</div>
+              )}
               {(() => {
                 const days = Math.ceil((new Date(selectedItem.start + 'T00:00:00').getTime() - new Date(today + 'T00:00:00').getTime()) / 86400000);
                 return days <= 2 ? (
