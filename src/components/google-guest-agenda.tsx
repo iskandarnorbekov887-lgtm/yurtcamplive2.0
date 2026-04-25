@@ -239,7 +239,20 @@ export function GoogleGuestAgenda({
     completed: 'bg-blue-100 text-blue-700 border border-blue-200',
     cancelled: 'bg-red-100 text-red-700 border border-red-200',
     pending: 'bg-slate-100 text-slate-600 border border-slate-200',
+    no_arrival: 'bg-gray-200 text-gray-600 border border-gray-300',
   }[s ?? ''] ?? 'bg-slate-100 text-slate-500');
+
+  const statusIcon = (s: string | undefined) => {
+    if (s === 'checked_in') return '✓';
+    if (s === 'completed') return '✈';
+    if (s === 'cancelled') return '✕';
+    if (s === 'no_arrival') return '⊘';
+    return '';
+  };
+  const statusIconColor = (s: string | undefined) => {
+    if (s === 'completed') return 'text-amber-500';
+    return '';
+  };
 
   const flash = (msg: string) => { setActionMsg(msg); setTimeout(() => setActionMsg(''), 4000); };
 
@@ -282,7 +295,6 @@ export function GoogleGuestAgenda({
         insertedId = findResp?.data?.[0]?.id;
       }
       if (doCheckIn && insertedId && onCheckIn) await onCheckIn(insertedId);
-      if (doCheckIn && insertedId) await updateCalendarColor({ google_event_id: ev.id } as Booking, GC_COLORS.checked_in);
       flash(doCheckIn ? '✓ Guest checked in from calendar event.' : '✓ Booking created from calendar event.');
       setSelectedItem(null);
       onRefresh?.();
@@ -305,20 +317,13 @@ export function GoogleGuestAgenda({
   const canCheckOut = sel?.status === 'checked_in' && !!onCheckOut && today >= (sel?.check_out ?? '9999');
   const canCancel = sel && ['confirmed', 'pending'].includes(sel.status) && !!onCancelBooking;
 
-  const GC_COLORS = { checked_in: '2', completed: '7', cancelled: '11', no_arrival: '1' } as const;
-  const updateCalendarColor = async (booking: Booking, colorId: string | null) => {
-    if (!booking.google_event_id) return;
-    await fetch('/api/calendar/update-event', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ eventId: booking.google_event_id, colorId }),
-    }).catch(() => {});
-  };
+  // Color rules are SYSTEM-ONLY — we never push status colors back to Google Calendar.
+  // Google Calendar's red color (colorId '11') is still READ as a cancellation signal via isGcCancelled.
 
   const handleCheckIn = async () => {
     if (!sel || !onCheckIn) return;
     setLoadingAction('checkin');
-    try { await onCheckIn(sel.id); await updateCalendarColor(sel, GC_COLORS.checked_in); flash('✓ Guest checked in.'); }
+    try { await onCheckIn(sel.id); flash('✓ Guest checked in.'); }
     catch { flash('⚠ Check-in failed.'); }
     finally { setLoadingAction(''); }
   };
@@ -337,7 +342,6 @@ export function GoogleGuestAgenda({
       if (extraServices.length) updates.extra_services = extraServices.map(e => ({ name: e.name, price: parseFloat(e.price) || 0, currency: e.currency as 'UZS' | 'USD' | 'EUR' }));
       if (Object.keys(updates).length && onUpdateBooking) await onUpdateBooking(sel.id, updates);
       await onCheckOut(sel.id);
-      await updateCalendarColor(sel, GC_COLORS.completed);
       flash('✓ Checked out. Finance record created.');
     } catch { flash('⚠ Checkout failed.'); }
     finally { setLoadingAction(''); }
@@ -347,7 +351,7 @@ export function GoogleGuestAgenda({
     if (!sel || !onCancelBooking) return;
     if (!confirm(`Cancel booking for ${sel.guest_name}?`)) return;
     setLoadingAction('cancel');
-    try { await onCancelBooking(sel.id); await updateCalendarColor(sel, GC_COLORS.cancelled); flash('Booking cancelled.'); }
+    try { await onCancelBooking(sel.id); flash('Booking cancelled.'); }
     catch { flash('⚠ Cancel failed.'); }
     finally { setLoadingAction(''); }
   };
@@ -483,7 +487,10 @@ export function GoogleGuestAgenda({
                   <h2 className="text-xl font-black text-slate-900">{sel.guest_name}</h2>
                   <p className="text-sm text-slate-500 mt-0.5">{getYurtName(sel)} · {sel.check_in} → {sel.check_out}{sel.nights ? ` · ${sel.nights}n` : ''}{(sel.guest_count || sel.number_of_people) ? ` · ${sel.guest_count || sel.number_of_people} pax` : ''}</p>
                 </div>
-                <span className={`text-xs font-bold px-3 py-1 rounded-full capitalize ${statusColor(sel.status)}`}>{sel.status.replace('_', ' ')}</span>
+                <span className={`text-xs font-bold px-3 py-1 rounded-full capitalize ${statusColor(sel.status)} flex items-center gap-1`}>
+                  {statusIcon(sel.status) && <span className={statusIconColor(sel.status)}>{statusIcon(sel.status)}</span>}
+                  {sel.status.replace('_', ' ')}
+                </span>
               </div>
 
               {actionMsg && (
@@ -537,7 +544,15 @@ export function GoogleGuestAgenda({
                 );
               })()}
 
-              {(userRole === 'Manager' || userRole === 'CEO') && (
+              {(sel.status === 'no_arrival' || sel.status === 'cancelled' || sel.status === 'completed') && (
+                <div className={`px-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 select-none cursor-not-allowed ${statusColor(sel.status)}`}>
+                  <span className={statusIconColor(sel.status)}>{statusIcon(sel.status)}</span>
+                  <span className="capitalize">{sel.status.replace('_', ' ')}</span>
+                  {sel.status === 'no_arrival' && <span className="text-[10px] font-medium opacity-70">· permanent</span>}
+                </div>
+              )}
+
+              {(userRole === 'Manager' || userRole === 'CEO') && sel.status !== 'no_arrival' && sel.status !== 'cancelled' && sel.status !== 'completed' && (
                 <div className="flex flex-wrap gap-2">
                   {canCheckIn && (
                     <button onClick={handleCheckIn} disabled={loadingAction === 'checkin'}
@@ -561,8 +576,8 @@ export function GoogleGuestAgenda({
                       className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-sm font-bold rounded-xl border border-red-200 transition-all disabled:opacity-60">Cancel Booking</button>
                   )}
                   {sel.status === 'confirmed' && sel.check_in < today && onUpdateBooking && (
-                    <button onClick={async () => { if (!confirm(`Mark ${sel.guest_name} as No Arrival?`)) return; setLoadingAction('na'); try { await onUpdateBooking(sel.id, { status: 'no_arrival' } as Partial<Booking>); await updateCalendarColor(sel, GC_COLORS.no_arrival); flash('Marked as No Arrival.'); } catch { flash('⚠ Failed.'); } finally { setLoadingAction(''); } }} disabled={loadingAction === 'na'}
-                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-bold rounded-xl transition-all disabled:opacity-60">No Arrival</button>
+                    <button onClick={async () => { if (!confirm(`Mark ${sel.guest_name} as No Arrival? This is PERMANENT and cannot be undone.`)) return; setLoadingAction('na'); try { await onUpdateBooking(sel.id, { status: 'no_arrival' } as Partial<Booking>); flash('Marked as No Arrival.'); } catch { flash('⚠ Failed.'); } finally { setLoadingAction(''); } }} disabled={loadingAction === 'na'}
+                      className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-bold rounded-xl border border-gray-300 transition-all disabled:opacity-60">⊘ No Arrival</button>
                   )}
                 </div>
               )}

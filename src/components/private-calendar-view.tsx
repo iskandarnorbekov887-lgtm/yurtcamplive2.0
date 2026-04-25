@@ -93,7 +93,7 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelect
     const bars: EventBar[] = [];
 
     bookings
-      .filter(b => b.status !== 'cancelled' && b.check_in <= weekEnd && b.check_out >= weekStart)
+      .filter(b => b.status !== 'cancelled' && b.status !== 'no_arrival' && b.check_in <= weekEnd && b.check_out >= weekStart)
       .forEach(b => {
         let startCol = 0, endCol = -1;
         for (let i = 0; i <= 6; i++) { if (days[i] !== null && days[i]! >= b.check_in) { startCol = i; break; } }
@@ -139,11 +139,21 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelect
   const handleDayClick = (d: string) => setSelectedDay(d);
 
   const barColor = (bar: EventBar) => {
+    if (bar.status === 'cancelled') return 'bg-red-500 text-white';
+    if (bar.status === 'no_arrival') return 'bg-gray-400 text-white';
     if (bar.status === 'checked_in') return 'bg-emerald-500 text-white';
+    if (bar.status === 'completed') return 'bg-blue-500 text-white';
     if (bar.status === 'confirmed') return 'bg-amber-400 text-white';
-    if (bar.status === 'completed') return 'bg-blue-400 text-white';
     if (bar.type === 'gc') return 'bg-indigo-400 text-white';
     return 'bg-slate-300 text-slate-700';
+  };
+
+  const barIcon = (bar: EventBar) => {
+    if (bar.status === 'checked_in') return '✓ ';
+    if (bar.status === 'completed') return '✈ ';
+    if (bar.status === 'cancelled') return '✕ ';
+    if (bar.status === 'no_arrival') return '⊘ ';
+    return '';
   };
 
   return (
@@ -228,7 +238,7 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelect
                         } ${
                           bar.endsThisWeek ? 'rounded-r-md' : 'rounded-r-none'
                         }`}>
-                        {bar.startsThisWeek ? bar.label : ''}
+                        {bar.startsThisWeek ? `${barIcon(bar)}${bar.label}` : ''}
                       </button>
                     ))}
                   </div>
