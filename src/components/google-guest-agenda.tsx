@@ -207,12 +207,7 @@ export function GoogleGuestAgenda({
     setLoadingAction('creating');
     try {
       // Guard: check if a booking for this event already exists
-      const { data: existingRows } = await supabase
-        .from('bookings')
-        .select('id, guest_name, check_in, check_out, status, yurt_id, total_price, number_of_people, payment_status, source, approved_by_manager, created_by_id, notes, google_event_id, last_edited_by_id')
-        .eq('google_event_id', ev.id)
-        .limit(1);
-      const existing = existingRows?.[0] ?? null;
+      const existing = bookings.find(b => b.google_event_id === ev.id) ?? null;
       if (existing) {
         flash('⚠ Booking for this event already exists — opening it.');
         handleSelect({ key: `db-${existing.id}`, name: existing.guest_name, start: existing.check_in, end: existing.check_out, source: 'db', booking: existing as Booking, event: ev });
