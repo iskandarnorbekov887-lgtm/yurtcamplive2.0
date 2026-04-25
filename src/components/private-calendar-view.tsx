@@ -14,28 +14,48 @@ interface CalEvent {
   location?: string | null;
 }
 
+interface EventBar {
+  startCol: number;
+  endCol: number;
+  label: string;
+  type: 'bk' | 'gc';
+  id: string | number;
+  status?: string;
+  startsThisWeek: boolean;
+  endsThisWeek: boolean;
+  raw: Booking | CalEvent;
+}
+
 interface Props {
   bookings: Booking[];
   gcEvents?: CalEvent[];
   onSelectBooking?: (b: Booking) => void;
   onSelectCalendarEvent?: (ev: CalEvent) => void;
+  onDayChange?: (day: string) => void;
 }
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
+function todayString() {
+  const t = new Date();
+  return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`;
+}
 
-export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelectBooking, onSelectCalendarEvent }: Props) {
+export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelectBooking, onSelectCalendarEvent, onDayChange }: Props) {
   const [fetchedEvents, setFetchedEvents] = useState<CalEvent[]>([]);
   const [loading, setLoading] = useState(gcEventsProp === undefined);
   const [apiError, setApiError] = useState('');
   const gcEvents = gcEventsProp ?? fetchedEvents;
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const todayStr = todayString();
+  const [selectedDay, setSelectedDay] = useState<string>(todayStr);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
+
+  useEffect(() => { onDayChange?.(selectedDay); }, [selectedDay]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (gcEventsProp !== undefined) return;
@@ -49,6 +69,8 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelect
       .finally(() => setLoading(false));
   }, [gcEventsProp]);
 
+  const dayStr = (day: number) => `${year}-${pad(month + 1)}-${pad(day)}`;
+
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const cells: (number | null)[] = [
@@ -57,17 +79,69 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelect
   ];
   while (cells.length % 7 !== 0) cells.push(null);
 
-  const dayStr = (day: number) => `${year}-${pad(month + 1)}-${pad(day)}`;
+  const weeks: (number | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
 
-  const today = new Date();
-  const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  const getWeekLanes = (week: (number | null)[]): EventBar[][] => {
+    const days = week.map(d => d ? dayStr(d) : null);
+    const validDays = days.filter(Boolean) as string[];
+    if (!validDays.length) return [];
+    const weekStart = validDays[0];
+    const weekEnd = validDays[validDays.length - 1];
 
-  const eventsOnDay = (d: string) => ({
-    gc: gcEvents.filter(e => e.start <= d && (e.end > d || e.start === d)),
-    bk: bookings.filter(b => b.check_in <= d && b.check_out > d && b.status !== 'cancelled'),
-  });
+    const bars: EventBar[] = [];
 
-  const sel = selectedDay ? eventsOnDay(selectedDay) : null;
+    bookings
+      .filter(b => b.status !== 'cancelled' && b.check_in <= weekEnd && b.check_out > weekStart)
+      .forEach(b => {
+        let startCol = 0, endCol = 6;
+        for (let i = 0; i <= 6; i++) { if (days[i] !== null && days[i]! >= b.check_in) { startCol = i; break; } }
+        for (let i = 6; i >= 0; i--) { if (days[i] !== null && days[i]! < b.check_out) { endCol = i; break; } }
+        bars.push({
+          startCol, endCol, label: b.guest_name, type: 'bk', id: b.id,
+          status: b.status, raw: b,
+          startsThisWeek: b.check_in >= weekStart,
+          endsThisWeek: endCol < 6 || b.check_out <= (days[6] ? days[6]! + '0' : weekEnd + '0'),
+        });
+      });
+
+    gcEvents
+      .filter(e => !bookings.some(b => b.google_event_id === e.id) && e.start <= weekEnd && e.end > weekStart)
+      .forEach(e => {
+        let startCol = 0, endCol = 6;
+        for (let i = 0; i <= 6; i++) { if (days[i] !== null && days[i]! >= e.start) { startCol = i; break; } }
+        for (let i = 6; i >= 0; i--) { if (days[i] !== null && days[i]! < e.end) { endCol = i; break; } }
+        bars.push({
+          startCol, endCol, label: e.summary, type: 'gc', id: e.id, raw: e,
+          startsThisWeek: e.start >= weekStart,
+          endsThisWeek: endCol < 6,
+        });
+      });
+
+    bars.sort((a, b) => a.startCol - b.startCol || (b.endCol - b.startCol) - (a.endCol - a.startCol));
+
+    const lanes: EventBar[][] = [];
+    for (const bar of bars) {
+      let placed = false;
+      for (const lane of lanes) {
+        if (!lane.some(e => e.startCol <= bar.endCol && e.endCol >= bar.startCol)) {
+          lane.push(bar); placed = true; break;
+        }
+      }
+      if (!placed) lanes.push([bar]);
+    }
+    return lanes;
+  };
+
+  const handleDayClick = (d: string) => setSelectedDay(d);
+
+  const barColor = (bar: EventBar) => {
+    if (bar.status === 'checked_in') return 'bg-emerald-500 text-white';
+    if (bar.status === 'confirmed') return 'bg-amber-400 text-white';
+    if (bar.status === 'completed') return 'bg-blue-400 text-white';
+    if (bar.type === 'gc') return 'bg-indigo-400 text-white';
+    return 'bg-slate-300 text-slate-700';
+  };
 
   return (
     <div className="mt-6 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -85,101 +159,77 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelect
           <span className="text-sm font-black text-slate-800 min-w-[130px] text-center">{MONTHS[month]} {year}</span>
           <button onClick={() => setCurrentDate(new Date(year, month + 1, 1))}
             className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-600 font-bold text-lg transition-all">›</button>
-          <button onClick={() => { setCurrentDate(new Date()); setSelectedDay(null); }}
+          <button onClick={() => { setCurrentDate(new Date()); setSelectedDay(todayStr); }}
             className="px-3 py-1 text-xs font-bold bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-all">Today</button>
         </div>
       </div>
 
-      <div className="p-4">
+      <div className="p-3">
+        {/* Day name headers */}
         <div className="grid grid-cols-7 mb-1">
           {DAYS.map(d => (
             <div key={d} className="text-center text-[10px] font-black uppercase tracking-widest text-slate-400 py-1">{d}</div>
           ))}
         </div>
 
-        <div className="grid grid-cols-7 gap-1">
-          {cells.map((day, i) => {
-            if (!day) return <div key={i} className="h-24 rounded-xl bg-slate-50/40" />;
-            const d = dayStr(day);
-            const { gc, bk } = eventsOnDay(d);
-            const isToday = d === todayStr;
-            const isSelected = d === selectedDay;
-            const total = gc.length + bk.length;
-
+        {/* Week rows */}
+        <div className="space-y-1">
+          {weeks.map((week, wi) => {
+            const lanes = getWeekLanes(week);
             return (
-              <button key={i} onClick={() => setSelectedDay(isSelected ? null : d)}
-                className={`h-24 rounded-xl p-1.5 text-left transition-all border ${
-                  isSelected ? 'border-indigo-400 bg-indigo-50 shadow-sm' :
-                  isToday ? 'border-indigo-300 bg-indigo-50/60' :
-                  total > 0 ? 'border-slate-200 bg-white hover:border-indigo-200 hover:bg-slate-50' :
-                  'border-transparent bg-slate-50/40 hover:bg-slate-100/60'
-                }`}>
-                <span className={`text-[11px] font-black mb-1 w-5 h-5 flex items-center justify-center rounded-full ${
-                  isToday ? 'bg-indigo-600 text-white' : 'text-slate-700'
-                }`}>{day}</span>
-                <div className="space-y-0.5 overflow-hidden">
-                  {bk.slice(0, 2).map(b => (
-                    <div key={b.id} className={`text-[9px] font-bold px-1 py-0.5 rounded truncate leading-tight ${
-                      b.status === 'checked_in' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                    }`}>{b.guest_name}</div>
-                  ))}
-                  {gc.slice(0, bk.length >= 2 ? 0 : 1).map(e => (
-                    <div key={e.id} className="text-[9px] font-bold px-1 py-0.5 rounded truncate leading-tight bg-indigo-100 text-indigo-700">{e.summary}</div>
-                  ))}
-                  {total > 3 && (
-                    <div className="text-[9px] text-slate-400 font-bold px-1">+{total - 3} more</div>
-                  )}
+              <div key={wi} className="mb-1">
+                {/* Day number buttons */}
+                <div className="grid grid-cols-7">
+                  {week.map((day, col) => {
+                    if (!day) return <div key={col} className="h-8" />;
+                    const d = dayStr(day);
+                    const isToday = d === todayStr;
+                    const isSelected = d === selectedDay;
+                    return (
+                      <button key={col} onClick={() => handleDayClick(d)}
+                        className="h-8 flex items-center justify-center transition-all">
+                        <span className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-black transition-all ${
+                          isSelected ? 'bg-indigo-600 text-white shadow-sm' :
+                          isToday ? 'bg-indigo-100 text-indigo-700 ring-2 ring-indigo-300' :
+                          'text-slate-700 hover:bg-slate-100'
+                        }`}>{day}</span>
+                      </button>
+                    );
+                  })}
                 </div>
-              </button>
+
+                {/* Event bar lanes */}
+                {lanes.slice(0, 3).map((lane, li) => (
+                  <div key={li} className="grid grid-cols-7 mt-px" style={{ gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
+                    {lane.map((bar, bi) => (
+                      <button
+                        key={bi}
+                        onClick={() => bar.type === 'bk' ? onSelectBooking?.(bar.raw as Booking) : onSelectCalendarEvent?.(bar.raw as CalEvent)}
+                        style={{ gridColumnStart: bar.startCol + 1, gridColumnEnd: bar.endCol + 2 }}
+                        className={`text-left text-[10px] font-bold px-2 py-[3px] truncate leading-tight transition-all hover:opacity-80 ${barColor(bar)} ${
+                          bar.startsThisWeek ? 'rounded-l-full pl-2' : 'rounded-l-none pl-1'
+                        } ${
+                          bar.endsThisWeek ? 'rounded-r-full pr-2' : 'rounded-r-none'
+                        }`}
+                      >
+                        {bar.startsThisWeek ? bar.label : ''}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+                {lanes.length > 3 && (
+                  <p className="text-[9px] text-slate-400 font-bold px-1 mt-px">+{lanes.length - 3} more</p>
+                )}
+              </div>
             );
           })}
         </div>
 
-        {selectedDay && sel && (
-          <div className="mt-4 bg-slate-50 rounded-xl p-4 border border-slate-200 animate-in fade-in duration-200">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">
-              {new Date(selectedDay + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-            </p>
-            {sel.bk.length === 0 && sel.gc.length === 0 ? (
-              <p className="text-sm text-slate-400">No events or guests on this day</p>
-            ) : (
-              <div className="space-y-2">
-                {sel.bk.map(b => (
-                  <button key={b.id} onClick={() => onSelectBooking?.(b)}
-                    className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
-                      b.status === 'checked_in'
-                        ? 'bg-emerald-50 border border-emerald-200 hover:bg-emerald-100'
-                        : 'bg-amber-50 border border-amber-200 hover:bg-amber-100'
-                    } ${onSelectBooking ? 'cursor-pointer' : 'cursor-default'}`}>
-                    <span className={`w-2 h-2 rounded-full shrink-0 ${b.status === 'checked_in' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-bold text-slate-900">{b.guest_name}</p>
-                      <p className="text-xs text-slate-500 capitalize">{b.check_in} → {b.check_out} · {b.status.replace('_', ' ')}</p>
-                    </div>
-                    {onSelectBooking && <span className="text-xs text-slate-400">›</span>}
-                  </button>
-                ))}
-                {sel.gc.map(e => (
-                  <button key={e.id} onClick={() => onSelectCalendarEvent?.(e)}
-                    className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl bg-indigo-50 border border-indigo-200 transition-all ${
-                      onSelectCalendarEvent ? 'hover:bg-indigo-100 cursor-pointer' : 'cursor-default'
-                    }`}>
-                    <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-bold text-slate-900">{e.summary}</p>
-                      <p className="text-xs text-slate-500">{e.start} → {e.end} · Google Calendar</p>
-                    </div>
-                    {onSelectCalendarEvent && <span className="text-xs text-slate-400">›</span>}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="mt-3 flex gap-4 flex-wrap">
-          <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-emerald-400 inline-block" />Checked In</span>
+        {/* Legend */}
+        <div className="mt-3 flex gap-4 flex-wrap pt-2 border-t border-slate-100">
+          <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-emerald-500 inline-block" />Checked In</span>
           <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-amber-400 inline-block" />Confirmed</span>
+          <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-blue-400 inline-block" />Checked Out</span>
           <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-indigo-400 inline-block" />Google Calendar</span>
         </div>
       </div>
