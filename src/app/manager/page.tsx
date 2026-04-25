@@ -174,7 +174,6 @@ function ManagerPortal() {
               }}
             />
 
-            <PrivateCalendarView bookings={bookings} />
           </div>
         )}
 
