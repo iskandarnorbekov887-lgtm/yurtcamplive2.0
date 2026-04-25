@@ -503,8 +503,17 @@ export function GoogleGuestAgenda({
 
           {!sel ? (
             <div className="p-5 space-y-3">
-              <h2 className="text-xl font-black text-slate-900">{selectedItem.event?.summary}</h2>
-              <p className="text-sm text-slate-500">{selectedItem.start} → {selectedItem.end}</p>
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-xl font-black text-slate-900">{selectedItem.event?.summary}</h2>
+                  <p className="text-sm text-slate-500">{selectedItem.start} → {selectedItem.end}</p>
+                </div>
+                {selectedItem.event && isGcCancelled(selectedItem.event) && (
+                  <span className="text-xs font-bold px-3 py-1 rounded-full bg-red-100 text-red-700 border border-red-200 flex items-center gap-1">
+                    ✕ cancelled
+                  </span>
+                )}
+              </div>
               {selectedItem.event?.description && !selectedItem.event.description.includes('tasks.google.com') && <p className="text-sm text-black bg-slate-50 rounded-xl p-3">{selectedItem.event.description}</p>}
               {selectedItem.event?.location && <p className="text-sm text-slate-500">📍 {selectedItem.event.location}</p>}
               {actionMsg && (
@@ -512,6 +521,13 @@ export function GoogleGuestAgenda({
               )}
               {(() => {
                 const days = Math.ceil((new Date(selectedItem.start + 'T00:00:00').getTime() - new Date(today + 'T00:00:00').getTime()) / 86400000);
+                if (selectedItem.event && isGcCancelled(selectedItem.event)) {
+                  return (
+                    <div className="w-full py-3 px-4 bg-red-50 border border-red-200 rounded-xl text-sm font-bold text-red-700 text-center flex items-center justify-center gap-2">
+                      <span>✕</span> Cancelled
+                    </div>
+                  );
+                }
                 return days <= 2 ? (
                   <button onClick={() => handleCreateFromEvent(true)} disabled={loadingAction === 'creating'}
                     className="w-full py-2.5 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 transition-all disabled:opacity-60 flex items-center justify-center gap-2">
