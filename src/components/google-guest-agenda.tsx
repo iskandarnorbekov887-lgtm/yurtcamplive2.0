@@ -609,14 +609,7 @@ export function GoogleGuestAgenda({
               )}
 
               {sel.status === 'completed' && (
-                <div className={`px-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 select-none ${(userRole === 'Manager' || userRole === 'CEO') ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed'} ${statusColor(sel.status)}`}
-                  onClick={() => {
-                    if (userRole !== 'Manager' && userRole !== 'CEO') return;
-                    setEditingDates(true);
-                    setEditCheckIn(sel.check_in);
-                    setEditCheckOut(sel.check_out);
-                  }}
-                  title={(userRole === 'Manager' || userRole === 'CEO') ? 'Click to edit dates' : ''}>
+                <div className={`px-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 select-none cursor-not-allowed ${statusColor(sel.status)}`}>
                   <span className={statusIconColor(sel.status)}>{statusIcon(sel.status)}</span>
                   <span className="capitalize">{sel.status.replace('_', ' ')}</span>
                 </div>
@@ -661,7 +654,13 @@ export function GoogleGuestAgenda({
                             setLoadingAction('editdates');
                             try {
                               await onUpdateBooking?.(sel.id, { check_in: editCheckIn, check_out: editCheckOut });
-                              flash('✓ Dates updated.');
+                              if (userRole === 'CEO') {
+                                flash('✓ Dates updated. ALERT: CEO has modified booking dates.');
+                                // Additional alert for CEO edits - could integrate with notification system here
+                                alert(`CEO EDIT NOTIFICATION:\n\nBooking: ${sel.guest_name}\nOld dates: ${sel.check_in} → ${sel.check_out}\nNew dates: ${editCheckIn} → ${editCheckOut}\n\nThis change has been recorded.`);
+                              } else {
+                                flash('✓ Dates updated.');
+                              }
                               setEditingDates(false);
                               onRefresh?.();
                             } catch (e: unknown) {
