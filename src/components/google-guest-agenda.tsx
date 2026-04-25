@@ -62,6 +62,9 @@ export function GoogleGuestAgenda({
   const [actionMsg, setActionMsg] = useState('');
   const [syncWarnings, setSyncWarnings] = useState<Record<number, 'deleted' | 'dates_changed'>>({});
   const [selectedCalendarDay, setSelectedCalendarDay] = useState<string>(localDateStr(new Date()));
+  const [editingDates, setEditingDates] = useState(false);
+  const [editCheckIn, setEditCheckIn] = useState('');
+  const [editCheckOut, setEditCheckOut] = useState('');
 
   const today = localDateStr(new Date());
 
@@ -597,7 +600,7 @@ export function GoogleGuestAgenda({
                 );
               })()}
 
-              {(sel.status === 'no_arrival' || sel.status === 'cancelled' || sel.status === 'completed') && (
+              {(sel.status === 'no_arrival' || sel.status === 'cancelled') && (
                 <div className={`px-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 select-none cursor-not-allowed ${statusColor(sel.status)}`}>
                   <span className={statusIconColor(sel.status)}>{statusIcon(sel.status)}</span>
                   <span className="capitalize">{sel.status.replace('_', ' ')}</span>
@@ -605,12 +608,87 @@ export function GoogleGuestAgenda({
                 </div>
               )}
 
-              {(userRole === 'Manager' || userRole === 'CEO') && sel.status !== 'no_arrival' && sel.status !== 'cancelled' && sel.status !== 'completed' && (
+              {sel.status === 'completed' && (
+                <div className={`px-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 select-none ${(userRole === 'Manager' || userRole === 'CEO') ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed'} ${statusColor(sel.status)}`}
+                  onClick={() => {
+                    if (userRole !== 'Manager' && userRole !== 'CEO') return;
+                    setEditingDates(true);
+                    setEditCheckIn(sel.check_in);
+                    setEditCheckOut(sel.check_out);
+                  }}
+                  title={(userRole === 'Manager' || userRole === 'CEO') ? 'Click to edit dates' : ''}>
+                  <span className={statusIconColor(sel.status)}>{statusIcon(sel.status)}</span>
+                  <span className="capitalize">{sel.status.replace('_', ' ')}</span>
+                </div>
+              )}
+
+              {(userRole === 'Manager' || userRole === 'CEO') && sel.status !== 'no_arrival' && sel.status !== 'cancelled' && (
                 <div className="flex flex-wrap gap-2">
+                  {sel.status === 'checked_in' && !editingDates && (
+                    <button
+                      onClick={() => { setEditingDates(true); setEditCheckIn(sel.check_in); setEditCheckOut(sel.check_out); }}
+                      className="px-4 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-sm font-bold rounded-xl border border-emerald-200 transition-all flex items-center gap-2">
+                      ✓ Checked In · Edit Dates
+                    </button>
+                  )}
+                  {editingDates && (
+                    <div className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-3">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Edit Stay Dates</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase">Check In</label>
+                          <input
+                            type="date"
+                            value={editCheckIn}
+                            onChange={e => setEditCheckIn(e.target.value)}
+                            className="w-full px-2 py-1.5 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 text-black"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase">Check Out</label>
+                          <input
+                            type="date"
+                            value={editCheckOut}
+                            onChange={e => setEditCheckOut(e.target.value)}
+                            className="w-full px-2 py-1.5 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 text-black"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={async () => {
+                            if (!confirm(`Update dates to ${editCheckIn} → ${editCheckOut}?`)) return;
+                            setLoadingAction('editdates');
+                            try {
+                              await onUpdateBooking?.(sel.id, { check_in: editCheckIn, check_out: editCheckOut });
+                              flash('✓ Dates updated.');
+                              setEditingDates(false);
+                              onRefresh?.();
+                            } catch (e: unknown) {
+                              const msg = e instanceof Error ? e.message : String(e);
+                              flash(`⚠ ${msg.slice(0, 100)}`);
+                            } finally {
+                              setLoadingAction('');
+                            }
+                          }}
+                          disabled={loadingAction === 'editdates' || !editCheckIn || !editCheckOut || editCheckIn > editCheckOut}
+                          className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg transition-all disabled:opacity-60 flex items-center justify-center gap-2">
+                          {loadingAction === 'editdates' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '✓'}
+                          Save
+                        </button>
+                        <button
+                          onClick={() => setEditingDates(false)}
+                          className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-bold rounded-lg transition-all">
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   {canCheckIn && (
                     <button onClick={handleCheckIn} disabled={loadingAction === 'checkin'}
                       className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition-all disabled:opacity-60 flex items-center gap-2">
-                      {loadingAction === 'checkin' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '→'} Check In
+                      {loadingAction === 'checkin' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '→'}
+                      Check In
                     </button>
                   )}
                   {isComingSoon && (
@@ -618,17 +696,18 @@ export function GoogleGuestAgenda({
                       ⏰ Coming in {daysUntilCheckIn} day{daysUntilCheckIn !== 1 ? 's' : ''}
                     </div>
                   )}
-                  {canCheckOut && (
+                  {canCheckOut && !editingDates && (
                     <button onClick={handleCheckOut} disabled={loadingAction === 'checkout'}
                       className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-all disabled:opacity-60 flex items-center gap-2">
-                      {loadingAction === 'checkout' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '✓'} Check Out
+                      {loadingAction === 'checkout' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '✓'}
+                      Check Out
                     </button>
                   )}
-                  {canCancel && (
+                  {canCancel && !editingDates && (
                     <button onClick={handleCancel} disabled={loadingAction === 'cancel'}
                       className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-sm font-bold rounded-xl border border-red-200 transition-all disabled:opacity-60">Cancel Booking</button>
                   )}
-                  {sel.status === 'confirmed' && sel.check_in < today && onUpdateBooking && (
+                  {sel.status === 'confirmed' && sel.check_in < today && onUpdateBooking && !editingDates && (
                     <button onClick={async () => { if (!confirm(`Mark ${sel.guest_name} as No Arrival? This is PERMANENT and cannot be undone.`)) return; setLoadingAction('na'); try { await onUpdateBooking(sel.id, { status: 'no_arrival' } as Partial<Booking>); flash('Marked as No Arrival.'); } catch { flash('⚠ Failed.'); } finally { setLoadingAction(''); } }} disabled={loadingAction === 'na'}
                       className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-bold rounded-xl border border-gray-300 transition-all disabled:opacity-60">⊘ No Arrival</button>
                   )}
