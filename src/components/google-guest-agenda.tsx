@@ -75,12 +75,27 @@ export function GoogleGuestAgenda({
           setGcEvents(events);
           const cutoff = localDateStr(new Date(Date.now() - 7 * 86400000));
           const warnings: Record<number, 'deleted' | 'dates_changed'> = {};
+          const toSilentlyDelete: number[] = [];
           bookings.filter(b => b.google_event_id && b.check_in >= cutoff).forEach(b => {
             const ev = events.find(e => e.id === b.google_event_id);
-            if (!ev) warnings[b.id] = 'deleted';
-            else if (ev.start !== b.check_in || ev.end !== b.check_out) warnings[b.id] = 'dates_changed';
+            if (!ev) {
+              // GC event deleted: if booking never reached check-in, drop it silently
+              if (b.status === 'confirmed') toSilentlyDelete.push(b.id);
+              else warnings[b.id] = 'deleted';
+            } else if (ev.start !== b.check_in || ev.end !== b.check_out) {
+              warnings[b.id] = 'dates_changed';
+            }
           });
           setSyncWarnings(warnings);
+          if (toSilentlyDelete.length > 0) {
+            (async () => {
+              for (const id of toSilentlyDelete) {
+                try { await supabase.from('bookings').delete().eq('id', id); }
+                catch (err) { console.error('Silent delete failed for booking', id, err); }
+              }
+              onRefresh?.();
+            })();
+          }
         }
       })
       .catch(e => setEventsError(String(e)))
