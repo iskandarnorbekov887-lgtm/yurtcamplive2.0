@@ -114,10 +114,18 @@ export function GoogleGuestAgenda({
 
   const sevenDaysAgo = localDateStr(new Date(Date.now() - 7 * 86400000));
   const thirtyDaysAgo = localDateStr(new Date(Date.now() - 30 * 86400000));
+  const twoDaysFromNow = localDateStr(new Date(Date.now() + 2 * 86400000));
 
+  // Arriving = confirmed bookings/events within 2-day window (overdue or arriving soon)
   const arrivingItems = [
-    ...bookingItems.filter(i => i.booking!.status === 'confirmed' && i.booking!.check_in <= today && i.booking!.check_out > today),
-    ...calendarOnlyItems.filter(i => i.event!.start <= today && i.event!.end > today && !isGcCancelled(i.event!)),
+    ...bookingItems.filter(i => i.booking!.status === 'confirmed' && i.booking!.check_in <= twoDaysFromNow && i.booking!.check_out > today),
+    ...calendarOnlyItems.filter(i => i.event!.start <= twoDaysFromNow && i.event!.end > today && !isGcCancelled(i.event!)),
+  ].sort((a, b) => a.start.localeCompare(b.start));
+
+  // Coming = confirmed bookings/events more than 2 days away
+  const comingItems = [
+    ...bookingItems.filter(i => i.booking!.status === 'confirmed' && i.booking!.check_in > twoDaysFromNow),
+    ...calendarOnlyItems.filter(i => i.event!.start > twoDaysFromNow && !isGcCancelled(i.event!)),
   ].sort((a, b) => a.start.localeCompare(b.start));
 
   const checkedInItems = bookingItems.filter(i => i.booking!.status === 'checked_in')
@@ -293,6 +301,12 @@ export function GoogleGuestAgenda({
           </div>
 
           <div className="flex-1 overflow-y-auto">
+            {comingItems.length > 0 && (
+              <div>
+                <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-sky-700 bg-sky-50 border-b border-sky-100">⏰ Coming · {comingItems.length}</p>
+                {comingItems.map(item => renderCard(item, false))}
+              </div>
+            )}
             {arrivingItems.length > 0 && (
               <div>
                 <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-700 bg-amber-50 border-b border-amber-100">◐ Arriving · {arrivingItems.length}</p>
@@ -317,7 +331,7 @@ export function GoogleGuestAgenda({
                 {cancelledItems.map(item => renderCard(item, true))}
               </div>
             )}
-            {arrivingItems.length === 0 && checkedInItems.length === 0 && checkedOutItems.length === 0 && cancelledItems.length === 0 && (
+            {comingItems.length === 0 && arrivingItems.length === 0 && checkedInItems.length === 0 && checkedOutItems.length === 0 && cancelledItems.length === 0 && (
               <div className="flex flex-col items-center justify-center py-12 text-slate-400">
                 <p className="text-sm font-medium">No guests today</p>
               </div>
@@ -329,7 +343,10 @@ export function GoogleGuestAgenda({
           bookings={bookings}
           gcEvents={gcEvents}
           onSelectBooking={b => handleSelect({ key: `db-${b.id}`, name: b.guest_name, start: b.check_in, end: b.check_out, source: 'db', booking: b, event: null })}
-          onSelectCalendarEvent={ev => handleSelect({ key: `ev-${ev.id}`, name: ev.summary, start: ev.start, end: ev.end, source: 'calendar', booking: null, event: ev })}
+          onSelectCalendarEvent={ev => {
+            const linked = bookings.find(b => b.google_event_id === ev.id) || null;
+            handleSelect({ key: linked ? `db-${linked.id}` : `ev-${ev.id}`, name: linked ? linked.guest_name : ev.summary, start: linked ? linked.check_in : ev.start, end: linked ? linked.check_out : ev.end, source: linked ? 'both' : 'calendar', booking: linked, event: ev });
+          }}
         />
       </div>
 
