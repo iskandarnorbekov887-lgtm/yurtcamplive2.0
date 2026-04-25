@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase, type Booking, type Yurt, type UserRole, type Drink } from '@/lib/supabase';
+import { PrivateCalendarView } from '@/components/private-calendar-view';
 
 interface CalEvent {
   id: string;
@@ -10,7 +11,6 @@ interface CalEvent {
   end: string;
   description?: string | null;
   location?: string | null;
-  colorId?: string | null;
 }
 
 interface ListItem {
@@ -21,7 +21,6 @@ interface ListItem {
   source: 'both' | 'calendar' | 'db';
   booking: Booking | null;
   event: CalEvent | null;
-  isYellow: boolean;
 }
 
 interface Props {
@@ -60,7 +59,6 @@ export function GoogleGuestAgenda({
   const [newExtraName, setNewExtraName] = useState('');
   const [newExtraPrice, setNewExtraPrice] = useState('');
   const [actionMsg, setActionMsg] = useState('');
-  const [createYurtId, setCreateYurtId] = useState<number | ''>('');
 
   const today = localDateStr(new Date());
 
@@ -107,13 +105,12 @@ export function GoogleGuestAgenda({
         source: matched ? 'both' : 'calendar',
         booking: matched || null,
         event: ev,
-        isYellow: ev.colorId === '5',
       });
     });
 
     bookings
       .filter(b => !usedBookingIds.has(b.id) && !['cancelled', 'completed'].includes(b.status) && b.check_out >= today)
-      .forEach(b => items.push({ key: `db-${b.id}`, name: b.guest_name, start: b.check_in, end: b.check_out, source: 'db', booking: b, event: null, isYellow: false }));
+      .forEach(b => items.push({ key: `db-${b.id}`, name: b.guest_name, start: b.check_in, end: b.check_out, source: 'db', booking: b, event: null }));
 
     items.sort((a, b) => a.start.localeCompare(b.start));
     return items;
@@ -142,30 +139,6 @@ export function GoogleGuestAgenda({
     setSelectedItem(item);
     setCollectedAmount(''); setSelectedDrinks({}); setExtraServices([]);
     setNewExtraName(''); setNewExtraPrice(''); setShowDrinks(false); setActionMsg('');
-    setCreateYurtId('');
-  };
-
-  const handleCreateBookingFromEvent = async () => {
-    if (!selectedItem?.event) return;
-    setLoadingAction('create');
-    try {
-      const { data, error } = await supabase.from('bookings').insert({
-        guest_name: selectedItem.event.summary,
-        check_in: selectedItem.start,
-        check_out: selectedItem.end && selectedItem.end !== selectedItem.start ? selectedItem.end : selectedItem.start,
-        status: 'confirmed',
-        yurt_id: createYurtId || null,
-        total_price: 0,
-        number_of_people: 1,
-        payment_status: 'Pending',
-        source: 'Manual',
-        approved_by_manager: true,
-      }).select().single();
-      if (error) throw error;
-      setSelectedItem(prev => prev ? { ...prev, booking: data as Booking, source: 'both' } : prev);
-      flash('✓ Booking created. You can now check them in.');
-    } catch { flash('⚠ Failed to create booking.'); }
-    finally { setLoadingAction(''); }
   };
 
   const sel = selectedItem?.booking ?? null;
@@ -255,7 +228,7 @@ export function GoogleGuestAgenda({
               filteredItems.map(item => {
                 const isSelected = selectedItem?.key === item.key;
                 const statusKey = item.booking?.status;
-                const rowBg = statusKey === 'checked_in' ? 'border-l-4 border-emerald-400' : (statusKey === 'confirmed' || (!statusKey && item.isYellow)) ? 'border-l-4 border-amber-400' : '';
+                const rowBg = statusKey === 'checked_in' ? 'border-l-4 border-emerald-400' : statusKey === 'confirmed' ? 'border-l-4 border-amber-400' : '';
                 return (
                   <button key={item.key} onClick={() => handleSelect(item)}
                     className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-all ${isSelected ? 'bg-indigo-50' : ''} ${rowBg}`}>
@@ -270,8 +243,6 @@ export function GoogleGuestAgenda({
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${statusColor(statusKey)}`}>
                             {statusKey.replace('_', ' ')}
                           </span>
-                        ) : item.isYellow ? (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">confirmed</span>
                         ) : (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-400 border border-slate-200">calendar only</span>
                         )}
@@ -295,85 +266,45 @@ export function GoogleGuestAgenda({
           )}
         </div>
 
-        {/* Right — Action Panel */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
-          {!selectedItem ? (
-            <div className="flex flex-col items-center justify-center h-full min-h-[260px] text-slate-400 gap-2">
-              <svg className="w-10 h-10 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-              </svg>
-              <p className="text-sm font-medium">Select a guest to see actions</p>
-            </div>
-          ) : !sel ? (
-            /* Calendar-only event — no Supabase booking */
-            <div className="p-6 space-y-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Google Calendar Event</p>
-                  <h2 className="text-xl font-black text-slate-900">{selectedItem.event?.summary}</h2>
-                  <p className="text-sm text-slate-500 mt-0.5">{selectedItem.start} → {selectedItem.end}</p>
-                </div>
-                {selectedItem.isYellow && (
-                  <span className="text-xs font-bold px-3 py-1 rounded-full bg-amber-100 text-amber-700 border border-amber-200">confirmed</span>
-                )}
-              </div>
+        <PrivateCalendarView bookings={bookings} gcEvents={gcEvents} />
+      </div>
+
+      {/* Event / Booking popup modal */}
+    {selectedItem && (
+      <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-16" onClick={() => setSelectedItem(null)}>
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+        <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 sticky top-0 bg-white rounded-t-2xl z-10">
+            <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500">
+              {sel ? 'Booking Details' : 'Google Calendar Event'}
+            </p>
+            <button onClick={() => setSelectedItem(null)} className="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-xl transition-all text-slate-500 font-bold text-xl">×</button>
+          </div>
+
+          {!sel ? (
+            <div className="p-5 space-y-3">
+              <h2 className="text-xl font-black text-slate-900">{selectedItem.event?.summary}</h2>
+              <p className="text-sm text-slate-500">{selectedItem.start} → {selectedItem.end}</p>
               {selectedItem.event?.description && <p className="text-sm text-black bg-slate-50 rounded-xl p-3">{selectedItem.event.description}</p>}
-              {selectedItem.isYellow ? (
-                <div className="space-y-3">
-                  <p className="text-xs text-slate-500">This is a yellow (confirmed) calendar event. Assign a yurt and create a booking to enable check-in/out.</p>
-                  <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Assign Yurt (optional)</label>
-                    <select value={createYurtId} onChange={e => setCreateYurtId(e.target.value ? Number(e.target.value) : '')}
-                      className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-300 text-black bg-white">
-                      <option value="">No yurt assigned</option>
-                      {yurts.map(y => <option key={y.id} value={y.id}>{y.name}</option>)}
-                    </select>
-                  </div>
-                  {actionMsg && (
-                    <div className={`text-sm font-medium px-3 py-2 rounded-lg ${actionMsg.startsWith('⚠') ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>
-                      {actionMsg}
-                    </div>
-                  )}
-                  <button onClick={handleCreateBookingFromEvent} disabled={loadingAction === 'create'}
-                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold rounded-xl transition-all disabled:opacity-60 flex items-center gap-2">
-                    {loadingAction === 'create' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '+'}
-                    Create Booking
-                  </button>
-                </div>
-              ) : (
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-600">
-                  No matching booking in Supabase. Guest name on calendar may not match exactly.
-                  {onAddNewBooking && (
-                    <button onClick={() => onAddNewBooking(selectedItem.start)}
-                      className="mt-2 block px-4 py-2 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 transition-all">
-                      Create Booking for this date
-                    </button>
-                  )}
-                </div>
+              {selectedItem.event?.location && <p className="text-sm text-slate-500">📍 {selectedItem.event.location}</p>}
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-800">No matching booking in Supabase.</div>
+              {onAddNewBooking && (
+                <button onClick={() => { onAddNewBooking(selectedItem.start); setSelectedItem(null); }}
+                  className="px-4 py-2 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 transition-all">Create Booking for this date</button>
               )}
             </div>
           ) : (
-            /* Full action panel */
             <div className="p-5 space-y-4">
               <div className="flex items-start justify-between">
                 <div>
                   <h2 className="text-xl font-black text-slate-900">{sel.guest_name}</h2>
-                  <p className="text-sm text-slate-500 mt-0.5">
-                    {getYurtName(sel)} · {sel.check_in} → {sel.check_out}
-                    {sel.nights ? ` · ${sel.nights}n` : ''}
-                    {(sel.guest_count || sel.number_of_people) ? ` · ${sel.guest_count || sel.number_of_people} pax` : ''}
-                  </p>
+                  <p className="text-sm text-slate-500 mt-0.5">{getYurtName(sel)} · {sel.check_in} → {sel.check_out}{sel.nights ? ` · ${sel.nights}n` : ''}{(sel.guest_count || sel.number_of_people) ? ` · ${sel.guest_count || sel.number_of_people} pax` : ''}</p>
                 </div>
-                <span className={`text-xs font-bold px-3 py-1 rounded-full capitalize ${statusColor(sel.status)}`}>
-                  {sel.status.replace('_', ' ')}
-                </span>
+                <span className={`text-xs font-bold px-3 py-1 rounded-full capitalize ${statusColor(sel.status)}`}>{sel.status.replace('_', ' ')}</span>
               </div>
 
               {actionMsg && (
-                <div className={`text-sm font-medium px-3 py-2 rounded-lg ${actionMsg.startsWith('⚠') ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>
-                  {actionMsg}
-                </div>
+                <div className={`text-sm font-medium px-3 py-2 rounded-lg ${actionMsg.startsWith('⚠') ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>{actionMsg}</div>
               )}
 
               {(userRole === 'Manager' || userRole === 'CEO') && (
@@ -381,30 +312,22 @@ export function GoogleGuestAgenda({
                   {canCheckIn && (
                     <button onClick={handleCheckIn} disabled={loadingAction === 'checkin'}
                       className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition-all disabled:opacity-60 flex items-center gap-2">
-                      {loadingAction === 'checkin' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '→'}
-                      Check In
+                      {loadingAction === 'checkin' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '→'} Check In
                     </button>
                   )}
                   {canCheckOut && (
                     <button onClick={handleCheckOut} disabled={loadingAction === 'checkout'}
                       className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-all disabled:opacity-60 flex items-center gap-2">
-                      {loadingAction === 'checkout' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '✓'}
-                      Check Out
+                      {loadingAction === 'checkout' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '✓'} Check Out
                     </button>
                   )}
                   {canCancel && (
                     <button onClick={handleCancel} disabled={loadingAction === 'cancel'}
-                      className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-sm font-bold rounded-xl border border-red-200 transition-all disabled:opacity-60">
-                      Cancel Booking
-                    </button>
+                      className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-sm font-bold rounded-xl border border-red-200 transition-all disabled:opacity-60">Cancel Booking</button>
                   )}
                   {sel.status === 'confirmed' && sel.check_in < today && onUpdateBooking && (
-                    <button
-                      onClick={async () => { if (!confirm(`Mark ${sel.guest_name} as No Arrival?`)) return; setLoadingAction('na'); try { await onUpdateBooking(sel.id, { status: 'no_arrival' } as Partial<Booking>); flash('Marked as No Arrival.'); } catch { flash('⚠ Failed.'); } finally { setLoadingAction(''); } }}
-                      disabled={loadingAction === 'na'}
-                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-bold rounded-xl transition-all disabled:opacity-60">
-                      No Arrival
-                    </button>
+                    <button onClick={async () => { if (!confirm(`Mark ${sel.guest_name} as No Arrival?`)) return; setLoadingAction('na'); try { await onUpdateBooking(sel.id, { status: 'no_arrival' } as Partial<Booking>); flash('Marked as No Arrival.'); } catch { flash('⚠ Failed.'); } finally { setLoadingAction(''); } }} disabled={loadingAction === 'na'}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-bold rounded-xl transition-all disabled:opacity-60">No Arrival</button>
                   )}
                 </div>
               )}
@@ -426,9 +349,7 @@ export function GoogleGuestAgenda({
               {(canCheckOut || sel.status === 'checked_in') && (userRole === 'Manager' || userRole === 'CEO') && (
                 <div className="border border-slate-200 rounded-xl p-4 space-y-3">
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Extra Services</p>
-                  <button onClick={() => setShowDrinks(v => !v)} className="text-sm font-bold text-indigo-600 hover:text-indigo-700">
-                    {showDrinks ? '− Hide Drinks' : '+ Add Drinks'}
-                  </button>
+                  <button onClick={() => setShowDrinks(v => !v)} className="text-sm font-bold text-indigo-600 hover:text-indigo-700">{showDrinks ? '− Hide Drinks' : '+ Add Drinks'}</button>
                   {showDrinks && drinks.length > 0 && (
                     <div className="grid grid-cols-2 gap-2">
                       {drinks.map(d => (
@@ -477,6 +398,7 @@ export function GoogleGuestAgenda({
           )}
         </div>
       </div>
+    )}
     </div>
   );
 }

@@ -12,6 +12,7 @@ interface CalEvent {
 
 interface Props {
   bookings: Booking[];
+  gcEvents?: CalEvent[];
 }
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -19,10 +20,11 @@ const MONTHS = ['January','February','March','April','May','June','July','August
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
 
-export function PrivateCalendarView({ bookings }: Props) {
-  const [gcEvents, setGcEvents] = useState<CalEvent[]>([]);
-  const [loading, setLoading] = useState(true);
+export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp }: Props) {
+  const [fetchedEvents, setFetchedEvents] = useState<CalEvent[]>([]);
+  const [loading, setLoading] = useState(gcEventsProp === undefined);
   const [apiError, setApiError] = useState('');
+  const gcEvents = gcEventsProp ?? fetchedEvents;
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
@@ -30,15 +32,16 @@ export function PrivateCalendarView({ bookings }: Props) {
   const month = currentDate.getMonth();
 
   useEffect(() => {
+    if (gcEventsProp !== undefined) return;
     fetch('/api/calendar/events')
       .then(r => r.json())
       .then((data: CalEvent[] | { error: string }) => {
         if ('error' in data) setApiError(data.error);
-        else setGcEvents(data);
+        else setFetchedEvents(data);
       })
       .catch(e => setApiError(String(e)))
       .finally(() => setLoading(false));
-  }, []);
+  }, [gcEventsProp]);
 
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -68,9 +71,9 @@ export function PrivateCalendarView({ bookings }: Props) {
           <p className="text-xs text-slate-500">Private · Google Calendar + Bookings</p>
         </div>
         <div className="flex items-center gap-2">
-          {loading && <span className="text-xs text-slate-400 animate-pulse">Syncing…</span>}
-          {!loading && !apiError && <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200">{gcEvents.length} Google events</span>}
-          {apiError && <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded-lg border border-red-200 max-w-xs truncate" title={apiError}>⚠ {apiError}</span>}
+          {loading && !gcEventsProp && <span className="text-xs text-slate-400 animate-pulse">Syncing…</span>}
+          {!loading && !apiError && !gcEventsProp && <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200">{gcEvents.length} Google events</span>}
+          {apiError && !gcEventsProp && <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded-lg border border-red-200 max-w-xs truncate" title={apiError}>⚠ {apiError}</span>}
           <button onClick={() => setCurrentDate(new Date(year, month - 1, 1))}
             className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-600 font-bold text-lg transition-all">‹</button>
           <span className="text-sm font-black text-slate-800 min-w-[130px] text-center">{MONTHS[month]} {year}</span>
