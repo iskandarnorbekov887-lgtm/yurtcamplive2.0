@@ -179,7 +179,7 @@ function ManagerPortal() {
                 <p className="text-xs text-slate-500">Shared camp calendar</p>
               </div>
               <iframe
-                src="https://calendar.google.com/calendar/embed?src=072d8da6e5b1a848d2ec34c42648591405a428494d10c820a7a8b198125e864c%40group.calendar.google.com&ctz=Asia%2FTashkent&mode=MONTH&showTitle=0&showNav=1&showDate=1&showPrint=0&showTabs=0&showCalendars=0"
+                src="https://calendar.google.com/calendar/embed?src=072d8da6e5b1a848d2ec34c42648591405a428494d10c820a7a8b198125e864c%40group.calendar.google.com&ctz=Asia%2FSamarkand"
                 style={{ border: 0 }}
                 width="100%"
                 height="600"
