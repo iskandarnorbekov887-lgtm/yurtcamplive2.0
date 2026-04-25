@@ -151,10 +151,20 @@ export function GoogleGuestAgenda({
     .filter(ev => !bookings.some(b => b.google_event_id === ev.id))
     .map(ev => ({ key: `ev-${ev.id}`, name: ev.summary, start: ev.start, end: ev.end, source: 'calendar' as const, booking: null, event: ev }));
 
-  const bookingItems: ListItem[] = bookings.map(b => ({
-    key: `db-${b.id}`, name: b.guest_name, start: b.check_in, end: b.check_out,
-    source: 'db' as const, booking: b, event: gcEvents.find(e => e.id === b.google_event_id) || null,
-  }));
+  // If a linked Google Calendar event is marked cancelled (red / colorId 11 / colorId 4 / 'cancel' in title),
+  // surface the booking as cancelled in the UI. We do NOT write to the DB — so if the office reverts the
+  // red color in Calendar, the original status (confirmed) returns automatically and Check In re-appears.
+  // Only override 'confirmed' (not yet checked in) — never override checked_in / completed / no_arrival.
+  const bookingItems: ListItem[] = bookings.map(b => {
+    const linkedEv = gcEvents.find(e => e.id === b.google_event_id) || null;
+    const effB: Booking = b.status === 'confirmed' && linkedEv && isGcCancelled(linkedEv)
+      ? { ...b, status: 'cancelled' }
+      : b;
+    return {
+      key: `db-${b.id}`, name: effB.guest_name, start: effB.check_in, end: effB.check_out,
+      source: 'db' as const, booking: effB, event: linkedEv,
+    };
+  });
 
   const D = selectedCalendarDay;
 
