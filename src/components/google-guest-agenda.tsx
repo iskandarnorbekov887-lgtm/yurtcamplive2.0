@@ -201,6 +201,18 @@ export function GoogleGuestAgenda({
     const ev = selectedItem.event;
     setLoadingAction('creating');
     try {
+      // Guard: check if a booking for this event already exists
+      const { data: existing } = await supabase
+        .from('bookings')
+        .select('id, guest_name, check_in, check_out, status, yurt_id, total_price, number_of_people, payment_status, source, approved_by_manager, created_by_id, notes, google_event_id, last_edited_by_id')
+        .eq('google_event_id', ev.id)
+        .maybeSingle();
+      if (existing) {
+        flash('⚠ Booking for this event already exists — opening it.');
+        handleSelect({ key: `db-${existing.id}`, name: existing.guest_name, start: existing.check_in, end: existing.check_out, source: 'db', booking: existing as Booking, event: ev });
+        return;
+      }
+
       const { data, error } = await supabase.from('bookings').insert({
         guest_name: ev.summary,
         check_in: ev.start,
@@ -217,6 +229,7 @@ export function GoogleGuestAgenda({
       }).select('id').single();
       if (error) throw error;
       if (doCheckIn && data?.id && onCheckIn) await onCheckIn(data.id);
+      if (doCheckIn && data?.id) await updateCalendarColor({ google_event_id: ev.id } as Booking, GC_COLORS.checked_in);
       flash(doCheckIn ? '✓ Guest checked in from calendar event.' : '✓ Booking created from calendar event.');
       setSelectedItem(null);
       onRefresh?.();
