@@ -200,46 +200,59 @@ export function GoogleGuestAgenda({
   const renderCard = (item: ListItem, isCancelled: boolean) => {
     const isSelected = selectedItem?.key === item.key;
     const booking = item.booking;
+    const showApprove = !!booking && booking.status === 'checked_in' && syncWarnings[booking.id] === 'dates_changed' && (userRole === 'Manager' || userRole === 'CEO');
     return (
-      <button
-        key={item.key}
-        onClick={() => handleSelect(item)}
-        className={`w-full text-left px-4 py-3 transition-all border-l-4 ${
-          isCancelled
-            ? 'border-red-300 bg-red-50/50'
-            : isSelected
-            ? 'bg-indigo-50 border-indigo-400'
-            : booking?.status === 'checked_in'
-            ? 'border-emerald-400 hover:bg-emerald-50'
-            : booking?.status === 'confirmed'
-            ? 'border-amber-400 hover:bg-amber-50'
-            : booking?.status === 'completed'
-            ? 'border-blue-300 hover:bg-blue-50'
-            : 'border-slate-200 hover:bg-slate-50'
-        }`}
-      >
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className={`font-bold text-sm truncate ${isCancelled ? 'text-red-600 line-through' : 'text-slate-900'}`}>
-              {item.name}
-            </p>
-            <p className="text-xs text-slate-400 mt-0.5">{item.start} → {item.end}</p>
-            {booking ? <p className="text-xs text-slate-500">{getYurtName(booking)}</p> : <p className="text-xs text-slate-400">calendar only</p>}
+      <div key={item.key} className={`w-full px-4 py-3 transition-all border-l-4 ${
+        isCancelled
+          ? 'border-red-300 bg-red-50/50'
+          : isSelected
+          ? 'bg-indigo-50 border-indigo-400'
+          : booking?.status === 'checked_in'
+          ? 'border-emerald-400 hover:bg-emerald-50'
+          : booking?.status === 'confirmed'
+          ? 'border-amber-400 hover:bg-amber-50'
+          : booking?.status === 'completed'
+          ? 'border-blue-300 hover:bg-blue-50'
+          : 'border-slate-200 hover:bg-slate-50'
+      }`}>
+        <button
+          className="w-full text-left"
+          onClick={() => handleSelect(item)}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className={`font-bold text-sm truncate ${isCancelled ? 'text-red-600 line-through' : 'text-slate-900'}`}>
+                {item.name}
+              </p>
+              <p className="text-xs text-slate-400 mt-0.5">{item.start} → {item.end}</p>
+              {booking ? <p className="text-xs text-slate-500">{getYurtName(booking)}</p> : <p className="text-xs text-slate-400">calendar only</p>}
+            </div>
+            <div className="flex flex-col items-end gap-1 shrink-0">
+              {isCancelled
+                ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600 border border-red-200">cancelled</span>
+                : booking && <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${statusColor(booking.status)}`}>{booking.status.replace('_', ' ')}</span>
+              }
+              {booking && syncWarnings[booking.id] === 'deleted' && (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 border border-red-200">⚠ removed</span>
+              )}
+              {booking && syncWarnings[booking.id] === 'dates_changed' && (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">⚠ dates ≠</span>
+              )}
+            </div>
           </div>
-          <div className="flex flex-col items-end gap-1 shrink-0">
-            {isCancelled
-              ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600 border border-red-200">cancelled</span>
-              : booking && <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${statusColor(booking.status)}`}>{booking.status.replace('_', ' ')}</span>
-            }
-            {booking && syncWarnings[booking.id] === 'deleted' && (
-              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 border border-red-200">⚠ removed</span>
-            )}
-            {booking && syncWarnings[booking.id] === 'dates_changed' && (
-              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">⚠ dates ≠</span>
-            )}
-          </div>
-        </div>
-      </button>
+        </button>
+
+        {showApprove && booking && (
+          <button
+            onClick={e => { e.stopPropagation(); void handleApproveDates(booking); }}
+            disabled={loadingAction === `syncdates-${booking.id}`}
+            className="mt-2 w-full px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-60"
+          >
+            {loadingAction === `syncdates-${booking.id}` ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '↻'}
+            Approve dates
+          </button>
+        )}
+      </div>
     );
   };
 
@@ -265,6 +278,28 @@ export function GoogleGuestAgenda({
   };
 
   const flash = (msg: string) => { setActionMsg(msg); setTimeout(() => setActionMsg(''), 4000); };
+
+  const handleApproveDates = async (booking: Booking) => {
+    if (!onUpdateBooking) return;
+    const linkedEv = gcEvents.find(e => e.id === booking.google_event_id);
+    if (!linkedEv) { flash('⚠ Linked calendar event not found.'); return; }
+    setLoadingAction(`syncdates-${booking.id}`);
+    try {
+      await onUpdateBooking(booking.id, { check_in: linkedEv.start, check_out: linkedEv.end } as Partial<Booking>);
+      setSyncWarnings(w => {
+        const next = { ...w };
+        delete next[booking.id];
+        return next;
+      });
+      flash('✓ Dates approved from calendar.');
+      onRefresh?.();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      flash(`⚠ ${msg.slice(0, 100)}`);
+    } finally {
+      setLoadingAction('');
+    }
+  };
 
   const handleCreateFromEvent = async (doCheckIn = false) => {
     if (!selectedItem?.event) { flash('⚠ No event selected.'); return; }
@@ -533,21 +568,13 @@ export function GoogleGuestAgenda({
                     {(userRole === 'Manager' || userRole === 'CEO') && onUpdateBooking && (
                       <button
                         onClick={async () => {
-                          if (!confirm(`Update booking dates to ${linkedEv.start} → ${linkedEv.end}?`)) return;
-                          setLoadingAction('syncdates');
-                          try {
-                            await onUpdateBooking(sel.id, { check_in: linkedEv.start, check_out: linkedEv.end } as Partial<Booking>);
-                            setSyncWarnings(w => { const n = { ...w }; delete n[sel.id]; return n; });
-                            flash('✓ Dates synced from calendar.');
-                          } catch (e: unknown) {
-                            const msg = e instanceof Error ? e.message : String(e);
-                            flash(`⚠ ${msg.slice(0, 100)}`);
-                          } finally { setLoadingAction(''); }
+                          if (!confirm(`Approve new booking dates from Calendar: ${linkedEv.start} → ${linkedEv.end}?`)) return;
+                          await handleApproveDates(sel);
                         }}
-                        disabled={loadingAction === 'syncdates'}
+                        disabled={loadingAction === `syncdates-${sel.id}`}
                         className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold rounded-lg transition-all disabled:opacity-60 flex items-center justify-center gap-2">
-                        {loadingAction === 'syncdates' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '↻'}
-                        Sync dates from Calendar
+                        {loadingAction === `syncdates-${sel.id}` ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '↻'}
+                        Approve dates
                       </button>
                     )}
                   </div>
