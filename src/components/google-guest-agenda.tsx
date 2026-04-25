@@ -102,7 +102,7 @@ export function GoogleGuestAgenda({
 
   const isGcCancelled = (ev: CalEvent) =>
     ev.status === 'cancelled' || ev.colorId === '11' || ev.colorId === '4' ||
-    ev.summary.toLowerCase().includes('cancel');
+    (ev.summary?.toLowerCase() ?? '').includes('cancel');
 
   const calendarOnlyItems: ListItem[] = gcEvents
     .filter(ev => !bookings.some(b => b.google_event_id === ev.id))

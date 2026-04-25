@@ -37,16 +37,24 @@ export async function GET() {
       maxResults: 100,
     });
 
-    const items = (response.data.items || []).map(event => ({
+    const items = (response.data.items || []).map(event => {
+      const start = event.start?.date || event.start?.dateTime?.split('T')[0] || '';
+      const rawEnd = event.end?.date || event.end?.dateTime?.split('T')[0] || '';
+      const end = rawEnd && rawEnd > start ? rawEnd : (() => {
+        if (!start) return '';
+        const d = new Date(start + 'T12:00:00'); d.setDate(d.getDate() + 1);
+        return d.toISOString().split('T')[0];
+      })();
+      return ({
       id: event.id,
-      summary: event.summary || 'Untitled Event',
-      start: event.start?.date || event.start?.dateTime?.split('T')[0] || '',
-      end: event.end?.date || event.end?.dateTime?.split('T')[0] || '',
+      summary: event.summary || '(No title)',
+      start, end,
       description: event.description || null,
       location: event.location || null,
       colorId: event.colorId || null,
       status: event.status || null,
-    }));
+    });
+    });
 
     return NextResponse.json(items);
   } catch (err: unknown) {
