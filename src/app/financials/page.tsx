@@ -128,6 +128,7 @@ function ManagerFinancials() {
   };
 
   const expenseCategories = [
+    'groceries',
     'workers income',
     'gas for car',
     'shezod akaga berildi',
