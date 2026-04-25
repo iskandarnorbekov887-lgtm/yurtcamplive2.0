@@ -222,7 +222,11 @@ export function GoogleGuestAgenda({
   };
 
   const sel = selectedItem?.booking ?? null;
-  const canCheckIn = sel?.status === 'confirmed' && !!onCheckIn;
+  const daysUntilCheckIn = sel
+    ? Math.ceil((new Date(sel.check_in + 'T00:00:00').getTime() - new Date(today + 'T00:00:00').getTime()) / 86400000)
+    : 999;
+  const canCheckIn = sel?.status === 'confirmed' && daysUntilCheckIn <= 2 && !!onCheckIn;
+  const isComingSoon = sel?.status === 'confirmed' && daysUntilCheckIn > 2;
   const canCheckOut = sel?.status === 'checked_in' && !!onCheckOut;
   const canCancel = sel && ['confirmed', 'pending'].includes(sel.status) && !!onCancelBooking;
 
@@ -320,7 +324,12 @@ export function GoogleGuestAgenda({
           </div>
         </div>
 
-        <PrivateCalendarView bookings={bookings} gcEvents={gcEvents} />
+        <PrivateCalendarView
+          bookings={bookings}
+          gcEvents={gcEvents}
+          onSelectBooking={b => handleSelect({ key: `db-${b.id}`, name: b.guest_name, start: b.check_in, end: b.check_out, source: 'db', booking: b, event: null })}
+          onSelectCalendarEvent={ev => handleSelect({ key: `ev-${ev.id}`, name: ev.summary, start: ev.start, end: ev.end, source: 'calendar', booking: null, event: ev })}
+        />
       </div>
 
       {/* Event / Booking popup modal */}
@@ -369,6 +378,11 @@ export function GoogleGuestAgenda({
                       className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition-all disabled:opacity-60 flex items-center gap-2">
                       {loadingAction === 'checkin' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '→'} Check In
                     </button>
+                  )}
+                  {isComingSoon && (
+                    <div className="px-4 py-2 bg-sky-50 border border-sky-200 rounded-xl text-sm font-bold text-sky-700">
+                      ⏰ Coming in {daysUntilCheckIn} day{daysUntilCheckIn !== 1 ? 's' : ''}
+                    </div>
                   )}
                   {canCheckOut && (
                     <button onClick={handleCheckOut} disabled={loadingAction === 'checkout'}

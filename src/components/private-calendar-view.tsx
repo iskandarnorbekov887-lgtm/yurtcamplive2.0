@@ -8,11 +8,17 @@ interface CalEvent {
   summary: string;
   start: string;
   end: string;
+  colorId?: string | null;
+  status?: string | null;
+  description?: string | null;
+  location?: string | null;
 }
 
 interface Props {
   bookings: Booking[];
   gcEvents?: CalEvent[];
+  onSelectBooking?: (b: Booking) => void;
+  onSelectCalendarEvent?: (ev: CalEvent) => void;
 }
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -20,7 +26,7 @@ const MONTHS = ['January','February','March','April','May','June','July','August
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
 
-export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp }: Props) {
+export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelectBooking, onSelectCalendarEvent }: Props) {
   const [fetchedEvents, setFetchedEvents] = useState<CalEvent[]>([]);
   const [loading, setLoading] = useState(gcEventsProp === undefined);
   const [apiError, setApiError] = useState('');
@@ -139,24 +145,32 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp }: Props)
             ) : (
               <div className="space-y-2">
                 {sel.bk.map(b => (
-                  <div key={b.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl ${
-                    b.status === 'checked_in' ? 'bg-emerald-50 border border-emerald-200' : 'bg-amber-50 border border-amber-200'
-                  }`}>
+                  <button key={b.id} onClick={() => onSelectBooking?.(b)}
+                    className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
+                      b.status === 'checked_in'
+                        ? 'bg-emerald-50 border border-emerald-200 hover:bg-emerald-100'
+                        : 'bg-amber-50 border border-amber-200 hover:bg-amber-100'
+                    } ${onSelectBooking ? 'cursor-pointer' : 'cursor-default'}`}>
                     <span className={`w-2 h-2 rounded-full shrink-0 ${b.status === 'checked_in' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="text-sm font-bold text-slate-900">{b.guest_name}</p>
                       <p className="text-xs text-slate-500 capitalize">{b.check_in} → {b.check_out} · {b.status.replace('_', ' ')}</p>
                     </div>
-                  </div>
+                    {onSelectBooking && <span className="text-xs text-slate-400">›</span>}
+                  </button>
                 ))}
                 {sel.gc.map(e => (
-                  <div key={e.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-indigo-50 border border-indigo-200">
+                  <button key={e.id} onClick={() => onSelectCalendarEvent?.(e)}
+                    className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl bg-indigo-50 border border-indigo-200 transition-all ${
+                      onSelectCalendarEvent ? 'hover:bg-indigo-100 cursor-pointer' : 'cursor-default'
+                    }`}>
                     <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="text-sm font-bold text-slate-900">{e.summary}</p>
                       <p className="text-xs text-slate-500">{e.start} → {e.end} · Google Calendar</p>
                     </div>
-                  </div>
+                    {onSelectCalendarEvent && <span className="text-xs text-slate-400">›</span>}
+                  </button>
                 ))}
               </div>
             )}
