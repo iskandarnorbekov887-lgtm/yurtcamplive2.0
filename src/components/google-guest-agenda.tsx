@@ -475,6 +475,53 @@ export function GoogleGuestAgenda({
                 <div className={`text-sm font-medium px-3 py-2 rounded-lg ${actionMsg.startsWith('⚠') ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>{actionMsg}</div>
               )}
 
+              {syncWarnings[sel.id] === 'deleted' && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
+                  <p className="font-bold mb-0.5">⚠ Calendar event deleted</p>
+                  <p className="text-xs">The linked Google Calendar event was removed. The booking remains here.</p>
+                </div>
+              )}
+
+              {syncWarnings[sel.id] === 'dates_changed' && (() => {
+                const linkedEv = gcEvents.find(e => e.id === sel.google_event_id);
+                if (!linkedEv) return null;
+                return (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
+                    <p className="text-sm font-bold text-amber-800">⚠ Dates changed in Google Calendar</p>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="bg-white rounded-lg p-2 border border-amber-100">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Saved</p>
+                        <p className="text-black font-bold">{sel.check_in} → {sel.check_out}</p>
+                      </div>
+                      <div className="bg-white rounded-lg p-2 border border-emerald-200">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-emerald-500">Calendar</p>
+                        <p className="text-black font-bold">{linkedEv.start} → {linkedEv.end}</p>
+                      </div>
+                    </div>
+                    {(userRole === 'Manager' || userRole === 'CEO') && onUpdateBooking && (
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`Update booking dates to ${linkedEv.start} → ${linkedEv.end}?`)) return;
+                          setLoadingAction('syncdates');
+                          try {
+                            await onUpdateBooking(sel.id, { check_in: linkedEv.start, check_out: linkedEv.end } as Partial<Booking>);
+                            setSyncWarnings(w => { const n = { ...w }; delete n[sel.id]; return n; });
+                            flash('✓ Dates synced from calendar.');
+                          } catch (e: unknown) {
+                            const msg = e instanceof Error ? e.message : String(e);
+                            flash(`⚠ ${msg.slice(0, 100)}`);
+                          } finally { setLoadingAction(''); }
+                        }}
+                        disabled={loadingAction === 'syncdates'}
+                        className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold rounded-lg transition-all disabled:opacity-60 flex items-center justify-center gap-2">
+                        {loadingAction === 'syncdates' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '↻'}
+                        Sync dates from Calendar
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
+
               {(userRole === 'Manager' || userRole === 'CEO') && (
                 <div className="flex flex-wrap gap-2">
                   {canCheckIn && (
