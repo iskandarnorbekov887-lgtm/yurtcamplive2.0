@@ -8,7 +8,6 @@ import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { GoogleGuestAgenda } from '@/components/google-guest-agenda';
 import type { UserRole } from '@/lib/supabase';
-import ICAL from 'ical.js';
 
 export default function CEOPage() {
   return (
@@ -25,103 +24,13 @@ function CEODashboard() {
   const { t } = useLanguage();
   const [yurts, setYurts] = useState<Yurt[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [icalEvents, setIcalEvents] = useState<Booking[]>([]);
   const [staff, setStaff] = useState<Profile[]>([]);
   const [activeTab, setActiveTab] = useState<'checkin' | 'team' | 'financials'>('checkin');
   const [loading, setLoading] = useState(true);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [calendarPreference, setCalendarPreference] = useState<'internal' | 'ical'>('internal');
-  const [icalConfig, setIcalConfig] = useState({
-    url: '',
-  });
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAllNotifications, setShowAllNotifications] = useState(false);
 
-  useEffect(() => {
-    // Load calendar preference from localStorage
-    const savedPreference = localStorage.getItem('ceo_calendar_preference') as 'internal' | 'ical' | 'google' | null;
-    if (savedPreference && (savedPreference === 'internal' || savedPreference === 'ical')) {
-      setCalendarPreference(savedPreference);
-    } else if (savedPreference === 'google') {
-      // Migrate old 'google' preference to 'ical'
-      setCalendarPreference('ical');
-      localStorage.setItem('ceo_calendar_preference', 'ical');
-    }
-    // Load iCal config
-    const savedConfig = localStorage.getItem('ical_config');
-    if (savedConfig) {
-      setIcalConfig(JSON.parse(savedConfig));
-    }
-  }, []);
-
-  // Fetch and parse iCal events
-  const fetchIcalEvents = async () => {
-    if (!icalConfig.url || calendarPreference !== 'ical') {
-      console.log('⚠️ iCal fetch skipped - URL:', icalConfig.url, 'Preference:', calendarPreference);
-      return;
-    }
-    
-    console.log('🔄 Fetching iCal from:', icalConfig.url);
-    
-    try {
-      const response = await fetch(icalConfig.url);
-      console.log('📡 Response status:', response.status, response.statusText);
-      
-      if (!response.ok) {
-        console.error('❌ Failed to fetch iCal:', response.status, response.statusText);
-        setIcalEvents([]);
-        return;
-      }
-      
-      const icalData = await response.text();
-      console.log('📄 iCal data length:', icalData.length);
-      
-      const jcalData = ICAL.parse(icalData);
-      const comp = new ICAL.Component(jcalData);
-      const vevents = comp.getAllSubcomponents('vevent');
-      console.log('📋 Number of vevents:', vevents.length);
-      
-      const mappedEvents: Booking[] = vevents.map((vevent, index) => {
-        const event = new ICAL.Event(vevent);
-        const startDate = event.startDate.toJSDate().toISOString().split('T')[0];
-        const endDate = event.endDate.toJSDate().toISOString().split('T')[0];
-        
-        console.log(`📅 Event ${index}: ${event.summary} (${startDate} - ${endDate})`);
-        
-        return {
-          id: 10000 + index, // Offset to avoid collision with Supabase IDs
-          yurt_id: 1, // Default yurt
-          guest_name: event.summary || 'iCal Event',
-          check_in: startDate,
-          check_out: endDate,
-          total_price: 0,
-          number_of_people: 1,
-          payment_status: 'Paid',
-          source: 'Manual',
-          status: 'confirmed',
-          notes: event.description || 'Imported from iCal',
-          meal_notes: null,
-          approved_by_manager: true,
-          created_by_id: currentUserId || '',
-          last_edited_by_id: null,
-        };
-      });
-      
-      console.log('✅ iCal events fetched:', mappedEvents.length);
-      setIcalEvents(mappedEvents);
-    } catch (err) {
-      console.error('❌ Error fetching iCal events:', err);
-      setIcalEvents([]);
-    }
-  };
-
-  // Fetch iCal events when preference changes or on mount
-  useEffect(() => {
-    if (calendarPreference === 'ical' && icalConfig.url) {
-      fetchIcalEvents();
-    }
-  }, [calendarPreference, icalConfig.url]);
 
   useEffect(() => {
     fetchData();
@@ -303,10 +212,6 @@ function CEODashboard() {
             </div>
           </div>
           <div className="flex gap-3">
-            <button onClick={() => setShowSettingsModal(true)} className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-bold transition-all border border-white/10 flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-              SETTINGS
-            </button>
             <LanguageSwitcher />
             <div className="relative">
               <button
@@ -529,30 +434,6 @@ function CEODashboard() {
 
         {activeTab === 'checkin' && (
           <div className="animate-in fade-in duration-500">
-            {/* Sync iCal Button */}
-            {calendarPreference === 'ical' && icalConfig.url && (
-              <div className="mb-4 flex items-center justify-between bg-blue-50 p-4 rounded-xl border border-blue-200">
-                <div className="flex items-center gap-3">
-                  <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2zm-7 5h5v5h-5z"/>
-                  </svg>
-                  <span className="text-sm text-blue-800">
-                    {icalEvents.length > 0 
-                      ? `${icalEvents.length} iCal events loaded` 
-                      : 'iCal connected'}
-                  </span>
-                </div>
-                <button
-                  onClick={fetchIcalEvents}
-                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-all flex items-center gap-2"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Sync Now
-                </button>
-              </div>
-            )}
             <GoogleGuestAgenda
               bookings={bookings}
               yurts={yurts}
@@ -630,106 +511,6 @@ function CEODashboard() {
       </main>
 
 
-      {/* Settings Modal */}
-      {showSettingsModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" onClick={() => setShowSettingsModal(false)}>
-          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-black text-slate-800">Calendar Settings</h2>
-              <button onClick={() => setShowSettingsModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-all">
-                <svg className="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-3">Choose Calendar Type</label>
-                <div className="space-y-3">
-                  <button
-                    onClick={() => {
-                      setCalendarPreference('internal');
-                      localStorage.setItem('ceo_calendar_preference', 'internal');
-                    }}
-                    className={`w-full p-4 rounded-xl border-2 transition-all flex items-center gap-4 ${
-                      calendarPreference === 'internal' 
-                        ? 'border-indigo-600 bg-indigo-50' 
-                        : 'border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
-                      <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                    </div>
-                    <div className="text-left">
-                      <p className="font-bold text-slate-800">Internal Calendar</p>
-                      <p className="text-xs text-slate-500">Built-in calendar for Isky Camp</p>
-                    </div>
-                    {calendarPreference === 'internal' && (
-                      <svg className="w-6 h-6 text-indigo-600 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                    )}
-                  </button>
-                  
-                  <button
-                    onClick={() => {
-                      setCalendarPreference('ical');
-                      localStorage.setItem('ceo_calendar_preference', 'ical');
-                    }}
-                    className={`w-full p-4 rounded-xl border-2 transition-all flex items-center gap-4 ${
-                      calendarPreference === 'ical' 
-                        ? 'border-indigo-600 bg-indigo-50' 
-                        : 'border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    <div className="p-2 bg-blue-50 rounded-xl">
-                      <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2zm-7 5h5v5h-5z"/></svg>
-                    </div>
-                    <div className="text-left">
-                      <p className="font-bold text-slate-800">iCal Calendar</p>
-                      <p className="text-xs text-slate-500">Sync with iCal feed URL</p>
-                    </div>
-                    {calendarPreference === 'ical' && (
-                      <svg className="w-6 h-6 text-indigo-600 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                    )}
-                  </button>
-                </div>
-              </div>
-              
-              {calendarPreference === 'ical' && (
-                <div className="space-y-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
-                  <p className="text-sm text-blue-800 mb-4">
-                    <strong>Setup Instructions:</strong> Get your iCal feed URL from Google Calendar, Outlook, or any calendar app.
-                  </p>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">iCal URL</label>
-                    <input
-                      type="text"
-                      value={icalConfig.url}
-                      onChange={(e) => setIcalConfig({ ...icalConfig, url: e.target.value })}
-                      placeholder="https://calendar.google.com/calendar/ical/..."
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                    />
-                  </div>
-                  <p className="text-xs text-slate-600">
-                    <strong>To get iCal URL from Google Calendar:</strong> Settings → Share with specific people → Get shareable link → Copy the iCal URL
-                  </p>
-                </div>
-              )}
-            </div>
-            
-            <button
-              onClick={() => {
-                if (calendarPreference === 'ical') {
-                  localStorage.setItem('ical_config', JSON.stringify(icalConfig));
-                }
-                setShowSettingsModal(false);
-              }}
-              className="w-full mt-6 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all"
-            >
-              Save Settings
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
