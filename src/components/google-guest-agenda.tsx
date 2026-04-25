@@ -90,6 +90,34 @@ export function GoogleGuestAgenda({
       .then(({ data }: { data: Drink[] | null }) => setDrinks(data || []));
   }, []);
 
+  // Auto-sync notes: when a linked Google Calendar event's description changes,
+  // update the booking's notes field to match.
+  const [didSyncNotes, setDidSyncNotes] = useState(false);
+  useEffect(() => {
+    if (didSyncNotes || gcEvents.length === 0 || bookings.length === 0) return;
+    const cleanDesc = (d: string | null | undefined) =>
+      d && !d.includes('tasks.google.com') ? d.trim() : null;
+    const toSync = bookings.filter(b => {
+      if (!b.google_event_id) return false;
+      const ev = gcEvents.find(e => e.id === b.google_event_id);
+      if (!ev) return false;
+      const live = cleanDesc(ev.description);
+      const saved = (b.notes || '').trim() || null;
+      return live !== saved;
+    });
+    if (toSync.length === 0) { setDidSyncNotes(true); return; }
+    (async () => {
+      for (const b of toSync) {
+        const ev = gcEvents.find(e => e.id === b.google_event_id)!;
+        const live = cleanDesc(ev.description);
+        try { await supabase.from('bookings').update({ notes: live }).eq('id', b.id); }
+        catch (err) { console.error('Notes sync failed for booking', b.id, err); }
+      }
+      setDidSyncNotes(true);
+      onRefresh?.();
+    })();
+  }, [gcEvents, bookings, didSyncNotes, onRefresh]);
+
   useEffect(() => {
     if (selectedItem?.booking) {
       const updated = bookings.find(b => b.id === selectedItem.booking!.id);
@@ -536,7 +564,7 @@ export function GoogleGuestAgenda({
               {(sel.notes || sel.description) && (
                 <div className="bg-slate-50 rounded-xl p-3">
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Notes</p>
-                  <p className="text-sm text-black">{sel.description || sel.notes}</p>
+                  <p className="text-sm text-black whitespace-pre-wrap">{sel.notes || sel.description}</p>
                 </div>
               )}
             </div>
