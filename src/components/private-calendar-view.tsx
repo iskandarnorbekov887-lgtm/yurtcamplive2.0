@@ -24,7 +24,12 @@ interface EventBar {
   startsThisWeek: boolean;
   endsThisWeek: boolean;
   raw: Booking | CalEvent;
+  gcCancelled?: boolean;
 }
+
+const isGcCancelled = (ev: CalEvent | null | undefined) =>
+  !!ev && (ev.status === 'cancelled' || ev.colorId === '11' || ev.colorId === '4' ||
+  (ev.summary?.toLowerCase() ?? '').includes('cancel'));
 
 interface Props {
   bookings: Booking[];
@@ -93,7 +98,7 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelect
     const bars: EventBar[] = [];
 
     bookings
-      .filter(b => b.status !== 'cancelled' && b.status !== 'no_arrival' && b.check_in <= weekEnd && b.check_out >= weekStart)
+      .filter(b => b.status !== 'no_arrival' && b.check_in <= weekEnd && b.check_out >= weekStart)
       .forEach(b => {
         let startCol = 0, endCol = -1;
         for (let i = 0; i <= 6; i++) { if (days[i] !== null && days[i]! >= b.check_in) { startCol = i; break; } }
@@ -113,9 +118,11 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelect
         let startCol = 0, endCol = -1;
         for (let i = 0; i <= 6; i++) { if (days[i] !== null && days[i]! >= e.start) { startCol = i; break; } }
         for (let i = 6; i >= 0; i--) { if (days[i] !== null && days[i]! < e.end) { endCol = i; break; } }
+        const cancelled = isGcCancelled(e);
         if (endCol < startCol) endCol = startCol;
         bars.push({
-          startCol, endCol, label: e.summary, type: 'gc', id: e.id, raw: e,
+          startCol, endCol, label: e.summary, type: 'gc', id: e.id,
+          raw: e, gcCancelled: cancelled, status: cancelled ? 'cancelled' : 'confirmed',
           startsThisWeek: e.start >= weekStart,
           endsThisWeek: endCol < 6,
         });
@@ -138,14 +145,15 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelect
 
   const handleDayClick = (d: string) => setSelectedDay(d);
 
+  // Hard color rule (system-only): GC events default to yellow (confirmed-like),
+  // red GC events read as cancelled. Status colors NEVER pushed back to GC.
   const barColor = (bar: EventBar) => {
     if (bar.status === 'cancelled') return 'bg-red-500 text-white';
     if (bar.status === 'no_arrival') return 'bg-gray-400 text-white';
     if (bar.status === 'checked_in') return 'bg-emerald-500 text-white';
     if (bar.status === 'completed') return 'bg-blue-500 text-white';
     if (bar.status === 'confirmed') return 'bg-amber-400 text-white';
-    if (bar.type === 'gc') return 'bg-indigo-400 text-white';
-    return 'bg-slate-300 text-slate-700';
+    return 'bg-amber-400 text-white';
   };
 
   const barIcon = (bar: EventBar) => {
@@ -306,10 +314,11 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelect
 
         {/* Legend */}
         <div className="mt-3 flex gap-4 flex-wrap pt-2 border-t border-slate-100">
-          <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-emerald-500 inline-block" />Checked In</span>
           <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-amber-400 inline-block" />Confirmed</span>
-          <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-blue-400 inline-block" />Checked Out</span>
-          <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-indigo-400 inline-block" />Google Calendar</span>
+          <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-emerald-500 inline-block" />✓ Checked In</span>
+          <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-blue-500 inline-block" /><span className="text-amber-500">✈</span> Checked Out</span>
+          <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-red-500 inline-block" />✕ Cancelled</span>
+          <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-gray-400 inline-block" />⊘ No Arrival</span>
         </div>
       </div>
     </div>
