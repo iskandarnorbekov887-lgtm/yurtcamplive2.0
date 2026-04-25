@@ -7,7 +7,6 @@ import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { GoogleGuestAgenda } from '@/components/google-guest-agenda';
-import { PrivateCalendarView } from '@/components/private-calendar-view';
 import type { UserRole } from '@/lib/supabase';
 
 export default function ManagerPage() {
@@ -174,7 +173,20 @@ function ManagerPortal() {
               }}
             />
 
-            <PrivateCalendarView bookings={bookings} />
+            <div className="mt-6 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-100">
+                <h2 className="text-lg font-black text-slate-900">Google Calendar</h2>
+                <p className="text-xs text-slate-500">Shared camp calendar</p>
+              </div>
+              <iframe
+                src="https://calendar.google.com/calendar/embed?src=072d8da6e5b1a848d2ec34c42648591405a428494d10c820a7a8b198125e864c%40group.calendar.google.com&ctz=Asia%2FTashkent&mode=MONTH&showTitle=0&showNav=1&showDate=1&showPrint=0&showTabs=0&showCalendars=0"
+                style={{ border: 0 }}
+                width="100%"
+                height="600"
+                frameBorder="0"
+                scrolling="no"
+              />
+            </div>
           </div>
         )}
 
