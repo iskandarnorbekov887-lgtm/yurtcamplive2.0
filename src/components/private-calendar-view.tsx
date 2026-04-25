@@ -51,6 +51,7 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelect
   const [currentDate, setCurrentDate] = useState(new Date());
   const todayStr = todayString();
   const [selectedDay, setSelectedDay] = useState<string>(todayStr);
+  const [moreDay, setMoreDay] = useState<string | null>(null);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -174,58 +175,124 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelect
           ))}
         </div>
 
-        {/* Week rows */}
-        <div className="space-y-1">
+        {/* Week rows — Google Calendar style bordered cells */}
+        <div className="border-l border-t border-slate-200">
           {weeks.map((week, wi) => {
             const lanes = getWeekLanes(week);
+            const VISIBLE = 5;
+            const LANE_HEIGHT = 18;
+            const LANE_GAP = 2;
+            const DAY_NUM_HEIGHT = 26;
+            const cellHeight = DAY_NUM_HEIGHT + Math.min(lanes.length, VISIBLE) * (LANE_HEIGHT + LANE_GAP) + (lanes.length > VISIBLE ? 18 : 4);
             return (
-              <div key={wi} className="mb-1">
-                {/* Day number buttons */}
-                <div className="grid grid-cols-7">
-                  {week.map((day, col) => {
-                    if (!day) return <div key={col} className="h-8" />;
-                    const d = dayStr(day);
-                    const isToday = d === todayStr;
-                    const isSelected = d === selectedDay;
-                    return (
-                      <button key={col} onClick={() => handleDayClick(d)}
-                        className="h-8 flex items-center justify-center transition-all">
-                        <span className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-black transition-all ${
-                          isSelected ? 'bg-indigo-600 text-white shadow-sm' :
-                          isToday ? 'bg-indigo-100 text-indigo-700 ring-2 ring-indigo-300' :
-                          'text-slate-700 hover:bg-slate-100'
-                        }`}>{day}</span>
-                      </button>
-                    );
-                  })}
-                </div>
+              <div key={wi} className="relative grid grid-cols-7" style={{ minHeight: `${Math.max(cellHeight, 110)}px` }}>
+                {/* Day cells (background grid with borders) */}
+                {week.map((day, col) => {
+                  if (!day) return <div key={col} className="border-r border-b border-slate-200 bg-slate-50/40" />;
+                  const d = dayStr(day);
+                  const isToday = d === todayStr;
+                  const isSelected = d === selectedDay;
+                  const totalInCol = lanes.filter(lane => lane.some(b => b.startCol <= col && b.endCol >= col)).length;
+                  const hidden = Math.max(0, totalInCol - VISIBLE);
+                  return (
+                    <div key={col} onClick={() => handleDayClick(d)}
+                      className={`border-r border-b border-slate-200 px-1 pt-1 cursor-pointer transition-colors relative ${
+                        isSelected ? 'bg-indigo-50/70' : 'hover:bg-slate-50/60'
+                      }`}>
+                      <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-black transition-all ${
+                        isToday ? 'bg-indigo-600 text-white' : isSelected ? 'text-indigo-700' : 'text-slate-700'
+                      }`}>{day}</span>
+                      {hidden > 0 && (
+                        <button onClick={e => { e.stopPropagation(); setMoreDay(d); }}
+                          style={{ position: 'absolute', bottom: 2, left: 4, right: 4 }}
+                          className="text-[10px] font-bold text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded px-1 py-0.5 text-left transition-colors z-10">
+                          +{hidden} more
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
 
-                {/* Event bar lanes */}
-                {lanes.slice(0, 3).map((lane, li) => (
-                  <div key={li} className="grid grid-cols-7 mt-px" style={{ gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
+                {/* Event bars overlaid on the cells */}
+                {lanes.slice(0, VISIBLE).map((lane, li) => (
+                  <div key={li}
+                    className="absolute left-0 right-0 grid grid-cols-7 px-px pointer-events-none"
+                    style={{ top: `${DAY_NUM_HEIGHT + li * (LANE_HEIGHT + LANE_GAP)}px`, height: `${LANE_HEIGHT}px` }}>
                     {lane.map((bar, bi) => (
                       <button
                         key={bi}
-                        onClick={() => bar.type === 'bk' ? onSelectBooking?.(bar.raw as Booking) : onSelectCalendarEvent?.(bar.raw as CalEvent)}
+                        onClick={e => { e.stopPropagation(); bar.type === 'bk' ? onSelectBooking?.(bar.raw as Booking) : onSelectCalendarEvent?.(bar.raw as CalEvent); }}
                         style={{ gridColumnStart: bar.startCol + 1, gridColumnEnd: bar.endCol + 2 }}
-                        className={`text-left text-[10px] font-bold px-2 py-[3px] truncate leading-tight transition-all hover:opacity-80 ${barColor(bar)} ${
-                          bar.startsThisWeek ? 'rounded-l-full pl-2' : 'rounded-l-none pl-1'
+                        className={`text-left text-[10px] font-bold px-2 truncate leading-[18px] transition-all hover:opacity-80 pointer-events-auto mx-px ${barColor(bar)} ${
+                          bar.startsThisWeek ? 'rounded-l-md' : 'rounded-l-none'
                         } ${
-                          bar.endsThisWeek ? 'rounded-r-full pr-2' : 'rounded-r-none'
-                        }`}
-                      >
+                          bar.endsThisWeek ? 'rounded-r-md' : 'rounded-r-none'
+                        }`}>
                         {bar.startsThisWeek ? bar.label : ''}
                       </button>
                     ))}
                   </div>
                 ))}
-                {lanes.length > 3 && (
-                  <p className="text-[9px] text-slate-400 font-bold px-1 mt-px">+{lanes.length - 3} more</p>
-                )}
               </div>
             );
           })}
         </div>
+
+        {/* "+N more" day modal */}
+        {moreDay && (() => {
+          const dayBookings = bookings.filter(b => b.status !== 'cancelled' && b.check_in <= moreDay && b.check_out >= moreDay);
+          const dayEvents = gcEvents.filter(e => !bookings.some(b => b.google_event_id === e.id) && e.start <= moreDay && e.end > moreDay);
+          return (
+            <div onClick={() => setMoreDay(null)} className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4">
+              <div onClick={e => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-y-auto">
+                <div className="px-5 py-4 border-b border-slate-100 sticky top-0 bg-white flex items-center justify-between rounded-t-2xl">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500">All Events</p>
+                    <h3 className="text-sm font-black text-slate-900">
+                      {new Date(moreDay + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                    </h3>
+                  </div>
+                  <button onClick={() => setMoreDay(null)} className="w-8 h-8 hover:bg-slate-100 rounded-xl text-slate-500 font-bold text-xl">×</button>
+                </div>
+                <div className="p-3 space-y-1.5">
+                  {dayBookings.length === 0 && dayEvents.length === 0 && (
+                    <p className="text-sm text-slate-400 text-center py-6">No events</p>
+                  )}
+                  {dayBookings.map(b => (
+                    <button key={b.id} onClick={() => { onSelectBooking?.(b); setMoreDay(null); }}
+                      className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all hover:opacity-80 ${
+                        b.status === 'checked_in' ? 'bg-emerald-50 border-emerald-200' :
+                        b.status === 'completed' ? 'bg-blue-50 border-blue-200' :
+                        'bg-amber-50 border-amber-200'
+                      }`}>
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${
+                        b.status === 'checked_in' ? 'bg-emerald-500' :
+                        b.status === 'completed' ? 'bg-blue-500' :
+                        'bg-amber-500'
+                      }`} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-slate-900 truncate">{b.guest_name}</p>
+                        <p className="text-xs text-slate-500 capitalize">{b.check_in} → {b.check_out} · {b.status.replace('_', ' ')}</p>
+                      </div>
+                      <span className="text-xs text-slate-400">›</span>
+                    </button>
+                  ))}
+                  {dayEvents.map(e => (
+                    <button key={e.id} onClick={() => { onSelectCalendarEvent?.(e); setMoreDay(null); }}
+                      className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl bg-indigo-50 border border-indigo-200 hover:opacity-80 transition-all">
+                      <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-slate-900 truncate">{e.summary}</p>
+                        <p className="text-xs text-slate-500">{e.start} → {e.end} · Google Calendar</p>
+                      </div>
+                      <span className="text-xs text-slate-400">›</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Legend */}
         <div className="mt-3 flex gap-4 flex-wrap pt-2 border-t border-slate-100">
