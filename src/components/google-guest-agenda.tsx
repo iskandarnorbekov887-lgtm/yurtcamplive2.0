@@ -236,13 +236,23 @@ export function GoogleGuestAgenda({
     : 999;
   const canCheckIn = sel?.status === 'confirmed' && daysUntilCheckIn <= 2 && !!onCheckIn;
   const isComingSoon = sel?.status === 'confirmed' && daysUntilCheckIn > 2;
-  const canCheckOut = sel?.status === 'checked_in' && !!onCheckOut;
+  const canCheckOut = sel?.status === 'checked_in' && !!onCheckOut && today >= (sel?.check_out ?? '9999');
   const canCancel = sel && ['confirmed', 'pending'].includes(sel.status) && !!onCancelBooking;
+
+  const GC_COLORS = { checked_in: '2', completed: '7', cancelled: '11', no_arrival: '1' } as const;
+  const updateCalendarColor = async (booking: Booking, colorId: string | null) => {
+    if (!booking.google_event_id) return;
+    await fetch('/api/calendar/update-event', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId: booking.google_event_id, colorId }),
+    }).catch(() => {});
+  };
 
   const handleCheckIn = async () => {
     if (!sel || !onCheckIn) return;
     setLoadingAction('checkin');
-    try { await onCheckIn(sel.id); flash('✓ Guest checked in.'); }
+    try { await onCheckIn(sel.id); await updateCalendarColor(sel, GC_COLORS.checked_in); flash('✓ Guest checked in.'); }
     catch { flash('⚠ Check-in failed.'); }
     finally { setLoadingAction(''); }
   };
@@ -261,6 +271,7 @@ export function GoogleGuestAgenda({
       if (extraServices.length) updates.extra_services = extraServices.map(e => ({ name: e.name, price: parseFloat(e.price) || 0, currency: e.currency as 'UZS' | 'USD' | 'EUR' }));
       if (Object.keys(updates).length && onUpdateBooking) await onUpdateBooking(sel.id, updates);
       await onCheckOut(sel.id);
+      await updateCalendarColor(sel, GC_COLORS.completed);
       flash('✓ Checked out. Finance record created.');
     } catch { flash('⚠ Checkout failed.'); }
     finally { setLoadingAction(''); }
@@ -270,7 +281,7 @@ export function GoogleGuestAgenda({
     if (!sel || !onCancelBooking) return;
     if (!confirm(`Cancel booking for ${sel.guest_name}?`)) return;
     setLoadingAction('cancel');
-    try { await onCancelBooking(sel.id); flash('Booking cancelled.'); }
+    try { await onCancelBooking(sel.id); await updateCalendarColor(sel, GC_COLORS.cancelled); flash('Booking cancelled.'); }
     catch { flash('⚠ Cancel failed.'); }
     finally { setLoadingAction(''); }
   };
@@ -421,7 +432,7 @@ export function GoogleGuestAgenda({
                       className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-sm font-bold rounded-xl border border-red-200 transition-all disabled:opacity-60">Cancel Booking</button>
                   )}
                   {sel.status === 'confirmed' && sel.check_in < today && onUpdateBooking && (
-                    <button onClick={async () => { if (!confirm(`Mark ${sel.guest_name} as No Arrival?`)) return; setLoadingAction('na'); try { await onUpdateBooking(sel.id, { status: 'no_arrival' } as Partial<Booking>); flash('Marked as No Arrival.'); } catch { flash('⚠ Failed.'); } finally { setLoadingAction(''); } }} disabled={loadingAction === 'na'}
+                    <button onClick={async () => { if (!confirm(`Mark ${sel.guest_name} as No Arrival?`)) return; setLoadingAction('na'); try { await onUpdateBooking(sel.id, { status: 'no_arrival' } as Partial<Booking>); await updateCalendarColor(sel, GC_COLORS.no_arrival); flash('Marked as No Arrival.'); } catch { flash('⚠ Failed.'); } finally { setLoadingAction(''); } }} disabled={loadingAction === 'na'}
                       className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-bold rounded-xl transition-all disabled:opacity-60">No Arrival</button>
                   )}
                 </div>
