@@ -188,16 +188,16 @@ export function GoogleGuestAgenda({
 
   const flash = (msg: string) => { setActionMsg(msg); setTimeout(() => setActionMsg(''), 4000); };
 
-  const handleCreateFromEvent = async () => {
+  const handleCreateFromEvent = async (doCheckIn = false) => {
     if (!selectedItem?.event || !currentUserId) return;
     const ev = selectedItem.event;
     setLoadingAction('creating');
     try {
-      const { error } = await supabase.from('bookings').insert({
+      const { data, error } = await supabase.from('bookings').insert({
         guest_name: ev.summary,
         check_in: ev.start,
         check_out: ev.end || ev.start,
-        status: 'confirmed',
+        status: doCheckIn ? 'checked_in' : 'confirmed',
         source: 'Manual',
         google_event_id: ev.id,
         total_price: 0,
@@ -205,13 +205,14 @@ export function GoogleGuestAgenda({
         payment_status: 'Unpaid',
         approved_by_manager: true,
         created_by_id: currentUserId,
-        notes: ev.description || null,
-      });
+        notes: (ev.description && !ev.description.includes('tasks.google.com')) ? ev.description : null,
+      }).select('id').single();
       if (error) throw error;
-      flash('✓ Booking created from calendar event.');
+      if (doCheckIn && data?.id && onCheckIn) await onCheckIn(data.id);
+      flash(doCheckIn ? '✓ Guest checked in from calendar event.' : '✓ Booking created from calendar event.');
       setSelectedItem(null);
       onRefresh?.();
-    } catch { flash('⚠ Failed to create booking.'); }
+    } catch { flash('⚠ Failed.'); }
     finally { setLoadingAction(''); }
   };
 
@@ -353,7 +354,7 @@ export function GoogleGuestAgenda({
               {(() => {
                 const days = Math.ceil((new Date(selectedItem.start + 'T00:00:00').getTime() - new Date(today + 'T00:00:00').getTime()) / 86400000);
                 return days <= 2 ? (
-                  <button onClick={handleCreateFromEvent} disabled={loadingAction === 'creating'}
+                  <button onClick={() => handleCreateFromEvent(true)} disabled={loadingAction === 'creating'}
                     className="w-full py-2.5 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 transition-all disabled:opacity-60 flex items-center justify-center gap-2">
                     {loadingAction === 'creating' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '→'}
                     Check In
