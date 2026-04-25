@@ -92,11 +92,12 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelect
     const bars: EventBar[] = [];
 
     bookings
-      .filter(b => b.status !== 'cancelled' && b.check_in <= weekEnd && b.check_out > weekStart)
+      .filter(b => b.status !== 'cancelled' && b.check_in <= weekEnd && (b.check_out > weekStart || b.check_in >= weekStart))
       .forEach(b => {
         let startCol = 0, endCol = 6;
         for (let i = 0; i <= 6; i++) { if (days[i] !== null && days[i]! >= b.check_in) { startCol = i; break; } }
         for (let i = 6; i >= 0; i--) { if (days[i] !== null && days[i]! < b.check_out) { endCol = i; break; } }
+        if (endCol < startCol) endCol = startCol;
         bars.push({
           startCol, endCol, label: b.guest_name, type: 'bk', id: b.id,
           status: b.status, raw: b,
@@ -111,6 +112,7 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelect
         let startCol = 0, endCol = 6;
         for (let i = 0; i <= 6; i++) { if (days[i] !== null && days[i]! >= e.start) { startCol = i; break; } }
         for (let i = 6; i >= 0; i--) { if (days[i] !== null && days[i]! < e.end) { endCol = i; break; } }
+        if (endCol < startCol) endCol = startCol;
         bars.push({
           startCol, endCol, label: e.summary, type: 'gc', id: e.id, raw: e,
           startsThisWeek: e.start >= weekStart,
