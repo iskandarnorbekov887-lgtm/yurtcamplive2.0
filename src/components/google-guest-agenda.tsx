@@ -10,6 +10,7 @@ interface CalEvent {
   end: string;
   description?: string | null;
   location?: string | null;
+  colorId?: string | null;
 }
 
 interface ListItem {
@@ -20,6 +21,7 @@ interface ListItem {
   source: 'both' | 'calendar' | 'db';
   booking: Booking | null;
   event: CalEvent | null;
+  isYellow: boolean;
 }
 
 interface Props {
@@ -58,6 +60,7 @@ export function GoogleGuestAgenda({
   const [newExtraName, setNewExtraName] = useState('');
   const [newExtraPrice, setNewExtraPrice] = useState('');
   const [actionMsg, setActionMsg] = useState('');
+  const [createYurtId, setCreateYurtId] = useState<number | ''>('');
 
   const today = localDateStr(new Date());
 
@@ -104,12 +107,13 @@ export function GoogleGuestAgenda({
         source: matched ? 'both' : 'calendar',
         booking: matched || null,
         event: ev,
+        isYellow: ev.colorId === '5',
       });
     });
 
     bookings
       .filter(b => !usedBookingIds.has(b.id) && !['cancelled', 'completed'].includes(b.status) && b.check_out >= today)
-      .forEach(b => items.push({ key: `db-${b.id}`, name: b.guest_name, start: b.check_in, end: b.check_out, source: 'db', booking: b, event: null }));
+      .forEach(b => items.push({ key: `db-${b.id}`, name: b.guest_name, start: b.check_in, end: b.check_out, source: 'db', booking: b, event: null, isYellow: false }));
 
     items.sort((a, b) => a.start.localeCompare(b.start));
     return items;
@@ -138,6 +142,30 @@ export function GoogleGuestAgenda({
     setSelectedItem(item);
     setCollectedAmount(''); setSelectedDrinks({}); setExtraServices([]);
     setNewExtraName(''); setNewExtraPrice(''); setShowDrinks(false); setActionMsg('');
+    setCreateYurtId('');
+  };
+
+  const handleCreateBookingFromEvent = async () => {
+    if (!selectedItem?.event) return;
+    setLoadingAction('create');
+    try {
+      const { data, error } = await supabase.from('bookings').insert({
+        guest_name: selectedItem.event.summary,
+        check_in: selectedItem.start,
+        check_out: selectedItem.end && selectedItem.end !== selectedItem.start ? selectedItem.end : selectedItem.start,
+        status: 'confirmed',
+        yurt_id: createYurtId || null,
+        total_price: 0,
+        number_of_people: 1,
+        payment_status: 'Pending',
+        source: 'Manual',
+        approved_by_manager: true,
+      }).select().single();
+      if (error) throw error;
+      setSelectedItem(prev => prev ? { ...prev, booking: data as Booking, source: 'both' } : prev);
+      flash('✓ Booking created. You can now check them in.');
+    } catch { flash('⚠ Failed to create booking.'); }
+    finally { setLoadingAction(''); }
   };
 
   const sel = selectedItem?.booking ?? null;
@@ -227,7 +255,7 @@ export function GoogleGuestAgenda({
               filteredItems.map(item => {
                 const isSelected = selectedItem?.key === item.key;
                 const statusKey = item.booking?.status;
-                const rowBg = statusKey === 'checked_in' ? 'border-l-4 border-emerald-400' : statusKey === 'confirmed' ? 'border-l-4 border-amber-400' : '';
+                const rowBg = statusKey === 'checked_in' ? 'border-l-4 border-emerald-400' : (statusKey === 'confirmed' || (!statusKey && item.isYellow)) ? 'border-l-4 border-amber-400' : '';
                 return (
                   <button key={item.key} onClick={() => handleSelect(item)}
                     className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-all ${isSelected ? 'bg-indigo-50' : ''} ${rowBg}`}>
@@ -242,6 +270,8 @@ export function GoogleGuestAgenda({
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${statusColor(statusKey)}`}>
                             {statusKey.replace('_', ' ')}
                           </span>
+                        ) : item.isYellow ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">confirmed</span>
                         ) : (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-400 border border-slate-200">calendar only</span>
                         )}
@@ -277,19 +307,50 @@ export function GoogleGuestAgenda({
             </div>
           ) : !sel ? (
             /* Calendar-only event — no Supabase booking */
-            <div className="p-6 space-y-3">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Google Calendar Event</p>
-              <h2 className="text-xl font-black text-slate-900">{selectedItem.event?.summary}</h2>
-              <p className="text-sm text-slate-500">{selectedItem.start} → {selectedItem.end}</p>
-              {selectedItem.event?.description && <p className="text-sm text-black bg-slate-50 rounded-xl p-3">{selectedItem.event.description}</p>}
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-800">
-                No matching booking in Supabase. Guest name on calendar may not match exactly.
+            <div className="p-6 space-y-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Google Calendar Event</p>
+                  <h2 className="text-xl font-black text-slate-900">{selectedItem.event?.summary}</h2>
+                  <p className="text-sm text-slate-500 mt-0.5">{selectedItem.start} → {selectedItem.end}</p>
+                </div>
+                {selectedItem.isYellow && (
+                  <span className="text-xs font-bold px-3 py-1 rounded-full bg-amber-100 text-amber-700 border border-amber-200">confirmed</span>
+                )}
               </div>
-              {onAddNewBooking && (
-                <button onClick={() => onAddNewBooking(selectedItem.start)}
-                  className="px-4 py-2 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 transition-all">
-                  Create Booking for this date
-                </button>
+              {selectedItem.event?.description && <p className="text-sm text-black bg-slate-50 rounded-xl p-3">{selectedItem.event.description}</p>}
+              {selectedItem.isYellow ? (
+                <div className="space-y-3">
+                  <p className="text-xs text-slate-500">This is a yellow (confirmed) calendar event. Assign a yurt and create a booking to enable check-in/out.</p>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Assign Yurt (optional)</label>
+                    <select value={createYurtId} onChange={e => setCreateYurtId(e.target.value ? Number(e.target.value) : '')}
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-300 text-black bg-white">
+                      <option value="">No yurt assigned</option>
+                      {yurts.map(y => <option key={y.id} value={y.id}>{y.name}</option>)}
+                    </select>
+                  </div>
+                  {actionMsg && (
+                    <div className={`text-sm font-medium px-3 py-2 rounded-lg ${actionMsg.startsWith('⚠') ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                      {actionMsg}
+                    </div>
+                  )}
+                  <button onClick={handleCreateBookingFromEvent} disabled={loadingAction === 'create'}
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold rounded-xl transition-all disabled:opacity-60 flex items-center gap-2">
+                    {loadingAction === 'create' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '+'}
+                    Create Booking
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-600">
+                  No matching booking in Supabase. Guest name on calendar may not match exactly.
+                  {onAddNewBooking && (
+                    <button onClick={() => onAddNewBooking(selectedItem.start)}
+                      className="mt-2 block px-4 py-2 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 transition-all">
+                      Create Booking for this date
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           ) : (
