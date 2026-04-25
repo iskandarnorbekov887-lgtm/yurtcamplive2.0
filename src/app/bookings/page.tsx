@@ -154,16 +154,15 @@ function ReserverPortal() {
         </div>
       </main>
 
-      {showIncomeForm && (
-        <ReserverIncomeForm
-          selectedDate={selectedBookingDate}
-          onClose={() => setShowIncomeForm(false)}
-          onSuccess={() => {
-            setShowIncomeForm(false);
-            fetchData();
-          }}
-        />
-      )}
+      <ReserverIncomeForm
+        isOpen={showIncomeForm}
+        selectedDate={selectedBookingDate}
+        onClose={() => setShowIncomeForm(false)}
+        onSuccess={() => {
+          setShowIncomeForm(false);
+          fetchData();
+        }}
+      />
     </div>
   );
 }

@@ -66,10 +66,11 @@ function getBookingStatus(b: Booking, today: string): 'checked-in' | 'checked-ou
   if (b.status === 'completed') return 'checked-out';
   if (b.status === 'confirmed') {
     if (b.check_in < today) return 'overdue-checkin';
-    // Check if it's the check-in day and after 6PM
+    // Check if it's the check-in day and after 6PM — only if booking was made before today
     if (b.check_in === today) {
       const now = new Date();
-      if (now.getHours() >= 18) return 'neglected-checkin';
+      const createdToday = b.created_at && b.created_at.startsWith(today);
+      if (now.getHours() >= 18 && !createdToday) return 'neglected-checkin';
     }
     return 'upcoming';
   }
@@ -257,6 +258,15 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
           </h2>
         </div>
         <div className="flex items-center gap-2">
+          {onAddNewBooking && (
+            <button
+              onClick={() => onAddNewBooking('')}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 transition-all"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              Add Booking
+            </button>
+          )}
           <button onClick={() => setCur(new Date())}
             className="px-3 py-1.5 text-xs font-semibold text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-all">
             Today
@@ -402,51 +412,96 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
         <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4" onClick={() => setSel(null)}>
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8 animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-start mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-4 h-4 rounded-full" style={{ backgroundColor: color(sel, today).bg }} />
+            {/* Google Calendar-style header */}
+            <div className="mb-6">
+              {/* Top row: close buttons */}
+              <div className="flex justify-end gap-1 mb-3">
+                {sel.status === 'checked_in' && onCancelBooking && (
+                  <button onClick={handleCancel} disabled={!!loadingAction} className="p-1.5 hover:bg-rose-100 rounded-lg transition-all" title="Cancel Trip">
+                    <svg className="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                )}
+                <button onClick={() => setSel(null)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-all">
+                  <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+
+              {/* Title + stats + date */}
+              <div className="flex items-start gap-4 mb-5">
+                <div className="w-5 h-5 rounded flex-shrink-0 mt-1.5" style={{ backgroundColor: color(sel, today).bg }} />
                 <div>
-                  <h3 className="text-2xl font-black text-slate-800">{sel.guest_name}</h3>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{t('manifest.guest')} • Booking ID: {sel.id}</p>
-                  <p className="text-[9px] text-black">
-                    Created by: <span className="font-semibold text-black">
-                      {staff?.find(s => s.id === sel.created_by_id)?.full_name || sel.created_by_role || 'Unknown'}
-                    </span>
-                    {sel.created_at && (
-                      <span className="text-black ml-1">
-                        ({new Date(sel.created_at).toLocaleDateString()} {new Date(sel.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})
-                      </span>
-                    )}
+                  <h3 className="text-2xl font-black text-slate-900 leading-tight">{sel.guest_name}</h3>
+                  <p className="text-sm font-bold text-slate-700 mt-1.5 flex flex-wrap gap-x-3">
+                    {(sel.num_people || sel.number_of_people || sel.guest_count) ? <span>+ {sel.num_people || sel.number_of_people || sel.guest_count} people</span> : null}
+                    {sel.nights ? <span>+ {sel.nights} night{Number(sel.nights) !== 1 ? 's' : ''}</span> : null}
+                    {sel.yurt_id ? <span>+ 1 yurt</span> : null}
+                    {sel.children_under_12 ? <span>+ {sel.children_under_12} under 12</span> : null}
                   </p>
-                  <p className="text-[9px] text-black">
-                    Last edited by: <span className="font-semibold text-black">
-                      {sel.last_edited_by_id ? (staff?.find(s => s.id === sel.last_edited_by_id)?.full_name || sel.last_edited_by_role || 'Unknown') : 'Not edited'}
-                    </span>
-                    {sel.last_edited_at && (
-                      <span className="text-black ml-1">
-                        ({new Date(sel.last_edited_at).toLocaleDateString()} {new Date(sel.last_edited_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})
-                      </span>
-                    )}
+                  <p className="text-sm text-slate-500 mt-0.5 font-medium">
+                    {(() => {
+                      const ci = new Date(sel.check_in + 'T00:00:00');
+                      const co = new Date(sel.check_out + 'T00:00:00');
+                      const sameMonth = ci.getMonth() === co.getMonth() && ci.getFullYear() === co.getFullYear();
+                      if (sel.check_in === sel.check_out) return `${ci.getDate()} ${ci.toLocaleString('en-US', { month: 'long' })}`;
+                      if (sameMonth) return `${ci.getDate()}–${co.getDate()} ${ci.toLocaleString('en-US', { month: 'long' })}`;
+                      return `${ci.getDate()} ${ci.toLocaleString('en-US', { month: 'long' })} – ${co.getDate()} ${co.toLocaleString('en-US', { month: 'long' })}`;
+                    })()}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {/* Small cancel button in top-left corner after check-in */}
-                {sel.status === 'checked_in' && onCancelBooking && (
-                  <button
-                    onClick={handleCancel}
-                    disabled={!!loadingAction}
-                    className="p-1.5 hover:bg-rose-100 rounded-lg transition-all"
-                    title="Cancel Trip"
-                  >
-                    <svg className="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                )}
-                <button onClick={() => setSel(null)} className="p-2 hover:bg-slate-100 rounded-xl transition-all">
-                  <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
+
+              {/* Icon rows */}
+              <div className="space-y-3 ml-9">
+                {/* Notes + Day-by-day itinerary */}
+                {(() => {
+                  let days: any[] = [];
+                  try { if (sel.special_requests) days = JSON.parse(sel.special_requests); } catch {}
+                  const filledDays = days.filter((d: any) => d.lunch || d.dinner || d.guideService || d.transportation || d.cookingClass || d.specialRequest?.trim());
+                  if (!sel.notes && filledDays.length === 0) return null;
+                  return (
+                    <div className="flex-1 space-y-4">
+                        {sel.notes && <p className="text-sm text-black">{sel.notes}</p>}
+                        {filledDays.map((day: any, i: number) => {
+                          const d = new Date(day.date + 'T00:00:00');
+                          const dateLabel = `${d.getDate()} ${d.toLocaleString('en-US', { month: 'long' })}`;
+                          const serviceNames = [
+                            day.lunch && 'Lunch',
+                            day.dinner && 'Dinner',
+                            day.cookingClass && 'Cooking Class',
+                            day.guideService && 'Guide Service',
+                            day.transportation && 'Transportation',
+                          ].filter(Boolean).join(', ');
+                          return (
+                            <div key={i}>
+                              <p className="text-sm text-black">
+                                <span className="font-black">{i + 1}-kun – {dateLabel}</span>
+                                {serviceNames ? `: ${serviceNames}` : ''}:
+                              </p>
+                              <div className="mt-1 space-y-1 text-sm text-black leading-relaxed">
+                                {day.specialRequest?.trim() && <p>{day.specialRequest}</p>}
+                                {(day.lunch || day.dinner) && day.lunchDietary && <p>Food request: {day.lunchDietary}</p>}
+                                {day.guideService && (
+                                  <p>Guide: {day.guideNames?.filter((n: string) => n.trim()).join(', ') || 'To be arranged'}</p>
+                                )}
+                                {day.cookingClass && day.cookingClassDescription && <p>Cooking class: {day.cookingClassDescription}</p>}
+                                {day.transportation && day.transEntries?.map((e: any, ei: number) => {
+                                  const parts: string[] = [];
+                                  if (e.driver?.trim()) parts.push(`Driver: ${e.driver}`);
+                                  if (e.time && !e.time.startsWith(':') && !e.time.endsWith(':')) parts.push(`Pickup: ${e.time}`);
+                                  if (e.from?.trim()) parts.push(`From: ${e.from}`);
+                                  if (e.to?.trim()) parts.push(`To: ${e.to}`);
+                                  if (e.arrivalTime && !e.arrivalTime.startsWith(':') && !e.arrivalTime.endsWith(':')) parts.push(`Arrival: ${e.arrivalTime}`);
+                                  if (e.price?.trim()) parts.push(`${e.price} USD`);
+                                  return parts.length > 0 ? <p key={ei}>🚗 {parts.join(' · ')}</p> : null;
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                  );
+                })()}
+
               </div>
             </div>
 
@@ -519,33 +574,6 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                     </div>
                   </div>
 
-                  {/* Dates - Smaller size */}
-                  <div className="col-span-2 grid grid-cols-2 gap-4 p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                    <div>
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">{t('form.check_in')}</label>
-                      {isEditing && canEdit(sel) ? (
-                        <input type="date" value={editData.check_in} onChange={e => setEditData({...editData, check_in: e.target.value})} className="w-full bg-white border border-slate-300 rounded-lg p-1 text-xs font-bold text-black" />
-                      ) : <p className="font-bold text-black text-xs">{sel.check_in}</p>}
-                    </div>
-                    <div>
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">{t('form.check_out')}</label>
-                      {isEditing && canEdit(sel) ? (
-                        <input type="date" value={editData.check_out} onChange={e => setEditData({...editData, check_out: e.target.value})} className="w-full bg-white border border-slate-300 rounded-lg p-1 text-xs font-bold text-black" />
-                      ) : <p className="font-bold text-black text-xs">{sel.check_out}</p>}
-                    </div>
-                  </div>
-
-                  {/* People and Nights - Below dates */}
-                  <div className="col-span-2 grid grid-cols-2 gap-4 p-3 bg-indigo-50/50 rounded-2xl border border-indigo-100">
-                    <div>
-                      <label className="text-[9px] font-black text-indigo-400 uppercase tracking-widest block mb-1">{t('form.num_people')}</label>
-                      <p className="font-bold text-black text-sm">{sel.num_people || sel.number_of_people || sel.guest_count}</p>
-                    </div>
-                    <div>
-                      <label className="text-[9px] font-black text-indigo-400 uppercase tracking-widest block mb-1">Nights</label>
-                      <p className="font-bold text-black text-sm">{sel.nights || '-'}</p>
-                    </div>
-                  </div>
 
                   {/* Yurt Special Requests */}
                   <div className="col-span-2 p-4 bg-amber-50/50 rounded-2xl border border-amber-100">
@@ -561,33 +589,47 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                     ) : <p className="text-sm font-bold text-black">{sel.yurt_requests || 'No special requests'}</p>}
                   </div>
 
-                  {/* Food Services */}
-                  <div className="col-span-2 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100">
-                    <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block mb-2">Food Services</label>
-                    <div className="space-y-2 text-xs">
-                      {sel.lunch && (
-                        <div>
-                          <div className="flex items-center gap-2"><span className="w-2 h-2 bg-emerald-500 rounded-full"></span><span className="font-bold text-black">Lunch x{sel.lunch_count || 1}</span></div>
-                          {sel.lunch_dietary && <p className="ml-4 text-black italic">Dietary: {sel.lunch_dietary}</p>}
-                        </div>
-                      )}
-                      {sel.dinner && (
-                        <div>
-                          <div className="flex items-center gap-2"><span className="w-2 h-2 bg-emerald-500 rounded-full"></span><span className="font-bold text-black">Dinner x{sel.dinner_count || 1}</span></div>
-                          {sel.dinner_dietary && <p className="ml-4 text-black italic">Dietary: {sel.dinner_dietary}</p>}
-                        </div>
-                      )}
-                      {!sel.lunch && !sel.dinner && <p className="text-black italic">No food services</p>}
-                    </div>
-                  </div>
-
-                  {/* Special Requests from Reserver */}
-                  {sel.special_requests && (
-                    <div className="col-span-2 p-4 bg-purple-50/50 rounded-2xl border border-purple-100">
-                      <label className="text-[10px] font-black text-purple-400 uppercase tracking-widest block mb-1">Special Requests</label>
-                      <p className="text-sm font-bold text-black">{sel.special_requests}</p>
-                    </div>
-                  )}
+                  {/* Per-Day Services from Reserver */}
+                  {(() => {
+                    let days: any[] = [];
+                    try { if (sel.special_requests) days = JSON.parse(sel.special_requests); } catch {}
+                    const filledDays = days.filter((d: any) => d.lunch || d.dinner || d.guideService || d.transportation || d.cookingClass || d.specialRequest?.trim());
+                    if (filledDays.length === 0) return null;
+                    return (
+                      <div className="col-span-2 space-y-2">
+                        <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block">Services by Day</label>
+                        {filledDays.map((day: any, i: number) => {
+                          const d = new Date(day.date + 'T00:00:00');
+                          const label = `${d.getDate()} ${d.toLocaleString('en-US', { month: 'long' })}`;
+                          return (
+                            <div key={i} className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                              <p className="font-black text-slate-800 text-sm">{label}</p>
+                              <div className="flex flex-wrap gap-2 text-xs">
+                                {day.lunch && <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold">Lunch {day.lunchCount > 0 ? `×${day.lunchCount}` : ''}</span>}
+                                {day.dinner && <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold">Dinner {day.dinnerCount > 0 ? `×${day.dinnerCount}` : ''}</span>}
+                                {day.cookingClass && <span className="px-2 py-0.5 bg-pink-100 text-pink-800 rounded-full font-bold">Cooking Class</span>}
+                                {day.guideService && <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full font-bold">Guide{day.guideNames?.filter((n: string) => n.trim()).length > 0 ? `: ${day.guideNames.filter((n: string) => n.trim()).join(', ')}` : ''}</span>}
+                                {day.transportation && <span className="px-2 py-0.5 bg-cyan-100 text-cyan-800 rounded-full font-bold">Transport</span>}
+                              </div>
+                              {day.lunchDietary && <p className="text-xs text-black font-bold italic">Food request: {day.lunchDietary}</p>}
+                              {day.cookingClassDescription && <p className="text-xs text-black font-bold">Cooking: {day.cookingClassDescription}</p>}
+                              {day.transportation && day.transEntries?.map((e: any, ei: number) => {
+                                const parts: string[] = [];
+                                if (e.driver?.trim()) parts.push(`Driver: ${e.driver}`);
+                                if (e.time && !e.time.startsWith(':') && !e.time.endsWith(':')) parts.push(`Pickup: ${e.time}`);
+                                if (e.from?.trim()) parts.push(`From: ${e.from}`);
+                                if (e.to?.trim()) parts.push(`To: ${e.to}`);
+                                if (e.arrivalTime && !e.arrivalTime.startsWith(':') && !e.arrivalTime.endsWith(':')) parts.push(`Arrival: ${e.arrivalTime}`);
+                                if (e.price?.trim()) parts.push(`${e.price} USD`);
+                                return parts.length > 0 ? <p key={ei} className="text-xs text-black font-bold">🚗 {parts.join(' · ')}</p> : null;
+                              })}
+                              {day.specialRequest?.trim() && <p className="text-xs text-black font-bold italic">Note: {day.specialRequest}</p>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
 
                   {/* Guide Service */}
                   <div className="col-span-2 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
@@ -642,8 +684,17 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                           />
                         )}
                       </div>
+                    ) : sel.has_transportation ? (
+                      <div className="space-y-2">
+                        {sel.transportation_details
+                          ? sel.transportation_details.split('\n').map((trip, i) => (
+                              <p key={i} className="text-xs font-bold text-black leading-relaxed">{trip}</p>
+                            ))
+                          : <p className="text-xs font-bold text-black italic">No details provided</p>
+                        }
+                      </div>
                     ) : (
-                      <p className="text-sm font-bold text-black">{sel.has_transportation ? `Yes - ${sel.transportation_details || 'No details'}` : 'No transportation'}</p>
+                      <p className="text-xs text-black italic">No transportation</p>
                     )}
                   </div>
 
@@ -716,112 +767,6 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                 </>
               ) : (
                 <>
-                  {/* Original layout for non-manager roles */}
-                  {/* Core Info */}
-                  <div className="col-span-2 grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                    <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">{t('form.check_in')}</label>
-                      {isEditing && canEdit(sel) ? (
-                        <input type="date" value={editData.check_in} onChange={e => setEditData({...editData, check_in: e.target.value})} className="w-full bg-white border border-slate-300 rounded-lg p-2 text-sm font-bold text-black" />
-                      ) : <p className="font-bold text-slate-700">{sel.check_in}</p>}
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">{t('form.check_out')}</label>
-                      {isEditing && canEdit(sel) ? (
-                        <input type="date" value={editData.check_out} onChange={e => setEditData({...editData, check_out: e.target.value})} className="w-full bg-white border border-slate-300 rounded-lg p-2 text-sm font-bold text-black" />
-                      ) : <p className="font-bold text-slate-700">{sel.check_out}</p>}
-                    </div>
-                  </div>
-
-                  {/* Status & Pricing */}
-                  <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">{t('table.status')}</label>
-                    <div className="flex flex-wrap gap-2">
-                      <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase ${sel.status === 'cancelled' ? 'bg-red-100 text-red-700' : sel.status === 'no_arrival' ? 'bg-gray-200 text-gray-700' : sel.payment_status === 'Paid' ? 'bg-emerald-100 text-emerald-700' : sel.payment_status === 'Partial' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>
-                        {sel.status === 'cancelled' ? 'CANCELLED' : sel.status === 'no_arrival' ? 'NO ARRIVAL' : sel.payment_status}
-                      </span>
-                      {sel.status === 'checked_in' && <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-[10px] font-black uppercase">IN</span>}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">{t('manifest.total_rate')}</label>
-                    <p className="text-lg font-black text-slate-800">${sel.total_price}</p>
-                  </div>
-
-                  {/* Operational Info */}
-                  <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 space-y-3">
-                    <div>
-                      <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block mb-1">{t('form.num_people')}</label>
-                      <p className="font-bold text-indigo-900">{sel.num_people || sel.number_of_people || sel.guest_count}</p>
-                    </div>
-                    {sel.children_under_12 !== undefined && sel.children_under_12 > 0 && (
-                      <div>
-                        <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block mb-1">Children Under 12</label>
-                        <p className="font-bold text-indigo-900">{sel.children_under_12}</p>
-                      </div>
-                    )}
-                    {sel.nights && (
-                      <div>
-                        <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block mb-1">Nights</label>
-                        <p className="font-bold text-indigo-900">{sel.nights}</p>
-                      </div>
-                    )}
-                    <div>
-                      <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block mb-1">{t('form.meal_preference')}</label>
-                      {isEditing && canEdit(sel) ? (
-                        <textarea value={editData.meal_preference || ''} onChange={e => setEditData({...editData, meal_preference: e.target.value})} className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-bold text-black" />
-                      ) : <p className="text-sm font-medium text-indigo-800 italic">{sel.meal_preference || 'No preference'}</p>}
-                    </div>
-                  </div>
-
-                  {/* Services Section for non-manager */}
-                  {(sel.lunch || sel.dinner || sel.drinks || sel.laundry || sel.guide_service || sel.has_transportation) && (
-                    <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 space-y-3">
-                      <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block mb-2">Services</label>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        {sel.lunch && <div className="flex items-center gap-2"><span className="w-2 h-2 bg-emerald-500 rounded-full"></span><span className="font-semibold text-emerald-900">Lunch x{sel.lunch_count || 1}</span></div>}
-                        {sel.dinner && <div className="flex items-center gap-2"><span className="w-2 h-2 bg-emerald-500 rounded-full"></span><span className="font-semibold text-emerald-900">Dinner x{sel.dinner_count || 1}</span></div>}
-                        {sel.drinks && <div className="flex items-center gap-2"><span className="w-2 h-2 bg-emerald-500 rounded-full"></span><span className="font-semibold text-emerald-900">Drinks x{sel.drinks_count || 1}</span></div>}
-                        {sel.laundry && <div className="flex items-center gap-2"><span className="w-2 h-2 bg-emerald-500 rounded-full"></span><span className="font-semibold text-emerald-900">Laundry {sel.laundry_price ? `(${sel.laundry_price} ${sel.laundry_currency || 'UZS'})` : ''}</span></div>}
-                        {sel.guide_service && <div className="flex items-center gap-2"><span className="w-2 h-2 bg-emerald-500 rounded-full"></span><span className="font-semibold text-emerald-900">Guide {sel.guide_names ? `(${sel.guide_names})` : ''}</span></div>}
-                        {sel.has_transportation && <div className="flex items-center gap-2"><span className="w-2 h-2 bg-emerald-500 rounded-full"></span><span className="font-semibold text-emerald-900">Transportation</span></div>}
-                      </div>
-                      {sel.transportation_details && (
-                        <div className="mt-2 text-xs text-emerald-700 italic max-h-20 overflow-y-auto">
-                          {sel.transportation_details}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-3">
-                    <div>
-                      <label className="text-[10px] font-black text-blue-400 uppercase tracking-widest block mb-1">{t('form.transportation')}</label>
-                      {isEditing && canEdit(sel) ? (
-                        <input type="text" value={editData.transportation || ''} onChange={e => setEditData({...editData, transportation: e.target.value})} className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-bold text-black" />
-                      ) : <p className="text-sm font-bold text-blue-900">{sel.transportation || 'Self transport'}</p>}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-[10px] font-black text-blue-400 uppercase tracking-widest">{t('form.guide_required')}</label>
-                      <div className={`w-10 h-5 rounded-full p-1 transition-all ${sel.guide_required || sel.guide_service ? 'bg-blue-600' : 'bg-slate-300'}`}>
-                        <div className={`w-3 h-3 bg-white rounded-full transition-all ${sel.guide_required || sel.guide_service ? 'translate-x-5' : ''}`} />
-                      </div>
-                    </div>
-                    {sel.payment_method && (
-                      <div>
-                        <label className="text-[10px] font-black text-blue-400 uppercase tracking-widest block mb-1">Payment Method</label>
-                        <p className="text-sm font-bold text-blue-900">{sel.payment_method}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Special Requests */}
-                  <div className="col-span-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">{t('form.special_requests')}</label>
-                    {isEditing && canEdit(sel) ? (
-                      <textarea value={editData.special_requests || ''} onChange={e => setEditData({...editData, special_requests: e.target.value})} className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-sm font-bold text-black" rows={3} />
-                    ) : <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-sm text-slate-600 italic">"{sel.special_requests || 'No special requests'}"</div>}
-                  </div>
 
                   {/* Service Editing (for Cook) */}
                   {isEditing && canEdit(sel) && userRole === 'Cook' && (

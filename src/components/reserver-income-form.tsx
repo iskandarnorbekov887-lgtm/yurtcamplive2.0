@@ -1,45 +1,54 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 
+type TransEntry = { driver: string; time: string; from: string; to: string; arrivalTime: string; price: string; };
+type DayEntry = {
+  date: string;
+  lunch: boolean; lunchCount: number; lunchDietary: string;
+  dinner: boolean; dinnerCount: number; dinnerDietary: string;
+  guideService: boolean; guideNames: string[];
+  transportation: boolean; transEntries: TransEntry[];
+  cookingClass: boolean; cookingClassDescription: string;
+  specialRequest: string;
+};
+const makeBlankDay = (date: string): DayEntry => ({
+  date,
+  lunch: false, lunchCount: 0, lunchDietary: '',
+  dinner: false, dinnerCount: 0, dinnerDietary: '',
+  guideService: false, guideNames: [''],
+  transportation: false, transEntries: [{ driver: '', time: '', from: '', to: '', arrivalTime: '', price: '' }],
+  cookingClass: false, cookingClassDescription: '',
+  specialRequest: '',
+});
+
 interface Props {
+  isOpen: boolean;
   selectedDate: string;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export function ReserverIncomeForm({ selectedDate, onClose, onSuccess }: Props) {
+export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess }: Props) {
   const { user } = useAuth();
   const currentUserId = user?.id;
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
+  const [duplicateWarning, setDuplicateWarning] = useState<{name: string, date: string} | null>(null);
+  const [bypassDuplicateCheck, setBypassDuplicateCheck] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
 
   const [guestNames, setGuestNames] = useState<string[]>(['']);
   const [guestCount, setGuestCount] = useState(1);
   const [childrenUnder12, setChildrenUnder12] = useState(0);
-  const [nights, setNights] = useState('');
-  const [lunch, setLunch] = useState(false);
-  const [lunchCount, setLunchCount] = useState(0);
-  const [lunchDietary, setLunchDietary] = useState('');
-  const [dinner, setDinner] = useState(false);
-  const [dinnerCount, setDinnerCount] = useState(0);
-  const [dinnerDietary, setDinnerDietary] = useState('');
-  const [drinks, setDrinks] = useState(false);
-  const [drinksCount, setDrinksCount] = useState(0);
-  const [laundry, setLaundry] = useState(false);
-  const [laundryPrice, setLaundryPrice] = useState('');
-  const [laundryCurrency, setLaundryCurrency] = useState<'UZS' | 'USD'>('UZS');
-  const [guideService, setGuideService] = useState(false);
-  const [guideNames, setGuideNames] = useState<string[]>(['']);
-  const [guideAmount, setGuideAmount] = useState('');
-  const [cookingClass, setCookingClass] = useState(false);
-  const [cookingClassDescription, setCookingClassDescription] = useState('');
-  const [transportation, setTransportation] = useState(false);
-  const [transportationEntries, setTransportationEntries] = useState([{
-    driver: '', organized: false, date: selectedDate, time: '', from: '', to: '', arrivalTime: '', price: '', description: ''
-  }]);
+  const [checkIn, setCheckIn] = useState(selectedDate || '');
+  const [checkOut, setCheckOut] = useState('');
+  const [calViewYear, setCalViewYear] = useState(() => selectedDate ? new Date(selectedDate + 'T00:00:00').getFullYear() : new Date().getFullYear());
+  const [calViewMonth, setCalViewMonth] = useState(() => selectedDate ? new Date(selectedDate + 'T00:00:00').getMonth() : new Date().getMonth());
+  const [dayEntries, setDayEntries] = useState<DayEntry[]>([]);
+  const [yurtRequests, setYurtRequests] = useState('');
   const [currency, setCurrency] = useState<'UZS' | 'USD' | 'EUR'>('USD');
   const [exchangeRate, setExchangeRate] = useState('1');
   const [paymentMethod, setPaymentMethod] = useState<'in_camp' | 'all_paid' | 'partially_paid'>('in_camp');
@@ -47,21 +56,47 @@ export function ReserverIncomeForm({ selectedDate, onClose, onSuccess }: Props) 
   const [paymentNote, setPaymentNote] = useState('');
   const [description, setDescription] = useState('');
 
+  const localDateStr = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
   useEffect(() => {
-    setTransportationEntries(prev => prev.map((e, i) => i === 0 ? { ...e, date: selectedDate } : e));
+    if (selectedDate) {
+      setCheckIn(selectedDate);
+      const ci = new Date(selectedDate + 'T00:00:00');
+      setCalViewYear(ci.getFullYear());
+      setCalViewMonth(ci.getMonth());
+    }
   }, [selectedDate]);
+
+  useEffect(() => {
+    if (!checkIn) return;
+    const ci = new Date(checkIn + 'T00:00:00');
+    const co = checkOut ? new Date(checkOut + 'T00:00:00') : ci;
+    const numNights = Math.max(0, Math.round((co.getTime() - ci.getTime()) / 86400000));
+    const dates: string[] = [];
+    for (let i = 0; i <= numNights; i++) {
+      const d = new Date(ci); d.setDate(d.getDate() + i);
+      dates.push(localDateStr(d));
+    }
+    setDayEntries(prev => dates.map(date => prev.find(d => d.date === date) || makeBlankDay(date)));
+  }, [checkIn, checkOut]);
 
   const addGuestName = () => setGuestNames([...guestNames, '']);
   const removeGuestName = (index: number) => setGuestNames(guestNames.filter((_, i) => i !== index));
   const updateGuestName = (index: number, value: string) => { const u = [...guestNames]; u[index] = value; setGuestNames(u); };
 
-  const addGuideName = () => setGuideNames([...guideNames, '']);
-  const removeGuideName = (index: number) => setGuideNames(guideNames.filter((_, i) => i !== index));
-  const updateGuideName = (index: number, value: string) => { const u = [...guideNames]; u[index] = value; setGuideNames(u); };
+  const updateDay = (index: number, updates: Partial<DayEntry>) =>
+    setDayEntries(prev => prev.map((d, i) => i === index ? { ...d, ...updates } : d));
 
-  const addTransportationEntry = () => setTransportationEntries([...transportationEntries, { driver: '', organized: false, date: selectedDate, time: '', from: '', to: '', arrivalTime: '', price: '', description: '' }]);
-  const removeTransportationEntry = (index: number) => setTransportationEntries(transportationEntries.filter((_, i) => i !== index));
-  const updateTransportationEntry = (index: number, field: string, value: any) => { const u = [...transportationEntries]; u[index] = { ...u[index], [field]: value }; setTransportationEntries(u); };
+  const updateDayGuideName = (dayIndex: number, nameIndex: number, value: string) =>
+    setDayEntries(prev => { const days = [...prev]; const names = [...days[dayIndex].guideNames]; names[nameIndex] = value; days[dayIndex] = { ...days[dayIndex], guideNames: names }; return days; });
+
+  const updateDayTransEntry = (dayIndex: number, ei: number, field: string, value: string) =>
+    setDayEntries(prev => { const days = [...prev]; const ents = [...days[dayIndex].transEntries]; ents[ei] = { ...ents[ei], [field]: value }; days[dayIndex] = { ...days[dayIndex], transEntries: ents }; return days; });
 
   const getTodayRate = async () => {
     try { const res = await fetch('https://api.exchangerate-api.com/v4/latest/USD'); const data = await res.json(); if (data.rates?.UZS) setExchangeRate(data.rates.UZS.toString()); }
@@ -72,6 +107,20 @@ export function ReserverIncomeForm({ selectedDate, onClose, onSuccess }: Props) 
     e.preventDefault(); setSubmitting(true); setMessage('');
     const validGuestNames = guestNames.filter(n => n.trim());
     if (validGuestNames.length === 0) { setMessage('Error: At least one guest name is required'); setSubmitting(false); return; }
+    const checkInDate = selectedDate || new Date().toISOString().split('T')[0];
+    if (!bypassDuplicateCheck) {
+      const { data: allOnDate } = await supabase.from('bookings')
+        .select('id, guest_name, check_in, status')
+        .eq('check_in', checkInDate);
+      const guestKey = validGuestNames.join(', ');
+      const existing = (allOnDate || []).filter((b: any) => b.guest_name === guestKey && b.status !== 'cancelled');
+      if (existing.length > 0) {
+        setDuplicateWarning({ name: guestKey, date: checkInDate });
+        setSubmitting(false);
+        return;
+      }
+    }
+    setBypassDuplicateCheck(false);
     try {
       const amountValue = parseFloat(amount || '0');
       const rateValue = parseFloat(exchangeRate || '1');
@@ -81,8 +130,8 @@ export function ReserverIncomeForm({ selectedDate, onClose, onSuccess }: Props) 
       const { error } = await supabase.from('bookings').insert([{
         yurt_id: null, // Reserver bookings don't require specific yurt
         guest_name: validGuestNames.join(', '),
-        check_in: selectedDate || new Date().toISOString().split('T')[0],
-        check_out: selectedDate || new Date().toISOString().split('T')[0], // Default to same day, will be editable
+        check_in: checkIn || new Date().toISOString().split('T')[0],
+        check_out: checkOut || checkIn || new Date().toISOString().split('T')[0],
         total_price: total_price || 0,
         number_of_people: guestCount,
         payment_status: 'Unpaid',
@@ -92,67 +141,71 @@ export function ReserverIncomeForm({ selectedDate, onClose, onSuccess }: Props) 
         meal_notes: null,
         transportation: null,
         meal_preference: null,
-        guide_required: guideService,
-        special_requests: null,
+        guide_required: dayEntries.some(d => d.guideService),
+        special_requests: (() => { const f = dayEntries.filter(d => d.lunch || d.dinner || d.guideService || d.transportation || d.cookingClass || d.specialRequest.trim()); return f.length > 0 ? JSON.stringify(f) : null; })(),
         created_by_role: 'Reserver',
         approved_by_manager: false,
         created_by_id: currentUserId || '',
         created_at: new Date().toISOString(),
         last_edited_by_id: currentUserId || '',
         last_edited_at: new Date().toISOString(),
-        yurt_requests: null, // Will be added as a separate input field
+        yurt_requests: yurtRequests || null,
         // Service fields
         guest_count: guestCount,
         children_under_12: childrenUnder12,
-        nights: nights || null,
-        guide_service: guideService,
-        guide_names: guideService ? `${guideNames.filter((n) => n.trim()).join(', ')}${guideAmount ? ` (Amount: ${guideAmount} USD)` : ''}` : null,
-        guide_amount: guideAmount,
-        has_transportation: transportation,
-        transportation_details: transportation ? transportationEntries.map((entry, index) => `Trip ${index + 1}: Driver: ${entry.driver || 'N/A'} | Date: ${entry.date ? new Date(entry.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'N/A'} | Time: ${entry.time || 'N/A'} | From: ${entry.from || 'N/A'} | To: ${entry.to || 'N/A'} | Arrival Time: ${entry.arrivalTime || 'N/A'}${entry.price ? ` | Price: ${entry.price} USD` : ''}${entry.description ? ` | Description: ${entry.description}` : ''}`).join(' | ') : null,
-        lunch: lunch,
-        lunch_count: lunchCount,
-        lunch_dietary: lunchDietary || null,
-        dinner: dinner,
-        dinner_count: dinnerCount,
-        dinner_dietary: dinnerDietary || null,
-        drinks: drinks,
-        drinks_count: drinksCount,
-        laundry: laundry,
-        laundry_price: laundryPrice,
-        laundry_currency: laundryCurrency,
+        nights: (checkOut && checkIn) ? Math.round((new Date(checkOut + 'T00:00:00').getTime() - new Date(checkIn + 'T00:00:00').getTime()) / 86400000).toString() : null,
+        guide_service: dayEntries.some(d => d.guideService),
+        guide_names: dayEntries.filter(d => d.guideService).flatMap(d => d.guideNames.filter(n => n.trim())).join(', ') || null,
+        guide_amount: null,
+        has_transportation: dayEntries.some(d => d.transportation),
+        transportation_details: (() => { const lines = dayEntries.filter(d => d.transportation).flatMap(d => d.transEntries.map(e => { const dd = new Date(d.date + 'T00:00:00'); const lbl = `${dd.getDate()} ${dd.toLocaleString('en-US', { month: 'long' })}`; const parts: string[] = [lbl]; if (e.driver?.trim()) parts.push(`Driver: ${e.driver}`); if (e.time && !e.time.startsWith(':') && !e.time.endsWith(':')) parts.push(`Pickup: ${e.time}`); if (e.from?.trim()) parts.push(`From: ${e.from}`); if (e.to?.trim()) parts.push(`To: ${e.to}`); if (e.arrivalTime && !e.arrivalTime.startsWith(':') && !e.arrivalTime.endsWith(':')) parts.push(`Arrival: ${e.arrivalTime}`); if (e.price?.trim()) parts.push(`Price: ${e.price} USD`); return parts.join(' · '); })); return lines.length ? lines.join('\n') : null; })(),
+        lunch: dayEntries.some(d => d.lunch),
+        lunch_count: dayEntries.reduce((s, d) => s + (d.lunch ? (d.lunchCount || 0) : 0), 0),
+        lunch_dietary: dayEntries.filter(d => d.lunch && d.lunchDietary).map(d => d.lunchDietary).join('; ') || null,
+        dinner: dayEntries.some(d => d.dinner),
+        dinner_count: dayEntries.reduce((s, d) => s + (d.dinner ? (d.dinnerCount || 0) : 0), 0),
+        dinner_dietary: dayEntries.filter(d => d.dinner && d.dinnerDietary).map(d => d.dinnerDietary).join('; ') || null,
+        drinks: false,
+        drinks_count: 0,
+        laundry: false,
+        laundry_price: null,
+        laundry_currency: 'UZS',
         payment_method: paymentMethod,
         payment_note: paymentNote || null,
         currency: currency,
         exchange_rate: rateValue,
         amount: amountValue,
         description: description,
-        cooking_class: cookingClass,
-        cooking_class_description: cookingClassDescription || null,
+        cooking_class: dayEntries.some(d => d.cookingClass),
+        cooking_class_description: dayEntries.filter(d => d.cookingClass && d.cookingClassDescription).map(d => d.cookingClassDescription).join('; ') || null,
       }]);
       if (error) throw error;
-      setMessage('Booking saved successfully!'); setTimeout(() => { onSuccess(); resetForm(); }, 1000);
+      setMessage('Booking saved successfully!'); setTimeout(() => { onSuccess(); resetForm(); setMessage(''); }, 1000);
     } catch (err: any) { setMessage(`Error: ${err.message}`); } finally { setSubmitting(false); }
   };
 
   const resetForm = () => {
-    setGuestNames(['']); setGuestCount(1); setChildrenUnder12(0); setNights(''); setGuideService(false); setGuideNames(['']); setGuideAmount('');
-    setTransportation(false); setTransportationEntries([{ driver: '', organized: false, date: selectedDate, time: '', from: '', to: '', arrivalTime: '', price: '', description: '' }]);
-    setLunch(false); setLunchCount(0); setLunchDietary(''); setDinner(false); setDinnerCount(0); setDinnerDietary(''); setDrinks(false); setDrinksCount(0); setLaundry(false); setLaundryPrice(''); setLaundryCurrency('UZS');
-    setCookingClass(false); setCookingClassDescription('');
+    setGuestNames(['']); setGuestCount(1); setChildrenUnder12(0);
+    setCheckIn(selectedDate || ''); setCheckOut('');
+    setDayEntries(selectedDate ? [makeBlankDay(selectedDate)] : []); setYurtRequests('');
     setCurrency('USD'); setExchangeRate('1'); setPaymentMethod('in_camp'); setAmount(''); setPaymentNote(''); setDescription('');
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl p-6 overflow-y-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-black text-slate-800">New Booking</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-black text-slate-800">New Booking</h2>
+            <button type="button" onClick={resetForm} className="px-3 py-1 bg-slate-100 text-slate-500 rounded-lg text-xs font-bold hover:bg-slate-200 transition-all">Clear</button>
+          </div>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl transition-all"><svg className="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
         </div>
         {message && <div className={`mb-4 p-3 rounded-lg text-sm ${message.includes('Error') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>{message}</div>}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
           {/* Guest Names */}
           <div>
             <label className="block text-sm font-black text-slate-900 mb-2">Guest Names *</label>
@@ -167,173 +220,213 @@ export function ReserverIncomeForm({ selectedDate, onClose, onSuccess }: Props) 
           </div>
 
           {/* Counts */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div><label className="block text-sm font-black text-slate-900 mb-2">Total Guests</label>
               <input type="number" min="1" value={guestCount} onChange={(e) => setGuestCount(parseInt(e.target.value) || 1)} className="w-full px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm" /></div>
             <div><label className="block text-sm font-black text-slate-900 mb-2">Children Under 12</label>
               <input type="number" min="0" value={childrenUnder12} onChange={(e) => setChildrenUnder12(parseInt(e.target.value) || 0)} className="w-full px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm" /></div>
-            <div><label className="block text-sm font-black text-slate-900 mb-2">Nights</label>
-              <input type="number" min="0" value={nights} onChange={(e) => setNights(e.target.value)} placeholder="Number of nights" className="w-full px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm" /></div>
           </div>
 
-          {/* Services */}
-          <div className="border-2 border-slate-200 rounded-xl p-4 space-y-3">
-            <h3 className="font-black text-slate-900 text-sm">Services and Food</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="flex items-center gap-3 cursor-pointer mb-2">
-                  <input type="checkbox" checked={lunch} onChange={(e) => { setLunch(e.target.checked); if (e.target.checked && lunchCount === 0) setLunchCount(1); }} className="w-5 h-5 rounded border-2 border-slate-300 text-emerald-600" />
-                  <span className="text-slate-900 font-semibold text-sm">Lunch</span>
-                  {lunch && <input type="number" min="1" value={lunchCount} onChange={(e) => setLunchCount(parseInt(e.target.value) || 1)} className="w-16 px-2 py-1 border-2 border-slate-300 rounded-lg text-sm font-semibold" />}
-                </label>
-                {lunch && (
-                  <input
-                    type="text"
-                    value={lunchDietary}
-                    onChange={(e) => setLunchDietary(e.target.value)}
-                    placeholder="Dietary request (vegetarian, special request)"
-                    className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black"
-                  />
-                )}
-              </div>
-              <div>
-                <label className="flex items-center gap-3 cursor-pointer mb-2">
-                  <input type="checkbox" checked={dinner} onChange={(e) => { setDinner(e.target.checked); if (e.target.checked && dinnerCount === 0) setDinnerCount(1); }} className="w-5 h-5 rounded border-2 border-slate-300 text-emerald-600" />
-                  <span className="text-slate-900 font-semibold text-sm">Dinner</span>
-                  {dinner && <input type="number" min="1" value={dinnerCount} onChange={(e) => setDinnerCount(parseInt(e.target.value) || 1)} className="w-16 px-2 py-1 border-2 border-slate-300 rounded-lg text-sm font-semibold" />}
-                </label>
-                {dinner && (
-                  <input
-                    type="text"
-                    value={dinnerDietary}
-                    onChange={(e) => setDinnerDietary(e.target.value)}
-                    placeholder="Dietary request (vegetarian, special request)"
-                    className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black"
-                  />
-                )}
-              </div>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input type="checkbox" checked={drinks} onChange={(e) => { setDrinks(e.target.checked); if (e.target.checked && drinksCount === 0) setDrinksCount(1); }} className="w-5 h-5 rounded border-2 border-slate-300 text-emerald-600" />
-                <span className="text-slate-900 font-semibold text-sm">Drinks</span>
-                {drinks && <input type="number" min="1" value={drinksCount} onChange={(e) => setDrinksCount(parseInt(e.target.value) || 1)} className="w-16 px-2 py-1 border-2 border-slate-300 rounded-lg text-sm font-semibold" />}
-              </label>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input type="checkbox" checked={laundry} onChange={(e) => setLaundry(e.target.checked)} className="w-5 h-5 rounded border-2 border-slate-300 text-emerald-600" />
-                <span className="text-slate-900 font-semibold text-sm">Laundry</span>
-              </label>
-            </div>
-            {laundry && (
-              <div className="flex gap-2 items-center">
-                <input type="number" min="0" step="0.01" value={laundryPrice} onChange={(e) => setLaundryPrice(e.target.value)} placeholder="Laundry price" className="flex-1 px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm" />
-                <select value={laundryCurrency} onChange={(e) => setLaundryCurrency(e.target.value as 'UZS' | 'USD')} className="px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm">
-                  <option value="UZS">UZS</option><option value="USD">USD</option>
-                </select>
-              </div>
-            )}
-          </div>
-
-          {/* Guide */}
-          <div className="border-2 border-slate-200 rounded-xl p-4 space-y-3">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" checked={guideService} onChange={(e) => setGuideService(e.target.checked)} className="w-5 h-5 rounded border-2 border-slate-300 text-emerald-600" />
-              <span className="text-slate-900 font-semibold text-sm">Guide Service</span>
-            </label>
-            {guideService && (
-              <div className="space-y-3">
-                {guideNames.map((name, index) => (
-                  <div key={index} className="flex gap-2">
-                    <input type="text" value={name} onChange={(e) => updateGuideName(index, e.target.value)} placeholder={`Guide ${index + 1} name`} className="flex-1 px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm" />
-                    {guideNames.length > 1 && <button type="button" onClick={() => removeGuideName(index)} className="px-3 py-2 bg-rose-600 text-white rounded-xl hover:bg-rose-700 font-bold text-xs">✕</button>}
-                  </div>
-                ))}
-                <button type="button" onClick={addGuideName} className="flex items-center gap-1 text-sm text-emerald-600 font-bold"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>Add Guide</button>
-                <div><label className="block text-xs font-bold text-slate-600 mb-1">Guide Amount (USD)</label>
-                  <input type="number" min="0" step="0.01" value={guideAmount} onChange={(e) => setGuideAmount(e.target.value)} placeholder="Enter guide amount in USD" className="w-full px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm" /></div>
-              </div>
-            )}
-          </div>
-
-          {/* Cooking Class */}
-          <div className="border-2 border-slate-200 rounded-xl p-4 space-y-3">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" checked={cookingClass} onChange={(e) => setCookingClass(e.target.checked)} className="w-5 h-5 rounded border-2 border-slate-300 text-emerald-600" />
-              <span className="text-slate-900 font-semibold text-sm">Cooking Class</span>
-            </label>
-            {cookingClass && (
-              <textarea
-                value={cookingClassDescription}
-                onChange={(e) => setCookingClassDescription(e.target.value)}
-                placeholder="Description (optional)"
-                rows={2}
-                className="w-full px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm"
-              />
-            )}
-          </div>
-
-          {/* Transportation */}
-          <div className="border-2 border-slate-200 rounded-xl p-4 space-y-3">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" checked={transportation} onChange={(e) => setTransportation(e.target.checked)} className="w-5 h-5 rounded border-2 border-slate-300 text-emerald-600" />
-              <span className="text-slate-900 font-semibold text-sm">Transportation</span>
-            </label>
-            {transportation && (
-              <div className="space-y-4">
-                {transportationEntries.map((entry, index) => (
-                  <div key={index} className="p-4 border-2 border-slate-200 rounded-xl space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-bold text-slate-700">Trip {index + 1}</span>
-                      {transportationEntries.length > 1 && <button type="button" onClick={() => removeTransportationEntry(index)} className="px-3 py-1 bg-rose-600 text-white rounded-lg hover:bg-rose-700 font-bold text-xs">✕ Remove</button>}
+          {/* Mini Check-out Calendar */}
+          {(() => {
+            const pad2 = (n: number) => String(n).padStart(2, '0');
+            const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+            const firstDay = new Date(calViewYear, calViewMonth, 1).getDay();
+            const daysInMonth = new Date(calViewYear, calViewMonth + 1, 0).getDate();
+            const nights = (checkOut && checkIn)
+              ? Math.round((new Date(checkOut + 'T00:00:00').getTime() - new Date(checkIn + 'T00:00:00').getTime()) / 86400000)
+              : 0;
+            const prevMonth = () => { if (calViewMonth === 0) { setCalViewMonth(11); setCalViewYear(y => y - 1); } else setCalViewMonth(m => m - 1); };
+            const nextMonth = () => { if (calViewMonth === 11) { setCalViewMonth(0); setCalViewYear(y => y + 1); } else setCalViewMonth(m => m + 1); };
+            return (
+              <div className="flex items-start gap-4">
+                <div className="w-56 flex-shrink-0">
+                  <label className="block text-xs font-black text-slate-900 mb-1">
+                    {selectedDate ? 'Check-out Date' : 'Check-in & Check-out'}
+                    {nights > 0 && <span className="ml-1.5 px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-bold">{nights}n</span>}
+                    {!checkIn && !selectedDate && <span className="ml-1.5 text-slate-400 font-normal text-[10px]">tap a date to start</span>}
+                  </label>
+                  <div className="border border-slate-200 rounded-lg overflow-hidden select-none text-[11px]">
+                    <div className="flex items-center justify-between px-2 py-1 bg-slate-50 border-b border-slate-200">
+                      <button type="button" onClick={prevMonth} className="text-slate-400 hover:text-slate-800 font-black leading-none w-5 h-5 flex items-center justify-center">‹</button>
+                      <span className="font-black text-slate-800 text-[11px]">{monthNames[calViewMonth].slice(0,3)} {calViewYear}</span>
+                      <button type="button" onClick={nextMonth} className="text-slate-400 hover:text-slate-800 font-black leading-none w-5 h-5 flex items-center justify-center">›</button>
                     </div>
-                    <div><label className="block text-xs font-bold text-slate-600 mb-1">Driver Name</label>
-                      <input type="text" value={entry.driver} onChange={(e) => updateTransportationEntry(index, 'driver', e.target.value)} placeholder="Enter driver name" className="w-full px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm" /></div>
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input type="checkbox" checked={entry.organized} onChange={(e) => updateTransportationEntry(index, 'organized', e.target.checked)} className="w-5 h-5 rounded border-2 border-slate-300 text-emerald-600" />
-                      <span className="text-slate-900 font-semibold text-sm">Need to organize driver</span>
+                    <div className="grid grid-cols-7 bg-slate-50 border-b border-slate-100">
+                      {['S','M','T','W','T','F','S'].map((d, i) => (
+                        <div key={i} className="text-center text-[9px] font-black text-slate-400 py-0.5">{d}</div>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-7 p-1 gap-px">
+                      {Array.from({ length: firstDay }).map((_, i) => <div key={`b${i}`} />)}
+                      {Array.from({ length: daysInMonth }).map((_, i) => {
+                        const day = i + 1;
+                        const ds = `${calViewYear}-${pad2(calViewMonth + 1)}-${pad2(day)}`;
+                        const isCI = ds === checkIn;
+                        const isCO = ds === checkOut;
+                        const inRange = !!(checkIn && checkOut && ds > checkIn && ds < checkOut);
+                        const before = !!(selectedDate && ds < selectedDate);
+                        const frozenCI = isCI && !!selectedDate;
+                        const handleClick = () => {
+                          if (before) return;
+                          if (!checkIn || (!selectedDate && ds <= checkIn)) {
+                            setCheckIn(ds); setCheckOut('');
+                          } else {
+                            setCheckOut(ds);
+                          }
+                        };
+                        return (
+                          <button
+                            key={day} type="button" disabled={before || frozenCI}
+                            onClick={handleClick}
+                            onDoubleClick={() => {
+                              if (isCI || isCO) {
+                                if (!selectedDate) { setCheckIn(''); setCheckOut(''); }
+                                else setCheckOut('');
+                              }
+                            }}
+                            className={[
+                              'w-full aspect-square text-[10px] font-bold rounded flex items-center justify-center transition-all',
+                              frozenCI ? 'bg-emerald-500 text-white cursor-default' : '',
+                              isCI && !frozenCI ? 'bg-emerald-500 text-white' : '',
+                              isCO ? 'bg-emerald-600 text-white' : '',
+                              inRange ? 'bg-emerald-100 text-emerald-700' : '',
+                              before ? 'text-slate-200 cursor-not-allowed' : '',
+                              !isCI && !isCO && !inRange && !before ? 'hover:bg-slate-100 text-slate-700 cursor-pointer' : '',
+                            ].join(' ')}
+                          >{day}</button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+          <div>
+            <label className="block text-sm font-black text-slate-900 mb-2">Yurt Request</label>
+            <input type="text" value={yurtRequests} onChange={e => setYurtRequests(e.target.value)} placeholder="e.g. 2 yurts, separate beds (optional)" className="w-full px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm" />
+          </div>
+
+          {/* Day-by-Day Services */}
+          {!checkOut && dayEntries.length <= 1 && (
+            <p className="text-xs text-slate-400 text-center border-2 border-dashed border-slate-200 rounded-xl py-3">Pick a check-out date above to expand services per day</p>
+          )}
+          {dayEntries.map((day, dayIndex) => {
+            const d = new Date(day.date + 'T00:00:00');
+            const dateLabel = `${d.getDate()} ${d.toLocaleString('en-US', { month: 'long' })}`;
+            const isFirst = dayIndex === 0;
+            const isLast = dayIndex === dayEntries.length - 1 && dayEntries.length > 1;
+            return (
+              <div key={day.date} className="border-2 border-slate-200 rounded-xl overflow-hidden">
+                <div className={`px-4 py-3 flex items-center gap-3 border-b-2 ${isFirst ? 'bg-emerald-50 border-emerald-200' : isLast ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
+                  <span className={`font-black text-base ${isFirst ? 'text-emerald-700' : isLast ? 'text-amber-700' : 'text-slate-800'}`}>{dateLabel}</span>
+                  {isFirst && <span className="text-xs font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">Arrival</span>}
+                  {isLast && <span className="text-xs font-bold text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">Departure</span>}
+                </div>
+                <div className="p-4 space-y-3">
+                  <div className="flex flex-wrap gap-4 items-center">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={day.lunch} onChange={e => updateDay(dayIndex, { lunch: e.target.checked })} className="w-5 h-5 border-2 border-slate-300 text-emerald-600 rounded" />
+                      <span className="text-sm font-semibold text-slate-900">Lunch</span>
                     </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div><label className="block text-xs font-bold text-slate-600 mb-1">Date</label>
-                        <input type="date" value={entry.date} onChange={(e) => updateTransportationEntry(index, 'date', e.target.value)} className="w-full px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm" /></div>
-                      <div><label className="block text-xs font-bold text-slate-600 mb-1">Pickup Time</label>
-                        <div className="flex gap-2">
-                          <select value={entry.time.split(':')[0] || ''} onChange={(e) => updateTransportationEntry(index, 'time', `${e.target.value}:${entry.time.split(':')[1] || '00'}`)} className="flex-1 px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm">
-                            <option value="">Hour</option>{Array.from({ length: 24 }, (_, i) => <option key={i} value={i.toString().padStart(2, '0')}>{i.toString().padStart(2, '0')}</option>)}
-                          </select>
-                          <select value={entry.time.split(':')[1] || ''} onChange={(e) => updateTransportationEntry(index, 'time', `${entry.time.split(':')[0] || '00'}:${e.target.value}`)} className="flex-1 px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm">
-                            <option value="">Min</option>{Array.from({ length: 60 }, (_, i) => <option key={i} value={i.toString().padStart(2, '0')}>{i.toString().padStart(2, '0')}</option>)}
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div><label className="block text-xs font-bold text-slate-600 mb-1">From</label>
-                        <input type="text" value={entry.from} onChange={(e) => updateTransportationEntry(index, 'from', e.target.value)} placeholder="Pickup location" className="w-full px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm" /></div>
-                      <div><label className="block text-xs font-bold text-slate-600 mb-1">To</label>
-                        <input type="text" value={entry.to} onChange={(e) => updateTransportationEntry(index, 'to', e.target.value)} placeholder="Destination" className="w-full px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm" /></div>
-                    </div>
-                    <div><label className="block text-xs font-bold text-slate-600 mb-1">Arrival Time</label>
-                      <div className="flex gap-2">
-                        <select value={entry.arrivalTime.split(':')[0] || ''} onChange={(e) => updateTransportationEntry(index, 'arrivalTime', `${e.target.value}:${entry.arrivalTime.split(':')[1] || '00'}`)} className="flex-1 px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm">
-                          <option value="">Hour</option>{Array.from({ length: 24 }, (_, i) => <option key={i} value={i.toString().padStart(2, '0')}>{i.toString().padStart(2, '0')}</option>)}
-                        </select>
-                        <select value={entry.arrivalTime.split(':')[1] || ''} onChange={(e) => updateTransportationEntry(index, 'arrivalTime', `${entry.arrivalTime.split(':')[0] || '00'}:${e.target.value}`)} className="flex-1 px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm">
-                          <option value="">Min</option>{Array.from({ length: 60 }, (_, i) => <option key={i} value={i.toString().padStart(2, '0')}>{i.toString().padStart(2, '0')}</option>)}
-                        </select>
-                      </div>
-                    </div>
-                    <div className="flex gap-2 items-center">
-                      <input type="number" min="0" step="0.01" value={entry.price} onChange={(e) => updateTransportationEntry(index, 'price', e.target.value)} placeholder="Transportation price" className="flex-1 px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm" />
-                      <span className="text-slate-900 font-semibold text-sm">USD</span>
-                    </div>
-                    <div><label className="block text-xs font-bold text-slate-600 mb-1">Description</label>
-                      <textarea value={entry.description} onChange={(e) => updateTransportationEntry(index, 'description', e.target.value)} placeholder="Enter description for this trip" rows={2} className="w-full px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm" /></div>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={day.dinner} onChange={e => updateDay(dayIndex, { dinner: e.target.checked })} className="w-5 h-5 border-2 border-slate-300 text-emerald-600 rounded" />
+                      <span className="text-sm font-semibold text-slate-900">Dinner</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={day.cookingClass} onChange={e => updateDay(dayIndex, { cookingClass: e.target.checked })} className="w-5 h-5 border-2 border-slate-300 text-emerald-600 rounded" />
+                      <span className="text-sm font-semibold text-slate-900">Cooking Class</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={day.guideService} onChange={e => updateDay(dayIndex, { guideService: e.target.checked })} className="w-5 h-5 border-2 border-slate-300 text-emerald-600 rounded" />
+                      <span className="text-sm font-semibold text-slate-900">Guide</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={day.transportation} onChange={e => updateDay(dayIndex, { transportation: e.target.checked })} className="w-5 h-5 border-2 border-slate-300 text-emerald-600 rounded" />
+                      <span className="text-sm font-semibold text-slate-900">Transport</span>
+                    </label>
                   </div>
-                ))}
-                <button type="button" onClick={addTransportationEntry} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 font-bold text-sm w-full justify-center">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>Add Another Trip
-                </button>
+                  {(day.lunch || day.dinner) && (
+                    <input type="text" value={day.lunchDietary}
+                      onChange={e => updateDay(dayIndex, { lunchDietary: e.target.value, dinnerDietary: e.target.value })}
+                      placeholder={`Food request${day.lunch && day.dinner ? ' (lunch & dinner)' : day.lunch ? ' (lunch)' : ' (dinner)'} e.g. vegetarian`}
+                      className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black" />
+                  )}
+                  {day.cookingClass && (
+                    <textarea value={day.cookingClassDescription} onChange={e => updateDay(dayIndex, { cookingClassDescription: e.target.value })}
+                      placeholder="Cooking class details (optional)" rows={2}
+                      className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black" />
+                  )}
+                  {day.guideService && (
+                    <div className="space-y-2">
+                      {day.guideNames.map((name, ni) => (
+                        <div key={ni} className="flex gap-2">
+                          <input type="text" value={name} onChange={e => updateDayGuideName(dayIndex, ni, e.target.value)}
+                            placeholder={`Guide ${ni + 1} name`} className="flex-1 px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black" />
+                          {day.guideNames.length > 1 && <button type="button" onClick={() => updateDay(dayIndex, { guideNames: day.guideNames.filter((_, i) => i !== ni) })} className="px-2 py-1 bg-rose-600 text-white rounded-lg font-bold text-xs">✕</button>}
+                        </div>
+                      ))}
+                      <button type="button" onClick={() => updateDay(dayIndex, { guideNames: [...day.guideNames, ''] })} className="text-xs text-emerald-600 font-bold flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>Add Guide
+                      </button>
+                    </div>
+                  )}
+                  {day.transportation && (
+                    <div className="space-y-2">
+                      {day.transEntries.map((entry, ei) => (
+                        <div key={ei} className="p-3 border-2 border-slate-200 rounded-xl space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs font-bold text-slate-600">Trip {ei + 1}</span>
+                            {day.transEntries.length > 1 && <button type="button" onClick={() => updateDay(dayIndex, { transEntries: day.transEntries.filter((_, i) => i !== ei) })} className="px-2 py-0.5 bg-rose-600 text-white rounded font-bold text-xs">✕</button>}
+                          </div>
+                          <input type="text" value={entry.driver} onChange={e => updateDayTransEntry(dayIndex, ei, 'driver', e.target.value)} placeholder="Driver name" className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black" />
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-xs font-bold text-slate-600 block mb-1">Pickup</label>
+                              <div className="flex gap-1">
+                                <select value={entry.time.split(':')[0] || ''} onChange={e => updateDayTransEntry(dayIndex, ei, 'time', `${e.target.value}:${entry.time.split(':')[1] || '00'}`)} className="flex-1 px-1 py-1 border-2 border-slate-300 rounded-lg text-xs font-bold text-black">
+                                  <option value="">Hr</option>{Array.from({ length: 24 }, (_, i) => <option key={i} value={i.toString().padStart(2, '0')}>{i.toString().padStart(2, '0')}</option>)}
+                                </select>
+                                <select value={entry.time.split(':')[1] || ''} onChange={e => updateDayTransEntry(dayIndex, ei, 'time', `${entry.time.split(':')[0] || '00'}:${e.target.value}`)} className="flex-1 px-1 py-1 border-2 border-slate-300 rounded-lg text-xs font-bold text-black">
+                                  <option value="">Min</option>{Array.from({ length: 60 }, (_, i) => <option key={i} value={i.toString().padStart(2, '0')}>{i.toString().padStart(2, '0')}</option>)}
+                                </select>
+                              </div>
+                            </div>
+                            <div>
+                              <label className="text-xs font-bold text-slate-600 block mb-1">Arrival</label>
+                              <div className="flex gap-1">
+                                <select value={entry.arrivalTime.split(':')[0] || ''} onChange={e => updateDayTransEntry(dayIndex, ei, 'arrivalTime', `${e.target.value}:${entry.arrivalTime.split(':')[1] || '00'}`)} className="flex-1 px-1 py-1 border-2 border-slate-300 rounded-lg text-xs font-bold text-black">
+                                  <option value="">Hr</option>{Array.from({ length: 24 }, (_, i) => <option key={i} value={i.toString().padStart(2, '0')}>{i.toString().padStart(2, '0')}</option>)}
+                                </select>
+                                <select value={entry.arrivalTime.split(':')[1] || ''} onChange={e => updateDayTransEntry(dayIndex, ei, 'arrivalTime', `${entry.arrivalTime.split(':')[0] || '00'}:${e.target.value}`)} className="flex-1 px-1 py-1 border-2 border-slate-300 rounded-lg text-xs font-bold text-black">
+                                  <option value="">Min</option>{Array.from({ length: 60 }, (_, i) => <option key={i} value={i.toString().padStart(2, '0')}>{i.toString().padStart(2, '0')}</option>)}
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <input type="text" value={entry.from} onChange={e => updateDayTransEntry(dayIndex, ei, 'from', e.target.value)} placeholder="From" className="px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black" />
+                            <input type="text" value={entry.to} onChange={e => updateDayTransEntry(dayIndex, ei, 'to', e.target.value)} placeholder="To" className="px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black" />
+                          </div>
+                          <div className="flex gap-2 items-center">
+                            <input type="number" min="0" step="0.01" value={entry.price} onChange={e => updateDayTransEntry(dayIndex, ei, 'price', e.target.value)} placeholder="Price" className="flex-1 px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black" />
+                            <span className="text-sm font-bold text-slate-600">USD</span>
+                          </div>
+                        </div>
+                      ))}
+                      <button type="button" onClick={() => updateDay(dayIndex, { transEntries: [...day.transEntries, { driver: '', time: '', from: '', to: '', arrivalTime: '', price: '' }] })} className="text-xs text-emerald-600 font-bold flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>Add Trip
+                      </button>
+                    </div>
+                  )}
+                  <input type="text" value={day.specialRequest} onChange={e => updateDay(dayIndex, { specialRequest: e.target.value })}
+                    placeholder="Special request for this day (optional)"
+                    className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg text-sm font-bold text-black" />
+                </div>
               </div>
-            )}
-          </div>
+            );
+          })}
 
           {/* Payment Method */}
           <div className="border-2 border-slate-200 rounded-xl p-4 space-y-4">
@@ -350,16 +443,15 @@ export function ReserverIncomeForm({ selectedDate, onClose, onSuccess }: Props) 
                   <div className="mt-3 space-y-3">
                     <div className="flex gap-2">
                       <div className="flex-1">
-                        <label className="block text-xs font-bold text-slate-600 mb-1">Amount *</label>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">Amount</label>
                         <input
                           type="number"
                           step="0.01"
                           min="0"
                           value={amount}
                           onChange={(e) => setAmount(e.target.value)}
-                          placeholder="Enter amount"
+                          placeholder="Enter amount (optional)"
                           className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black focus:border-emerald-500"
-                          required
                         />
                       </div>
                       <div>
@@ -375,15 +467,6 @@ export function ReserverIncomeForm({ selectedDate, onClose, onSuccess }: Props) 
                         </select>
                       </div>
                     </div>
-                    {currency !== 'UZS' && (
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">Exchange Rate (to UZS)</label>
-                        <div className="flex gap-2">
-                          <input type="number" step="0.01" value={exchangeRate} onChange={(e) => setExchangeRate(e.target.value)} placeholder={`1 ${currency} = ? UZS`} className="flex-1 px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black" />
-                          <button type="button" onClick={getTodayRate} className="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold text-xs whitespace-nowrap">Get Today's Rate</button>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
@@ -438,11 +521,28 @@ export function ReserverIncomeForm({ selectedDate, onClose, onSuccess }: Props) 
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Additional notes..." rows={3} className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-bold text-black" />
           </div>
 
+          {/* Duplicate Warning */}
+          {duplicateWarning && (
+            <div className="p-4 bg-amber-50 border-2 border-amber-400 rounded-xl space-y-3">
+              <div className="flex items-start gap-3">
+                <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
+                <div>
+                  <p className="font-black text-amber-800 text-sm">Duplicate Booking Detected</p>
+                  <p className="text-amber-700 text-xs mt-1 font-bold">A booking for <span className="font-black">{duplicateWarning.name}</span> already exists on <span className="font-black">{(() => { const d = new Date(duplicateWarning.date + 'T00:00:00'); return `${d.getDate()} ${d.toLocaleString('en-US', { month: 'long' })}`; })()}</span>. Do you want to book anyway?</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setDuplicateWarning(null)} className="flex-1 px-4 py-2 bg-white border-2 border-amber-300 text-amber-700 rounded-lg font-bold text-sm hover:bg-amber-50 transition-all">Go Back</button>
+                <button type="button" onClick={() => { setDuplicateWarning(null); setBypassDuplicateCheck(true); setTimeout(() => formRef.current?.requestSubmit(), 50); }} className="flex-1 px-4 py-2 bg-amber-500 text-white rounded-lg font-bold text-sm hover:bg-amber-600 transition-all">Book Anyway</button>
+              </div>
+            </div>
+          )}
+
           {/* Submit */}
           <div className="flex gap-4 pt-4">
             <button type="button" onClick={onClose} className="flex-1 px-6 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-all">Cancel</button>
             <button type="submit" disabled={submitting} className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all disabled:opacity-50">
-              {submitting ? 'Saving...' : 'Create Booking'}
+              {submitting ? 'Booking...' : 'Create Booking'}
             </button>
           </div>
         </form>

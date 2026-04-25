@@ -6,7 +6,7 @@ import { supabase, type Yurt, type Booking } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
-import { OccupancyCalendar } from '@/components/occupancy-calendar';
+import { GoogleGuestAgenda } from '@/components/google-guest-agenda';
 import type { UserRole } from '@/lib/supabase';
 
 export default function ManagerPage() {
@@ -159,7 +159,7 @@ function ManagerPortal() {
 
         {activeTab === 'checkin' && (
           <div className="animate-in fade-in duration-500">
-            <OccupancyCalendar
+            <GoogleGuestAgenda
               bookings={bookings}
               yurts={yurts}
               userRole={userRole}
@@ -167,6 +167,10 @@ function ManagerPortal() {
               onCheckIn={checkIn}
               onCheckOut={checkOut}
               onUpdateBooking={handleUpdateBooking}
+              onCancelBooking={async (id) => {
+                await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', id);
+                fetchData();
+              }}
             />
           </div>
         )}

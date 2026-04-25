@@ -6,7 +6,7 @@ import { supabase, type Yurt, type Booking, type Profile, type Finance, type Not
 import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
-import { OccupancyCalendar } from '@/components/occupancy-calendar';
+import { GoogleGuestAgenda } from '@/components/google-guest-agenda';
 import type { UserRole } from '@/lib/supabase';
 import ICAL from 'ical.js';
 
@@ -553,12 +553,11 @@ function CEODashboard() {
                 </button>
               </div>
             )}
-            <OccupancyCalendar
-              bookings={calendarPreference === 'ical' ? icalEvents : bookings}
+            <GoogleGuestAgenda
+              bookings={bookings}
               yurts={yurts}
               userRole={userRole}
               currentUserId={currentUserId}
-              staff={staff}
               onCancelBooking={handleCancelBooking}
               onCheckIn={handleCheckIn}
               onCheckOut={handleCheckOut}
