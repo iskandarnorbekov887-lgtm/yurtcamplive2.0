@@ -1449,23 +1449,39 @@ export function GoogleGuestAgenda({
                               </span>
                               <div className="relative">
                                 <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">$</span>
-                                {svcPayList.length === 1 ? (
-                                  <div className="w-full pl-6 pr-2 py-2 bg-slate-100 border border-slate-200 rounded-xl text-sm font-black text-slate-600">
-                                    {usdAmt.toFixed(2)}
-                                  </div>
-                                ) : (
-                                  <input
-                                    type="text"
-                                    inputMode="decimal"
-                                    value={pay.amount}
-                                    onChange={e => {
-                                      setPayModified(true);
-                                      setSvcPayList(v => v.map((p, i) => i === pi ? { ...p, amount: e.target.value } : p));
-                                    }}
-                                    placeholder="0.00"
-                                    className="w-full pl-6 pr-2 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black text-black focus:border-indigo-500 outline-none"
-                                  />
-                                )}
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={pay.amount}
+                                  onChange={e => {
+                                    const valStr = e.target.value;
+                                    setPayModified(true);
+                                    setSvcPayList(v => v.map((p, i) => i === pi ? { ...p, amount: valStr } : p));
+                                    
+                                    // If this is the only payment, also update the base svcAmount
+                                    if (svcPayList.length === 1) {
+                                      const newTotal = parseFloat(valStr) || 0;
+                                      const sTotal = (
+                                        (svcLunch ? svcLunchCount * (pricing?.lunch_price || 0) : 0) +
+                                        (svcDinner ? svcDinnerCount * (pricing?.dinner_price || 0) : 0) +
+                                        (svcGuide ? svcGuidePrice : 0) +
+                                        (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0) +
+                                        (svcLaundry ? svcLaundryPrice : 0) +
+                                        (svcCooking ? svcCookingPrice : 0)
+                                      );
+                                      const dTotal = Object.entries(selectedDrinks).reduce((sum, [id, qty]) => {
+                                        const drink = drinks.find(d => d.id === parseInt(id));
+                                        return sum + (qty * (drink?.sold_price || 0));
+                                      }, 0);
+                                      const eTotal = extraServices.reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0);
+                                      
+                                      const newBase = Math.max(0, newTotal - (sTotal + dTotal + eTotal));
+                                      setSvcAmount(newBase);
+                                    }
+                                  }}
+                                  placeholder="0.00"
+                                  className="w-full pl-6 pr-2 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black text-black focus:border-indigo-500 outline-none"
+                                />
                               </div>
                             </div>
 
