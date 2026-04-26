@@ -1742,9 +1742,10 @@ export function GoogleGuestAgenda({
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Notes</p>
                   <p className="text-sm text-black whitespace-pre-wrap">{sel.notes || sel.description}</p>
                 </div>
-                  </>
-                );
-              })()}
+              )}
+            </>
+          );
+        })()}
             </div>
           )}
         </div>
