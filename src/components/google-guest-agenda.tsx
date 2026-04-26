@@ -108,7 +108,7 @@ export function GoogleGuestAgenda({
   const [svcChildren, setSvcChildren] = useState(0);
   const [svcAmount, setSvcAmount] = useState(0);
 
-  const [pricing, setPricing] = useState<{ usd_to_uzs?: number; usd_to_eur?: number } | null>(null);
+  const [pricing, setPricing] = useState<{ usd_to_uzs?: number; usd_to_eur?: number; guide_price?: number; lunch_price?: number; dinner_price?: number } | null>(null);
 
   const today = localDateStr(new Date());
 
@@ -1105,7 +1105,7 @@ export function GoogleGuestAgenda({
                               />
                             )}
                           </div>
-                          {svcLunch && pricing?.lunch_price > 0 && (
+                          {svcLunch && pricing?.lunch_price && pricing.lunch_price > 0 && (
                             <span className="text-xs font-bold text-slate-500">
                               ${(svcLunchCount * pricing.lunch_price).toFixed(2)}
                               <span className="ml-1 opacity-50">(${pricing.lunch_price}/ea)</span>
@@ -1133,7 +1133,7 @@ export function GoogleGuestAgenda({
                               />
                             )}
                           </div>
-                          {svcDinner && pricing?.dinner_price > 0 && (
+                          {svcDinner && pricing?.dinner_price && pricing.dinner_price > 0 && (
                             <span className="text-xs font-bold text-slate-500">
                               ${(svcDinnerCount * pricing.dinner_price).toFixed(2)}
                               <span className="ml-1 opacity-50">(${pricing.dinner_price}/ea)</span>
@@ -1502,7 +1502,7 @@ export function GoogleGuestAgenda({
                                   value={pay.currency === 'UZS' ? pricing.usd_to_uzs : pricing.usd_to_eur}
                                   onChange={e => {
                                     const val = parseFloat(e.target.value) || 0;
-                                    setPricing((prev: typeof pricing) => prev ? { ...prev, [pay.currency === 'UZS' ? 'usd_to_uzs' : 'usd_to_eur']: val } : prev);
+                                    setPricing((prev) => prev ? { ...prev, [pay.currency === 'UZS' ? 'usd_to_uzs' : 'usd_to_eur']: val } : prev);
                                   }}
                                   className="w-24 px-2 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-black text-indigo-600 outline-none"
                                 />
