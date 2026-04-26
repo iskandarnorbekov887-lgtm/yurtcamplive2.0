@@ -1209,7 +1209,7 @@ export function GoogleGuestAgenda({
                                 <div key={ni} className="flex gap-2">
                                   <input
                                     type="text"
-                                    value={name}
+                                    value={name || ''}
                                     onChange={e => {
                                       const next = [...svcGuideNames];
                                       next[ni] = e.target.value;
@@ -1541,7 +1541,7 @@ export function GoogleGuestAgenda({
                                 <input
                                   type="text"
                                   inputMode="decimal"
-                                  value={pay.amount}
+                                  value={pay.amount || ''}
                                   onChange={e => {
                                     const valStr = e.target.value;
                                     setPayModified(true);
