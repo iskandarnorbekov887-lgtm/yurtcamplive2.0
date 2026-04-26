@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import confetti from 'canvas-confetti';
 import { supabase, type Booking, type Yurt, type UserRole, type Drink } from '@/lib/supabase';
 import { PrivateCalendarView } from '@/components/private-calendar-view';
 
@@ -207,6 +208,22 @@ export function GoogleGuestAgenda({
       if (updated) setSelectedItem(prev => prev ? { ...prev, booking: updated } : prev);
     }
   }, [bookings]);
+
+  const [lastBalance, setLastBalance] = useState(999999);
+  
+  // Confetti trigger
+  useEffect(() => {
+    // Only if balance just hit zero or below, and it was previously positive, and we are checked in
+    if (sel?.status === 'checked_in' && balance <= 0.01 && lastBalance > 0.01 && tPaidUsd > 0) {
+      confetti({
+        particleCount: 150,
+        spread: 100,
+        origin: { y: 0.7 },
+        colors: ['#6366f1', '#10b981', '#f59e0b']
+      });
+    }
+    setLastBalance(balance);
+  }, [balance, lastBalance, tPaidUsd, sel?.status]);
 
   const getYurtName = (b: Booking) =>
     yurts.find(y => y.id === b.yurt_id)?.name || (b.yurt_id ? `Yurt #${b.yurt_id}` : '—');
@@ -1606,7 +1623,17 @@ export function GoogleGuestAgenda({
                           </div>
 
                           <div className="grid grid-cols-12 gap-3 items-end">
-                            {/* USD Target (Editable only for split payments) */}
+                            {/* Amount Due in this currency */}
+                            <div className="col-span-12">
+                              <div className="flex items-center justify-between px-3 py-2 bg-slate-100 rounded-xl border border-slate-200">
+                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Amount Due in {pay.currency}</span>
+                                <span className="text-xs font-black text-indigo-600">
+                                  {(balance * currentRate).toLocaleString(undefined, { minimumFractionDigits: pay.currency === 'UZS' ? 0 : 2, maximumFractionDigits: pay.currency === 'UZS' ? 0 : 2 })} {pay.currency}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* USD Target */}
                             <div className="col-span-4 space-y-1.5">
                               <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">
                                 {svcPayList.length === 1 ? 'Total Bill' : 'Amount (USD)'}
@@ -1625,7 +1652,7 @@ export function GoogleGuestAgenda({
                                     setSvcPayList(v => v.map((p, i) => i === pi ? { ...p, amount: valStr } : p));
                                   }}
                                   placeholder="0.00"
-                                  className={`w-full ${pay.currency === 'UZS' ? 'pl-9' : 'pl-6'} pr-2 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black text-black focus:border-indigo-500 outline-none`}
+                                  className={`w-full ${pay.currency === 'UZS' ? 'pl-9' : 'pl-6'} py-3 bg-white border-2 border-slate-200 rounded-2xl text-base font-black text-black focus:border-indigo-500 outline-none transition-all shadow-sm`}
                                 />
                               </div>
                             </div>
@@ -1678,27 +1705,32 @@ export function GoogleGuestAgenda({
 
                           {/* Rate Control (Only for non-USD) */}
                           {pay.currency !== 'USD' && pricing && (
-                            <div className="flex items-center gap-3 pt-1">
-                              <div className="flex items-center gap-2 flex-1">
-                                <span className="text-[9px] font-black text-slate-400 uppercase whitespace-nowrap">1 USD =</span>
-                                <input
-                                  type="number"
-                                  value={pay.currency === 'UZS' ? pricing.usd_to_uzs : pricing.usd_to_eur}
-                                  onChange={e => {
-                                    const val = parseFloat(e.target.value) || 0;
-                                    setPricing((prev) => prev ? { ...prev, [pay.currency === 'UZS' ? 'usd_to_uzs' : 'usd_to_eur']: val } : prev);
-                                  }}
-                                  className="w-24 px-2 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-black text-indigo-600 outline-none"
-                                />
-                                <span className="text-[9px] font-black text-slate-400 uppercase">{pay.currency}</span>
+                            <div className="flex flex-col gap-2 pt-2 border-t border-slate-100 mt-2">
+                              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center">
+                                Conversion: $1 = {currentRate.toLocaleString()} {pay.currency}
+                              </p>
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2 flex-1">
+                                  <span className="text-[9px] font-black text-slate-400 uppercase whitespace-nowrap">1 USD =</span>
+                                  <input
+                                    type="number"
+                                    value={pay.currency === 'UZS' ? pricing.usd_to_uzs : pricing.usd_to_eur}
+                                    onChange={e => {
+                                      const val = parseFloat(e.target.value) || 0;
+                                      setPricing((prev) => prev ? { ...prev, [pay.currency === 'UZS' ? 'usd_to_uzs' : 'usd_to_eur']: val } : prev);
+                                    }}
+                                    className="w-24 px-2 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-black text-indigo-600 outline-none"
+                                  />
+                                  <span className="text-[9px] font-black text-slate-400 uppercase">{pay.currency}</span>
+                                </div>
+                                <button 
+                                  onClick={() => fetchCbuRate(pay.currency as 'UZS' | 'EUR')}
+                                  disabled={fetchingRate === pay.currency}
+                                  className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[9px] font-black rounded-lg hover:bg-indigo-100 transition-all flex items-center gap-1 disabled:opacity-50 border border-indigo-100"
+                                >
+                                  {fetchingRate === pay.currency ? '...' : 'Fetch CBU Rate'}
+                                </button>
                               </div>
-                              <button 
-                                onClick={() => fetchCbuRate(pay.currency as 'UZS' | 'EUR')}
-                                disabled={fetchingRate === pay.currency}
-                                className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[9px] font-black rounded-lg hover:bg-indigo-100 transition-all flex items-center gap-1 disabled:opacity-50 border border-indigo-100"
-                              >
-                                {fetchingRate === pay.currency ? '...' : 'Fetch CBU Rate'}
-                              </button>
                             </div>
                           )}
                         </div>
