@@ -108,7 +108,7 @@ export function GoogleGuestAgenda({
   const [svcChildren, setSvcChildren] = useState(0);
   const [svcAmount, setSvcAmount] = useState(0);
 
-  const [pricing, setPricing] = useState<any>(null);
+  const [pricing, setPricing] = useState<{ usd_to_uzs?: number; usd_to_eur?: number } | null>(null);
 
   const today = localDateStr(new Date());
 
@@ -667,7 +667,7 @@ export function GoogleGuestAgenda({
       const data = await res.json();
       if (data && data.rates && data.rates[curr]) {
         const rate = data.rates[curr];
-        setPricing(prev => prev ? { 
+        setPricing((prev: typeof pricing) => prev ? { 
           ...prev, 
           [curr === 'UZS' ? 'usd_to_uzs' : 'usd_to_eur']: rate 
         } : prev);
@@ -1502,7 +1502,7 @@ export function GoogleGuestAgenda({
                                   value={pay.currency === 'UZS' ? pricing.usd_to_uzs : pricing.usd_to_eur}
                                   onChange={e => {
                                     const val = parseFloat(e.target.value) || 0;
-                                    setPricing(prev => prev ? { ...prev, [pay.currency === 'UZS' ? 'usd_to_uzs' : 'usd_to_eur']: val } : prev);
+                                    setPricing((prev: typeof pricing) => prev ? { ...prev, [pay.currency === 'UZS' ? 'usd_to_uzs' : 'usd_to_eur']: val } : prev);
                                   }}
                                   className="w-24 px-2 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-black text-indigo-600 outline-none"
                                 />
