@@ -295,17 +295,22 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelect
                       <span className="text-xs text-slate-400">›</span>
                     </button>
                   ))}
-                  {dayEvents.map(e => (
-                    <button key={e.id} onClick={() => { onSelectCalendarEvent?.(e); setMoreDay(null); }}
-                      className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl bg-indigo-50 border border-indigo-200 hover:opacity-80 transition-all">
-                      <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-slate-900 truncate">{e.summary}</p>
-                        <p className="text-xs text-slate-500">{e.start} → {e.end} · Google Calendar</p>
-                      </div>
-                      <span className="text-xs text-slate-400">›</span>
-                    </button>
-                  ))}
+                  {dayEvents.map(e => {
+                    const cancelled = isGcCancelled(e);
+                    return (
+                      <button key={e.id} onClick={() => { onSelectCalendarEvent?.(e); setMoreDay(null); }}
+                        className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all hover:opacity-80 ${
+                          cancelled ? 'bg-red-50 border-red-200' : 'bg-indigo-50 border-indigo-200'
+                        }`}>
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${cancelled ? 'bg-red-500' : 'bg-amber-400'}`} />
+                        <div className="min-w-0 flex-1">
+                          <p className={`text-sm font-bold text-slate-900 truncate ${cancelled ? 'line-through opacity-70' : ''}`}>{e.summary}</p>
+                          <p className="text-xs text-slate-500">{e.start} → {e.end} · Google Calendar</p>
+                        </div>
+                        <span className="text-xs text-slate-400">›</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
