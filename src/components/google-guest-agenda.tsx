@@ -853,7 +853,35 @@ export function GoogleGuestAgenda({
             </div>
           ) : (
             <div className="p-5 space-y-4">
-              <div className="flex items-start justify-between">
+              {(() => {
+                // Pre-calculate totals for use in UI
+                const sTotal = (
+                  (svcLunch ? svcLunchCount * (pricing?.lunch_price || 0) : 0) +
+                  (svcDinner ? svcDinnerCount * (pricing?.dinner_price || 0) : 0) +
+                  (svcGuide ? svcGuidePrice : 0) +
+                  (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0) +
+                  (svcLaundry ? svcLaundryPrice : 0) +
+                  (svcCooking ? svcCookingPrice : 0)
+                );
+                const dTotal = Object.entries(selectedDrinks).reduce((sum, [id, qty]) => {
+                  const drink = drinks.find(d => d.id === parseInt(id));
+                  return sum + (qty * (drink?.sold_price || 0));
+                }, 0);
+                const eTotal = extraServices.reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0);
+                const gTotal = svcAmount + sTotal + dTotal + eTotal;
+                
+                const tPaidUsd = svcPayList.reduce((sum, p) => {
+                  const amt = parseFloat(p.amount) || 0;
+                  if (p.currency === 'USD') return sum + amt;
+                  const rate = p.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92);
+                  return sum + (amt / rate);
+                }, 0);
+                
+                const balance = gTotal - tPaidUsd;
+
+                return (
+                  <>
+                  <div className="flex items-start justify-between">
                 <div>
                   <h2 className="text-xl font-black text-slate-900">{sel.guest_name}</h2>
                   <p className="text-sm text-slate-500 mt-0.5">{getYurtName(sel)} · {sel.check_in} → {sel.check_out}{sel.nights ? ` · ${sel.nights}n` : ''}{(sel.guest_count || sel.number_of_people) ? ` · ${sel.guest_count || sel.number_of_people} pax` : ''}</p>
@@ -1439,22 +1467,10 @@ export function GoogleGuestAgenda({
                     <div>
                       <p className="text-[9px] font-black uppercase tracking-widest text-indigo-300 leading-none mb-1">Grand Total</p>
                       <p className="text-3xl font-black tracking-tighter leading-none">
-                        ${(
-                          svcAmount + 
-                          ((svcLunch ? svcLunchCount * (pricing?.lunch_price || 0) : 0) +
-                           (svcDinner ? svcDinnerCount * (pricing?.dinner_price || 0) : 0) +
-                           (svcGuide ? svcGuidePrice : 0) +
-                           (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0) +
-                           (svcLaundry ? svcLaundryPrice : 0) +
-                           (svcCooking ? svcCookingPrice : 0)) +
-                          Object.entries(selectedDrinks).reduce((sum, [id, qty]) => {
-                            const drink = drinks.find(d => d.id === parseInt(id));
-                            return sum + (qty * (drink?.sold_price || 0));
-                          }, 0) +
-                          extraServices.reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0)
-                        ).toFixed(2)}
+                        ${gTotal.toFixed(2)}
                       </p>
                     </div>
+
                     <div className="bg-white/20 px-3 py-1.5 rounded-lg backdrop-blur-sm border border-white/10">
                       <p className="text-[10px] font-bold text-indigo-100">USD</p>
                     </div>
@@ -1467,6 +1483,19 @@ export function GoogleGuestAgenda({
                 <div className="bg-white border-2 border-slate-100 rounded-2xl p-5 space-y-4 shadow-sm">
                   <div className="flex justify-between items-center">
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Payment Collection</p>
+                    {balance > 0.01 ? (
+                      <span className="text-[10px] font-black uppercase tracking-widest text-rose-500 bg-rose-50 px-2 py-1 rounded-lg border border-rose-100 animate-pulse">
+                        Remaining: ${balance.toFixed(2)}
+                      </span>
+                    ) : balance < -0.01 ? (
+                      <span className="text-[10px] font-black uppercase tracking-widest text-indigo-500 bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100">
+                        Change: ${Math.abs(balance).toFixed(2)}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100">
+                        ✓ Fully Paid
+                      </span>
+                    )}
                   </div>
 
                   <div className="space-y-4">
@@ -1637,46 +1666,24 @@ export function GoogleGuestAgenda({
                             <span className="text-slate-600">Accommodation</span>
                             <span className="text-slate-900 font-bold">${svcAmount.toFixed(2)}</span>
                           </div>
-                          {(() => {
-                             const sTotal = (
-                              (svcLunch ? svcLunchCount * (pricing?.lunch_price || 0) : 0) +
-                              (svcDinner ? svcDinnerCount * (pricing?.dinner_price || 0) : 0) +
-                              (svcGuide ? svcGuidePrice : 0) +
-                              (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0) +
-                              (svcLaundry ? svcLaundryPrice : 0) +
-                              (svcCooking ? svcCookingPrice : 0)
-                            );
-                            if (sTotal <= 0) return null;
-                            return (
-                              <div className="flex justify-between text-sm">
-                                <span className="text-slate-600">Services & Food</span>
-                                <span className="text-slate-900 font-bold">${sTotal.toFixed(2)}</span>
-                              </div>
-                            );
-                          })()}
-                          {(() => {
-                            const dTotal = Object.entries(selectedDrinks).reduce((sum, [id, qty]) => {
-                              const drink = drinks.find(d => d.id === parseInt(id));
-                              return sum + (qty * (drink?.sold_price || 0));
-                            }, 0);
-                            if (dTotal <= 0) return null;
-                            return (
-                              <div className="flex justify-between text-sm">
-                                <span className="text-slate-600">Drinks Tab</span>
-                                <span className="text-slate-900 font-bold">${dTotal.toFixed(2)}</span>
-                              </div>
-                            );
-                          })()}
-                          {(() => {
-                            const eTotal = extraServices.reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0);
-                            if (eTotal <= 0) return null;
-                            return (
-                              <div className="flex justify-between text-sm">
-                                <span className="text-slate-600">Extra Services</span>
-                                <span className="text-slate-900 font-bold">${eTotal.toFixed(2)}</span>
-                              </div>
-                            );
-                          })()}
+                          {sTotal > 0 && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-slate-600">Services & Food</span>
+                              <span className="text-slate-900 font-bold">${sTotal.toFixed(2)}</span>
+                            </div>
+                          )}
+                          {dTotal > 0 && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-slate-600">Drinks Tab</span>
+                              <span className="text-slate-900 font-bold">${dTotal.toFixed(2)}</span>
+                            </div>
+                          )}
+                          {eTotal > 0 && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-slate-600">Extra Services</span>
+                              <span className="text-slate-900 font-bold">${eTotal.toFixed(2)}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -1684,20 +1691,7 @@ export function GoogleGuestAgenda({
                         <div className="flex justify-between items-center">
                           <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Total Bill (USD)</span>
                           <span className="text-xl font-black text-indigo-700">
-                            ${(
-                              svcAmount + 
-                              ((svcLunch ? svcLunchCount * (pricing?.lunch_price || 0) : 0) +
-                               (svcDinner ? svcDinnerCount * (pricing?.dinner_price || 0) : 0) +
-                               (svcGuide ? svcGuidePrice : 0) +
-                               (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0) +
-                               (svcLaundry ? svcLaundryPrice : 0) +
-                               (svcCooking ? svcCookingPrice : 0)) +
-                              Object.entries(selectedDrinks).reduce((sum, [id, qty]) => {
-                                const drink = drinks.find(d => d.id === parseInt(id));
-                                return sum + (qty * (drink?.sold_price || 0));
-                              }, 0) +
-                              extraServices.reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0)
-                            ).toFixed(2)}
+                            ${gTotal.toFixed(2)}
                           </span>
                         </div>
                         
@@ -1712,6 +1706,17 @@ export function GoogleGuestAgenda({
                             ))}
                           </div>
                         </div>
+
+                        {Math.abs(balance) > 0.01 && (
+                          <div className={`pt-2 border-t ${balance > 0 ? 'border-rose-100' : 'border-indigo-100'} flex justify-between items-center`}>
+                            <span className={`text-[10px] font-black uppercase tracking-widest ${balance > 0 ? 'text-rose-500' : 'text-indigo-500'}`}>
+                              {balance > 0 ? 'Remaining' : 'Change Due'}
+                            </span>
+                            <span className={`text-sm font-black ${balance > 0 ? 'text-rose-600' : 'text-indigo-600'}`}>
+                              ${Math.abs(balance).toFixed(2)}
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       <button
@@ -1729,6 +1734,7 @@ export function GoogleGuestAgenda({
                   </div>
                 </div>
               )}
+
 
 
               {(sel.notes || sel.description) && (
