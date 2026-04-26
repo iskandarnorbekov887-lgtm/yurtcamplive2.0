@@ -24,6 +24,22 @@ function CEOFinancialCalendar() {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [dayFinances, setDayFinances] = useState<Finance[]>([]);
   const [loading, setLoading] = useState(false);
+  const [cashBox, setCashBox] = useState<{ USD: number; UZS: number; EUR: number }>({ USD: 0, UZS: 0, EUR: 0 });
+
+  useEffect(() => {
+    fetchCashBox();
+  }, []);
+
+  const fetchCashBox = async () => {
+    const { data } = await supabase.from('payments').select('*').eq('method', 'Cash');
+    if (data) {
+      const summary = data.reduce((acc: any, p: any) => {
+        acc[p.currency_original] = (acc[p.currency_original] || 0) + p.amount_original;
+        return acc;
+      }, { USD: 0, UZS: 0, EUR: 0 });
+      setCashBox(summary);
+    }
+  };
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -123,7 +139,34 @@ function CEOFinancialCalendar() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto p-6">
+      <main className="max-w-4xl mx-auto p-6 space-y-6">
+        {/* Cash Box Summary */}
+        <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-3xl p-8 text-white shadow-2xl border border-white/10">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2.5 bg-indigo-500/20 rounded-xl border border-indigo-400/30 backdrop-blur-md">
+              <svg className="w-6 h-6 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+            </div>
+            <div>
+              <h2 className="text-xl font-black tracking-tight">Camp Cash Box</h2>
+              <p className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest opacity-70">Physical drawer contents</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-6">
+            <div className="space-y-1">
+              <p className="text-[10px] font-black text-indigo-300 uppercase tracking-tighter">USD Total</p>
+              <p className="text-2xl font-black tracking-tight">${cashBox.USD.toLocaleString()}</p>
+            </div>
+            <div className="space-y-1 border-x border-white/10 px-6">
+              <p className="text-[10px] font-black text-indigo-300 uppercase tracking-tighter">UZS (Sum)</p>
+              <p className="text-2xl font-black tracking-tight">{cashBox.UZS.toLocaleString()} <span className="text-xs opacity-50">sum</span></p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-[10px] font-black text-indigo-300 uppercase tracking-tighter">EUR Total</p>
+              <p className="text-2xl font-black tracking-tight">€{cashBox.EUR.toLocaleString()}</p>
+            </div>
+          </div>
+        </div>
+
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <div className="flex justify-between items-center mb-6">
             <button

@@ -1,7 +1,7 @@
 // LocalStorage-based mock Supabase client for offline development
 // Switch to real Supabase by replacing this with the real client in supabase.ts
 
-import type { Profile, Yurt, Booking, Finance } from './supabase';
+import type { Profile, Yurt, Booking, Finance, Payment } from './supabase';
 
 const STORAGE_KEYS = {
   users: 'camp_users',
@@ -14,6 +14,7 @@ const STORAGE_KEYS = {
   service_pricing: 'camp_service_pricing',
   deleted_records: 'camp_deleted_records',
   notifications: 'camp_notifications',
+  payments: 'camp_payments',
 };
 
 // Check if we're on client

@@ -91,6 +91,7 @@ export interface Booking {
   collected_amount?: number;
   collected_currency?: 'UZS' | 'USD' | 'EUR';
   google_event_id?: string;
+  payments?: Payment[];
 }
 
 export interface Drink {
@@ -134,6 +135,17 @@ export interface Finance {
   drinks?: boolean | null;
   drinks_count?: number | null;
   payment_method?: 'cash' | 'online' | 'already_paid' | 'partially_paid' | 'in_camp' | null;
+}
+
+export interface Payment {
+  id: number;
+  booking_id: number;
+  amount_original: number;
+  currency_original: 'USD' | 'UZS' | 'EUR';
+  method: 'Cash' | 'Card/Online';
+  exchange_rate_used: number;
+  amount_usd_equivalent: number;
+  created_at?: string;
 }
 
 export interface Notification {

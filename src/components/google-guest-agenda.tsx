@@ -79,7 +79,13 @@ export function GoogleGuestAgenda({
   const [newExtraName, setNewExtraName] = useState('');
   const [newExtraPrice, setNewExtraPrice] = useState('');
   const [actionMsg, setActionMsg] = useState('');
-  const [svcPayList, setSvcPayList] = useState<Array<{ amount: string; currency: 'USD' | 'UZS' | 'EUR' }>>([{ amount: '', currency: 'USD' }]);
+  const [svcPayList, setSvcPayList] = useState<Array<{ 
+    amount: string; 
+    currency: 'USD' | 'UZS' | 'EUR'; 
+    method: 'Cash' | 'Card/Online';
+    rate?: number;
+    id?: number; 
+  }>>([{ amount: '', currency: 'USD', method: 'Cash' }]);
   const [fetchingRate, setFetchingRate] = useState<string | null>(null);
   const [syncWarnings, setSyncWarnings] = useState<Record<number, 'deleted' | 'dates_changed'>>({});
   const [payModified, setPayModified] = useState(false); // Track if user manually changed payment amount
@@ -409,7 +415,35 @@ export function GoogleGuestAgenda({
     finally { setLoadingAction(''); }
   };
 
-  const handleSelect = (item: ListItem) => {
+  const fetchCbuRate = async (currency: 'UZS' | 'EUR') => {
+    setFetchingRate(currency);
+    try {
+      const res = await fetch('https://cbu.uz/uz/arkhiv-kursov-valyut/json/');
+      const data = await res.json();
+      const code = currency === 'UZS' ? 'USD' : (currency === 'EUR' ? 'EUR' : '');
+      const rateObj = data.find((r: any) => r.Ccy === code);
+      if (rateObj && pricing) {
+        const rate = parseFloat(rateObj.Rate);
+        if (currency === 'UZS') {
+          setPricing({ ...pricing, usd_to_uzs: rate });
+        } else if (currency === 'EUR') {
+          const usdRate = data.find((r: any) => r.Ccy === 'USD')?.Rate;
+          if (usdRate) {
+            const usdToEur = parseFloat(usdRate) / rate;
+            setPricing({ ...pricing, usd_to_eur: usdToEur });
+          }
+        }
+        flash(`✓ CBU Rate updated: ${rate}`);
+      }
+    } catch (err) {
+      console.error('CBU Rate error:', err);
+      flash('⚠ Failed to fetch CBU rate.');
+    } finally {
+      setFetchingRate(null);
+    }
+  };
+
+  const handleSelect = async (item: ListItem) => {
     setSelectedItem(item);
     setCollectedAmount(''); setSelectedDrinks({}); setExtraServices([]);
     setNewExtraName(''); setNewExtraPrice(''); setShowDrinks(false); setActionMsg('');
@@ -420,7 +454,6 @@ export function GoogleGuestAgenda({
       let existing: DayEntry[] = [];
       try { if (b.special_requests) existing = JSON.parse(b.special_requests); } catch (e) { console.error('Failed to parse special_requests', e); }
       
-      // Re-generate day entries based on check-in/out to ensure all days are present
       const ci = new Date(b.check_in + 'T00:00:00');
       const co = new Date(b.check_out + 'T00:00:00');
       const numNights = Math.max(0, Math.round((co.getTime() - ci.getTime()) / 86400000));
@@ -441,7 +474,6 @@ export function GoogleGuestAgenda({
       }
       setDayEntries(entries);
       
-      // Initialize global states
       setSvcLunch(b.lunch || false);
       setSvcLunchCount(b.lunch_count || 0);
       setSvcDinner(b.dinner || false);
@@ -450,12 +482,10 @@ export function GoogleGuestAgenda({
       setSvcGuideNames(b.guide_names ? b.guide_names.split(', ') : ['']);
       setSvcGuidePrice(parseFloat(b.guide_amount || '0') || (pricing?.guide_price || 0));
       setSvcTransport(b.has_transportation || false);
-      // Attempt to parse existing transportation_details if it was saved by this simplified UI
       const details = b.transportation_details || '';
       if (details.includes(' | Price: $')) {
         const lines = details.split('\n');
         const list = lines.map(line => {
-          // Format: [Name] | [Details] | Price: $[Price]
           const namePart = line.split(' | ')[0] || '';
           const detailPart = line.split(' | ')[1] || '';
           const pricePart = line.split(' | Price: $')[1] || '0';
@@ -472,8 +502,22 @@ export function GoogleGuestAgenda({
       setSvcAdults(b.number_of_people || 1);
       setSvcChildren(b.children_under_12 || 0);
       setSvcAmount(b.amount || 0);
-      setSvcPayList([{ amount: (b.total_price || b.amount || 0).toString(), currency: b.collected_currency || 'USD' }]);
-      setPayModified(false);
+
+      // Load payments
+      const { data: pData } = await supabase.from('payments').select('*').eq('booking_id', b.id);
+      if (pData && pData.length > 0) {
+        setSvcPayList(pData.map((p: any) => ({
+          id: p.id,
+          amount: p.amount_original.toString(),
+          currency: p.currency_original,
+          method: p.method,
+          rate: p.exchange_rate_used
+        })));
+        setPayModified(true);
+      } else {
+        setSvcPayList([{ amount: (b.total_price || b.amount || 0).toString(), currency: b.collected_currency || 'USD', method: 'Cash' }]);
+        setPayModified(false);
+      }
     } else {
       setDayEntries([]);
       setSvcLunch(false); setSvcLunchCount(0);
@@ -484,7 +528,7 @@ export function GoogleGuestAgenda({
       setSvcLaundry(false); setSvcLaundryPrice(0);
       setSvcAdults(1); setSvcChildren(0);
       setSvcAmount(0);
-      setSvcPayList([{ amount: '0', currency: 'USD' }]);
+      setSvcPayList([{ amount: '0', currency: 'USD', method: 'Cash' }]);
       setPayModified(false);
     }
   };
@@ -569,22 +613,53 @@ export function GoogleGuestAgenda({
 
       const totalPaidUsd = svcPayList.reduce((sum, p) => {
         const amt = parseFloat(p.amount) || 0;
-        if (p.currency === 'USD') return sum + amt;
-        const rate = p.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92);
-        return sum + (amt / rate);
+        const rate = p.currency === 'USD' ? 1 : (p.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92));
+        return sum + (p.currency === 'USD' ? amt : (amt / rate));
       }, 0);
+
+      const gTotal = svcAmount + sTotal + dTotal + eTotal;
+      const isFullyPaid = totalPaidUsd >= (gTotal - 0.01);
+      
+      // Save individual payments
+      for (const p of svcPayList) {
+        const amt = parseFloat(p.amount) || 0;
+        if (amt <= 0) continue;
+        const rate = p.currency === 'USD' ? 1 : (p.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92));
+        const usdEquiv = p.currency === 'USD' ? amt : (amt / rate);
+        
+        const payData = {
+          booking_id: sel.id,
+          amount_original: amt,
+          currency_original: p.currency,
+          method: p.method,
+          exchange_rate_used: rate,
+          amount_usd_equivalent: usdEquiv
+        };
+        
+        if (p.id) {
+          await supabase.from('payments').update(payData).eq('id', p.id);
+        } else {
+          await supabase.from('payments').insert(payData);
+        }
+      }
       
       const updates: Partial<Booking> = {
-        total_price: svcAmount + sTotal + dTotal + eTotal,
+        total_price: gTotal,
         collected_amount: totalPaidUsd,
         collected_currency: 'USD',
-        payment_note: `Multi-payment: ${svcPayList.map(p => `${p.amount} ${p.currency}`).join(', ')}`
+        payment_status: isFullyPaid ? 'Paid' : 'Partial',
+        payment_note: `Split Payment: ${svcPayList.map(p => `${p.amount} ${p.currency} (${p.method})`).join(', ')}`
       };
       if (drinkTab.length) updates.drinks_tab = drinkTab;
       if (extraServices.length) updates.extra_services = extraServices.map(e => ({ name: e.name, price: parseFloat(e.price) || 0, currency: e.currency as 'UZS' | 'USD' | 'EUR' }));
       if (onUpdateBooking) await onUpdateBooking(sel.id, updates);
-      await onCheckOut(sel.id);
-      flash('✓ Checked out. Finance record created.');
+      
+      if (isFullyPaid) {
+        await onCheckOut(sel.id);
+        flash('✓ Fully Paid & Checked out. Finance record created.');
+      } else {
+        flash('✓ Payment records updated (Partial).');
+      }
     } catch { flash('⚠ Checkout failed.'); }
     finally { setLoadingAction(''); }
   };
@@ -1567,14 +1642,34 @@ export function GoogleGuestAgenda({
                               </select>
                             </div>
 
-                            {/* Guest Pays (Result) */}
+                            {/* Method Selector */}
                             <div className="col-span-5 space-y-1.5">
+                              <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Method</span>
+                              <div className="flex gap-1.5">
+                                {(['Cash', 'Card/Online'] as const).map(m => (
+                                  <button
+                                    key={m}
+                                    onClick={() => setSvcPayList(v => v.map((p, i) => i === pi ? { ...p, method: m } : p))}
+                                    className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-tighter transition-all border-2 ${
+                                      pay.method === m 
+                                        ? 'bg-indigo-600 border-indigo-600 text-white' 
+                                        : 'bg-white border-slate-200 text-slate-400 hover:border-indigo-100 hover:text-indigo-500'
+                                    }`}
+                                  >
+                                    {m === 'Card/Online' ? 'Card' : m}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Guest Pays (Result) */}
+                            <div className="col-span-12 space-y-1.5">
                               <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Guest Pays</span>
-                              <div className="px-3 py-2 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-100 flex justify-between items-center">
-                                <span className="text-xs font-black truncate">
+                              <div className="px-4 py-3 bg-indigo-600 rounded-2xl text-white shadow-xl shadow-indigo-100 flex justify-between items-center border border-white/20">
+                                <span className="text-sm font-black tracking-tight">
                                   {guestPays.toLocaleString(undefined, { minimumFractionDigits: pay.currency === 'UZS' ? 0 : 2, maximumFractionDigits: pay.currency === 'UZS' ? 0 : 2 })}
                                 </span>
-                                <span className="text-[10px] font-black opacity-80">{pay.currency}</span>
+                                <span className="text-[10px] font-black opacity-80 uppercase tracking-widest">{pay.currency}</span>
                               </div>
                             </div>
                           </div>
@@ -1596,11 +1691,11 @@ export function GoogleGuestAgenda({
                                 <span className="text-[9px] font-black text-slate-400 uppercase">{pay.currency}</span>
                               </div>
                               <button 
-                                onClick={() => fetchLiveRate(pay.currency as 'UZS' | 'EUR')}
+                                onClick={() => fetchCbuRate(pay.currency as 'UZS' | 'EUR')}
                                 disabled={fetchingRate === pay.currency}
-                                className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[9px] font-black rounded-lg hover:bg-indigo-100 transition-all flex items-center gap-1 disabled:opacity-50"
+                                className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[9px] font-black rounded-lg hover:bg-indigo-100 transition-all flex items-center gap-1 disabled:opacity-50 border border-indigo-100"
                               >
-                                {fetchingRate === pay.currency ? '...' : 'Live Rate'}
+                                {fetchingRate === pay.currency ? '...' : 'Fetch CBU Rate'}
                               </button>
                             </div>
                           )}
@@ -1609,8 +1704,8 @@ export function GoogleGuestAgenda({
                     })}
 
                     <button
-                      onClick={() => setSvcPayList(v => [...v, { amount: '', currency: 'USD' }])}
-                      className="w-full py-2 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:border-indigo-300 hover:text-indigo-500 transition-all flex items-center justify-center gap-2"
+                      onClick={() => setSvcPayList(v => [...v, { amount: '', currency: 'USD', method: 'Cash' }])}
+                      className="w-full py-3 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:border-indigo-300 hover:text-indigo-500 transition-all flex items-center justify-center gap-2 bg-slate-50/30"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
                       Add Another Currency
