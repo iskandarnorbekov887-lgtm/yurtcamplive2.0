@@ -1612,7 +1612,9 @@ export function GoogleGuestAgenda({
                                 {svcPayList.length === 1 ? 'Total Bill' : 'Amount (USD)'}
                               </span>
                               <div className="relative">
-                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">$</span>
+                                <span className={`absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold ${pay.currency === 'UZS' ? 'text-[9px]' : 'text-xs'}`}>
+                                  {pay.currency === 'USD' ? '$' : pay.currency === 'UZS' ? 'SUM' : '€'}
+                                </span>
                                 <input
                                   type="text"
                                   inputMode="decimal"
@@ -1623,7 +1625,7 @@ export function GoogleGuestAgenda({
                                     setSvcPayList(v => v.map((p, i) => i === pi ? { ...p, amount: valStr } : p));
                                   }}
                                   placeholder="0.00"
-                                  className="w-full pl-6 pr-2 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black text-black focus:border-indigo-500 outline-none"
+                                  className={`w-full ${pay.currency === 'UZS' ? 'pl-9' : 'pl-6'} pr-2 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black text-black focus:border-indigo-500 outline-none`}
                                 />
                               </div>
                             </div>
