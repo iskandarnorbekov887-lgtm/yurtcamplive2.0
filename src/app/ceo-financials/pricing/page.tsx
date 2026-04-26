@@ -288,29 +288,7 @@ function CEOPricing() {
                 />
               </div>
 
-              <div className="pt-4 border-t border-slate-100">
-                <h3 className="text-sm font-black text-slate-900 mb-4 uppercase tracking-widest">Exchange Rates</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-400 mb-1.5 uppercase">1 USD to UZS</label>
-                    <input
-                      type="number"
-                      value={usdToUzs}
-                      onChange={(e) => setUsdToUzs(e.target.value)}
-                      className="w-full px-4 py-2 border-2 border-slate-200 rounded-xl focus:border-indigo-500 transition-all font-bold text-black"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-400 mb-1.5 uppercase">1 USD to EUR</label>
-                    <input
-                      type="number"
-                      value={usdToEur}
-                      onChange={(e) => setUsdToEur(e.target.value)}
-                      className="w-full px-4 py-2 border-2 border-slate-200 rounded-xl focus:border-indigo-500 transition-all font-bold text-black"
-                    />
-                  </div>
-                </div>
-              </div>
+
 
               {message && (
                 <div className={`p-4 rounded-xl ${message.includes('Error') ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'} font-semibold`}>
