@@ -96,7 +96,7 @@ export function GoogleGuestAgenda({
   const [svcDinner, setSvcDinner] = useState(false);
   const [svcDinnerCount, setSvcDinnerCount] = useState(0);
   const [svcGuide, setSvcGuide] = useState(false);
-  const [svcGuideNames, setSvcGuideNames] = useState('');
+  const [svcGuideNames, setSvcGuideNames] = useState<string[]>(['']);
   const [svcGuidePrice, setSvcGuidePrice] = useState(0);
   const [svcTransport, setSvcTransport] = useState(false);
   const [svcTransList, setSvcTransList] = useState<Array<{ name: string; details: string; price: number }>>([{ name: '', details: '', price: 0 }]);
@@ -447,7 +447,7 @@ export function GoogleGuestAgenda({
       setSvcDinner(b.dinner || false);
       setSvcDinnerCount(b.dinner_count || 0);
       setSvcGuide(b.guide_service || false);
-      setSvcGuideNames(b.guide_names || '');
+      setSvcGuideNames(b.guide_names ? b.guide_names.split(', ') : ['']);
       setSvcGuidePrice(parseFloat(b.guide_amount || '0') || (pricing?.guide_price || 0));
       setSvcTransport(b.has_transportation || false);
       // Attempt to parse existing transportation_details if it was saved by this simplified UI
@@ -478,7 +478,7 @@ export function GoogleGuestAgenda({
       setDayEntries([]);
       setSvcLunch(false); setSvcLunchCount(0);
       setSvcDinner(false); setSvcDinnerCount(0);
-      setSvcGuide(false); setSvcGuideNames(''); setSvcGuidePrice(0);
+      setSvcGuide(false); setSvcGuideNames(['']); setSvcGuidePrice(0);
       setSvcTransport(false); setSvcTransList([{ name: '', details: '', price: 0 }]);
       setSvcCooking(false); setSvcCookingPrice(0);
       setSvcLaundry(false); setSvcLaundryPrice(0);
@@ -633,7 +633,7 @@ export function GoogleGuestAgenda({
         dinner: svcDinner,
         dinner_count: svcDinner ? svcDinnerCount : 0,
         guide_service: svcGuide,
-        guide_names: svcGuide ? svcGuideNames : null,
+        guide_names: svcGuide ? svcGuideNames.filter(n => n.trim()).join(', ') : null,
         guide_amount: svcGuide ? svcGuidePrice.toString() : null,
         has_transportation: svcTransport,
         transportation_details: svcTransport 
@@ -1147,12 +1147,13 @@ export function GoogleGuestAgenda({
 
 
                         {/* Guide */}
-                        <div className="space-y-2 pt-2 border-t border-slate-100">
-                          <div className="flex justify-between items-center">
                             <label className="flex items-center gap-2 cursor-pointer">
                               <input type="checkbox" checked={svcGuide} onChange={e => {
                                 setSvcGuide(e.target.checked);
-                                if (e.target.checked) setSvcGuidePrice(pricing?.guide_price || 0);
+                                if (e.target.checked) {
+                                  setSvcGuidePrice(pricing?.guide_price || 0);
+                                  setSvcGuideNames(['']);
+                                }
                               }} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
                               <span className="text-sm font-bold text-slate-900">Guide Service</span>
                             </label>
@@ -1173,13 +1174,45 @@ export function GoogleGuestAgenda({
                             )}
                           </div>
                           {svcGuide && (
-                            <input
-                              type="text"
-                              value={svcGuideNames}
-                              onChange={e => setSvcGuideNames(e.target.value)}
-                              placeholder="Guide names..."
-                              className={`w-full px-3 py-2 border-2 ${!svcGuideNames.trim() ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-sm font-bold text-black focus:border-indigo-500 transition-all`}
-                            />
+                            <div className="space-y-2">
+                              {svcGuideNames.map((name, ni) => (
+                                <div key={ni} className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    value={name}
+                                    onChange={e => {
+                                      const next = [...svcGuideNames];
+                                      next[ni] = e.target.value;
+                                      setSvcGuideNames(next);
+                                    }}
+                                    placeholder={`Guide ${ni + 1} name...`}
+                                    className={`flex-1 px-3 py-2 border-2 ${!name.trim() ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-sm font-bold text-black focus:border-indigo-500 transition-all`}
+                                  />
+                                  {svcGuideNames.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSvcGuideNames(v => v.filter((_, i) => i !== ni));
+                                        setSvcGuidePrice(v => Math.max(0, v - (pricing?.guide_price || 0)));
+                                      }}
+                                      className="text-rose-500 hover:text-rose-600 font-black text-xl px-1"
+                                    >
+                                      ×
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSvcGuideNames(v => [...v, '']);
+                                  setSvcGuidePrice(v => v + (pricing?.guide_price || 0));
+                                }}
+                                className="w-full py-1.5 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:border-indigo-300 hover:text-indigo-500 transition-all"
+                              >
+                                + Add Another Guide
+                              </button>
+                            </div>
                           )}
                         </div>
 
