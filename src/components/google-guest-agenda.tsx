@@ -1464,14 +1464,31 @@ export function GoogleGuestAgenda({
                   </div>
 
                   <div className="mt-4 pt-4 border-t border-indigo-400 flex justify-between items-end">
-                    <div>
-                      <p className="text-[9px] font-black uppercase tracking-widest text-indigo-300 leading-none mb-1">Grand Total</p>
-                      <p className="text-3xl font-black tracking-tighter leading-none">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-indigo-300 leading-none">Grand Total</p>
+                        <span className="text-[8px] font-black bg-white/20 px-1.5 py-0.5 rounded text-white/80 uppercase">Supposed to pay</span>
+                      </div>
+                      <p className="text-3xl font-black tracking-tighter leading-none mb-2">
                         ${gTotal.toFixed(2)}
                       </p>
+                      
+                      {/* Live Math */}
+                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-200 bg-black/10 rounded-lg px-2 py-1.5 w-fit">
+                        <span>${gTotal.toFixed(2)}</span>
+                        <span className="opacity-50">−</span>
+                        <span className={tPaidUsd > 0 ? 'text-white' : ''}>${tPaidUsd.toFixed(2)} (Paid)</span>
+                        <span className="opacity-50">=</span>
+                        {Math.abs(balance) < 0.01 ? (
+                          <span className="text-emerald-300 font-black">PAYMENT DONE</span>
+                        ) : (
+                          <span className={balance > 0 ? 'text-rose-300' : 'text-sky-300'}>
+                            ${Math.abs(balance).toFixed(2)} {balance > 0 ? 'REMAINING' : 'CHANGE'}
+                          </span>
+                        )}
+                      </div>
                     </div>
-
-                    <div className="bg-white/20 px-3 py-1.5 rounded-lg backdrop-blur-sm border border-white/10">
+                    <div className="bg-white/20 px-3 py-1.5 rounded-lg backdrop-blur-sm border border-white/10 ml-4">
                       <p className="text-[10px] font-bold text-indigo-100">USD</p>
                     </div>
                   </div>
@@ -1529,27 +1546,6 @@ export function GoogleGuestAgenda({
                                     const valStr = e.target.value;
                                     setPayModified(true);
                                     setSvcPayList(v => v.map((p, i) => i === pi ? { ...p, amount: valStr } : p));
-                                    
-                                    // If this is the only payment, also update the base svcAmount
-                                    if (svcPayList.length === 1) {
-                                      const newTotal = parseFloat(valStr) || 0;
-                                      const sTotal = (
-                                        (svcLunch ? svcLunchCount * (pricing?.lunch_price || 0) : 0) +
-                                        (svcDinner ? svcDinnerCount * (pricing?.dinner_price || 0) : 0) +
-                                        (svcGuide ? svcGuidePrice : 0) +
-                                        (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0) +
-                                        (svcLaundry ? svcLaundryPrice : 0) +
-                                        (svcCooking ? svcCookingPrice : 0)
-                                      );
-                                      const dTotal = Object.entries(selectedDrinks).reduce((sum, [id, qty]) => {
-                                        const drink = drinks.find(d => d.id === parseInt(id));
-                                        return sum + (qty * (drink?.sold_price || 0));
-                                      }, 0);
-                                      const eTotal = extraServices.reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0);
-                                      
-                                      const newBase = Math.max(0, newTotal - (sTotal + dTotal + eTotal));
-                                      setSvcAmount(newBase);
-                                    }
                                   }}
                                   placeholder="0.00"
                                   className="w-full pl-6 pr-2 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black text-black focus:border-indigo-500 outline-none"
