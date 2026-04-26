@@ -60,10 +60,10 @@ export interface Booking {
   children_under_12?: number;
   nights?: string;
   guide_service?: boolean;
-  guide_names?: string;
-  guide_amount?: string;
+  guide_names?: string | null;
+  guide_amount?: string | null;
   has_transportation?: boolean;
-  transportation_details?: string;
+  transportation_details?: string | null;
   lunch?: boolean;
   lunch_count?: number;
   lunch_dietary?: string; // Dietary requests for lunch (vegetarian, special request)
@@ -73,10 +73,10 @@ export interface Booking {
   drinks?: boolean;
   drinks_count?: number;
   laundry?: boolean;
-  laundry_price?: string;
-  laundry_currency?: 'UZS' | 'USD';
-  payment_method?: 'in_camp' | 'all_paid' | 'partially_paid';
-  payment_note?: string; // Optional message for all_paid, required for partially_paid
+  laundry_price?: string | null;
+  laundry_currency?: 'UZS' | 'USD' | null;
+  payment_method?: 'in_camp' | 'all_paid' | 'partially_paid' | null;
+  payment_note?: string | null; // Optional message for all_paid, required for partially_paid
   currency?: 'UZS' | 'USD' | 'EUR';
   exchange_rate?: number;
   amount?: number;
@@ -84,8 +84,8 @@ export interface Booking {
   // New fields for manager UI
   yurt_requests?: string; // Special requests for yurts (separate/together beds, how many yurts)
   cooking_class?: boolean; // Cooking class service
-  cooking_class_description?: string; // Optional description for cooking class
-  cooking_class_amount?: string; // Amount for cooking class
+  cooking_class_description?: string | null; // Optional description for cooking class
+  cooking_class_amount?: string | null; // Amount for cooking class
   drinks_tab?: Array<{ drink_id: number; drink_name: string; quantity: number; price: number; currency: 'UZS' | 'USD' | 'EUR' }>;
   extra_services?: Array<{ name: string; price: number; currency: 'UZS' | 'USD' | 'EUR' }>;
   collected_amount?: number;
