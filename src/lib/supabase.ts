@@ -85,6 +85,7 @@ export interface Booking {
   yurt_requests?: string; // Special requests for yurts (separate/together beds, how many yurts)
   cooking_class?: boolean; // Cooking class service
   cooking_class_description?: string; // Optional description for cooking class
+  cooking_class_amount?: string; // Amount for cooking class
   drinks_tab?: Array<{ drink_id: number; drink_name: string; quantity: number; price: number; currency: 'UZS' | 'USD' | 'EUR' }>;
   extra_services?: Array<{ name: string; price: number; currency: 'UZS' | 'USD' | 'EUR' }>;
   collected_amount?: number;
