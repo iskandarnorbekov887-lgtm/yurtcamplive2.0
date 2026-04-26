@@ -23,6 +23,8 @@ function CEOPricing() {
   const [dinnerPrice, setDinnerPrice] = useState('');
   const [nightStayPrice, setNightStayPrice] = useState('');
   const [laundryPrice, setLaundryPrice] = useState('');
+  const [usdToUzs, setUsdToUzs] = useState('12500');
+  const [usdToEur, setUsdToEur] = useState('0.92');
   const [pricingEnabled, setPricingEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -45,6 +47,8 @@ function CEOPricing() {
           setDinnerPrice(pricing.dinner_price?.toString() || '');
           setNightStayPrice(pricing.night_stay_price?.toString() || '');
           setLaundryPrice(pricing.laundry_price?.toString() || '');
+          setUsdToUzs(pricing.usd_to_uzs?.toString() || '12500');
+          setUsdToEur(pricing.usd_to_eur?.toString() || '0.92');
           setPricingEnabled(pricing.pricing_enabled || false);
         }
       } else {
@@ -60,6 +64,8 @@ function CEOPricing() {
           setDinnerPrice(data[0].dinner_price?.toString() || '');
           setNightStayPrice(data[0].night_stay_price?.toString() || '');
           setLaundryPrice(data[0].laundry_price?.toString() || '');
+          setUsdToUzs(data[0].usd_to_uzs?.toString() || '12500');
+          setUsdToEur(data[0].usd_to_eur?.toString() || '0.92');
           setPricingEnabled(data[0].pricing_enabled || false);
         }
       }
@@ -89,6 +95,8 @@ function CEOPricing() {
             dinner_price: parseFloat(dinnerPrice) || 0,
             night_stay_price: parseFloat(nightStayPrice) || 0,
             laundry_price: parseFloat(laundryPrice) || 0,
+            usd_to_uzs: parseFloat(usdToUzs) || 0,
+            usd_to_eur: parseFloat(usdToEur) || 0,
             pricing_enabled: pricingEnabled,
           };
         } else {
@@ -100,6 +108,8 @@ function CEOPricing() {
             dinner_price: parseFloat(dinnerPrice) || 0,
             night_stay_price: parseFloat(nightStayPrice) || 0,
             laundry_price: parseFloat(laundryPrice) || 0,
+            usd_to_uzs: parseFloat(usdToUzs) || 0,
+            usd_to_eur: parseFloat(usdToEur) || 0,
             pricing_enabled: pricingEnabled,
           });
         }
@@ -122,6 +132,8 @@ function CEOPricing() {
               dinner_price: parseFloat(dinnerPrice) || 0,
               night_stay_price: parseFloat(nightStayPrice) || 0,
               laundry_price: parseFloat(laundryPrice) || 0,
+              usd_to_uzs: parseFloat(usdToUzs) || 0,
+              usd_to_eur: parseFloat(usdToEur) || 0,
               pricing_enabled: pricingEnabled,
             })
             .eq('id', 1);
@@ -137,6 +149,8 @@ function CEOPricing() {
               dinner_price: parseFloat(dinnerPrice) || 0,
               night_stay_price: parseFloat(nightStayPrice) || 0,
               laundry_price: parseFloat(laundryPrice) || 0,
+              usd_to_uzs: parseFloat(usdToUzs) || 0,
+              usd_to_eur: parseFloat(usdToEur) || 0,
               pricing_enabled: pricingEnabled,
             });
           if (error) throw error;
@@ -272,6 +286,30 @@ function CEOPricing() {
                   placeholder="Enter laundry price in USD"
                   className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all text-slate-900 font-semibold"
                 />
+              </div>
+
+              <div className="pt-4 border-t border-slate-100">
+                <h3 className="text-sm font-black text-slate-900 mb-4 uppercase tracking-widest">Exchange Rates</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 mb-1.5 uppercase">1 USD to UZS</label>
+                    <input
+                      type="number"
+                      value={usdToUzs}
+                      onChange={(e) => setUsdToUzs(e.target.value)}
+                      className="w-full px-4 py-2 border-2 border-slate-200 rounded-xl focus:border-indigo-500 transition-all font-bold text-black"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 mb-1.5 uppercase">1 USD to EUR</label>
+                    <input
+                      type="number"
+                      value={usdToEur}
+                      onChange={(e) => setUsdToEur(e.target.value)}
+                      className="w-full px-4 py-2 border-2 border-slate-200 rounded-xl focus:border-indigo-500 transition-all font-bold text-black"
+                    />
+                  </div>
+                </div>
               </div>
 
               {message && (

@@ -15,6 +15,25 @@ interface CalEvent {
   status?: string | null;
 }
 
+interface DayEntry {
+  date: string;
+  lunch: boolean; lunchCount: number; lunchDietary: string;
+  dinner: boolean; dinnerCount: number; dinnerDietary: string;
+  guideService: boolean; guideNames: string[];
+  transportation: boolean; transEntries: TransEntry[];
+  cookingClass: boolean; cookingClassDescription: string;
+  specialRequest: string;
+}
+
+interface TransEntry {
+  driver: string;
+  time: string;
+  from: string;
+  to: string;
+  arrivalTime: string;
+  price: string;
+}
+
 interface ListItem {
   key: string;
   name: string;
@@ -60,13 +79,51 @@ export function GoogleGuestAgenda({
   const [newExtraName, setNewExtraName] = useState('');
   const [newExtraPrice, setNewExtraPrice] = useState('');
   const [actionMsg, setActionMsg] = useState('');
+  const [svcPayList, setSvcPayList] = useState<Array<{ amount: string; currency: 'USD' | 'UZS' | 'EUR' }>>([{ amount: '', currency: 'USD' }]);
+  const [fetchingRate, setFetchingRate] = useState<string | null>(null);
   const [syncWarnings, setSyncWarnings] = useState<Record<number, 'deleted' | 'dates_changed'>>({});
+  const [payModified, setPayModified] = useState(false); // Track if user manually changed payment amount
   const [selectedCalendarDay, setSelectedCalendarDay] = useState<string>(localDateStr(new Date()));
   const [editingDates, setEditingDates] = useState(false);
   const [editCheckIn, setEditCheckIn] = useState('');
   const [editCheckOut, setEditCheckOut] = useState('');
+  const [dayEntries, setDayEntries] = useState<DayEntry[]>([]);
+  const [showServices, setShowServices] = useState(false);
+  
+  // Global service states for simplified Manager view
+  const [svcLunch, setSvcLunch] = useState(false);
+  const [svcLunchCount, setSvcLunchCount] = useState(0);
+  const [svcDinner, setSvcDinner] = useState(false);
+  const [svcDinnerCount, setSvcDinnerCount] = useState(0);
+  const [svcGuide, setSvcGuide] = useState(false);
+  const [svcGuideNames, setSvcGuideNames] = useState('');
+  const [svcGuidePrice, setSvcGuidePrice] = useState(0);
+  const [svcTransport, setSvcTransport] = useState(false);
+  const [svcTransList, setSvcTransList] = useState<Array<{ name: string; details: string; price: number }>>([{ name: '', details: '', price: 0 }]);
+  const [svcCooking, setSvcCooking] = useState(false);
+  const [svcCookingPrice, setSvcCookingPrice] = useState(0);
+  const [svcLaundry, setSvcLaundry] = useState(false);
+  const [svcLaundryPrice, setSvcLaundryPrice] = useState(0);
+  const [svcAdults, setSvcAdults] = useState(1);
+  const [svcChildren, setSvcChildren] = useState(0);
+  const [svcAmount, setSvcAmount] = useState(0);
+
+  const [pricing, setPricing] = useState<any>(null);
 
   const today = localDateStr(new Date());
+
+  useEffect(() => {
+    fetchPricing();
+  }, []);
+
+  const fetchPricing = async () => {
+    try {
+      const { data } = await supabase.from('service_pricing').select('*').eq('id', 1);
+      if (data && data.length > 0) setPricing(data[0]);
+    } catch (err) {
+      console.error('Error fetching pricing:', err);
+    }
+  };
 
   useEffect(() => {
     fetch('/api/calendar/events')
@@ -354,7 +411,90 @@ export function GoogleGuestAgenda({
     setSelectedItem(item);
     setCollectedAmount(''); setSelectedDrinks({}); setExtraServices([]);
     setNewExtraName(''); setNewExtraPrice(''); setShowDrinks(false); setActionMsg('');
+    setShowServices(false);
+    
+    if (item.booking) {
+      const b = item.booking;
+      let existing: DayEntry[] = [];
+      try { if (b.special_requests) existing = JSON.parse(b.special_requests); } catch (e) { console.error('Failed to parse special_requests', e); }
+      
+      // Re-generate day entries based on check-in/out to ensure all days are present
+      const ci = new Date(b.check_in + 'T00:00:00');
+      const co = new Date(b.check_out + 'T00:00:00');
+      const numNights = Math.max(0, Math.round((co.getTime() - ci.getTime()) / 86400000));
+      const entries: DayEntry[] = [];
+      for (let i = 0; i <= numNights; i++) {
+        const d = new Date(ci); d.setDate(d.getDate() + i);
+        const ds = localDateStr(d);
+        const found = existing.find(ex => ex.date === ds);
+        entries.push(found || {
+          date: ds,
+          lunch: false, lunchCount: 0, lunchDietary: '',
+          dinner: false, dinnerCount: 0, dinnerDietary: '',
+          guideService: false, guideNames: [''],
+          transportation: false, transEntries: [{ driver: '', time: '', from: '', to: '', arrivalTime: '', price: '' }],
+          cookingClass: false, cookingClassDescription: '',
+          specialRequest: '',
+        });
+      }
+      setDayEntries(entries);
+      
+      // Initialize global states
+      setSvcLunch(b.lunch || false);
+      setSvcLunchCount(b.lunch_count || 0);
+      setSvcDinner(b.dinner || false);
+      setSvcDinnerCount(b.dinner_count || 0);
+      setSvcGuide(b.guide_service || false);
+      setSvcGuideNames(b.guide_names || '');
+      setSvcGuidePrice(parseFloat(b.guide_amount || '0') || (pricing?.guide_price || 0));
+      setSvcTransport(b.has_transportation || false);
+      // Attempt to parse existing transportation_details if it was saved by this simplified UI
+      const details = b.transportation_details || '';
+      if (details.includes(' | Price: $')) {
+        const lines = details.split('\n');
+        const list = lines.map(line => {
+          // Format: [Name] | [Details] | Price: $[Price]
+          const namePart = line.split(' | ')[0] || '';
+          const detailPart = line.split(' | ')[1] || '';
+          const pricePart = line.split(' | Price: $')[1] || '0';
+          return { name: namePart, details: detailPart, price: parseFloat(pricePart) || 0 };
+        });
+        setSvcTransList(list);
+      } else {
+        setSvcTransList([{ name: '', details: details, price: 0 }]);
+      }
+      setSvcCooking(b.cooking_class || false);
+      setSvcCookingPrice(parseFloat(b.cooking_class_amount || '0') || 0);
+      setSvcLaundry(b.laundry || false);
+      setSvcLaundryPrice(parseFloat(b.laundry_price || '0') || 0);
+      setSvcAdults(b.number_of_people || 1);
+      setSvcChildren(b.children_under_12 || 0);
+      setSvcAmount(b.amount || 0);
+      setSvcPayList([{ amount: (b.total_price || b.amount || 0).toString(), currency: b.collected_currency || 'USD' }]);
+      setPayModified(false);
+    } else {
+      setDayEntries([]);
+      setSvcLunch(false); setSvcLunchCount(0);
+      setSvcDinner(false); setSvcDinnerCount(0);
+      setSvcGuide(false); setSvcGuideNames(''); setSvcGuidePrice(0);
+      setSvcTransport(false); setSvcTransList([{ name: '', details: '', price: 0 }]);
+      setSvcCooking(false); setSvcCookingPrice(0);
+      setSvcLaundry(false); setSvcLaundryPrice(0);
+      setSvcAdults(1); setSvcChildren(0);
+      setSvcAmount(0);
+      setSvcPayList([{ amount: '0', currency: 'USD' }]);
+      setPayModified(false);
+    }
   };
+
+  const updateDay = (index: number, updates: Partial<DayEntry>) =>
+    setDayEntries(prev => prev.map((d, i) => i === index ? { ...d, ...updates } : d));
+
+  const updateDayGuideName = (dayIndex: number, nameIndex: number, value: string) =>
+    setDayEntries(prev => { const days = [...prev]; const names = [...days[dayIndex].guideNames]; names[nameIndex] = value; days[dayIndex] = { ...days[dayIndex], guideNames: names }; return days; });
+
+  const updateDayTransEntry = (dayIndex: number, ei: number, field: string, value: string) =>
+    setDayEntries(prev => { const days = [...prev]; const ents = [...days[dayIndex].transEntries]; ents[ei] = { ...ents[ei], [field]: value }; days[dayIndex] = { ...days[dayIndex], transEntries: ents }; return days; });
 
   const sel = selectedItem?.booking ?? null;
   const daysUntilCheckIn = sel
@@ -378,21 +518,166 @@ export function GoogleGuestAgenda({
 
   const handleCheckOut = async () => {
     if (!sel || !onCheckOut) return;
+    if (svcAdults <= 0) {
+      flash('⚠ Number of adults is required for check-out.');
+      setShowServices(true);
+      return;
+    }
+    if ((svcLunch && svcLunchCount <= 0) || (svcDinner && svcDinnerCount <= 0)) {
+      flash('⚠ Quantity is required for selected meals.');
+      setShowServices(true);
+      return;
+    }
+    if (svcGuide && (!svcGuideNames.trim() || svcGuidePrice <= 0)) {
+      flash('⚠ Please enter guide name and amount.');
+      setShowServices(true);
+      return;
+    }
+    if (svcTransport && svcTransList.some(t => !t.name.trim() || !t.details.trim() || t.price <= 0)) {
+      flash('⚠ Please fill all transport fields (name, destination, amount).');
+      setShowServices(true);
+      return;
+    }
+    if (svcLaundry && svcLaundryPrice <= 0) {
+      flash('⚠ Please enter laundry amount.');
+      setShowServices(true);
+      return;
+    }
+    if (svcCooking && svcCookingPrice <= 0) {
+      flash('⚠ Please enter cooking class amount.');
+      setShowServices(true);
+      return;
+    }
     setLoadingAction('checkout');
     try {
       const drinkTab = Object.entries(selectedDrinks).filter(([, q]) => q > 0).map(([id, qty]) => {
         const d = drinks.find(d => d.id === parseInt(id));
         return { drink_id: parseInt(id), drink_name: d?.name || '', quantity: qty, price: d?.sold_price || 0, currency: d?.currency || 'USD' };
       });
-      const updates: Partial<Booking> = {};
-      if (collectedAmount) { updates.amount = parseFloat(collectedAmount); updates.currency = collectedCurrency; }
+      const dTotal = drinkTab.reduce((s, d) => s + (d.price * d.quantity), 0);
+      const eTotal = extraServices.reduce((s, e) => s + (parseFloat(e.price) || 0), 0);
+      const sTotal = (
+        (svcLunch ? svcLunchCount * (pricing?.lunch_price || 0) : 0) +
+        (svcDinner ? svcDinnerCount * (pricing?.dinner_price || 0) : 0) +
+        (svcGuide ? svcGuidePrice : 0) +
+        (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0) +
+        (svcLaundry ? svcLaundryPrice : 0) +
+        (svcCooking ? svcCookingPrice : 0)
+      );
+
+      const totalPaidUsd = svcPayList.reduce((sum, p) => {
+        const amt = parseFloat(p.amount) || 0;
+        if (p.currency === 'USD') return sum + amt;
+        const rate = p.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92);
+        return sum + (amt / rate);
+      }, 0);
+      
+      const updates: Partial<Booking> = {
+        total_price: svcAmount + sTotal + dTotal + eTotal,
+        collected_amount: totalPaidUsd,
+        collected_currency: 'USD',
+        payment_note: `Multi-payment: ${svcPayList.map(p => `${p.amount} ${p.currency}`).join(', ')}`
+      };
       if (drinkTab.length) updates.drinks_tab = drinkTab;
       if (extraServices.length) updates.extra_services = extraServices.map(e => ({ name: e.name, price: parseFloat(e.price) || 0, currency: e.currency as 'UZS' | 'USD' | 'EUR' }));
-      if (Object.keys(updates).length && onUpdateBooking) await onUpdateBooking(sel.id, updates);
+      if (onUpdateBooking) await onUpdateBooking(sel.id, updates);
       await onCheckOut(sel.id);
       flash('✓ Checked out. Finance record created.');
     } catch { flash('⚠ Checkout failed.'); }
     finally { setLoadingAction(''); }
+  };
+
+  const handleSaveServices = async () => {
+    if (!sel || !onUpdateBooking) return;
+    if ((svcLunch && svcLunchCount <= 0) || (svcDinner && svcDinnerCount <= 0)) {
+      flash('⚠ Please enter quantity for selected meals.');
+      return;
+    }
+    if (svcGuide && (!svcGuideNames.trim() || svcGuidePrice <= 0)) {
+      flash('⚠ Please enter guide name and amount.');
+      return;
+    }
+    if (svcTransport && svcTransList.some(t => !t.name.trim() || !t.details.trim() || t.price <= 0)) {
+      flash('⚠ Please enter all transport details.');
+      return;
+    }
+    if (svcLaundry && svcLaundryPrice <= 0) {
+      flash('⚠ Please enter laundry amount.');
+      return;
+    }
+    if (svcCooking && svcCookingPrice <= 0) {
+      flash('⚠ Please enter cooking class amount.');
+      return;
+    }
+    setLoadingAction('saveservices');
+    try {
+      const dTotal = Object.entries(selectedDrinks).reduce((sum, [id, qty]) => {
+        const drink = drinks.find(d => d.id === parseInt(id));
+        return sum + (qty * (drink?.sold_price || 0));
+      }, 0);
+      const eTotal = extraServices.reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0);
+      const sTotal = (
+        (svcLunch ? svcLunchCount * (pricing?.lunch_price || 0) : 0) +
+        (svcDinner ? svcDinnerCount * (pricing?.dinner_price || 0) : 0) +
+        (svcGuide ? svcGuidePrice : 0) +
+        (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0) +
+        (svcLaundry ? svcLaundryPrice : 0) +
+        (svcCooking ? svcCookingPrice : 0)
+      );
+
+      const updates: Partial<Booking> = {
+        lunch: svcLunch,
+        lunch_count: svcLunch ? svcLunchCount : 0,
+        dinner: svcDinner,
+        dinner_count: svcDinner ? svcDinnerCount : 0,
+        guide_service: svcGuide,
+        guide_names: svcGuide ? svcGuideNames : null,
+        guide_amount: svcGuide ? svcGuidePrice.toString() : null,
+        has_transportation: svcTransport,
+        transportation_details: svcTransport 
+          ? svcTransList.filter(t => t.name.trim() || t.details.trim() || t.price > 0)
+              .map(t => `${t.name.trim()} | ${t.details.trim()} | Price: $${t.price}`)
+              .join('\n') || null
+          : null,
+        cooking_class: svcCooking,
+        cooking_class_amount: svcCooking ? svcCookingPrice.toString() : null,
+        laundry: svcLaundry,
+        laundry_price: svcLaundry ? svcLaundryPrice.toString() : null,
+        laundry_currency: 'USD',
+        number_of_people: svcAdults,
+        children_under_12: svcChildren,
+        amount: svcAmount,
+        currency: 'USD',
+        total_price: svcAmount + sTotal + dTotal + eTotal
+      };
+      await onUpdateBooking(sel.id, updates);
+      flash('✓ Services updated.');
+      setShowServices(false);
+    } catch {
+      flash('⚠ Failed to save services.');
+    } finally {
+      setLoadingAction('');
+    }
+  };
+
+  const fetchLiveRate = async (curr: 'UZS' | 'EUR') => {
+    setFetchingRate(curr);
+    try {
+      const res = await fetch('https://open.er-api.com/v6/latest/USD');
+      const data = await res.json();
+      if (data && data.rates && data.rates[curr]) {
+        const rate = data.rates[curr];
+        setPricing(prev => prev ? { 
+          ...prev, 
+          [curr === 'UZS' ? 'usd_to_uzs' : 'usd_to_eur']: rate 
+        } : prev);
+        flash(`✓ Updated ${curr} rate to ${rate}`);
+      }
+    } catch {
+      flash('⚠ Failed to fetch live rate.');
+    } finally {
+      setFetchingRate(null);
+    }
   };
 
   const handleCancel = async () => {
@@ -403,6 +688,26 @@ export function GoogleGuestAgenda({
     catch { flash('⚠ Cancel failed.'); }
     finally { setLoadingAction(''); }
   };
+
+  useEffect(() => {
+    if (!payModified && svcPayList.length === 1 && svcPayList[0].currency === 'USD') {
+      const gTotal = (
+        svcAmount + 
+        ((svcLunch ? svcLunchCount * (pricing?.lunch_price || 0) : 0) +
+         (svcDinner ? svcDinnerCount * (pricing?.dinner_price || 0) : 0) +
+         (svcGuide ? svcGuidePrice : 0) +
+         (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0) +
+         (svcLaundry ? svcLaundryPrice : 0) +
+         (svcCooking ? svcCookingPrice : 0)) +
+        Object.entries(selectedDrinks).reduce((sum, [id, qty]) => {
+          const drink = drinks.find(d => d.id === parseInt(id));
+          return sum + (qty * (drink?.sold_price || 0));
+        }, 0) +
+        extraServices.reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0)
+      );
+      setSvcPayList([{ amount: gTotal.toString(), currency: 'USD' }]);
+    }
+  }, [svcAmount, svcLunch, svcLunchCount, svcDinner, svcDinnerCount, svcGuide, svcGuidePrice, svcTransport, svcTransList, svcLaundry, svcLaundryPrice, svcCooking, svcCookingPrice, selectedDrinks, extraServices, pricing, payModified]);
 
   return (
     <div className="space-y-4">
@@ -419,7 +724,7 @@ export function GoogleGuestAgenda({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4">
         {/* Left — Today's Guest List */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col max-h-[680px]">
           <div className="px-5 py-3 border-b border-slate-100 bg-slate-50">
@@ -727,6 +1032,263 @@ export function GoogleGuestAgenda({
                 </div>
               )}
 
+              {/* Simplified Global Services */}
+              {(sel.status === 'checked_in' || sel.status === 'confirmed') && (userRole === 'Manager' || userRole === 'CEO') && (
+                <div className="border border-slate-200 rounded-xl p-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Services (Food, Guide, Transport)</p>
+                    <button onClick={() => setShowServices(v => !v)} className="text-sm font-bold text-indigo-600 hover:text-indigo-700">
+                      {showServices ? '− Hide' : '+ Manage Services'}
+                    </button>
+                  </div>
+                  
+                  {showServices && (
+                    <div className="space-y-4 pt-2">
+                      {/* Guest Counts */}
+                      <div className="grid grid-cols-2 gap-4 pb-4 border-b border-slate-100">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Adults *</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={svcAdults}
+                            onChange={e => setSvcAdults(parseInt(e.target.value) || 0)}
+                            className={`w-full px-3 py-2 border-2 ${svcAdults <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-xl text-sm font-black text-black focus:border-indigo-500 transition-all`}
+                            placeholder="0"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Children</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={svcChildren}
+                            onChange={e => setSvcChildren(parseInt(e.target.value) || 0)}
+                            className="w-full px-3 py-2 border-2 border-slate-200 bg-white rounded-xl text-sm font-black text-black focus:border-indigo-500 transition-all"
+                            placeholder="0"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="pb-4 border-b border-slate-100">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Stay Price Total (USD)</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                            <input
+                              type="number"
+                              value={svcAmount}
+                              onChange={e => setSvcAmount(parseFloat(e.target.value) || 0)}
+                              className="w-full pl-7 pr-3 py-2 border-2 border-slate-200 bg-white rounded-xl text-sm font-black text-black focus:border-indigo-500 transition-all"
+                              placeholder="0.00"
+                            />
+                          </div>
+                        </div>
+                      </div>                      <div className="grid grid-cols-1 gap-4">
+                        {/* Lunch */}
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <label className="flex items-center gap-2 cursor-pointer min-w-[100px]">
+                              <input type="checkbox" checked={svcLunch} onChange={e => {
+                                setSvcLunch(e.target.checked);
+                                if (e.target.checked && svcLunchCount <= 0) setSvcLunchCount(1);
+                              }} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
+                              <span className="text-sm font-bold text-slate-900">Lunch</span>
+                            </label>
+                            {svcLunch && (
+                              <input
+                                type="number"
+                                value={svcLunchCount}
+                                onChange={e => setSvcLunchCount(parseInt(e.target.value) || 0)}
+                                placeholder="Qty"
+                                className={`w-20 px-3 py-1.5 border-2 ${svcLunchCount <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-sm font-bold text-black focus:border-indigo-500 transition-all`}
+                              />
+                            )}
+                          </div>
+                          {svcLunch && pricing?.lunch_price > 0 && (
+                            <span className="text-xs font-bold text-slate-500">
+                              ${(svcLunchCount * pricing.lunch_price).toFixed(2)}
+                              <span className="ml-1 opacity-50">(${pricing.lunch_price}/ea)</span>
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Dinner */}
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <label className="flex items-center gap-2 cursor-pointer min-w-[100px]">
+                              <input type="checkbox" checked={svcDinner} onChange={e => {
+                                setSvcDinner(e.target.checked);
+                                if (e.target.checked && svcDinnerCount <= 0) setSvcDinnerCount(1);
+                              }} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
+                              <span className="text-sm font-bold text-slate-900">Dinner</span>
+                            </label>
+                            {svcDinner && (
+                              <input
+                                type="number"
+                                value={svcDinnerCount}
+                                onChange={e => setSvcDinnerCount(parseInt(e.target.value) || 0)}
+                                placeholder="Qty"
+                                className={`w-20 px-3 py-1.5 border-2 ${svcDinnerCount <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-sm font-bold text-black focus:border-indigo-500 transition-all`}
+                              />
+                            )}
+                          </div>
+                          {svcDinner && pricing?.dinner_price > 0 && (
+                            <span className="text-xs font-bold text-slate-500">
+                              ${(svcDinnerCount * pricing.dinner_price).toFixed(2)}
+                              <span className="ml-1 opacity-50">(${pricing.dinner_price}/ea)</span>
+                            </span>
+                          )}
+                        </div>
+
+
+
+                        {/* Guide */}
+                        <div className="space-y-2 pt-2 border-t border-slate-100">
+                          <div className="flex justify-between items-center">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={svcGuide} onChange={e => {
+                                setSvcGuide(e.target.checked);
+                                if (e.target.checked && svcGuidePrice === 0) setSvcGuidePrice(pricing?.guide_price || 0);
+                              }} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
+                              <span className="text-sm font-bold text-slate-900">Guide Service</span>
+                            </label>
+                            {svcGuide && (
+                              <div className="flex items-center gap-2">
+                                <button type="button" onClick={() => setSvcGuidePrice(v => Math.max(0, v - 5))} className="w-6 h-6 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full font-black text-sm">－</button>
+                                <span className={`text-xs font-bold ${svcGuidePrice <= 0 ? 'text-rose-500' : 'text-slate-700'} min-w-[40px] text-center`}>${svcGuidePrice.toFixed(0)}</span>
+                                <button type="button" onClick={() => setSvcGuidePrice(v => v + 5)} className="w-6 h-6 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full font-black text-sm">＋</button>
+                              </div>
+                            )}
+                          </div>
+                          {svcGuide && (
+                            <input
+                              type="text"
+                              value={svcGuideNames}
+                              onChange={e => setSvcGuideNames(e.target.value)}
+                              placeholder="Guide names..."
+                              className={`w-full px-3 py-2 border-2 ${!svcGuideNames.trim() ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-sm font-bold text-black focus:border-indigo-500 transition-all`}
+                            />
+                          )}
+                        </div>
+
+                        {/* Transport */}
+                        <div className="space-y-2 pt-2 border-t border-slate-100">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={svcTransport} onChange={e => setSvcTransport(e.target.checked)} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
+                            <span className="text-sm font-bold text-slate-900">Transport</span>
+                          </label>
+                          
+                          {svcTransport && (
+                            <div className="space-y-3">
+                              {svcTransList.map((trans, ti) => (
+                                <div key={ti} className="p-3 border border-slate-100 rounded-xl bg-slate-50/50 space-y-2">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Transfer {ti + 1}</span>
+                                    {svcTransList.length > 1 && (
+                                      <button type="button" onClick={() => setSvcTransList(v => v.filter((_, i) => i !== ti))} className="text-rose-600 hover:text-rose-700 font-bold text-xs">✕ Remove</button>
+                                    )}
+                                  </div>
+                                  <div className="space-y-2">
+                                    <input
+                                      type="text"
+                                      value={trans.name}
+                                      onChange={e => setSvcTransList(v => v.map((t, i) => i === ti ? { ...t, name: e.target.value } : t))}
+                                      placeholder="Driver Name..."
+                                      className={`w-full px-3 py-1.5 border-2 ${!trans.name.trim() ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-xs font-bold text-black focus:border-indigo-500 transition-all`}
+                                    />
+                                    <div className="flex gap-2">
+                                      <input
+                                        type="text"
+                                        value={trans.details}
+                                        onChange={e => setSvcTransList(v => v.map((t, i) => i === ti ? { ...t, details: e.target.value } : t))}
+                                        placeholder="From/To details..."
+                                        className={`flex-1 px-3 py-1.5 border-2 ${!trans.details.trim() ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-xs font-bold text-black focus:border-indigo-500 transition-all`}
+                                      />
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="text-[10px] font-bold text-slate-400">$</span>
+                                        <input
+                                          type="number"
+                                          value={trans.price}
+                                          onChange={e => setSvcTransList(v => v.map((t, i) => i === ti ? { ...t, price: parseFloat(e.target.value) || 0 } : t))}
+                                          placeholder="Price"
+                                          className={`w-20 px-2 py-1.5 border-2 ${trans.price <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-xs font-bold text-black focus:border-indigo-500 transition-all`}
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                              <button
+                                type="button"
+                                onClick={() => setSvcTransList(v => [...v, { name: '', details: '', price: 0 }])}
+                                className="w-full py-1.5 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:border-indigo-300 hover:text-indigo-500 transition-all"
+                              >
+                                + Add Another Transfer
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Cooking Class */}
+                        <div className="space-y-2 pt-2 border-t border-slate-100">
+                          <div className="flex justify-between items-center">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={svcCooking} onChange={e => setSvcCooking(e.target.checked)} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
+                              <span className="text-sm font-bold text-slate-900">Cooking Class</span>
+                            </label>
+                            {svcCooking && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-slate-400">$</span>
+                                <input
+                                  type="number"
+                                  value={svcCookingPrice}
+                                  onChange={e => setSvcCookingPrice(parseFloat(e.target.value) || 0)}
+                                  placeholder="Price"
+                                  className={`w-24 px-3 py-1.5 border-2 ${svcCookingPrice <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-xs font-bold text-black focus:border-indigo-500 transition-all`}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Laundry */}
+                        <div className="space-y-2 pt-2 border-t border-slate-100">
+                          <div className="flex justify-between items-center">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={svcLaundry} onChange={e => setSvcLaundry(e.target.checked)} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
+                              <span className="text-sm font-bold text-slate-900">Laundry Service</span>
+                            </label>
+                            {svcLaundry && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-slate-400">$</span>
+                                <input
+                                  type="number"
+                                  value={svcLaundryPrice}
+                                  onChange={e => setSvcLaundryPrice(parseFloat(e.target.value) || 0)}
+                                  placeholder="Price"
+                                  className={`w-24 px-3 py-1.5 border-2 ${svcLaundryPrice <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-xs font-bold text-black focus:border-indigo-500 transition-all`}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <button
+                        onClick={handleSaveServices}
+                        disabled={loadingAction === 'saveservices'}
+                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-black rounded-xl transition-all disabled:opacity-60 flex items-center justify-center gap-2 shadow-lg shadow-indigo-100"
+                      >
+                        {loadingAction === 'saveservices' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '✓'}
+                        Update All Services
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Extra Services */}
               {(canCheckOut || sel.status === 'checked_in') && (userRole === 'Manager' || userRole === 'CEO') && (
                 <div className="border border-slate-200 rounded-xl p-4 space-y-3">
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Extra Services</p>
@@ -766,6 +1328,207 @@ export function GoogleGuestAgenda({
                       ))}
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Grand Total Tab */}
+              {(userRole === 'Manager' || userRole === 'CEO') && (
+                <div className="bg-indigo-600 rounded-2xl p-5 text-white shadow-xl shadow-indigo-200 animate-in fade-in zoom-in duration-500">
+                  <div className="flex justify-between items-center mb-4">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Final Tab (Total Sum)</p>
+                    <svg className="w-5 h-5 text-indigo-300 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center opacity-90 border-b border-white/20 pb-2 mb-2">
+                      <span className="font-bold">Accommodation</span>
+                      <span className="font-black">${svcAmount.toFixed(2)}</span>
+                    </div>
+                    
+                    {(() => {
+                      const sTotal = (
+                        (svcLunch ? svcLunchCount * (pricing?.lunch_price || 0) : 0) +
+                        (svcDinner ? svcDinnerCount * (pricing?.dinner_price || 0) : 0) +
+                        (svcGuide ? svcGuidePrice : 0) +
+                        (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0) +
+                        (svcLaundry ? svcLaundryPrice : 0) +
+                        (svcCooking ? svcCookingPrice : 0)
+                      );
+                      if (sTotal <= 0) return null;
+                      return (
+                        <div className="flex justify-between items-center opacity-90">
+                          <span className="font-bold">Services & Food</span>
+                          <span className="font-black">${sTotal.toFixed(2)}</span>
+                        </div>
+                      );
+                    })()}
+
+                    {(() => {
+                      const dTotal = Object.entries(selectedDrinks).reduce((sum, [id, qty]) => {
+                        const drink = drinks.find(d => d.id === parseInt(id));
+                        return sum + (qty * (drink?.sold_price || 0));
+                      }, 0);
+                      if (dTotal <= 0) return null;
+                      return (
+                        <div className="flex justify-between items-center opacity-90">
+                          <span className="font-bold">Drinks Tab</span>
+                          <span className="font-black">${dTotal.toFixed(2)}</span>
+                        </div>
+                      );
+                    })()}
+
+                    {(() => {
+                      const eTotal = extraServices.reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0);
+                      if (eTotal <= 0) return null;
+                      return (
+                        <div className="flex justify-between items-center opacity-90">
+                          <span className="font-bold">Extra Services</span>
+                          <span className="font-black">${eTotal.toFixed(2)}</span>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  <div className="mt-4 pt-4 border-t border-indigo-400 flex justify-between items-end">
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-widest text-indigo-300 leading-none mb-1">Grand Total</p>
+                      <p className="text-3xl font-black tracking-tighter leading-none">
+                        ${(
+                          svcAmount + 
+                          ((svcLunch ? svcLunchCount * (pricing?.lunch_price || 0) : 0) +
+                           (svcDinner ? svcDinnerCount * (pricing?.dinner_price || 0) : 0) +
+                           (svcGuide ? svcGuidePrice : 0) +
+                           (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0) +
+                           (svcLaundry ? svcLaundryPrice : 0) +
+                           (svcCooking ? svcCookingPrice : 0)) +
+                          Object.entries(selectedDrinks).reduce((sum, [id, qty]) => {
+                            const drink = drinks.find(d => d.id === parseInt(id));
+                            return sum + (qty * (drink?.sold_price || 0));
+                          }, 0) +
+                          extraServices.reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0)
+                        ).toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="bg-white/20 px-3 py-1.5 rounded-lg backdrop-blur-sm border border-white/10">
+                      <p className="text-[10px] font-bold text-indigo-100">USD</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Payment Collection */}
+              {(userRole === 'Manager' || userRole === 'CEO') && (
+                <div className="bg-white border-2 border-slate-100 rounded-2xl p-5 space-y-4 shadow-sm">
+                  <div className="flex justify-between items-center">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Payment Collection</p>
+                  </div>
+
+                  <div className="space-y-4">
+                    {svcPayList.map((pay, pi) => {
+                      const usdAmt = parseFloat(pay.amount) || 0;
+                      const currentRate = pay.currency === 'USD' ? 1 : (pay.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92));
+                      const guestPays = usdAmt * currentRate;
+
+                      return (
+                        <div key={pi} className="space-y-3 p-4 bg-slate-50/50 rounded-2xl border border-slate-100 animate-in slide-in-from-top-2 duration-300">
+                          <div className="flex justify-between items-center">
+                            <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">Payment {pi + 1}</label>
+                            {svcPayList.length > 1 && (
+                              <button onClick={() => setSvcPayList(v => v.filter((_, i) => i !== pi))} className="text-[10px] font-bold text-rose-500 hover:text-rose-700">✕ Remove</button>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-12 gap-3 items-end">
+                            {/* USD Target (Editable only for split payments) */}
+                            <div className="col-span-4 space-y-1.5">
+                              <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">
+                                {svcPayList.length === 1 ? 'Total Bill' : 'Amount (USD)'}
+                              </span>
+                              <div className="relative">
+                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">$</span>
+                                {svcPayList.length === 1 ? (
+                                  <div className="w-full pl-6 pr-2 py-2 bg-slate-100 border border-slate-200 rounded-xl text-sm font-black text-slate-600">
+                                    {usdAmt.toFixed(2)}
+                                  </div>
+                                ) : (
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={pay.amount}
+                                    onChange={e => {
+                                      setPayModified(true);
+                                      setSvcPayList(v => v.map((p, i) => i === pi ? { ...p, amount: e.target.value } : p));
+                                    }}
+                                    placeholder="0.00"
+                                    className="w-full pl-6 pr-2 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black text-black focus:border-indigo-500 outline-none"
+                                  />
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Currency Selector */}
+                            <div className="col-span-3 space-y-1.5">
+                              <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Pay in</span>
+                              <select 
+                                value={pay.currency}
+                                onChange={e => setSvcPayList(v => v.map((p, i) => i === pi ? { ...p, currency: e.target.value as any } : p))}
+                                className="w-full px-2 py-2 bg-white border border-slate-200 rounded-xl text-xs font-black text-indigo-600 outline-none"
+                              >
+                                <option value="USD">USD ($)</option>
+                                <option value="UZS">UZS (Sum)</option>
+                                <option value="EUR">EUR (€)</option>
+                              </select>
+                            </div>
+
+                            {/* Guest Pays (Result) */}
+                            <div className="col-span-5 space-y-1.5">
+                              <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Guest Pays</span>
+                              <div className="px-3 py-2 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-100 flex justify-between items-center">
+                                <span className="text-xs font-black truncate">
+                                  {guestPays.toLocaleString(undefined, { minimumFractionDigits: pay.currency === 'UZS' ? 0 : 2, maximumFractionDigits: pay.currency === 'UZS' ? 0 : 2 })}
+                                </span>
+                                <span className="text-[10px] font-black opacity-80">{pay.currency}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Rate Control (Only for non-USD) */}
+                          {pay.currency !== 'USD' && pricing && (
+                            <div className="flex items-center gap-3 pt-1">
+                              <div className="flex items-center gap-2 flex-1">
+                                <span className="text-[9px] font-black text-slate-400 uppercase whitespace-nowrap">1 USD =</span>
+                                <input
+                                  type="number"
+                                  value={pay.currency === 'UZS' ? pricing.usd_to_uzs : pricing.usd_to_eur}
+                                  onChange={e => {
+                                    const val = parseFloat(e.target.value) || 0;
+                                    setPricing(prev => prev ? { ...prev, [pay.currency === 'UZS' ? 'usd_to_uzs' : 'usd_to_eur']: val } : prev);
+                                  }}
+                                  className="w-24 px-2 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-black text-indigo-600 outline-none"
+                                />
+                                <span className="text-[9px] font-black text-slate-400 uppercase">{pay.currency}</span>
+                              </div>
+                              <button 
+                                onClick={() => fetchLiveRate(pay.currency as 'UZS' | 'EUR')}
+                                disabled={fetchingRate === pay.currency}
+                                className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[9px] font-black rounded-lg hover:bg-indigo-100 transition-all flex items-center gap-1 disabled:opacity-50"
+                              >
+                                {fetchingRate === pay.currency ? '...' : 'Live Rate'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    <button
+                      onClick={() => setSvcPayList(v => [...v, { amount: '', currency: 'USD' }])}
+                      className="w-full py-2 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:border-indigo-300 hover:text-indigo-500 transition-all flex items-center justify-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                      Add Another Currency
+                    </button>
+                  </div>
                 </div>
               )}
 

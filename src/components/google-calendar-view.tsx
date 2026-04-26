@@ -176,7 +176,7 @@ export function GoogleCalendarView({
       </div>
 
       {/* Search + Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4">
 
         {/* Left — Guest Search */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
