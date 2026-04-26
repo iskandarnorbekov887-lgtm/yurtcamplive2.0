@@ -530,7 +530,7 @@ export function GoogleGuestAgenda({
       setShowServices(true);
       return;
     }
-    if (svcGuide && (!svcGuideNames.trim() || svcGuidePrice <= 0)) {
+    if (svcGuide && (svcGuideNames.some(n => !n.trim()) || svcGuidePrice <= 0)) {
       flash('⚠ Please enter guide name and amount.');
       setShowServices(true);
       return;
