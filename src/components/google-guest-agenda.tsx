@@ -107,6 +107,8 @@ export function GoogleGuestAgenda({
   const [svcAdults, setSvcAdults] = useState(1);
   const [svcChildren, setSvcChildren] = useState(0);
   const [svcAmount, setSvcAmount] = useState(0);
+  const [showFinalReceipt, setShowFinalReceipt] = useState(false);
+
 
   const [pricing, setPricing] = useState<{ usd_to_uzs?: number; usd_to_eur?: number; guide_price?: number; lunch_price?: number; dinner_price?: number } | null>(null);
 
@@ -1001,16 +1003,17 @@ export function GoogleGuestAgenda({
                     </div>
                   )}
                   {canCheckOut && !editingDates && (
-                    <button onClick={handleCheckOut} disabled={loadingAction === 'checkout'}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-all disabled:opacity-60 flex items-center gap-2">
-                      {loadingAction === 'checkout' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '✓'}
-                      Check Out
+                    <button onClick={() => setShowFinalReceipt(true)} disabled={loadingAction === 'checkout'}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-all disabled:opacity-60 flex items-center gap-2 shadow-lg shadow-indigo-100">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                      Finalize & Paid
                     </button>
                   )}
                   {canCancel && !editingDates && (
                     <button onClick={handleCancel} disabled={loadingAction === 'cancel'}
                       className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-sm font-bold rounded-xl border border-red-200 transition-all disabled:opacity-60">Cancel Booking</button>
                   )}
+
                   {sel.status === 'confirmed' && sel.check_in < today && onUpdateBooking && !editingDates && (
                     <button onClick={async () => { if (!confirm(`Mark ${sel.guest_name} as No Arrival? This is PERMANENT and cannot be undone.`)) return; setLoadingAction('na'); try { await onUpdateBooking(sel.id, { status: 'no_arrival' } as Partial<Booking>); flash('Marked as No Arrival.'); } catch { flash('⚠ Failed.'); } finally { setLoadingAction(''); } }} disabled={loadingAction === 'na'}
                       className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-bold rounded-xl border border-gray-300 transition-all disabled:opacity-60">⊘ No Arrival</button>
@@ -1528,9 +1531,146 @@ export function GoogleGuestAgenda({
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
                       Add Another Currency
                     </button>
+
+                    <button
+                      onClick={() => setShowFinalReceipt(true)}
+                      className="w-full py-3 bg-indigo-600 text-white rounded-xl font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      Paid
+                    </button>
                   </div>
                 </div>
               )}
+
+              {/* Receipt / Confirmation Modal */}
+              {showFinalReceipt && sel && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+                  <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowFinalReceipt(false)} />
+                  <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+                    <div className="bg-indigo-600 px-6 py-8 text-white text-center relative">
+                      <div className="absolute top-4 right-4">
+                        <button onClick={() => setShowFinalReceipt(false)} className="text-white/60 hover:text-white transition-all text-2xl font-bold">×</button>
+                      </div>
+                      <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/30">
+                        <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      </div>
+                      <h3 className="text-xl font-black uppercase tracking-tight">Final Receipt</h3>
+                      <p className="text-indigo-200 text-xs font-bold uppercase tracking-widest mt-1">Payment Summary</p>
+                    </div>
+
+                    <div className="p-6 space-y-4">
+                      <div className="space-y-2 border-b border-slate-100 pb-4">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-slate-500 font-bold">Guest</span>
+                          <span className="text-slate-900 font-black">{sel.guest_name}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-slate-500 font-bold">Stay</span>
+                          <span className="text-slate-900 font-black">{sel.check_in} → {sel.check_out}</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Charges Breakdown</p>
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-slate-600">Accommodation</span>
+                            <span className="text-slate-900 font-bold">${svcAmount.toFixed(2)}</span>
+                          </div>
+                          {(() => {
+                             const sTotal = (
+                              (svcLunch ? svcLunchCount * (pricing?.lunch_price || 0) : 0) +
+                              (svcDinner ? svcDinnerCount * (pricing?.dinner_price || 0) : 0) +
+                              (svcGuide ? svcGuidePrice : 0) +
+                              (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0) +
+                              (svcLaundry ? svcLaundryPrice : 0) +
+                              (svcCooking ? svcCookingPrice : 0)
+                            );
+                            if (sTotal <= 0) return null;
+                            return (
+                              <div className="flex justify-between text-sm">
+                                <span className="text-slate-600">Services & Food</span>
+                                <span className="text-slate-900 font-bold">${sTotal.toFixed(2)}</span>
+                              </div>
+                            );
+                          })()}
+                          {(() => {
+                            const dTotal = Object.entries(selectedDrinks).reduce((sum, [id, qty]) => {
+                              const drink = drinks.find(d => d.id === parseInt(id));
+                              return sum + (qty * (drink?.sold_price || 0));
+                            }, 0);
+                            if (dTotal <= 0) return null;
+                            return (
+                              <div className="flex justify-between text-sm">
+                                <span className="text-slate-600">Drinks Tab</span>
+                                <span className="text-slate-900 font-bold">${dTotal.toFixed(2)}</span>
+                              </div>
+                            );
+                          })()}
+                          {(() => {
+                            const eTotal = extraServices.reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0);
+                            if (eTotal <= 0) return null;
+                            return (
+                              <div className="flex justify-between text-sm">
+                                <span className="text-slate-600">Extra Services</span>
+                                <span className="text-slate-900 font-bold">${eTotal.toFixed(2)}</span>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+
+                      <div className="bg-indigo-50 rounded-2xl p-4 space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Total Bill (USD)</span>
+                          <span className="text-xl font-black text-indigo-700">
+                            ${(
+                              svcAmount + 
+                              ((svcLunch ? svcLunchCount * (pricing?.lunch_price || 0) : 0) +
+                               (svcDinner ? svcDinnerCount * (pricing?.dinner_price || 0) : 0) +
+                               (svcGuide ? svcGuidePrice : 0) +
+                               (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0) +
+                               (svcLaundry ? svcLaundryPrice : 0) +
+                               (svcCooking ? svcCookingPrice : 0)) +
+                              Object.entries(selectedDrinks).reduce((sum, [id, qty]) => {
+                                const drink = drinks.find(d => d.id === parseInt(id));
+                                return sum + (qty * (drink?.sold_price || 0));
+                              }, 0) +
+                              extraServices.reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0)
+                            ).toFixed(2)}
+                          </span>
+                        </div>
+                        
+                        <div className="pt-2 border-t border-indigo-100">
+                          <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">Collected Money</p>
+                          <div className="space-y-1.5">
+                            {svcPayList.map((p, i) => (
+                              <div key={i} className="flex justify-between text-xs font-bold text-slate-700">
+                                <span>{p.currency}</span>
+                                <span>{parseFloat(p.amount || '0').toLocaleString(undefined, { minimumFractionDigits: p.currency === 'UZS' ? 0 : 2 })} {p.currency}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={async () => {
+                          setShowFinalReceipt(false);
+                          await handleCheckOut();
+                        }}
+                        disabled={loadingAction === 'checkout'}
+                        className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black uppercase tracking-widest transition-all shadow-xl shadow-emerald-100 flex items-center justify-center gap-2"
+                      >
+                        {loadingAction === 'checkout' ? <span className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin" /> : 'Confirm & Check Out'}
+                      </button>
+                      <p className="text-[10px] text-center text-slate-400 font-bold">This action is permanent and cannot be undone.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
 
               {(sel.notes || sel.description) && (
                 <div className="bg-slate-50 rounded-xl p-3">
