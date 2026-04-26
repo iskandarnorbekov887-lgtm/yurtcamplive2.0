@@ -812,18 +812,17 @@ export function GoogleGuestAgenda({
       const gTotal = (
         svcAmount + 
         ((svcLunch ? svcLunchCount * (pricing?.lunch_price || 0) : 0) +
-         (svcDinner ? svcDinnerCount * (pricing?.dinner_price || 0) : 0) +
-         (svcGuide ? svcGuidePrice : 0) +
-         (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0) +
-         (svcLaundry ? svcLaundryPrice : 0) +
-         (svcCooking ? svcCookingPrice : 0)) +
+        (svcDinner ? svcDinnerCount * (pricing?.dinner_price || 0) : 0) +
+        (svcGuide ? svcGuidePrice : 0) +
+        (svcLaundry ? svcLaundryPrice : 0) +
+        (svcCooking ? svcCookingPrice : 0)) +
         Object.entries(selectedDrinks).reduce((sum, [id, qty]) => {
-          const drink = drinks.find(d => d.id === parseInt(id));
-          return sum + (qty * (drink?.sold_price || 0));
+          const d = drinks.find(x => x.id === Number(id));
+          return sum + (d ? d.sold_price * (qty as number) : 0);
         }, 0) +
         extraServices.reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0)
       );
-      setSvcPayList([{ amount: gTotal.toString(), currency: 'USD' }]);
+      setSvcPayList([{ amount: gTotal.toString(), currency: 'USD', method: 'Cash' }]);
     }
   }, [svcAmount, svcLunch, svcLunchCount, svcDinner, svcDinnerCount, svcGuide, svcGuidePrice, svcTransport, svcTransList, svcLaundry, svcLaundryPrice, svcCooking, svcCookingPrice, selectedDrinks, extraServices, pricing, payModified]);
 
@@ -1082,8 +1081,6 @@ export function GoogleGuestAgenda({
                               await onUpdateBooking?.(sel.id, { check_in: editCheckIn, check_out: editCheckOut });
                               if (userRole === 'CEO') {
                                 flash('✓ Dates updated. ALERT: CEO has modified booking dates.');
-                                // Additional alert for CEO edits - could integrate with notification system here
-                                alert(`CEO EDIT NOTIFICATION:\n\nBooking: ${sel.guest_name}\nOld dates: ${sel.check_in} → ${sel.check_out}\nNew dates: ${editCheckIn} → ${editCheckOut}\n\nThis change has been recorded.`);
                               } else {
                                 flash('✓ Dates updated.');
                               }
@@ -1790,22 +1787,22 @@ export function GoogleGuestAgenda({
                             <span className="text-slate-600">Accommodation</span>
                             <span className="text-slate-900 font-bold">${svcAmount.toFixed(2)}</span>
                           </div>
-                          {sTotal > 0 && (
+                          {sTotal_calc > 0 && (
                             <div className="flex justify-between text-sm">
                               <span className="text-slate-600">Services & Food</span>
-                              <span className="text-slate-900 font-bold">${sTotal.toFixed(2)}</span>
+                              <span className="text-slate-900 font-bold">${sTotal_calc.toFixed(2)}</span>
                             </div>
                           )}
-                          {dTotal > 0 && (
+                          {dTotal_calc > 0 && (
                             <div className="flex justify-between text-sm">
                               <span className="text-slate-600">Drinks Tab</span>
-                              <span className="text-slate-900 font-bold">${dTotal.toFixed(2)}</span>
+                              <span className="text-slate-900 font-bold">${dTotal_calc.toFixed(2)}</span>
                             </div>
                           )}
-                          {eTotal > 0 && (
+                          {eTotal_calc > 0 && (
                             <div className="flex justify-between text-sm">
                               <span className="text-slate-600">Extra Services</span>
-                              <span className="text-slate-900 font-bold">${eTotal.toFixed(2)}</span>
+                              <span className="text-slate-900 font-bold">${eTotal_calc.toFixed(2)}</span>
                             </div>
                           )}
                         </div>
