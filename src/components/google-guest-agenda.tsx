@@ -1147,6 +1147,8 @@ export function GoogleGuestAgenda({
 
 
                         {/* Guide */}
+                        <div className="space-y-2 pt-2 border-t border-slate-100">
+                          <div className="flex justify-between items-center">
                             <label className="flex items-center gap-2 cursor-pointer">
                               <input type="checkbox" checked={svcGuide} onChange={e => {
                                 setSvcGuide(e.target.checked);
