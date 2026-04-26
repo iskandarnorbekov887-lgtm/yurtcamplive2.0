@@ -69,6 +69,7 @@ export function GoogleGuestAgenda({
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [eventsError, setEventsError] = useState('');
   const [selectedItem, setSelectedItem] = useState<ListItem | null>(null);
+  const sel = selectedItem?.booking ?? null;
 
   const [loadingAction, setLoadingAction] = useState('');
   const [drinks, setDrinks] = useState<Drink[]>([]);
@@ -583,7 +584,6 @@ export function GoogleGuestAgenda({
   const updateDayTransEntry = (dayIndex: number, ei: number, field: string, value: string) =>
     setDayEntries(prev => { const days = [...prev]; const ents = [...days[dayIndex].transEntries]; ents[ei] = { ...ents[ei], [field]: value }; days[dayIndex] = { ...days[dayIndex], transEntries: ents }; return days; });
 
-  const sel = selectedItem?.booking ?? null;
   const daysUntilCheckIn = sel
     ? Math.ceil((new Date(sel.check_in + 'T00:00:00').getTime() - new Date(today + 'T00:00:00').getTime()) / 86400000)
     : 999;
