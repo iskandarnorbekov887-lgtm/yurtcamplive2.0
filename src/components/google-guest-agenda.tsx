@@ -595,7 +595,7 @@ export function GoogleGuestAgenda({
       flash('⚠ Please enter quantity for selected meals.');
       return;
     }
-    if (svcGuide && (!svcGuideNames.trim() || svcGuidePrice <= 0)) {
+    if (svcGuide && (svcGuideNames.some(n => !n.trim()) || svcGuidePrice <= 0)) {
       flash('⚠ Please enter guide name and amount.');
       return;
     }
