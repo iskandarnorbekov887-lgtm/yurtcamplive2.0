@@ -1152,15 +1152,23 @@ export function GoogleGuestAgenda({
                             <label className="flex items-center gap-2 cursor-pointer">
                               <input type="checkbox" checked={svcGuide} onChange={e => {
                                 setSvcGuide(e.target.checked);
-                                if (e.target.checked && svcGuidePrice === 0) setSvcGuidePrice(pricing?.guide_price || 0);
+                                if (e.target.checked) setSvcGuidePrice(pricing?.guide_price || 0);
                               }} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
                               <span className="text-sm font-bold text-slate-900">Guide Service</span>
                             </label>
                             {svcGuide && (
                               <div className="flex items-center gap-2">
-                                <button type="button" onClick={() => setSvcGuidePrice(v => Math.max(0, v - 5))} className="w-6 h-6 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full font-black text-sm">－</button>
-                                <span className={`text-xs font-bold ${svcGuidePrice <= 0 ? 'text-rose-500' : 'text-slate-700'} min-w-[40px] text-center`}>${svcGuidePrice.toFixed(0)}</span>
-                                <button type="button" onClick={() => setSvcGuidePrice(v => v + 5)} className="w-6 h-6 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full font-black text-sm">＋</button>
+                                <button type="button" onClick={() => setSvcGuidePrice(v => Math.max(0, v - 5))} className="w-8 h-8 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-black text-sm transition-all shadow-sm">－</button>
+                                <div className="relative">
+                                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px]">$</span>
+                                  <input
+                                    type="number"
+                                    value={svcGuidePrice}
+                                    onChange={e => setSvcGuidePrice(parseFloat(e.target.value) || 0)}
+                                    className="w-20 pl-5 pr-2 py-1.5 bg-white border-2 border-slate-200 rounded-xl text-xs font-black text-indigo-600 focus:border-indigo-500 outline-none text-center"
+                                  />
+                                </div>
+                                <button type="button" onClick={() => setSvcGuidePrice(v => v + 5)} className="w-8 h-8 flex items-center justify-center bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl font-black text-sm transition-all shadow-sm">＋</button>
                               </div>
                             )}
                           </div>
