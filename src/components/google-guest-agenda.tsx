@@ -115,9 +115,33 @@ export function GoogleGuestAgenda({
   const [svcChildren, setSvcChildren] = useState(0);
   const [svcAmount, setSvcAmount] = useState(0);
   const [showFinalReceipt, setShowFinalReceipt] = useState(false);
-
-
+  
   const [pricing, setPricing] = useState<{ usd_to_uzs?: number; usd_to_eur?: number; guide_price?: number; lunch_price?: number; dinner_price?: number } | null>(null);
+
+  // Calculate totals at top level for scope availability
+  const sTotal_calc = (
+    (svcLunch ? svcLunchCount * (pricing?.lunch_price || 0) : 0) +
+    (svcDinner ? svcDinnerCount * (pricing?.dinner_price || 0) : 0) +
+    (svcGuide ? svcGuidePrice : 0) +
+    (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0) +
+    (svcLaundry ? svcLaundryPrice : 0) +
+    (svcCooking ? svcCookingPrice : 0)
+  );
+  const dTotal_calc = Object.entries(selectedDrinks).reduce((sum, [id, qty]) => {
+    const drink = drinks.find(d => d.id === parseInt(id));
+    return sum + (qty * (drink?.sold_price || 0));
+  }, 0);
+  const eTotal_calc = extraServices.reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0);
+  const gTotal = svcAmount + sTotal_calc + dTotal_calc + eTotal_calc;
+  
+  const tPaidUsd = svcPayList.reduce((sum, p) => {
+    const amt = parseFloat(p.amount) || 0;
+    if (p.currency === 'USD') return sum + amt;
+    const rate = p.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92);
+    return sum + (amt / rate);
+  }, 0);
+  
+  const balance = gTotal - tPaidUsd;
 
   const today = localDateStr(new Date());
 
@@ -946,31 +970,6 @@ export function GoogleGuestAgenda({
           ) : (
             <div className="p-5 space-y-4">
               {(() => {
-                // Pre-calculate totals for use in UI
-                const sTotal = (
-                  (svcLunch ? svcLunchCount * (pricing?.lunch_price || 0) : 0) +
-                  (svcDinner ? svcDinnerCount * (pricing?.dinner_price || 0) : 0) +
-                  (svcGuide ? svcGuidePrice : 0) +
-                  (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0) +
-                  (svcLaundry ? svcLaundryPrice : 0) +
-                  (svcCooking ? svcCookingPrice : 0)
-                );
-                const dTotal = Object.entries(selectedDrinks).reduce((sum, [id, qty]) => {
-                  const drink = drinks.find(d => d.id === parseInt(id));
-                  return sum + (qty * (drink?.sold_price || 0));
-                }, 0);
-                const eTotal = extraServices.reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0);
-                const gTotal = svcAmount + sTotal + dTotal + eTotal;
-                
-                const tPaidUsd = svcPayList.reduce((sum, p) => {
-                  const amt = parseFloat(p.amount) || 0;
-                  if (p.currency === 'USD') return sum + amt;
-                  const rate = p.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92);
-                  return sum + (amt / rate);
-                }, 0);
-                
-                const balance = gTotal - tPaidUsd;
-
                 return (
                   <>
                   <div className="flex items-start justify-between">
