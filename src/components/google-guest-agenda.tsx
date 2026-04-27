@@ -1515,25 +1515,6 @@ export function GoogleGuestAgenda({
                       ⏰ Coming in {daysUntilCheckIn} day{daysUntilCheckIn !== 1 ? 's' : ''}
                     </div>
                   )}
-                  {canCheckOut && sel?.status !== 'completed' && !editingDates && (
-                    <button 
-                      onClick={() => {
-                        const hasAnyCharges = gTotal > 0.01 || isPrepaid;
-                        if (!hasAnyCharges && (sel.collected_amount || 0) === 0) {
-                          flash('⚠ No charges to settle. Add services or set a stay price first.');
-                          setShowServices(true);
-                          return;
-                        }
-                        setSelectedReceipt(null);
-                        setShowFinalReceipt(true);
-                      }} 
-                      disabled={loadingAction === 'checkout'}
-                      className={`px-4 py-2 text-white text-sm font-bold rounded-xl transition-all flex items-center gap-2 shadow-lg bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100`}
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                      Finalize & Paid
-                    </button>
-                  )}
                   {canCancel && !editingDates && (
                     <button onClick={handleCancel} disabled={loadingAction === 'cancel'}
                       className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-sm font-bold rounded-xl border border-red-200 transition-all disabled:opacity-60">Cancel Booking</button>
