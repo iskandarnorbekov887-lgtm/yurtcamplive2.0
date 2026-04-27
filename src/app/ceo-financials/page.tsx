@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ProtectedRoute } from '@/components/protected-route';
-import { supabase, type Finance, type Booking, type BookingReceipt, clearTestReceipts, deleteReceiptById } from '@/lib/supabase';
+import { supabase, type Finance, type Booking, type BookingReceipt, clearTestReceipts, deleteReceiptById, findBookingWithReceipt } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
@@ -173,6 +173,23 @@ function CEOFinancialCalendar() {
                 onChange={(e) => setReceiptToDelete(e.target.value.toUpperCase())}
                 className="px-3 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-xs font-black text-slate-900 focus:border-indigo-500 outline-none w-40"
               />
+              <button
+                onClick={async () => {
+                  if (!receiptToDelete.trim()) {
+                    alert('Please enter a Receipt ID');
+                    return;
+                  }
+                  const found = await findBookingWithReceipt(receiptToDelete);
+                  if (found.length > 0) {
+                    alert(`Found in ${found.length} booking(s):\n\n${found.map(b => `Booking #${b.booking_id}: ${b.guest_name} (${b.receipt_count} receipts)`).join('\n')}`);
+                  } else {
+                    alert(`Receipt ${receiptToDelete} not found in any booking's special_requests. Check booking_receipts table directly.`);
+                  }
+                }}
+                className="px-3 py-2.5 bg-blue-600/90 hover:bg-blue-600 rounded-xl text-xs font-black transition-all shadow-lg hover:shadow-blue-500/20 active:scale-95"
+              >
+                Find
+              </button>
               <button
                 onClick={async () => {
                   if (!receiptToDelete.trim()) {

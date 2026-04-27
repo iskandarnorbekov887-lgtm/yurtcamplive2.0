@@ -213,11 +213,11 @@ export async function deleteReceiptById(receiptId: string) {
       .from('booking_receipts')
       .delete()
       .eq('receipt_id', receiptId);
-    
+
     if (dbError) {
       console.error('Error deleting from booking_receipts:', dbError);
     }
-    
+
     // Remove from special_requests in bookings table
     const { data: bookings } = await supabase.from('bookings').select('id, special_requests');
     if (bookings) {
@@ -228,7 +228,7 @@ export async function deleteReceiptById(receiptId: string) {
               ? JSON.parse(booking.special_requests || '{}')
               : (booking.special_requests || {});
             const meta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
-            
+
             if (meta.settled_receipts && meta.settled_receipts.length > 0) {
               const filtered = meta.settled_receipts.filter((r: any) => r.id !== receiptId);
               if (filtered.length !== meta.settled_receipts.length) {
@@ -245,11 +245,59 @@ export async function deleteReceiptById(receiptId: string) {
         }
       }
     }
-    
+
     console.log(`Receipt ${receiptId} deleted from both locations`);
     return true;
   } catch (error) {
     console.error('Failed to delete receipt:', error);
     return false;
   }
+}
+
+// SQL queries to manually delete receipts (run in Supabase SQL Editor)
+export const SQL_DELETE_RECEIPTS = {
+  // Delete from booking_receipts table
+  deleteFromBookingReceipts: (receiptId: string) =>
+    `DELETE FROM booking_receipts WHERE receipt_id = '${receiptId}';`,
+
+  // Delete from special_requests (more complex - need to update JSON)
+  // Run this for each booking that has the receipt in special_requests
+  clearSettledReceipts:
+    `UPDATE bookings
+     SET special_requests = special_requests::jsonb - 'settled_receipts'
+     WHERE special_requests::jsonb ? 'settled_receipts';`
+};
+
+// Function to find which booking contains a specific receipt
+export async function findBookingWithReceipt(receiptId: string) {
+  const { data: bookings } = await supabase.from('bookings').select('id, guest_name, special_requests');
+  const found: any[] = [];
+
+  if (bookings) {
+    for (const booking of bookings) {
+      if (booking.special_requests) {
+        try {
+          const parsed = typeof booking.special_requests === 'string'
+            ? JSON.parse(booking.special_requests || '{}')
+            : (booking.special_requests || {});
+          const meta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
+
+          if (meta.settled_receipts && meta.settled_receipts.length > 0) {
+            const hasReceipt = meta.settled_receipts.some((r: any) => r.id === receiptId);
+            if (hasReceipt) {
+              found.push({
+                booking_id: booking.id,
+                guest_name: booking.guest_name,
+                receipt_count: meta.settled_receipts.length
+              });
+            }
+          }
+        } catch {
+          // Skip if parsing fails
+        }
+      }
+    }
+  }
+
+  return found;
 }
