@@ -210,6 +210,17 @@ function CEOFinancialCalendar() {
                 Delete
               </button>
             </div>
+            <button
+              onClick={() => {
+                if (!confirm('⚠️ WARNING: This will clear ALL local storage data (bookings, payments, expenses, etc.). This cannot be undone. Continue?')) return;
+                localStorage.clear();
+                alert('Local storage cleared. Refresh the page.');
+                window.location.reload();
+              }}
+              className="px-5 py-2.5 bg-red-600/90 hover:bg-red-600 rounded-xl text-xs font-black transition-all shadow-lg hover:shadow-red-500/20 active:scale-95"
+            >
+              Clear Local Storage
+            </button>
             <LanguageSwitcher variant="light" />
             <button
               onClick={signOut}
