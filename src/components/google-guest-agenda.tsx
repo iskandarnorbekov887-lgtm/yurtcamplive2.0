@@ -1355,42 +1355,34 @@ export function GoogleGuestAgenda({
                             type="date"
                             value={editCheckOut}
                             onChange={e => {
-                              setEditCheckOut(e.target.value);
-                              if ((sel.collected_amount || 0) > 0 && e.target.value !== sel.check_out) {
-                                // Reset adjustment when date changes if desired, or leave it
-                              }
+                              const v = e.target.value;
+                              setEditCheckOut(v);
+                              if (v === sel.check_out) setDateAdjAmount('');
                             }}
                             className="w-full px-2 py-1.5 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 text-black"
                           />
                         </div>
                       </div>
 
-                      {editCheckOut !== sel.check_out && (
+                      {editCheckOut > sel.check_out && (
                         <div className="pt-2 border-t border-slate-200 animate-in fade-in slide-in-from-top-1">
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-tight mb-1 block">
-                            {editCheckOut > sel.check_out ? 'Stay Extension Price (USD)' : 'Adjust Total Stay Price (USD)'}
+                            Stay Extension Price (USD)
                           </label>
                           <div className="relative">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">
-                              {editCheckOut > sel.check_out ? '+' : '$'}
+                              +
                             </span>
                             <input
                               type="number"
                               value={dateAdjAmount}
                               onChange={e => setDateAdjAmount(e.target.value)}
-                              onFocus={() => {
-                                if (editCheckOut < sel.check_out && !dateAdjAmount) {
-                                  setDateAdjAmount((sel.total_price || 0).toString());
-                                }
-                              }}
-                              placeholder={editCheckOut > sel.check_out ? "0.00" : (sel.total_price || 0).toString()}
+                              placeholder="0.00"
                               className="w-full pl-7 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-black text-black focus:border-indigo-500 outline-none transition-all"
                             />
                           </div>
                           <p className="text-[8px] text-slate-400 font-bold mt-1 uppercase italic">
-                            {editCheckOut > sel.check_out 
-                              ? "* This amount will be added to the guest's total bill." 
-                              : `* Current total is $${sel.total_price}. Edit this to reflect the shortened stay price.`}
+                            * This amount will be added to the current open tab as Accommodation.
                           </p>
                         </div>
                       )}
@@ -1402,28 +1394,23 @@ export function GoogleGuestAgenda({
                             setLoadingAction('editdates');
                             try {
                               const adj = parseFloat(dateAdjAmount) || 0;
+                              const isExtension = editCheckOut > sel.check_out;
                               const updates: Partial<Booking> = { 
                                 check_in: editCheckIn, 
                                 check_out: editCheckOut,
                                 last_edited_at: new Date().toISOString()
                               };
 
-                              if ((sel.collected_amount || 0) > 0 && adj !== 0) {
-                                if (editCheckOut > sel.check_out) {
-                                  // Extension: add to total_price, status remains checked_in
+                              if (isExtension) {
+                                if (adj > 0) {
                                   updates.total_price = (sel.total_price || 0) + adj;
-                                  // We don't automatically mark as paid, so they can settle it later
-                                  flash(`✓ Extended to ${editCheckOut}. $${adj} added to bill.`);
+                                  setSvcAmount(v => (parseFloat(String(v)) || 0) + adj);
+                                  flash(`✓ Extended to ${editCheckOut}. +$${adj} added to Open Tab (Accommodation).`);
                                 } else {
-                                  // Shorten: update total_price to the new total? 
-                                  // The user says "editable last charged price for stay".
-                                  // If they enter a value, let's assume it's the NEW total price or a reduction.
-                                  // To be safe, if it's less than current total, we update it.
-                                  updates.total_price = adj; // Assuming adj is the NEW total
-                                  flash(`✓ Shortened to ${editCheckOut}. Bill adjusted to $${adj}.`);
+                                  flash(`✓ Extended to ${editCheckOut}.`);
                                 }
                               } else {
-                                flash('✓ Dates updated and synced with Calendar.');
+                                flash('✓ Dates updated.');
                               }
 
                                 const currentMeta = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
