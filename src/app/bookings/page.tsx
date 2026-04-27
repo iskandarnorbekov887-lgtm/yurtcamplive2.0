@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ProtectedRoute } from '@/components/protected-route';
-import { supabase, type Booking, type Yurt } from '@/lib/supabase';
+import { supabase, type Booking } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
@@ -23,7 +23,6 @@ function ReserverPortal() {
   const currentUserId = user?.id;
   const userRole = user?.role as UserRole;
   const { t } = useLanguage();
-  const [yurts, setYurts] = useState<Yurt[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [showIncomeForm, setShowIncomeForm] = useState(false);
@@ -41,7 +40,7 @@ function ReserverPortal() {
     
     // Listen for localStorage changes from other tabs for instant sync
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'camp_bookings' || e.key === 'camp_yurts') {
+      if (e.key === 'camp_bookings') {
         fetchData();
       }
     };
@@ -55,11 +54,7 @@ function ReserverPortal() {
 
   const fetchData = async () => {
     try {
-      const [{ data: yurtsData }, { data: bookingsData }] = await Promise.all([
-        supabase.from('yurts').select('*'),
-        supabase.from('bookings').select('*'),
-      ]);
-      setYurts(yurtsData || []);
+      const { data: bookingsData } = await supabase.from('bookings').select('*');
       setBookings(bookingsData || []);
       console.log('🔄 Reserver Fetched bookings:', bookingsData?.length);
     } catch (err) {
@@ -109,7 +104,6 @@ function ReserverPortal() {
       <main className="p-8 max-w-7xl mx-auto w-full space-y-8">
         <OccupancyCalendar 
           bookings={bookings} 
-          yurts={yurts} 
           userRole={userRole}
           currentUserId={currentUserId}
           onCancelBooking={cancelBooking}
@@ -122,7 +116,6 @@ function ReserverPortal() {
             <thead className="bg-slate-50 border-b border-slate-100">
               <tr>
                 <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('table.name')}</th>
-                <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('table.yurt')}</th>
                 <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('table.dates')}</th>
                 <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('table.status')}</th>
                 <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('table.price')}</th>
@@ -132,7 +125,6 @@ function ReserverPortal() {
               {bookings.map((booking) => (
                 <tr key={booking.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
                   <td className="px-8 py-4 font-semibold text-slate-800">{booking.guest_name}</td>
-                  <td className="px-8 py-4 text-slate-600">{booking.yurt?.name || `Yurt ${booking.yurt_id}`}</td>
                   <td className="px-8 py-4 text-slate-600 text-sm">
                     {new Date(booking.check_in).toLocaleDateString()} - {new Date(booking.check_out).toLocaleDateString()}
                   </td>

@@ -1,12 +1,11 @@
 // LocalStorage-based mock Supabase client for offline development
 // Switch to real Supabase by replacing this with the real client in supabase.ts
 
-import type { Profile, Yurt, Booking, Finance, Payment } from './supabase';
+import type { Profile, Booking, Finance, Payment } from './supabase';
 
 const STORAGE_KEYS = {
   users: 'camp_users',
   profiles: 'camp_profiles',
-  yurts: 'camp_yurts',
   bookings: 'camp_bookings',
   expenses: 'camp_expenses',
   camp_finances: 'camp_finances',
@@ -63,20 +62,6 @@ const initDefaultData = () => {
 
   localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(users));
   localStorage.setItem(STORAGE_KEYS.profiles, JSON.stringify(profiles));
-
-  
-  // Create default yurts if they don't exist
-  const existingYurts = JSON.parse(localStorage.getItem(STORAGE_KEYS.yurts) || '[]');
-  if (existingYurts.length === 0) {
-    const defaultYurts: Yurt[] = [
-      { id: 1, name: 'Yurt #1', status: 'Clean', type: 'Standard', capacity: 4 },
-      { id: 2, name: 'Yurt #2', status: 'Clean', type: 'Standard', capacity: 4 },
-      { id: 3, name: 'Yurt #3', status: 'Clean', type: 'Standard', capacity: 4 },
-      { id: 4, name: 'Yurt #4', status: 'Clean', type: 'Premium', capacity: 2 },
-      { id: 5, name: 'Yurt #5', status: 'Maintenance', type: 'Standard', capacity: 4 },
-    ];
-    localStorage.setItem(STORAGE_KEYS.yurts, JSON.stringify(defaultYurts));
-  }
 
   // No hardcoded example bookings - start with empty bookings
   // Data will only come from the database (or user-created bookings)

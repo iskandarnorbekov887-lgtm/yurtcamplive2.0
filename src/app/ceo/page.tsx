@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ProtectedRoute } from '@/components/protected-route';
-import { supabase, type Yurt, type Booking, type Profile, type Finance, type Notification } from '@/lib/supabase';
+import { supabase, type Booking, type Profile, type Finance, type Notification } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
@@ -22,7 +22,6 @@ function CEODashboard() {
   const currentUserId = user?.id;
   const userRole = user?.role as UserRole;
   const { t } = useLanguage();
-  const [yurts, setYurts] = useState<Yurt[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [staff, setStaff] = useState<Profile[]>([]);
   const [activeTab, setActiveTab] = useState<'checkin' | 'team' | 'financials' | 'pricing'>('checkin');
@@ -78,8 +77,8 @@ function CEODashboard() {
     
     // Listen for localStorage changes from other tabs for instant sync
     const handleStorageChange = (e: StorageEvent) => {
-      console.log('🔔 CEO Storage event:', e.key);
-      if (e.key === 'camp_bookings' || e.key === 'camp_yurts' || e.key === 'camp_profiles') {
+      console.log(' CEO Storage event:', e.key);
+      if (e.key === 'camp_bookings' || e.key === 'camp_profiles') {
         fetchData();
       }
     };
@@ -94,8 +93,7 @@ function CEODashboard() {
 
   const fetchData = async () => {
     try {
-      const [yurtsData, bookingsData, staffData, notificationsData] = await Promise.all([
-        supabase.from('yurts').select('*'),
+      const [bookingsData, staffData, notificationsData] = await Promise.all([
         supabase.from('bookings').select('*'),
         supabase.from('profiles').select('*'),
         supabase.from('notifications').select('*').eq('user_id', currentUserId || '').order('created_at', { ascending: false })
@@ -114,7 +112,6 @@ function CEODashboard() {
         return Array.from(map.values());
       };
 
-      setYurts(deDuplicate(yurtsData.data));
       setBookings(deDuplicate(bookingsData.data));
       setStaff(staffData.data || []);
       setNotifications((notificationsData.data || []).slice(0, 10));
@@ -446,7 +443,6 @@ function CEODashboard() {
           <div className="animate-in fade-in duration-500">
             <GoogleGuestAgenda
               bookings={bookings}
-              yurts={yurts}
               userRole={userRole}
               currentUserId={currentUserId}
               onCancelBooking={handleCancelBooking}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ProtectedRoute } from '@/components/protected-route';
-import { supabase, type Booking, type Yurt } from '@/lib/supabase';
+import { supabase, type Booking } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
@@ -29,7 +29,6 @@ function CookPortal() {
   const { user, signOut } = useAuth();
   const { t } = useLanguage();
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [yurts, setYurts] = useState<Yurt[]>([]);
   const [activeTab, setActiveTab] = useState<'orders' | 'grocery' | 'calendar'>('orders');
   const [groceryItems, setGroceryItems] = useState<string[]>(['']);
   const [sentToManager, setSentToManager] = useState(false);
@@ -41,7 +40,7 @@ function CookPortal() {
     
     // Listen for localStorage changes from other tabs for instant sync
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'camp_bookings' || e.key === 'camp_yurts') {
+      if (e.key === 'camp_bookings') {
         fetchData();
       }
     };
@@ -54,13 +53,8 @@ function CookPortal() {
   }, []);
 
   const fetchData = async () => {
-    const [{ data: bookingsData }, { data: yurtsData }] = await Promise.all([
-      supabase.from('bookings').select('*'),
-      supabase.from('yurts').select('*'),
-    ]);
-    
+    const { data: bookingsData } = await supabase.from('bookings').select('*');
     setBookings(bookingsData || []);
-    setYurts(yurtsData || []);
   };
 
   const today = new Date().toISOString().split('T')[0];
@@ -80,10 +74,6 @@ function CookPortal() {
       const now = new Date();
       return checkIn <= now && checkOut >= now && b.status === 'confirmed';
     });
-  };
-
-  const getYurtName = (yurtId: number) => {
-    return yurts.find(y => y.id === yurtId)?.name || `Yurt #${yurtId}`;
   };
 
   const handleAddGroceryItem = () => {
@@ -173,7 +163,7 @@ function CookPortal() {
                     <div key={booking.id} className="bg-white rounded-lg p-4 border border-yellow-200">
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="font-bold text-gray-900">{getYurtName(booking.yurt_id || 0)} - {booking.guest_name}</p>
+                          <p className="font-bold text-gray-900">Booking #{booking.id} - {booking.guest_name}</p>
                           <p className="text-sm text-gray-600 mt-1">{booking.meal_notes}</p>
                         </div>
                       </div>
@@ -199,7 +189,7 @@ function CookPortal() {
                       className={`border-2 rounded-xl p-6 ${booking.meal_notes ? 'border-yellow-300 bg-yellow-50' : 'border-orange-200 bg-orange-50'}`}
                     >
                       <div className="text-4xl font-bold text-orange-800 mb-2">
-                        {getYurtName(booking.yurt_id || 0)}
+                        #{booking.id}
                       </div>
                       <p className="text-gray-900 font-medium text-lg">{booking.guest_name}</p>
                       <p className="text-sm text-gray-700 mt-2">

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
-import { supabase, type Booking, type Yurt, type UserRole, type Drink } from '@/lib/supabase';
+import { supabase, type Booking, type UserRole, type Drink } from '@/lib/supabase';
 import { PrivateCalendarView } from '@/components/private-calendar-view';
 
 interface CalEvent {
@@ -47,15 +47,14 @@ interface ListItem {
 
 interface Props {
   bookings: Booking[];
-  yurts: Yurt[];
   userRole?: UserRole;
   currentUserId?: string;
   onCheckIn?: (id: number) => Promise<void> | void;
   onCheckOut?: (id: number) => Promise<void> | void;
-  onUpdateBooking?: (id: number, updates: Partial<Booking>) => Promise<void> | void;
+  onUpdateBooking?: (id: number, data: Partial<Booking>) => Promise<void> | void;
   onCancelBooking?: (id: number) => Promise<void> | void;
-  onAddNewBooking?: (date: string) => void;
-  onRefresh?: () => void;
+  onAddNewBooking?: (data: Partial<Booking>) => Promise<void> | void;
+  onRefresh?: () => Promise<void> | void;
 }
 
 function localDateStr(d: Date) {
@@ -70,7 +69,7 @@ const formatSpace = (num: number, decimals = 2) => {
 };
 
 export function GoogleGuestAgenda({
-  bookings, yurts, userRole, currentUserId, onCheckIn, onCheckOut, onUpdateBooking, onCancelBooking, onAddNewBooking, onRefresh,
+  bookings, userRole, currentUserId, onCheckIn, onCheckOut, onUpdateBooking, onCancelBooking, onAddNewBooking, onRefresh,
 }: Props) {
   const [gcEvents, setGcEvents] = useState<CalEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
@@ -387,9 +386,6 @@ export function GoogleGuestAgenda({
 
 
 
-  const getYurtName = (b: Booking) =>
-    yurts.find(y => y.id === b.yurt_id)?.name || (b.yurt_id ? `Yurt #${b.yurt_id}` : '—');
-
   const isGcCancelled = (ev: CalEvent) =>
     ev.status === 'cancelled' || ev.colorId === '11' || ev.colorId === '4' ||
     (ev.summary?.toLowerCase() ?? '').includes('cancel');
@@ -472,7 +468,7 @@ export function GoogleGuestAgenda({
                 {item.name}
               </p>
               <p className="text-xs text-slate-400 mt-0.5">{item.start} → {item.end}</p>
-              {booking ? <p className="text-xs text-slate-500">{getYurtName(booking)}</p> : <p className="text-xs text-slate-400">calendar only</p>}
+              {booking ? <p className="text-xs text-slate-500">Booking</p> : <p className="text-xs text-slate-400">calendar only</p>}
             </div>
             <div className="flex flex-col items-end gap-1 shrink-0">
               {isCancelled
@@ -801,9 +797,7 @@ export function GoogleGuestAgenda({
   const daysUntilCheckIn = sel
     ? Math.ceil((new Date(sel.check_in + 'T00:00:00').getTime() - new Date(today + 'T00:00:00').getTime()) / 86400000)
     : 999;
-  const isGracePeriodActive = sel?.status === 'completed' && sel?.last_edited_at && (
-    (new Date().getTime() - new Date(sel.last_edited_at).getTime()) < (60 * 60 * 1000)
-  );
+  const isGracePeriodActive = false;
 
   const canCheckIn = sel?.status === 'confirmed' && daysUntilCheckIn <= 2 && !!onCheckIn;
   const isComingSoon = sel?.status === 'confirmed' && daysUntilCheckIn > 2;
@@ -1243,7 +1237,7 @@ export function GoogleGuestAgenda({
                   <div className="flex items-start justify-between">
                 <div>
                   <h2 className="text-xl font-black text-slate-900">{sel.guest_name}</h2>
-                  <p className="text-sm text-slate-500 mt-0.5">{getYurtName(sel)} · {sel.check_in} → {sel.check_out}{sel.nights ? ` · ${sel.nights}n` : ''}{(sel.guest_count || sel.number_of_people) ? ` · ${sel.guest_count || sel.number_of_people} pax` : ''}</p>
+                  <p className="text-sm text-slate-500 mt-0.5">{sel.check_in} → {sel.check_out}{sel.nights ? ` · ${sel.nights}n` : ''}{(sel.guest_count || sel.number_of_people) ? ` · ${sel.guest_count || sel.number_of_people} pax` : ''}</p>
                 </div>
                 <div className="flex flex-col items-end gap-2">
                   {(sel.notes || sel.description) && (
@@ -1450,9 +1444,8 @@ export function GoogleGuestAgenda({
                               const adj = parseFloat(dateAdjAmount) || 0;
                               const isExtension = editCheckOut > sel.check_out;
                               const updates: Partial<Booking> = { 
-                                check_in: editCheckIn, 
-                                check_out: editCheckOut,
-                                last_edited_at: new Date().toISOString()
+                                check_in: editCheckIn,
+                                check_out: editCheckOut
                               };
 
                               if (isExtension) {

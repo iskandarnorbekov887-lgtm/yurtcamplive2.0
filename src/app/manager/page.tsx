@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { ProtectedRoute } from '@/components/protected-route';
-import { supabase, type Yurt, type Booking } from '@/lib/supabase';
+import { supabase, type Booking } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
@@ -23,7 +23,6 @@ function ManagerPortal() {
   const currentUserId = user?.id;
   const userRole = user?.role as UserRole;
   const { t } = useLanguage();
-  const [yurts, setYurts] = useState<Yurt[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [activeTab, setActiveTab] = useState<'checkin' | 'bookings' | 'financials'>('checkin');
   const [pendingBookings, setPendingBookings] = useState<Booking[]>([]);
@@ -38,7 +37,7 @@ function ManagerPortal() {
     
     // Listen for localStorage changes from other tabs for instant sync
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'camp_bookings' || e.key === 'camp_yurts') {
+      if (e.key === 'camp_bookings') {
         fetchData();
       }
     };
@@ -51,12 +50,10 @@ function ManagerPortal() {
   }, []);
 
   const fetchData = async () => {
-    const [{ data: yurtsData }, { data: bookingsData }, { data: pendingData }] = await Promise.all([
-      supabase.from('yurts').select('*'),
+    const [{ data: bookingsData }, { data: pendingData }] = await Promise.all([
       supabase.from('bookings').select('*'),
-      supabase.from('bookings').select('*, yurt:yurts(*)').eq('status', 'pending'),
+      supabase.from('bookings').select('*').eq('status', 'pending'),
     ]);
-    setYurts(yurtsData || []);
     setBookings(bookingsData || []);
     setPendingBookings(pendingData || []);
     console.log('🔄 Manager Fetched bookings:', bookingsData?.length);
@@ -93,11 +90,6 @@ function ManagerPortal() {
   };
 
 
-
-  const updateYurtStatus = async (yurtId: number, status: string) => {
-    await supabase.from('yurts').update({ status }).eq('id', yurtId);
-    fetchData();
-  };
 
   const today = new Date().toISOString().split('T')[0];
   const now = new Date();
@@ -162,7 +154,6 @@ function ManagerPortal() {
           <div className="animate-in fade-in duration-500">
             <GoogleGuestAgenda
               bookings={bookings}
-              yurts={yurts}
               userRole={userRole}
               currentUserId={currentUserId}
               onCheckIn={checkIn}
@@ -217,7 +208,7 @@ function ManagerPortal() {
                       <div className="flex justify-between items-start">
                         <div>
                           <p className="font-bold text-gray-900">{booking.guest_name}</p>
-                          <p className="text-sm text-gray-700">{booking.yurt?.name || `Yurt ${booking.yurt_id}`}</p>
+                          <p className="text-sm text-gray-700">Booking #{booking.id}</p>
                           <p className="text-sm text-red-600 font-medium">
                             Check-in: {booking.check_in}
                           </p>
@@ -245,7 +236,7 @@ function ManagerPortal() {
                       <div className="flex justify-between items-start mb-2">
                         <div>
                           <p className="font-bold text-gray-900">{booking.guest_name}</p>
-                          <p className="text-sm text-gray-700">{booking.yurt?.name}</p>
+                          <p className="text-sm text-gray-700">Booking #{booking.id}</p>
                           <p className="text-sm text-gray-600">
                             {booking.check_in} → {booking.check_out}
                           </p>

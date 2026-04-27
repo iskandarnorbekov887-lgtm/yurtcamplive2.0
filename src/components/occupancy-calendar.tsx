@@ -2,11 +2,10 @@
 
 import { useState } from 'react';
 import { useLanguage } from '@/lib/language-context';
-import type { Booking, Yurt, UserRole, Profile } from '@/lib/supabase';
+import type { Booking, UserRole, Profile } from '@/lib/supabase';
 
 interface Props { 
   bookings: Booking[]; 
-  yurts: Yurt[]; 
   userRole: UserRole;
   currentUserId?: string;
   staff?: Profile[];
@@ -95,11 +94,11 @@ function color(b: Booking, today: string) {
     case 'no-arrival':
       return { bg: '#9CA3AF', text: '#374151' }; // Gray
     default:
-      return PALETTE[(b.yurt_id || 0) % PALETTE.length];
+      return PALETTE[(b.id || 0) % PALETTE.length];
   }
 }
 
-export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, staff, onCancelBooking, onCheckIn, onCheckOut, onUpdateBooking, onAddNewBooking }: Props) {
+export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, onCancelBooking, onCheckIn, onCheckOut, onUpdateBooking, onAddNewBooking }: Props) {
   const { t } = useLanguage();
   const [cur, setCur]   = useState(new Date());
   const [sel, setSel]   = useState<Booking | null>(null);
@@ -124,7 +123,7 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
   const confirmed = bookings.filter(b => b.status === 'confirmed' || b.status === 'checked_in');
   const completed = bookings.filter(b => b.status === 'completed');
   const cancelled = bookings.filter(b => b.status === 'cancelled');
-  const totalYurts = yurts.filter(y => y.status !== 'Maintenance').length;
+  const totalYurts = 0;
 
   const eventsForWeek = (week: Date[]): EventInfo[] => {
     const strs  = week.map(dateToStr);
@@ -434,7 +433,6 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                   <p className="text-sm font-bold text-slate-700 mt-1.5 flex flex-wrap gap-x-3">
                     {(sel.num_people || sel.number_of_people || sel.guest_count) ? <span>+ {sel.num_people || sel.number_of_people || sel.guest_count} people</span> : null}
                     {sel.nights ? <span>+ {sel.nights} night{Number(sel.nights) !== 1 ? 's' : ''}</span> : null}
-                    {sel.yurt_id ? <span>+ 1 yurt</span> : null}
                     {sel.children_under_12 ? <span>+ {sel.children_under_12} under 12</span> : null}
                   </p>
                   <p className="text-sm text-slate-500 mt-0.5 font-medium">
@@ -574,20 +572,6 @@ export function OccupancyCalendar({ bookings, yurts, userRole, currentUserId, st
                     </div>
                   </div>
 
-
-                  {/* Yurt Special Requests */}
-                  <div className="col-span-2 p-4 bg-amber-50/50 rounded-2xl border border-amber-100">
-                    <label className="text-[10px] font-black text-amber-400 uppercase tracking-widest block mb-1">Yurt Requests</label>
-                    {isEditing && canEdit(sel) ? (
-                      <textarea 
-                        value={editData.yurt_requests || ''} 
-                        onChange={e => setEditData({...editData, yurt_requests: e.target.value})} 
-                        placeholder="How many yurts needed? Separate or together beds?"
-                        className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-bold text-black" 
-                        rows={2}
-                      />
-                    ) : <p className="text-sm font-bold text-black">{sel.yurt_requests || 'No special requests'}</p>}
-                  </div>
 
                   {/* Per-Day Services from Reserver */}
                   {(() => {

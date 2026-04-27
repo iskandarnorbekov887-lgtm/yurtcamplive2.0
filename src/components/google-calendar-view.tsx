@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase, type Booking, type Yurt, type UserRole, type Drink } from '@/lib/supabase';
+import { supabase, type Booking, type UserRole, type Drink } from '@/lib/supabase';
 
 function localDateStr(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -9,7 +9,6 @@ function localDateStr(d: Date) {
 
 interface Props {
   bookings: Booking[];
-  yurts: Yurt[];
   userRole?: UserRole;
   currentUserId?: string;
   calendarId?: string;
@@ -21,7 +20,7 @@ interface Props {
 }
 
 export function GoogleCalendarView({
-  bookings, yurts, userRole, currentUserId,
+  bookings, userRole, currentUserId,
   calendarId, onCheckIn, onCheckOut, onUpdateBooking, onCancelBooking, onAddNewBooking,
 }: Props) {
   const [search, setSearch] = useState('');
@@ -62,9 +61,6 @@ export function GoogleCalendarView({
   const listToShow = search.trim()
     ? bookings.filter(b => b.guest_name.toLowerCase().includes(search.toLowerCase()))
     : todayBookings;
-
-  const getYurtName = (b: Booking) =>
-    yurts.find(y => y.id === b.yurt_id)?.name || (b.yurt_id ? `Yurt #${b.yurt_id}` : '—');
 
   const statusBadge = (s: string) => ({
     checked_in: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
@@ -215,7 +211,7 @@ export function GoogleCalendarView({
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="font-bold text-slate-900 text-sm truncate">{b.guest_name}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">{getYurtName(b)} · {b.check_in} → {b.check_out}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{b.check_in} → {b.check_out}</p>
                     </div>
                     <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${statusBadge(b.status)}`}>
                       {b.status.replace('_', ' ')}
@@ -258,7 +254,7 @@ export function GoogleCalendarView({
                 <div>
                   <h2 className="text-xl font-black text-slate-900">{selected.guest_name}</h2>
                   <p className="text-sm text-slate-500 mt-0.5">
-                    {getYurtName(selected)} · {selected.check_in} → {selected.check_out}
+                    {selected.check_in} → {selected.check_out}
                     {selected.nights ? ` · ${selected.nights}n` : ''}
                     {(selected.guest_count || selected.number_of_people) ? ` · ${selected.guest_count || selected.number_of_people} pax` : ''}
                   </p>

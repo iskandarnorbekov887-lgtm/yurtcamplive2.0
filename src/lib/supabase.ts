@@ -21,41 +21,35 @@ export interface Profile {
   full_name: string;
 }
 
-export interface Yurt {
-  id: number;
-  name: string;
-  status: 'Clean' | 'Dirty' | 'Maintenance';
-  type: string;
-  capacity: number;
-}
-
 export interface Booking {
   id: number;
-  yurt_id?: number;
   guest_name: string;
   check_in: string;
   check_out: string;
   total_price: number;
   number_of_people: number;
-  num_people?: number;
-  payment_status: 'Paid' | 'Partial' | 'Unpaid';
-  source: 'Manual' | 'Booking.com' | 'TripAdvisor';
-  status: 'confirmed' | 'cancelled' | 'completed' | 'pending' | 'checked_in' | 'no_arrival';
-  notes: string | null;
-  meal_notes: string | null;
-  transportation?: string;
-  meal_preference?: string;
-  guide_required?: boolean;
-  special_requests?: string;
-  created_by_role?: UserRole;
+  num_people: number;
+  payment_status: string;
+  source: string;
+  status: string;
+  notes: string;
+  meal_notes: string;
+  transportation: string;
+  meal_preference: string;
+  guide_required: boolean;
+  special_requests: string;
+  created_by_role: string;
   approved_by_manager: boolean;
   created_by_id: string;
-  created_at?: string;
-  last_edited_by_id: string | null;
-  last_edited_by_role?: UserRole;
-  last_edited_at?: string;
-  yurt?: Yurt;
-  // Service fields (from income form)
+  last_edited_by_id: string;
+  last_edited_by_role: string;
+  created_at: string;
+  google_event_id?: string;
+  cooking_class?: boolean;
+  cooking_class_amount?: string | null;
+  cooking_class_description?: string | null;
+  laundry_price?: string | null;
+  laundry_currency?: 'UZS' | 'USD' | null;
   guest_count?: number;
   children_under_12?: number;
   nights?: string;
@@ -66,31 +60,23 @@ export interface Booking {
   transportation_details?: string | null;
   lunch?: boolean;
   lunch_count?: number;
-  lunch_dietary?: string; // Dietary requests for lunch (vegetarian, special request)
+  lunch_dietary?: string;
   dinner?: boolean;
   dinner_count?: number;
-  dinner_dietary?: string; // Dietary requests for dinner (vegetarian, special request)
+  dinner_dietary?: string;
   drinks?: boolean;
   drinks_count?: number;
   laundry?: boolean;
-  laundry_price?: string | null;
-  laundry_currency?: 'UZS' | 'USD' | null;
   payment_method?: 'in_camp' | 'all_paid' | 'partially_paid' | null;
-  payment_note?: string | null; // Optional message for all_paid, required for partially_paid
+  payment_note?: string | null;
   currency?: 'UZS' | 'USD' | 'EUR';
   exchange_rate?: number;
   amount?: number;
   description?: string;
-  // New fields for manager UI
-  yurt_requests?: string; // Special requests for yurts (separate/together beds, how many yurts)
-  cooking_class?: boolean; // Cooking class service
-  cooking_class_description?: string | null; // Optional description for cooking class
-  cooking_class_amount?: string | null; // Amount for cooking class
   drinks_tab?: Array<{ drink_id: number; drink_name: string; quantity: number; price: number; currency: 'UZS' | 'USD' | 'EUR' }>;
   extra_services?: Array<{ name: string; price: number; currency: 'UZS' | 'USD' | 'EUR' }>;
   collected_amount?: number;
   collected_currency?: 'UZS' | 'USD' | 'EUR';
-  google_event_id?: string;
   payments?: Payment[];
 }
 

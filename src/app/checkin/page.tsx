@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ProtectedRoute } from '@/components/protected-route';
-import { supabase, type Booking, type Yurt, type UserRole } from '@/lib/supabase';
+import { supabase, type Booking, type UserRole } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
@@ -22,7 +22,6 @@ function CheckinPortal() {
   const userRole = user?.role as UserRole;
   const { t } = useLanguage();
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [yurts, setYurts] = useState<Yurt[]>([]);
 
   useEffect(() => {
     fetchData();
@@ -31,7 +30,7 @@ function CheckinPortal() {
     
     // Listen for localStorage changes from other tabs for instant sync
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'camp_bookings' || e.key === 'camp_yurts') {
+      if (e.key === 'camp_bookings') {
         fetchData();
       }
     };
@@ -44,13 +43,8 @@ function CheckinPortal() {
   }, []);
 
   const fetchData = async () => {
-    const [{ data: bookingsData }, { data: yurtsData }] = await Promise.all([
-      supabase.from('bookings').select('*'),
-      supabase.from('yurts').select('*'),
-    ]);
-
+    const { data: bookingsData } = await supabase.from('bookings').select('*');
     setBookings(bookingsData || []);
-    setYurts(yurtsData || []);
   };
 
   const checkIn = async (id: number) => {
@@ -139,7 +133,6 @@ function CheckinPortal() {
       <main className="p-8 max-w-7xl mx-auto">
         <OccupancyCalendar
           bookings={bookings}
-          yurts={yurts}
           userRole={userRole}
           currentUserId={currentUserId}
           onCheckIn={userRole === 'Manager' || userRole === 'CEO' ? checkIn : undefined}
