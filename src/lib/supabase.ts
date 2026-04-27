@@ -204,3 +204,52 @@ export async function clearTestReceipts() {
     console.error('Failed to clear test receipts:', error);
   }
 }
+
+// Helper function to delete specific receipts by receipt ID
+export async function deleteReceiptById(receiptId: string) {
+  try {
+    // Delete from booking_receipts table
+    const { error: dbError } = await supabase
+      .from('booking_receipts')
+      .delete()
+      .eq('receipt_id', receiptId);
+    
+    if (dbError) {
+      console.error('Error deleting from booking_receipts:', dbError);
+    }
+    
+    // Remove from special_requests in bookings table
+    const { data: bookings } = await supabase.from('bookings').select('id, special_requests');
+    if (bookings) {
+      for (const booking of bookings) {
+        if (booking.special_requests) {
+          try {
+            const parsed = typeof booking.special_requests === 'string'
+              ? JSON.parse(booking.special_requests || '{}')
+              : (booking.special_requests || {});
+            const meta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
+            
+            if (meta.settled_receipts && meta.settled_receipts.length > 0) {
+              const filtered = meta.settled_receipts.filter((r: any) => r.id !== receiptId);
+              if (filtered.length !== meta.settled_receipts.length) {
+                meta.settled_receipts = filtered;
+                await supabase.from('bookings').update({
+                  special_requests: JSON.stringify(meta)
+                }).eq('id', booking.id);
+                console.log(`Removed receipt ${receiptId} from booking ${booking.id}`);
+              }
+            }
+          } catch {
+            // Skip if parsing fails
+          }
+        }
+      }
+    }
+    
+    console.log(`Receipt ${receiptId} deleted from both locations`);
+    return true;
+  } catch (error) {
+    console.error('Failed to delete receipt:', error);
+    return false;
+  }
+}

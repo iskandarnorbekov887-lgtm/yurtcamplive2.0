@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ProtectedRoute } from '@/components/protected-route';
-import { supabase, type Finance, type Booking, type BookingReceipt, clearTestReceipts } from '@/lib/supabase';
+import { supabase, type Finance, type Booking, type BookingReceipt, clearTestReceipts, deleteReceiptById } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
@@ -27,6 +27,7 @@ function CEOFinancialCalendar() {
   const [dayReceipts, setDayReceipts] = useState<BookingReceipt[]>([]);
   const [loading, setLoading] = useState(false);
   const [cashBox, setCashBox] = useState<{ USD: number; UZS: number; EUR: number }>({ USD: 0, UZS: 0, EUR: 0 });
+  const [receiptToDelete, setReceiptToDelete] = useState('');
 
   useEffect(() => {
     fetchCashBox();
@@ -164,6 +165,34 @@ function CEOFinancialCalendar() {
               </svg>
               Clear Test Data
             </button>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="Receipt ID (e.g., RCP-KLX9M)"
+                value={receiptToDelete}
+                onChange={(e) => setReceiptToDelete(e.target.value.toUpperCase())}
+                className="px-3 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-xs font-black text-slate-900 focus:border-indigo-500 outline-none w-40"
+              />
+              <button
+                onClick={async () => {
+                  if (!receiptToDelete.trim()) {
+                    alert('Please enter a Receipt ID');
+                    return;
+                  }
+                  if (!confirm(`⚠️ Delete receipt ${receiptToDelete}? This cannot be undone.`)) return;
+                  const success = await deleteReceiptById(receiptToDelete);
+                  if (success) {
+                    alert(`Receipt ${receiptToDelete} deleted successfully.`);
+                    setReceiptToDelete('');
+                  } else {
+                    alert('Failed to delete receipt. Check console for details.');
+                  }
+                }}
+                className="px-5 py-2.5 bg-orange-600/90 hover:bg-orange-600 rounded-xl text-xs font-black transition-all shadow-lg hover:shadow-orange-500/20 active:scale-95"
+              >
+                Delete
+              </button>
+            </div>
             <LanguageSwitcher variant="light" />
             <button
               onClick={signOut}
