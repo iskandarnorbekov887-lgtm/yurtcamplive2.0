@@ -148,6 +148,15 @@ export interface Payment {
   created_at?: string;
 }
 
+export interface BookingReceipt {
+  id: number;
+  booking_id: number;
+  receipt_id: string;
+  snapshot: any;
+  total_usd: number;
+  created_at: string;
+}
+
 export interface Notification {
   id: number;
   user_id: string;

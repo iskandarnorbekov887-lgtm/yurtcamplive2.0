@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ProtectedRoute } from '@/components/protected-route';
-import { supabase, type Finance } from '@/lib/supabase';
+import { supabase, type Finance, type Booking, type BookingReceipt } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
@@ -23,6 +23,8 @@ function CEOFinancialCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [dayFinances, setDayFinances] = useState<Finance[]>([]);
+  const [dayBookings, setDayBookings] = useState<Booking[]>([]);
+  const [dayReceipts, setDayReceipts] = useState<BookingReceipt[]>([]);
   const [loading, setLoading] = useState(false);
   const [cashBox, setCashBox] = useState<{ USD: number; UZS: number; EUR: number }>({ USD: 0, UZS: 0, EUR: 0 });
 
@@ -60,16 +62,36 @@ function CEOFinancialCalendar() {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
     try {
-      const { data } = await supabase
+      // Fetch camp finances
+      const { data: finances } = await supabase
         .from('camp_finances')
         .select('*')
         .eq('date', dateStr)
         .order('created_at', { ascending: false });
 
-      setDayFinances(data || []);
+      // Fetch bookings that checked out on this day
+      const { data: bookings } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('check_out', dateStr)
+        .in('status', ['completed', 'checked_in'])
+        .order('check_out', { ascending: false });
+
+      // Fetch receipts created on this day
+      const { data: receipts } = await supabase
+        .from('booking_receipts')
+        .select('*')
+        .eq('created_at', `like%${dateStr}%`)
+        .order('created_at', { ascending: false });
+
+      setDayFinances(finances || []);
+      setDayBookings(bookings || []);
+      setDayReceipts(receipts || []);
     } catch (error) {
-      console.error('Error fetching finances:', error);
+      console.error('Error fetching data:', error);
       setDayFinances([]);
+      setDayBookings([]);
+      setDayReceipts([]);
     } finally {
       setLoading(false);
     }
@@ -77,6 +99,10 @@ function CEOFinancialCalendar() {
 
   const handleFinanceClick = (finance: Finance) => {
     router.push(`/ceo-financials/detail/${finance.id}`);
+  };
+
+  const handleBookingClick = (booking: Booking) => {
+    router.push(`/ceo-financials/booking/${booking.id}`);
   };
 
   const daysInMonth = getDaysInMonth(year, month);
@@ -244,6 +270,7 @@ function CEOFinancialCalendar() {
               </div>
             ) : (
               <>
+                {/* Net Profit Summary */}
                 <div className="bg-slate-100 rounded-xl p-4 mb-6 border-2 border-slate-300">
                   <p className="text-sm font-black text-slate-900 mb-1">Net Profit</p>
                   <p className="text-3xl font-black text-slate-900">
@@ -256,36 +283,76 @@ function CEOFinancialCalendar() {
                   </p>
                 </div>
 
-                <div className="space-y-3">
-                  {dayFinances.map((finance) => (
-                    <button
-                      key={finance.id}
-                      onClick={() => handleFinanceClick(finance)}
-                      className={`w-full p-4 rounded-xl border-2 text-left transition-all hover:shadow-lg ${
-                        finance.type === 'income'
-                          ? 'bg-emerald-50 border-emerald-200 hover:border-emerald-400'
-                          : 'bg-rose-50 border-rose-200 hover:border-rose-400'
-                      }`}
-                    >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <p className="font-bold text-slate-800">
-                            {finance.type === 'income' ? finance.guest_name : finance.category}
+                {/* Guest Tabs Section */}
+                {dayBookings.length > 0 && (
+                  <div className="mb-6">
+                    <h4 className="text-sm font-black text-indigo-900 uppercase tracking-widest mb-3">Guest Tabs (Checked Out)</h4>
+                    <div className="space-y-3">
+                      {dayBookings.map((booking) => (
+                        <button
+                          key={booking.id}
+                          onClick={() => handleBookingClick(booking)}
+                          className="w-full p-4 rounded-xl border-2 bg-indigo-50 border-indigo-200 text-left transition-all hover:shadow-lg hover:border-indigo-400"
+                        >
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-bold text-slate-800">{booking.guest_name}</p>
+                              <p className="text-sm text-slate-600">
+                                {booking.check_in} → {booking.check_out}
+                              </p>
+                              <p className="text-xs text-slate-500 mt-1">
+                                Status: {booking.status === 'completed' ? 'Completed' : 'Checked In'}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-black text-indigo-700">
+                                ${(booking.total_price || 0).toFixed(2)}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                Collected: ${(booking.collected_amount || 0).toFixed(2)}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Finances Section */}
+                <div>
+                  <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-3">Camp Finances</h4>
+                  <div className="space-y-3">
+                    {dayFinances.map((finance) => (
+                      <button
+                        key={finance.id}
+                        onClick={() => handleFinanceClick(finance)}
+                        className={`w-full p-4 rounded-xl border-2 text-left transition-all hover:shadow-lg ${
+                          finance.type === 'income'
+                            ? 'bg-emerald-50 border-emerald-200 hover:border-emerald-400'
+                            : 'bg-rose-50 border-rose-200 hover:border-rose-400'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-bold text-slate-800">
+                              {finance.type === 'income' ? finance.guest_name : finance.category}
+                            </p>
+                            <p className="text-sm text-slate-600">{finance.description}</p>
+                          </div>
+                          <p className={`font-black ${
+                            finance.type === 'income' ? 'text-emerald-700' : 'text-rose-700'
+                          }`}>
+                            {finance.original_amount.toLocaleString()} {finance.currency}
                           </p>
-                          <p className="text-sm text-slate-600">{finance.description}</p>
                         </div>
-                        <p className={`font-black ${
-                          finance.type === 'income' ? 'text-emerald-700' : 'text-rose-700'
-                        }`}>
-                          {finance.original_amount.toLocaleString()} {finance.currency}
-                        </p>
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                {dayFinances.length === 0 && (
-                  <p className="text-center text-slate-500 italic">No transactions recorded for this day</p>
+                {dayFinances.length === 0 && dayBookings.length === 0 && (
+                  <p className="text-center text-slate-500 italic">No transactions or guest tabs for this day</p>
                 )}
               </>
             )}
