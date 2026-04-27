@@ -25,7 +25,7 @@ function CEODashboard() {
   const [yurts, setYurts] = useState<Yurt[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [staff, setStaff] = useState<Profile[]>([]);
-  const [activeTab, setActiveTab] = useState<'checkin' | 'team' | 'financials'>('checkin');
+  const [activeTab, setActiveTab] = useState<'checkin' | 'team' | 'financials' | 'pricing'>('checkin');
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -430,6 +430,16 @@ function CEODashboard() {
               {t(`tab.${tab}`)}
             </button>
           ))}
+          <button
+            key="pricing"
+            onClick={() => setActiveTab('pricing')}
+            className={`px-8 py-3 rounded-xl font-bold capitalize transition-all duration-300 text-sm flex items-center gap-2 ${
+              activeTab === 'pricing' ? 'bg-white text-indigo-700 shadow-lg border border-slate-100 scale-105' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            Pricing Settings
+          </button>
         </div>
 
         {activeTab === 'checkin' && (
@@ -508,9 +518,101 @@ function CEODashboard() {
             </div>
           </div>
         )}
+        {activeTab === 'pricing' && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <PricingSettings />
+          </div>
+        )}
       </main>
 
 
+    </div>
+  );
+}
+function PricingSettings() {
+  const [pricing, setPricing] = useState({
+    lunch_price: 10,
+    dinner_price: 10,
+    guide_price: 40,
+    usd_to_uzs: 12500,
+    usd_to_eur: 0.92
+  });
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    const fetchPricing = async () => {
+      const { data } = await supabase.from('service_pricing').select('*').eq('id', 1);
+      if (data && data.length > 0) setPricing({ ...pricing, ...data[0] });
+    };
+    fetchPricing();
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    const { error } = await supabase.from('service_pricing').upsert({ id: 1, ...pricing });
+    setSaving(false);
+    if (!error) {
+      setMessage('Pricing updated successfully!');
+      setTimeout(() => setMessage(''), 3000);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/60 border border-slate-100 overflow-hidden max-w-2xl mx-auto">
+      <div className="p-8 border-b border-slate-50 bg-gradient-to-r from-indigo-900 to-blue-900 text-white">
+        <h3 className="text-xl font-black flex items-center gap-3">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m10 4a2 2 0 100-4m0 4a2 2 0 110-4M6 20v-2m0 0V12m0 0V8m12 12v-2m0 0V12m0 0V8m-6 8v-2" /></svg>
+          Global Pricing Configuration
+        </h3>
+        <p className="text-indigo-200 text-xs mt-1 font-bold uppercase tracking-widest">Set official rates for all accounts</p>
+      </div>
+      
+      <div className="p-8 space-y-6">
+        <div className="grid grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Lunch Price (USD)</label>
+            <input type="number" value={pricing.lunch_price} onChange={e => setPricing({...pricing, lunch_price: parseFloat(e.target.value) || 0})}
+              className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-indigo-500 outline-none transition-all" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Dinner Price (USD)</label>
+            <input type="number" value={pricing.dinner_price} onChange={e => setPricing({...pricing, dinner_price: parseFloat(e.target.value) || 0})}
+              className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-indigo-500 outline-none transition-all" />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Guide Service (USD / Guide)</label>
+          <input type="number" value={pricing.guide_price} onChange={e => setPricing({...pricing, guide_price: parseFloat(e.target.value) || 0})}
+            className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-indigo-500 outline-none transition-all" />
+        </div>
+
+        <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-100">
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Exchange: 1 USD to UZS</label>
+            <input type="number" value={pricing.usd_to_uzs} onChange={e => setPricing({...pricing, usd_to_uzs: parseFloat(e.target.value) || 0})}
+              className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-indigo-500 outline-none transition-all" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Exchange: 1 USD to EUR</label>
+            <input type="number" value={pricing.usd_to_eur} onChange={e => setPricing({...pricing, usd_to_eur: parseFloat(e.target.value) || 0})}
+              className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-indigo-500 outline-none transition-all" />
+          </div>
+        </div>
+
+        <button 
+          onClick={handleSave}
+          disabled={saving}
+          className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 disabled:opacity-50 active:scale-95 mt-4"
+        >
+          {saving ? 'Saving...' : 'Save Configuration'}
+        </button>
+        
+        {message && (
+          <p className="text-center text-emerald-600 font-bold text-sm animate-bounce mt-4">{message}</p>
+        )}
+      </div>
     </div>
   );
 }

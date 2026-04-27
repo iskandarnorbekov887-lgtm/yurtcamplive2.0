@@ -97,7 +97,7 @@ function CEOPricing() {
             laundry_price: parseFloat(laundryPrice) || 0,
             usd_to_uzs: parseFloat(usdToUzs) || 0,
             usd_to_eur: parseFloat(usdToEur) || 0,
-            pricing_enabled: pricingEnabled,
+            pricing_enabled: true,
           };
         } else {
           // Insert new record
@@ -110,7 +110,7 @@ function CEOPricing() {
             laundry_price: parseFloat(laundryPrice) || 0,
             usd_to_uzs: parseFloat(usdToUzs) || 0,
             usd_to_eur: parseFloat(usdToEur) || 0,
-            pricing_enabled: pricingEnabled,
+            pricing_enabled: true,
           });
         }
 
@@ -134,7 +134,7 @@ function CEOPricing() {
               laundry_price: parseFloat(laundryPrice) || 0,
               usd_to_uzs: parseFloat(usdToUzs) || 0,
               usd_to_eur: parseFloat(usdToEur) || 0,
-              pricing_enabled: pricingEnabled,
+              pricing_enabled: true,
             })
             .eq('id', 1);
           if (error) throw error;
@@ -151,7 +151,7 @@ function CEOPricing() {
               laundry_price: parseFloat(laundryPrice) || 0,
               usd_to_uzs: parseFloat(usdToUzs) || 0,
               usd_to_eur: parseFloat(usdToEur) || 0,
-              pricing_enabled: pricingEnabled,
+              pricing_enabled: true,
             });
           if (error) throw error;
         }
@@ -207,21 +207,7 @@ function CEOPricing() {
             </div>
           ) : (
             <div className="space-y-6">
-              <div className="p-4 bg-indigo-50 rounded-xl border-2 border-indigo-200">
-                <div className="flex items-center justify-between">
-                  <label className="block text-sm font-black text-slate-900">Enable Pricing Calculations</label>
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={pricingEnabled}
-                      onChange={(e) => setPricingEnabled(e.target.checked)}
-                      className="w-5 h-5 rounded border-2 border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                    />
-                    <span className="text-sm font-semibold text-slate-700">Enable</span>
-                  </label>
-                </div>
-                <p className="text-xs text-slate-600 mt-2">When enabled, pricing will be used to calculate expected amounts for comparison with actual income.</p>
-              </div>
+
 
               <div>
                 <label className="block text-sm font-black text-slate-900 mb-2">Guide Price (per guide) - USD</label>

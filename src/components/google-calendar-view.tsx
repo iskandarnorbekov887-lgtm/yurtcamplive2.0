@@ -36,6 +36,7 @@ export function GoogleCalendarView({
   const [newExtraName, setNewExtraName] = useState('');
   const [newExtraPrice, setNewExtraPrice] = useState('');
   const [actionMsg, setActionMsg] = useState('');
+  const [showNotes, setShowNotes] = useState(true);
 
   const today = localDateStr(new Date());
   const calId = calendarId || process.env.NEXT_PUBLIC_GOOGLE_CALENDAR_ID || '';
@@ -148,6 +149,7 @@ export function GoogleCalendarView({
     setNewExtraPrice('');
     setShowDrinks(false);
     setActionMsg('');
+    setShowNotes(true);
   };
 
   return (
@@ -261,10 +263,30 @@ export function GoogleCalendarView({
                     {(selected.guest_count || selected.number_of_people) ? ` · ${selected.guest_count || selected.number_of_people} pax` : ''}
                   </p>
                 </div>
-                <span className={`text-xs font-bold px-3 py-1 rounded-full capitalize ${statusBadge(selected.status)}`}>
-                  {selected.status.replace('_', ' ')}
-                </span>
+                <div className="flex flex-col items-end gap-2">
+                  {(selected.notes || selected.description) && (
+                    <button 
+                      onClick={() => setShowNotes(!showNotes)}
+                      className="text-[10px] font-black text-indigo-600 hover:text-indigo-700 flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100 transition-all active:scale-95"
+                    >
+                      <svg className={`w-3 h-3 transition-transform ${showNotes ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                      {showNotes ? 'Hide Notes' : 'View Notes'}
+                    </button>
+                  )}
+                  <span className={`text-xs font-bold px-3 py-1 rounded-full capitalize ${statusBadge(selected.status)}`}>
+                    {selected.status.replace('_', ' ')}
+                  </span>
+                </div>
               </div>
+
+              {showNotes && (selected.notes || selected.description) && (
+                <div className="bg-amber-50 rounded-xl p-3 border border-amber-100 animate-in fade-in slide-in-from-top-1">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 mb-1">Calendar Notes</p>
+                  <p className="text-sm text-black whitespace-pre-wrap">{selected.description || selected.notes}</p>
+                </div>
+              )}
 
               {actionMsg && (
                 <div className={`text-sm font-medium px-3 py-2 rounded-lg ${actionMsg.startsWith('⚠') ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>
@@ -416,13 +438,7 @@ export function GoogleCalendarView({
                 </div>
               )}
 
-              {/* Booking Notes (read-only) */}
-              {(selected.notes || selected.description) && (
-                <div className="bg-slate-50 rounded-xl p-3">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Notes</p>
-                  <p className="text-sm text-black">{selected.description || selected.notes}</p>
-                </div>
-              )}
+
             </div>
           )}
         </div>

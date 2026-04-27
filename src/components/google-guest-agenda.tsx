@@ -62,6 +62,13 @@ function localDateStr(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+const formatSpace = (num: number, decimals = 2) => {
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(num).replace(/,/g, ' ');
+};
+
 export function GoogleGuestAgenda({
   bookings, yurts, userRole, currentUserId, onCheckIn, onCheckOut, onUpdateBooking, onCancelBooking, onAddNewBooking, onRefresh,
 }: Props) {
@@ -81,6 +88,9 @@ export function GoogleGuestAgenda({
   const [newExtraName, setNewExtraName] = useState('');
   const [newExtraPrice, setNewExtraPrice] = useState('');
   const [actionMsg, setActionMsg] = useState('');
+  const [svcChildren, setSvcChildren] = useState(0);
+  const [svcAmount, setSvcAmount] = useState(0);
+  const [svcDiscount, setSvcDiscount] = useState(0);
   const [svcPayList, setSvcPayList] = useState<Array<{ 
     amount: string; 
     currency: 'USD' | 'UZS' | 'EUR'; 
@@ -91,12 +101,27 @@ export function GoogleGuestAgenda({
   const [fetchingRate, setFetchingRate] = useState<string | null>(null);
   const [syncWarnings, setSyncWarnings] = useState<Record<number, 'deleted' | 'dates_changed'>>({});
   const [payModified, setPayModified] = useState(false); // Track if user manually changed payment amount
+  const [isPrepaid, setIsPrepaid] = useState(false); // Toggle for prepaid accommodation
+  const [isLunchPrepaid, setIsLunchPrepaid] = useState(false);
+  const [isDinnerPrepaid, setIsDinnerPrepaid] = useState(false);
   const [selectedCalendarDay, setSelectedCalendarDay] = useState<string>(localDateStr(new Date()));
+  const [nowTime, setNowTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNowTime(new Date()), 60000); // Update every minute
+    return () => clearInterval(timer);
+  }, []);
+
+  const currentHour = nowTime.getHours();
+  const currentMinute = nowTime.getMinutes();
+  const isAfterNoon = currentHour >= 12;
+  const isAfterTwo = currentHour >= 14;
   const [editingDates, setEditingDates] = useState(false);
   const [editCheckIn, setEditCheckIn] = useState('');
   const [editCheckOut, setEditCheckOut] = useState('');
   const [dayEntries, setDayEntries] = useState<DayEntry[]>([]);
   const [showServices, setShowServices] = useState(false);
+  const [showNotes, setShowNotes] = useState(true);
   
   // Global service states for simplified Manager view
   const [svcLunch, setSvcLunch] = useState(false);
@@ -113,16 +138,37 @@ export function GoogleGuestAgenda({
   const [svcLaundry, setSvcLaundry] = useState(false);
   const [svcLaundryPrice, setSvcLaundryPrice] = useState(0);
   const [svcAdults, setSvcAdults] = useState(1);
-  const [svcChildren, setSvcChildren] = useState(0);
-  const [svcAmount, setSvcAmount] = useState(0);
   const [showFinalReceipt, setShowFinalReceipt] = useState(false);
+  const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
+  const [historyPayments, setHistoryPayments] = useState<any[]>([]);
+  const [dateAdjAmount, setDateAdjAmount] = useState('');
+
+  useEffect(() => {
+    if (sel?.id) {
+      const loadHistory = async () => {
+        const { data } = await supabase.from('payments').select('*').eq('booking_id', sel.id).order('created_at', { ascending: false });
+        setHistoryPayments(data || []);
+      };
+      loadHistory();
+    } else {
+      setHistoryPayments([]);
+    }
+  }, [sel?.id, showFinalReceipt]);
   
-  const [pricing, setPricing] = useState<{ usd_to_uzs?: number; usd_to_eur?: number; guide_price?: number; lunch_price?: number; dinner_price?: number } | null>(null);
+  const DEFAULT_PRICING = {
+    lunch_price: 10,
+    dinner_price: 10,
+    guide_price: 40,
+    usd_to_uzs: 12500,
+    usd_to_eur: 0.92
+  };
+  const [pricing, setPricing] = useState(DEFAULT_PRICING);
+  const [valError, setValError] = useState<string | null>(null);
 
   // Calculate totals at top level for scope availability
   const sTotal_calc = (
-    (svcLunch ? svcLunchCount * (pricing?.lunch_price || 0) : 0) +
-    (svcDinner ? svcDinnerCount * (pricing?.dinner_price || 0) : 0) +
+    (svcLunch ? svcLunchCount * (pricing.lunch_price) : 0) +
+    (svcDinner ? svcDinnerCount * (pricing.dinner_price) : 0) +
     (svcGuide ? svcGuidePrice : 0) +
     (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0) +
     (svcLaundry ? svcLaundryPrice : 0) +
@@ -133,7 +179,7 @@ export function GoogleGuestAgenda({
     return sum + (qty * (drink?.sold_price || 0));
   }, 0);
   const eTotal_calc = extraServices.reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0);
-  const gTotal = svcAmount + sTotal_calc + dTotal_calc + eTotal_calc;
+  const gTotal = Math.max(0, (isPrepaid ? 0 : svcAmount) + sTotal_calc + dTotal_calc + eTotal_calc - svcDiscount);
   
   const tPaidUsd = svcPayList.reduce((sum, p) => {
     const amt = parseFloat(p.amount) || 0;
@@ -142,8 +188,18 @@ export function GoogleGuestAgenda({
     return sum + (amt / rate);
   }, 0);
   
-  const balance = gTotal - tPaidUsd;
+  const prepaidLunchAmt = isLunchPrepaid && svcLunch ? svcLunchCount * (pricing?.lunch_price || 0) : 0;
+  const prepaidDinnerAmt = isDinnerPrepaid && svcDinner ? svcDinnerCount * (pricing?.dinner_price || 0) : 0;
 
+  // Logic for what is ALREADY accounted for (Pre-paid or DB)
+  // For the active tab, we only care about pre-paid items for THIS tab.
+  // Previous stay payments (sel.collected_amount) should NOT offset the current tab's items.
+  const recordedPaid = (isPrepaid ? svcAmount : 0) + prepaidLunchAmt + prepaidDinnerAmt;
+  const debtRemaining = gTotal - recordedPaid;
+
+  const canFinalize = isPrepaid || (svcAmount > 0) || (sTotal_calc + dTotal_calc + eTotal_calc > 0);
+  const isBalanceMatched = Math.abs(tPaidUsd - debtRemaining) < 1.00;
+  
   const today = localDateStr(new Date());
 
   useEffect(() => {
@@ -153,7 +209,12 @@ export function GoogleGuestAgenda({
   const fetchPricing = async () => {
     try {
       const { data } = await supabase.from('service_pricing').select('*').eq('id', 1);
-      if (data && data.length > 0) setPricing(data[0]);
+      if (data && data.length > 0) {
+        setPricing({
+          ...DEFAULT_PRICING,
+          ...data[0]
+        });
+      }
     } catch (err) {
       console.error('Error fetching pricing:', err);
     }
@@ -177,7 +238,14 @@ export function GoogleGuestAgenda({
               if (b.status === 'confirmed') toSilentlyDelete.push(b.id);
               else warnings[b.id] = 'deleted';
             } else if (ev.start !== b.check_in || ev.end !== b.check_out) {
-              warnings[b.id] = 'dates_changed';
+              try {
+                const m = typeof b.special_requests === 'string' ? JSON.parse(b.special_requests || '{}') : (b.special_requests || {});
+                if (!m.is_manual_dates) {
+                  warnings[b.id] = 'dates_changed';
+                }
+              } catch {
+                warnings[b.id] = 'dates_changed';
+              }
             }
           });
           setSyncWarnings(warnings);
@@ -230,25 +298,59 @@ export function GoogleGuestAgenda({
   useEffect(() => {
     if (selectedItem?.booking) {
       const updated = bookings.find(b => b.id === selectedItem.booking!.id);
-      if (updated) setSelectedItem(prev => prev ? { ...prev, booking: updated } : prev);
+      if (updated) {
+        // Deep compare to prevent unnecessary re-renders that could close modals
+        const currentStr = JSON.stringify(selectedItem.booking);
+        const updatedStr = JSON.stringify(updated);
+        if (currentStr !== updatedStr) {
+          setSelectedItem(prev => prev ? { ...prev, booking: updated } : prev);
+        }
+      }
     }
-  }, [bookings]);
+  }, [bookings, selectedItem?.booking]);
 
-  const [lastBalance, setLastBalance] = useState(999999);
-  
-  // Confetti trigger
+  // Reset receipt view only when guest ID actually changes
   useEffect(() => {
-    // Only if balance just hit zero or below, and it was previously positive, and we are checked in
-    if (sel?.status === 'checked_in' && balance <= 0.01 && lastBalance > 0.01 && tPaidUsd > 0) {
-      confetti({
-        particleCount: 150,
-        spread: 100,
-        origin: { y: 0.7 },
-        colors: ['#6366f1', '#10b981', '#f59e0b']
+    setSelectedReceipt(null);
+  }, [sel?.id]);
+
+  // --- AUTO-CHECKOUT WORKER ---
+  useEffect(() => {
+    if (!onCheckOut) return;
+    const checkAutoCO = async () => {
+      const now = new Date();
+      const todayStr = localDateStr(now);
+      const isPostNoon = now.getHours() >= 12;
+      
+      // Auto-checkout if:
+      // 1. Status is 'checked_in'
+      // 2. Checkout day is today (or past)
+      // 3. It's past 12:00 PM
+      // 4. Debt is basically 0
+      const toAutoCO = bookings.filter(b => {
+        if (b.status !== 'checked_in') return false;
+        if (b.check_out > todayStr) return false;
+        if (b.check_out === todayStr && !isPostNoon) return false;
+        const debt = (b.total_price || 0) - (b.collected_amount || 0);
+        return debt < 1.00;
       });
-    }
-    setLastBalance(balance);
-  }, [balance, lastBalance, tPaidUsd, sel?.status]);
+      
+      for (const b of toAutoCO) {
+        try {
+          await onCheckOut(b.id);
+          console.log(`Auto-checked out settled guest: ${b.guest_name}`);
+        } catch (e) {
+          console.error('Auto-checkout failed for', b.id, e);
+        }
+      }
+    };
+    
+    const interval = setInterval(checkAutoCO, 300000); // Run every 5 minutes
+    checkAutoCO();
+    return () => clearInterval(interval);
+  }, [bookings, onCheckOut]);
+
+
 
   const getYurtName = (b: Booking) =>
     yurts.find(y => y.id === b.yurt_id)?.name || (b.yurt_id ? `Yurt #${b.yurt_id}` : '—');
@@ -340,13 +442,41 @@ export function GoogleGuestAgenda({
             <div className="flex flex-col items-end gap-1 shrink-0">
               {isCancelled
                 ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600 border border-red-200">cancelled</span>
-                : booking && <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${statusColor(booking.status)}`}>{booking.status.replace('_', ' ')}</span>
+                : booking && (
+                    <div className="flex flex-col items-end gap-1">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${statusColor(booking.status)}`}>{booking.status.replace('_', ' ')}</span>
+                      {(() => {
+                        try {
+                          const m = typeof booking.special_requests === 'string' ? JSON.parse(booking.special_requests || '{}') : (booking.special_requests || {});
+                          const rCount = m.settled_receipts?.length || 0;
+                          if (rCount > 0) return (
+                            <span className="text-[9px] font-black bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md border border-indigo-200 uppercase tracking-widest flex items-center gap-1.5 shadow-sm animate-in fade-in slide-in-from-right-1">
+                              <svg className="w-3 h-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                              TAB {rCount}
+                            </span>
+                          );
+                        } catch { return null; }
+                        return null;
+                      })()}
+                    </div>
+                  )
               }
               {booking && syncWarnings[booking.id] === 'deleted' && (
                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 border border-red-200">⚠ removed</span>
               )}
               {booking && syncWarnings[booking.id] === 'dates_changed' && (
                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">⚠ dates ≠</span>
+              )}
+              {booking?.status === 'checked_in' && booking.check_out === today && (
+                <>
+                  {isAfterTwo ? (
+                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-rose-600 text-white animate-pulse">⚠ OVERDUE (2PM+)</span>
+                  ) : isAfterNoon ? (
+                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-amber-500 text-white">⚠ LATE (12PM+)</span>
+                  ) : (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-600 border border-indigo-200 italic">Auto-CO @ 11:59</span>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -358,7 +488,7 @@ export function GoogleGuestAgenda({
             disabled={loadingAction === `syncdates-${booking.id}`}
             className="mt-2 w-full px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-60"
           >
-            {loadingAction === `syncdates-${booking.id}` ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '↻'}
+            {loadingAction === `syncdates-${booking.id}` ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '⇵'}
             Approve dates
           </button>
         )}
@@ -489,12 +619,23 @@ export function GoogleGuestAgenda({
     setSelectedItem(item);
     setCollectedAmount(''); setSelectedDrinks({}); setExtraServices([]);
     setNewExtraName(''); setNewExtraPrice(''); setShowDrinks(false); setActionMsg('');
-    setShowServices(false);
+    setShowServices(false); setShowFinalReceipt(false); setShowNotes(true); 
     
     if (item.booking) {
       const b = item.booking;
-      let existing: DayEntry[] = [];
-      try { if (b.special_requests) existing = JSON.parse(b.special_requests); } catch (e) { console.error('Failed to parse special_requests', e); }
+      let existingDays: DayEntry[] = [];
+      let draft: any = null;
+      try { 
+        if (b.special_requests) {
+          const parsed = JSON.parse(b.special_requests);
+          if (Array.isArray(parsed)) {
+            existingDays = parsed;
+          } else {
+            existingDays = parsed.days || [];
+            draft = parsed.draft || null;
+          }
+        }
+      } catch (e) { console.error('Failed to parse special_requests', e); }
       
       const ci = new Date(b.check_in + 'T00:00:00');
       const co = new Date(b.check_out + 'T00:00:00');
@@ -503,7 +644,7 @@ export function GoogleGuestAgenda({
       for (let i = 0; i <= numNights; i++) {
         const d = new Date(ci); d.setDate(d.getDate() + i);
         const ds = localDateStr(d);
-        const found = existing.find(ex => ex.date === ds);
+        const found = existingDays.find(ex => ex.date === ds);
         entries.push(found || {
           date: ds,
           lunch: false, lunchCount: 0, lunchDietary: '',
@@ -515,65 +656,103 @@ export function GoogleGuestAgenda({
         });
       }
       setDayEntries(entries);
-      
-      setSvcLunch(b.lunch || false);
-      setSvcLunchCount(b.lunch_count || 0);
-      setSvcDinner(b.dinner || false);
-      setSvcDinnerCount(b.dinner_count || 0);
-      setSvcGuide(b.guide_service || false);
-      setSvcGuideNames(b.guide_names ? b.guide_names.split(', ') : ['']);
-      setSvcGuidePrice(parseFloat(b.guide_amount || '0') || (pricing?.guide_price || 0));
-      setSvcTransport(b.has_transportation || false);
-      const details = b.transportation_details || '';
-      if (details.includes(' | Price: $')) {
-        const lines = details.split('\n');
-        const list = lines.map(line => {
-          const namePart = line.split(' | ')[0] || '';
-          const detailPart = line.split(' | ')[1] || '';
-          const pricePart = line.split(' | Price: $')[1] || '0';
-          return { name: namePart, details: detailPart, price: parseFloat(pricePart) || 0 };
-        });
-        setSvcTransList(list);
-      } else {
-        setSvcTransList([{ name: '', details: details, price: 0 }]);
-      }
-      setSvcCooking(b.cooking_class || false);
-      setSvcCookingPrice(parseFloat(b.cooking_class_amount || '0') || 0);
-      setSvcLaundry(b.laundry || false);
-      setSvcLaundryPrice(parseFloat(b.laundry_price || '0') || 0);
-      setSvcAdults(b.number_of_people || 1);
-      setSvcChildren(b.children_under_12 || 0);
-      setSvcAmount(b.amount || 0);
+      setSvcAmount(b.total_price - (b.collected_amount || 0));
 
-      // Load payments
-      const { data: pData } = await supabase.from('payments').select('*').eq('booking_id', b.id);
-      if (pData && pData.length > 0) {
-        setSvcPayList(pData.map((p: any) => ({
-          id: p.id,
-          amount: p.amount_original.toString(),
-          currency: p.currency_original,
-          method: p.method,
-          rate: p.exchange_rate_used
-        })));
-        setPayModified(true);
+      // Load draft/saved states with priority for draft
+      setIsPrepaid(draft?.isPrepaid ?? (b.payment_note?.includes('Accommodation') || false));
+      setIsLunchPrepaid(draft?.isLunchPrepaid ?? (b.payment_note?.includes('Lunch') || false));
+      setIsDinnerPrepaid(draft?.isDinnerPrepaid ?? (b.payment_note?.includes('Dinner') || false));
+      
+      setSvcLunch(draft?.svcLunch ?? b.lunch ?? false);
+      setSvcLunchCount(draft?.svcLunchCount ?? b.lunch_count ?? 0);
+      setSvcDinner(draft?.svcDinner ?? b.dinner ?? false);
+      setSvcDinnerCount(draft?.svcDinnerCount ?? b.dinner_count ?? 0);
+      setSvcGuide(draft?.svcGuide ?? b.guide_service ?? false);
+      setSvcGuideNames(draft?.svcGuideNames ?? (b.guide_names ? b.guide_names.split(', ') : ['']));
+      setSvcGuidePrice(draft?.svcGuidePrice ?? (parseFloat(b.guide_amount || '0') || (pricing.guide_price)));
+      setSvcTransport(draft?.svcTransport ?? b.has_transportation ?? false);
+      
+      if (draft?.svcTransList) {
+        setSvcTransList(draft.svcTransList);
       } else {
-        setSvcPayList([{ amount: (b.total_price || b.amount || 0).toString(), currency: b.collected_currency || 'USD', method: 'Cash' }]);
-        setPayModified(false);
+        const details = b.transportation_details || '';
+        if (details.includes(' | Price: $')) {
+          const lines = details.split('\n');
+          const list = lines.map(line => {
+            const namePart = line.split(' | ')[0] || '';
+            const detailPart = line.split(' | ')[1] || '';
+            const pricePart = line.split(' | Price: $')[1] || '0';
+            return { name: namePart, details: detailPart, price: parseFloat(pricePart) || 0 };
+          });
+          setSvcTransList(list);
+        } else {
+          setSvcTransList([{ name: '', details: '', price: 0 }]);
+        }
       }
+
+      setSvcCooking(draft?.svcCooking ?? b.cooking_class ?? false);
+      setSvcCookingPrice(draft?.svcCookingPrice ?? (parseFloat(b.cooking_class_amount || '0') || 0));
+      setSvcLaundry(draft?.svcLaundry ?? b.laundry ?? false);
+      setSvcLaundryPrice(draft?.svcLaundryPrice ?? (parseFloat(b.laundry_price || '0') || 0));
+      setSvcAdults(draft?.svcAdults ?? b.number_of_people ?? 1);
+      setSvcChildren(draft?.svcChildren ?? b.children_under_12 ?? 0);
+      setSvcAmount(draft?.svcAmount ?? b.amount ?? 0);
+      setSvcDiscount(draft?.svcDiscount ?? 0);
+
+      // Always start with a fresh payment input list for the current tab
+      setSvcPayList([{ amount: '', currency: b.collected_currency || 'USD', method: 'Cash' }]);
+      setPayModified(false);
     } else {
       setDayEntries([]);
       setSvcLunch(false); setSvcLunchCount(0);
       setSvcDinner(false); setSvcDinnerCount(0);
-      setSvcGuide(false); setSvcGuideNames(['']); setSvcGuidePrice(0);
+      setSvcGuide(false); setSvcGuideNames(['']); setSvcGuidePrice(40);
       setSvcTransport(false); setSvcTransList([{ name: '', details: '', price: 0 }]);
       setSvcCooking(false); setSvcCookingPrice(0);
       setSvcLaundry(false); setSvcLaundryPrice(0);
       setSvcAdults(1); setSvcChildren(0);
       setSvcAmount(0);
+      setSvcDiscount(0);
       setSvcPayList([{ amount: '0', currency: 'USD', method: 'Cash' }]);
       setPayModified(false);
     }
   };
+
+  // AUTO-SAVE effect for "Choices" (Prepaid toggles, service selections)
+  useEffect(() => {
+    if (!sel || !onUpdateBooking) return;
+    
+    const timer = setTimeout(async () => {
+      // Only auto-save if we are in an active session
+      const draft = {
+        isPrepaid, isLunchPrepaid, isDinnerPrepaid,
+        svcLunch, svcLunchCount, svcDinner, svcDinnerCount,
+        svcGuide, svcGuidePrice, svcGuideNames,
+        svcTransport, svcTransList,
+        svcCooking, svcCookingPrice,
+        svcLaundry, svcLaundryPrice,
+        svcAdults, svcChildren, svcAmount, svcDiscount
+      };
+      
+      try {
+        const payload = JSON.stringify({ days: dayEntries, draft });
+        await supabase.from('bookings').update({ special_requests: payload }).eq('id', sel.id);
+      } catch (err) {
+        console.error('Auto-save failed:', err);
+      }
+    }, 2000); // 2 second debounce
+
+    return () => clearTimeout(timer);
+  }, [
+    sel?.id, isPrepaid, isLunchPrepaid, isDinnerPrepaid,
+    svcLunch, svcLunchCount, svcDinner, svcDinnerCount,
+    svcGuide, svcGuidePrice, svcGuideNames,
+    svcTransport, svcTransList,
+    svcCooking, svcCookingPrice,
+    svcLaundry, svcLaundryPrice,
+    svcAdults, svcChildren, svcAmount, svcDiscount,
+    dayEntries
+  ]);
 
   const updateDay = (index: number, updates: Partial<DayEntry>) =>
     setDayEntries(prev => prev.map((d, i) => i === index ? { ...d, ...updates } : d));
@@ -587,9 +766,13 @@ export function GoogleGuestAgenda({
   const daysUntilCheckIn = sel
     ? Math.ceil((new Date(sel.check_in + 'T00:00:00').getTime() - new Date(today + 'T00:00:00').getTime()) / 86400000)
     : 999;
+  const isGracePeriodActive = sel?.status === 'completed' && sel?.last_edited_at && (
+    (new Date().getTime() - new Date(sel.last_edited_at).getTime()) < (60 * 60 * 1000)
+  );
+
   const canCheckIn = sel?.status === 'confirmed' && daysUntilCheckIn <= 2 && !!onCheckIn;
   const isComingSoon = sel?.status === 'confirmed' && daysUntilCheckIn > 2;
-  const canCheckOut = sel?.status === 'checked_in' && !!onCheckOut && today >= (sel?.check_out ?? '9999');
+  const canCheckOut = (sel?.status === 'checked_in' || isGracePeriodActive) && !!onCheckOut;
   const canCancel = sel && ['confirmed', 'pending'].includes(sel.status) && !!onCancelBooking;
 
   // Color rules are SYSTEM-ONLY — we never push status colors back to Google Calendar.
@@ -605,7 +788,7 @@ export function GoogleGuestAgenda({
 
   const handleCheckOut = async () => {
     if (!sel || !onCheckOut) return;
-    if (svcAdults <= 0) {
+    if (svcAdults <= 0 && (sel.collected_amount || 0) === 0) {
       flash('⚠ Number of adults is required for check-out.');
       setShowServices(true);
       return;
@@ -644,13 +827,33 @@ export function GoogleGuestAgenda({
       const dTotal = drinkTab.reduce((s, d) => s + (d.price * d.quantity), 0);
       const eTotal = extraServices.reduce((s, e) => s + (parseFloat(e.price) || 0), 0);
       const sTotal = (
-        (svcLunch ? svcLunchCount * (pricing?.lunch_price || 0) : 0) +
-        (svcDinner ? svcDinnerCount * (pricing?.dinner_price || 0) : 0) +
+        (svcLunch ? svcLunchCount * (pricing.lunch_price) : 0) +
+        (svcDinner ? svcDinnerCount * (pricing.dinner_price) : 0) +
         (svcGuide ? svcGuidePrice : 0) +
         (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0) +
         (svcLaundry ? svcLaundryPrice : 0) +
         (svcCooking ? svcCookingPrice : 0)
       );
+
+      // --- GENERATE RECEIPT SNAPSHOT ---
+      const receiptId = 'RCP-' + Math.random().toString(36).substring(2, 7).toUpperCase();
+      const snapshot = {
+        id: receiptId,
+        date: new Date().toISOString(),
+        items: {
+          accommodation: svcAmount,
+          isPrepaid: isPrepaid,
+          meals: { lunch: svcLunchCount, dinner: svcDinnerCount },
+          services: { guide: svcGuidePrice, transport: svcTransList.reduce((s, t) => s + (t.price || 0), 0), laundry: svcLaundryPrice, cooking: svcCookingPrice },
+          extras: [...extraServices],
+          drinks: drinkTab
+        },
+        total: gTotal,
+        payments: svcPayList.filter(p => parseFloat(p.amount) > 0)
+      };
+
+      const currentMeta = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
+      const settledReceipts = [...(currentMeta.settled_receipts || []), snapshot];
 
       const totalPaidUsd = svcPayList.reduce((sum, p) => {
         const amt = parseFloat(p.amount) || 0;
@@ -658,50 +861,61 @@ export function GoogleGuestAgenda({
         return sum + (p.currency === 'USD' ? amt : (amt / rate));
       }, 0);
 
-      const gTotal = svcAmount + sTotal + dTotal + eTotal;
-      const isFullyPaid = totalPaidUsd >= (gTotal - 0.01);
-      
-      // Save individual payments
+      // Save payments ... (same loop as before)
       for (const p of svcPayList) {
         const amt = parseFloat(p.amount) || 0;
         if (amt <= 0) continue;
         const rate = p.currency === 'USD' ? 1 : (p.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92));
         const usdEquiv = p.currency === 'USD' ? amt : (amt / rate);
-        
-        const payData = {
+        await supabase.from('payments').insert({
           booking_id: sel.id,
           amount_original: amt,
           currency_original: p.currency,
           method: p.method,
           exchange_rate_used: rate,
-          amount_usd_equivalent: usdEquiv
-        };
-        
-        if (p.id) {
-          await supabase.from('payments').update(payData).eq('id', p.id);
-        } else {
-          await supabase.from('payments').insert(payData);
-        }
+          amount_usd_equivalent: usdEquiv,
+          note: `Receipt #${receiptId}`
+        });
       }
-      
+
       const updates: Partial<Booking> = {
-        total_price: gTotal,
-        collected_amount: totalPaidUsd,
+        total_price: (sel.total_price || 0) + gTotal,
+        collected_amount: (sel.collected_amount || 0) + totalPaidUsd,
         collected_currency: 'USD',
-        payment_status: isFullyPaid ? 'Paid' : 'Partial',
-        payment_note: `Split Payment: ${svcPayList.map(p => `${p.amount} ${p.currency} (${p.method})`).join(', ')}`
+        payment_status: 'Paid',
+        lunch: false, lunch_count: 0,
+        dinner: false, dinner_count: 0,
+        guide_service: false, guide_amount: null, guide_names: null,
+        has_transportation: false, transportation_details: null,
+        cooking_class: false, cooking_class_amount: null,
+        laundry: false, laundry_price: null,
+        drinks_tab: undefined,
+        extra_services: undefined,
+        special_requests: JSON.stringify({ ...currentMeta, settled_receipts: settledReceipts, days: dayEntries, draft: null }), 
+        amount: 0
       };
-      if (drinkTab.length) updates.drinks_tab = drinkTab;
-      if (extraServices.length) updates.extra_services = extraServices.map(e => ({ name: e.name, price: parseFloat(e.price) || 0, currency: e.currency as 'UZS' | 'USD' | 'EUR' }));
+      
       if (onUpdateBooking) await onUpdateBooking(sel.id, updates);
       
-      if (isFullyPaid) {
-        await onCheckOut(sel.id);
-        flash('✓ Fully Paid & Checked out. Finance record created.');
-      } else {
-        flash('✓ Payment records updated (Partial).');
-      }
-    } catch { flash('⚠ Checkout failed.'); }
+      confetti({ particleCount: 150, spread: 100, origin: { y: 0.7 } });
+      flash('✓ Tab Settled & Archived. Receipt is ready below.');
+      setSelectedReceipt(snapshot);
+      
+      // Reset local UI states for the new tab
+      setSvcAmount(0); setSvcDiscount(0);
+      setSvcLunch(false); setSvcLunchCount(0); setSvcDinner(false); setSvcDinnerCount(0);
+      setSvcGuide(false); setSvcGuidePrice(40); setSvcGuideNames(['']);
+      setSvcTransport(false); setSvcTransList([{ name: '', details: '', price: 0 }]);
+      setSvcLaundry(false); setSvcLaundryPrice(0);
+      setSvcCooking(false); setSvcCookingPrice(0);
+      setExtraServices([]); setSelectedDrinks({});
+      setSvcPayList([{ amount: '', currency: 'USD', method: 'Cash' }]);
+      setPayModified(false);
+
+    } catch (err) { 
+      console.error('Finalize Tab failed:', err);
+      flash('⚠ Failed to settle tab.'); 
+    }
     finally { setLoadingAction(''); }
   };
 
@@ -735,8 +949,8 @@ export function GoogleGuestAgenda({
       }, 0);
       const eTotal = extraServices.reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0);
       const sTotal = (
-        (svcLunch ? svcLunchCount * (pricing?.lunch_price || 0) : 0) +
-        (svcDinner ? svcDinnerCount * (pricing?.dinner_price || 0) : 0) +
+        (svcLunch ? svcLunchCount * (pricing.lunch_price) : 0) +
+        (svcDinner ? svcDinnerCount * (pricing.dinner_price) : 0) +
         (svcGuide ? svcGuidePrice : 0) +
         (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0) +
         (svcLaundry ? svcLaundryPrice : 0) +
@@ -753,10 +967,10 @@ export function GoogleGuestAgenda({
         guide_amount: svcGuide ? svcGuidePrice.toString() : null,
         has_transportation: svcTransport,
         transportation_details: svcTransport 
-          ? svcTransList.filter(t => t.name.trim() || t.details.trim() || t.price > 0)
-              .map(t => `${t.name.trim()} | ${t.details.trim()} | Price: $${t.price}`)
-              .join('\n') || null
-          : null,
+        ? svcTransList.filter(t => t.name.trim() || t.details.trim() || t.price > 0)
+            .map(t => `${t.name.trim()} | ${t.details.trim()} | Price: $${t.price}`)
+            .join('\n') || null
+        : null,
         cooking_class: svcCooking,
         cooking_class_amount: svcCooking ? svcCookingPrice.toString() : null,
         laundry: svcLaundry,
@@ -766,7 +980,7 @@ export function GoogleGuestAgenda({
         children_under_12: svcChildren,
         amount: svcAmount,
         currency: 'USD',
-        total_price: svcAmount + sTotal + dTotal + eTotal
+        total_price: svcAmount + sTotal + dTotal + eTotal - svcDiscount
       };
       await onUpdateBooking(sel.id, updates);
       flash('✓ Services updated.');
@@ -811,8 +1025,8 @@ export function GoogleGuestAgenda({
     if (!payModified && svcPayList.length === 1 && svcPayList[0].currency === 'USD') {
       const gTotal = (
         svcAmount + 
-        ((svcLunch ? svcLunchCount * (pricing?.lunch_price || 0) : 0) +
-        (svcDinner ? svcDinnerCount * (pricing?.dinner_price || 0) : 0) +
+        ((svcLunch ? svcLunchCount * (pricing.lunch_price) : 0) +
+        (svcDinner ? svcDinnerCount * (pricing.dinner_price) : 0) +
         (svcGuide ? svcGuidePrice : 0) +
         (svcLaundry ? svcLaundryPrice : 0) +
         (svcCooking ? svcCookingPrice : 0)) +
@@ -820,11 +1034,11 @@ export function GoogleGuestAgenda({
           const d = drinks.find(x => x.id === Number(id));
           return sum + (d ? d.sold_price * (qty as number) : 0);
         }, 0) +
-        extraServices.reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0)
+        extraServices.reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0) - svcDiscount
       );
       setSvcPayList([{ amount: gTotal.toString(), currency: 'USD', method: 'Cash' }]);
     }
-  }, [svcAmount, svcLunch, svcLunchCount, svcDinner, svcDinnerCount, svcGuide, svcGuidePrice, svcTransport, svcTransList, svcLaundry, svcLaundryPrice, svcCooking, svcCookingPrice, selectedDrinks, extraServices, pricing, payModified]);
+  }, [svcAmount, svcDiscount, svcLunch, svcLunchCount, svcDinner, svcDinnerCount, svcGuide, svcGuidePrice, svcTransport, svcTransList, svcLaundry, svcLaundryPrice, svcCooking, svcCookingPrice, selectedDrinks, extraServices, pricing, payModified]);
 
   return (
     <div className="space-y-4">
@@ -854,7 +1068,7 @@ export function GoogleGuestAgenda({
           <div className="flex-1 overflow-y-auto">
             {arrivingItems.length > 0 && (
               <div>
-                <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-700 bg-amber-50 border-b border-amber-100">◐ Arriving · {arrivingItems.length}</p>
+                <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-700 bg-amber-50 border-b border-amber-100">● Arriving · {arrivingItems.length}</p>
                 {arrivingItems.map(item => renderCard(item, false))}
               </div>
             )}
@@ -976,11 +1190,36 @@ export function GoogleGuestAgenda({
                   <h2 className="text-xl font-black text-slate-900">{sel.guest_name}</h2>
                   <p className="text-sm text-slate-500 mt-0.5">{getYurtName(sel)} · {sel.check_in} → {sel.check_out}{sel.nights ? ` · ${sel.nights}n` : ''}{(sel.guest_count || sel.number_of_people) ? ` · ${sel.guest_count || sel.number_of_people} pax` : ''}</p>
                 </div>
-                <span className={`text-xs font-bold px-3 py-1 rounded-full capitalize ${statusColor(sel.status)} flex items-center gap-1`}>
-                  {statusIcon(sel.status) && <span className={statusIconColor(sel.status)}>{statusIcon(sel.status)}</span>}
-                  {sel.status.replace('_', ' ')}
-                </span>
+                <div className="flex flex-col items-end gap-2">
+                  {(sel.notes || sel.description) && (
+                    <button 
+                      onClick={() => setShowNotes(!showNotes)}
+                      className="text-[10px] font-black text-indigo-600 hover:text-indigo-700 flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100 transition-all active:scale-95"
+                    >
+                      <svg className={`w-3 h-3 transition-transform ${showNotes ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                      {showNotes ? 'Hide Notes' : 'View Notes'}
+                    </button>
+                  )}
+                  <span className={`text-xs font-bold px-3 py-1 rounded-full capitalize ${statusColor(sel.status)} flex items-center gap-1`}>
+                    {statusIcon(sel.status) && <span className={statusIconColor(sel.status)}>{statusIcon(sel.status)}</span>}
+                    {sel.status.replace('_', ' ')}
+                  </span>
+                </div>
               </div>
+
+              {showNotes && (sel.notes || sel.description) && (
+                <div className="bg-amber-50 rounded-[20px] p-4 border border-amber-100 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-6 h-6 bg-amber-100 rounded-lg flex items-center justify-center text-amber-600">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    </div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">Google Calendar Notes</p>
+                  </div>
+                  <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed font-medium">{sel.notes || sel.description}</p>
+                </div>
+              )}
 
               {actionMsg && (
                 <div className={`text-sm font-medium px-3 py-2 rounded-lg ${actionMsg.startsWith('⚠') ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>{actionMsg}</div>
@@ -990,6 +1229,27 @@ export function GoogleGuestAgenda({
                 <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
                   <p className="font-bold mb-0.5">⚠ Calendar event deleted</p>
                   <p className="text-xs">The linked Google Calendar event was removed. The booking remains here.</p>
+                </div>
+              )}
+
+              {sel.status === 'checked_in' && sel.check_out === today && isAfterNoon && (
+                <div className={`border-2 rounded-2xl p-4 flex items-center gap-4 ${isAfterTwo ? 'bg-rose-50 border-rose-200 text-rose-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${isAfterTwo ? 'bg-rose-100' : 'bg-amber-100'}`}>
+                    <span className="text-2xl">⚠</span>
+                  </div>
+                  <div>
+                    <p className="font-black uppercase tracking-widest text-xs">
+                      {isAfterTwo ? 'Critical: Guest Not Checked Out' : 'Late Checkout Warning'}
+                    </p>
+                    <p className="text-sm font-bold opacity-80">
+                      Standard checkout time is 12:00 PM. {isAfterTwo ? 'It is past 2:00 PM. Please check the guest immediately.' : 'Please coordinate with the guest.'}
+                    </p>
+                    {isAfterTwo && (
+                      <p className="text-[10px] mt-2 font-black text-rose-600 bg-white px-2 py-1 rounded w-fit border border-rose-200">
+                        CEO MESSAGE: CHECK OUT TIME IS 12 PM
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -1017,7 +1277,7 @@ export function GoogleGuestAgenda({
                         }}
                         disabled={loadingAction === `syncdates-${sel.id}`}
                         className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold rounded-lg transition-all disabled:opacity-60 flex items-center justify-center gap-2">
-                        {loadingAction === `syncdates-${sel.id}` ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '↻'}
+                        {loadingAction === `syncdates-${sel.id}` ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '⇵'}
                         Approve dates
                       </button>
                     )}
@@ -1033,33 +1293,60 @@ export function GoogleGuestAgenda({
                 </div>
               )}
 
-              {sel.status === 'completed' && (
+              {sel.status === 'completed' && !isGracePeriodActive && (
                 <div className={`px-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 select-none cursor-not-allowed ${statusColor(sel.status)}`}>
                   <span className={statusIconColor(sel.status)}>{statusIcon(sel.status)}</span>
                   <span className="capitalize">{sel.status.replace('_', ' ')}</span>
                 </div>
               )}
 
-              {(userRole === 'Manager' || userRole === 'CEO') && sel.status !== 'no_arrival' && sel.status !== 'cancelled' && (
+              {(userRole === 'Manager' || userRole === 'CEO') && sel.status !== 'no_arrival' && sel.status !== 'cancelled' && (sel.status !== 'completed' || isGracePeriodActive) && (
                 <div className="flex flex-wrap gap-2">
                   {sel.status === 'checked_in' && !editingDates && (
-                    <button
-                      onClick={() => { setEditingDates(true); setEditCheckIn(sel.check_in); setEditCheckOut(sel.check_out); }}
-                      className="px-4 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-sm font-bold rounded-xl border border-emerald-200 transition-all flex items-center gap-2">
-                      ✓ Checked In · Edit Dates
-                    </button>
+                    <div className="w-full">
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col gap-1.5">
+                          <span className="px-4 py-2 bg-emerald-100 text-emerald-700 text-sm font-bold rounded-xl border border-emerald-200 flex items-center gap-2">
+                            ✓ Checked In
+                          </span>
+                          {(() => {
+                            try {
+                              const m = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
+                              const rCount = m.settled_receipts?.length || 0;
+                              if (rCount > 0) return (
+                                <span className="text-[10px] font-black bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl border border-indigo-200 uppercase tracking-widest flex items-center gap-2 w-fit shadow-sm animate-in fade-in slide-in-from-left-2">
+                                  <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                  TAB {rCount}
+                                </span>
+                              );
+                            } catch { return null; }
+                            return null;
+                          })()}
+                        </div>
+                        <button
+                          onClick={() => { setEditingDates(true); setEditCheckIn(sel.check_in); setEditCheckOut(sel.check_out); }}
+                          className="text-[10px] font-bold text-indigo-500 hover:text-indigo-700 underline underline-offset-2 decoration-indigo-200 transition-all">
+                          Edit Dates
+                        </button>
+                      </div>
+                    </div>
                   )}
                   {editingDates && (
                     <div className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-3">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Edit Stay Dates</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Edit Stay Dates</p>
+                        {(sel.collected_amount || 0) > 0 && (
+                          <span className="text-[9px] font-black bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded uppercase">Tab Settled</span>
+                        )}
+                      </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="text-[10px] font-bold text-slate-400 uppercase">Check In</label>
                           <input
                             type="date"
                             value={editCheckIn}
-                            onChange={e => setEditCheckIn(e.target.value)}
-                            className="w-full px-2 py-1.5 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 text-black"
+                            disabled
+                            className="w-full px-2 py-1.5 text-sm rounded-lg border border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed outline-none"
                           />
                         </div>
                         <div>
@@ -1067,25 +1354,86 @@ export function GoogleGuestAgenda({
                           <input
                             type="date"
                             value={editCheckOut}
-                            onChange={e => setEditCheckOut(e.target.value)}
+                            onChange={e => {
+                              setEditCheckOut(e.target.value);
+                              if ((sel.collected_amount || 0) > 0 && e.target.value !== sel.check_out) {
+                                // Reset adjustment when date changes if desired, or leave it
+                              }
+                            }}
                             className="w-full px-2 py-1.5 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 text-black"
                           />
                         </div>
                       </div>
+
+                      {editCheckOut !== sel.check_out && (
+                        <div className="pt-2 border-t border-slate-200 animate-in fade-in slide-in-from-top-1">
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-tight mb-1 block">
+                            {editCheckOut > sel.check_out ? 'Stay Extension Price (USD)' : 'Adjust Total Stay Price (USD)'}
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">
+                              {editCheckOut > sel.check_out ? '+' : '$'}
+                            </span>
+                            <input
+                              type="number"
+                              value={dateAdjAmount}
+                              onChange={e => setDateAdjAmount(e.target.value)}
+                              onFocus={() => {
+                                if (editCheckOut < sel.check_out && !dateAdjAmount) {
+                                  setDateAdjAmount((sel.total_price || 0).toString());
+                                }
+                              }}
+                              placeholder={editCheckOut > sel.check_out ? "0.00" : (sel.total_price || 0).toString()}
+                              className="w-full pl-7 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-black text-black focus:border-indigo-500 outline-none transition-all"
+                            />
+                          </div>
+                          <p className="text-[8px] text-slate-400 font-bold mt-1 uppercase italic">
+                            {editCheckOut > sel.check_out 
+                              ? "* This amount will be added to the guest's total bill." 
+                              : `* Current total is $${sel.total_price}. Edit this to reflect the shortened stay price.`}
+                          </p>
+                        </div>
+                      )}
+
                       <div className="flex gap-2">
                         <button
                           onClick={async () => {
                             if (!confirm(`Update dates to ${editCheckIn} → ${editCheckOut}?`)) return;
                             setLoadingAction('editdates');
                             try {
-                              await onUpdateBooking?.(sel.id, { check_in: editCheckIn, check_out: editCheckOut });
-                              if (userRole === 'CEO') {
-                                flash('✓ Dates updated. ALERT: CEO has modified booking dates.');
+                              const adj = parseFloat(dateAdjAmount) || 0;
+                              const updates: Partial<Booking> = { 
+                                check_in: editCheckIn, 
+                                check_out: editCheckOut,
+                                last_edited_at: new Date().toISOString()
+                              };
+
+                              if ((sel.collected_amount || 0) > 0 && adj !== 0) {
+                                if (editCheckOut > sel.check_out) {
+                                  // Extension: add to total_price, status remains checked_in
+                                  updates.total_price = (sel.total_price || 0) + adj;
+                                  // We don't automatically mark as paid, so they can settle it later
+                                  flash(`✓ Extended to ${editCheckOut}. $${adj} added to bill.`);
+                                } else {
+                                  // Shorten: update total_price to the new total? 
+                                  // The user says "editable last charged price for stay".
+                                  // If they enter a value, let's assume it's the NEW total price or a reduction.
+                                  // To be safe, if it's less than current total, we update it.
+                                  updates.total_price = adj; // Assuming adj is the NEW total
+                                  flash(`✓ Shortened to ${editCheckOut}. Bill adjusted to $${adj}.`);
+                                }
                               } else {
-                                flash('✓ Dates updated.');
+                                flash('✓ Dates updated and synced with Calendar.');
                               }
-                              setEditingDates(false);
-                              onRefresh?.();
+
+                                const currentMeta = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
+                                updates.special_requests = JSON.stringify({ ...currentMeta, is_manual_dates: true, days: dayEntries });
+                                await onUpdateBooking?.(sel.id, updates);
+
+                                flash('✓ Dates updated in System. Google Calendar remains unchanged.');
+                                setEditingDates(false);
+                                setDateAdjAmount('');
+                                onRefresh?.();
                             } catch (e: unknown) {
                               const msg = e instanceof Error ? e.message : String(e);
                               flash(`⚠ ${msg.slice(0, 100)}`);
@@ -1118,9 +1466,21 @@ export function GoogleGuestAgenda({
                       ⏰ Coming in {daysUntilCheckIn} day{daysUntilCheckIn !== 1 ? 's' : ''}
                     </div>
                   )}
-                  {canCheckOut && !editingDates && (
-                    <button onClick={() => setShowFinalReceipt(true)} disabled={loadingAction === 'checkout'}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-all disabled:opacity-60 flex items-center gap-2 shadow-lg shadow-indigo-100">
+                  {canCheckOut && sel?.status !== 'completed' && !editingDates && (
+                    <button 
+                      onClick={() => {
+                        const hasAnyCharges = gTotal > 0.01 || isPrepaid;
+                        if (!hasAnyCharges && (sel.collected_amount || 0) === 0) {
+                          flash('⚠ No charges to settle. Add services or set a stay price first.');
+                          setShowServices(true);
+                          return;
+                        }
+                        setSelectedReceipt(null);
+                        setShowFinalReceipt(true);
+                      }} 
+                      disabled={loadingAction === 'checkout'}
+                      className={`px-4 py-2 text-white text-sm font-bold rounded-xl transition-all flex items-center gap-2 shadow-lg bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100`}
+                    >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                       Finalize & Paid
                     </button>
@@ -1137,316 +1497,258 @@ export function GoogleGuestAgenda({
                 </div>
               )}
 
-              {canCheckOut && (
-                <div className="border border-slate-200 rounded-xl p-4 space-y-3">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Collect Payment</p>
-                  <div className="flex gap-2">
-                    <input type="number" value={collectedAmount} onChange={e => setCollectedAmount(e.target.value)} placeholder="Amount collected"
-                      className="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300 text-black" />
-                    <select value={collectedCurrency} onChange={e => setCollectedCurrency(e.target.value as 'UZS' | 'USD' | 'EUR')}
-                      className="px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none text-black bg-white">
-                      <option>USD</option><option>UZS</option><option>EUR</option>
-                    </select>
-                  </div>
-                </div>
-              )}
 
-              {/* Simplified Global Services */}
-              {(sel.status === 'checked_in' || sel.status === 'confirmed') && (userRole === 'Manager' || userRole === 'CEO') && (
-                <div className="border border-slate-200 rounded-xl p-4 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Services (Food, Guide, Transport)</p>
-                    <button onClick={() => setShowServices(v => !v)} className="text-sm font-bold text-indigo-600 hover:text-indigo-700">
-                      {showServices ? '− Hide' : '+ Manage Services'}
-                    </button>
-                  </div>
-                  
-                  {showServices && (
-                    <div className="space-y-4 pt-2">
-                      {/* Guest Counts */}
-                      <div className="grid grid-cols-2 gap-4 pb-4 border-b border-slate-100">
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Adults *</label>
-                          <input
-                            type="number"
-                            min="1"
-                            value={svcAdults}
-                            onChange={e => setSvcAdults(parseInt(e.target.value) || 0)}
-                            className={`w-full px-3 py-2 border-2 ${svcAdults <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-xl text-sm font-black text-black focus:border-indigo-500 transition-all`}
-                            placeholder="0"
-                          />
+
+                  {/* Premium Add to Tab Dashboard */}
+                  {(sel.status === 'checked_in' || sel.status === 'confirmed') && (userRole === 'Manager' || userRole === 'CEO') && (
+                    <div className="bg-white border-2 border-slate-100 rounded-[32px] p-6 shadow-xl shadow-slate-100/50 mb-6">
+                      <div className="flex justify-between items-center mb-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight leading-tight">Add to Tab</h3>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Post new charges for this guest</p>
+                          </div>
                         </div>
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Children</label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={svcChildren}
-                            onChange={e => setSvcChildren(parseInt(e.target.value) || 0)}
-                            className="w-full px-3 py-2 border-2 border-slate-200 bg-white rounded-xl text-sm font-black text-black focus:border-indigo-500 transition-all"
-                            placeholder="0"
-                          />
+                        <button 
+                          onClick={() => setShowServices(v => !v)} 
+                          className={`text-[10px] font-black px-5 py-2.5 rounded-xl border-2 transition-all active:scale-95 ${showServices ? 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100' : 'bg-indigo-600 text-white border-indigo-700 shadow-lg shadow-indigo-100 hover:bg-indigo-700'}`}
+                        >
+                          {showServices ? 'HIDE OPTIONS' : 'START NEW ORDER'}
+                        </button>
+                      </div>
+                      
+                      {!showServices && (
+                        <div 
+                          className="group relative flex items-center justify-center py-10 border-2 border-dashed border-slate-200 rounded-[24px] bg-slate-50/50 cursor-pointer hover:bg-white hover:border-indigo-300 transition-all duration-300 overflow-hidden" 
+                          onClick={() => setShowServices(true)}
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/0 to-indigo-50/50 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          <div className="relative flex flex-col items-center">
+                            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md mb-3 group-hover:scale-110 transition-transform">
+                              <span className="text-indigo-600 text-3xl font-light">+</span>
+                            </div>
+                            <p className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] group-hover:text-indigo-600 transition-colors">Select Meals or Services</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {showServices && (sel.status === 'checked_in' || sel.status === 'confirmed') && (userRole === 'Manager' || userRole === 'CEO') && (
+                    <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300 mt-4">
+                  {/* Accommodation - Always show on first tab or if extended */}
+                  {(svcAmount > 0 || (sel.collected_amount || 0) === 0) && (
+                    <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-white animate-in slide-in-from-top-2">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Accommodation Extension</p>
+                          <button onClick={() => { 
+                              const next = !isPrepaid;
+                              setIsPrepaid(next);
+                              if (next) setSvcAmount(0); 
+                            }}
+                            className={`px-2 py-0.5 text-[8px] font-black uppercase tracking-wider rounded-md border transition-all ${isPrepaid ? 'bg-emerald-100 text-emerald-700 border-emerald-300' : 'bg-slate-50 text-slate-400 border-slate-200 hover:border-slate-300'}`}>
+                            {isPrepaid ? '✓ Pre-paid' : 'Pre-paid'}
+                          </button>
                         </div>
                       </div>
-
-                      <div className="pb-4 border-b border-slate-100">
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Stay Price Total (USD)</label>
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
-                            <input
-                              type="number"
-                              value={svcAmount}
-                              onChange={e => setSvcAmount(parseFloat(e.target.value) || 0)}
-                              className="w-full pl-7 pr-3 py-2 border-2 border-slate-200 bg-white rounded-xl text-sm font-black text-black focus:border-indigo-500 transition-all"
-                              placeholder="0.00"
+                      <div className="space-y-4 pt-2">
+                        <div className="grid grid-cols-2 gap-4 pb-4 border-b border-slate-100">
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Adults *</label>
+                            <input 
+                              type="number" 
+                              value={svcAdults || ''} 
+                              onChange={e => setSvcAdults(parseInt(e.target.value) || 0)}
+                              disabled={(sel.collected_amount || 0) > 0}
+                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-black text-black focus:border-indigo-500 outline-none transition-all disabled:opacity-50"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Children</label>
+                            <input 
+                              type="number" 
+                              value={svcChildren || ''} 
+                              onChange={e => setSvcChildren(parseInt(e.target.value) || 0)}
+                              disabled={(sel.collected_amount || 0) > 0}
+                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-black text-black focus:border-indigo-500 outline-none transition-all disabled:opacity-50"
                             />
                           </div>
                         </div>
-                      </div>                      <div className="grid grid-cols-1 gap-4">
-                        {/* Lunch */}
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-3">
-                            <label className="flex items-center gap-2 cursor-pointer min-w-[100px]">
-                              <input type="checkbox" checked={svcLunch} onChange={e => {
-                                setSvcLunch(e.target.checked);
-                                if (e.target.checked && svcLunchCount <= 0) setSvcLunchCount(1);
-                              }} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
-                              <span className="text-sm font-bold text-slate-900">Lunch</span>
-                            </label>
-                            {svcLunch && (
-                              <input
-                                type="number"
-                                value={svcLunchCount}
-                                onChange={e => setSvcLunchCount(parseInt(e.target.value) || 0)}
-                                placeholder="Qty"
-                                className={`w-20 px-3 py-1.5 border-2 ${svcLunchCount <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-sm font-bold text-black focus:border-indigo-500 transition-all`}
-                              />
-                            )}
+
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Stay Price (USD)</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                            <input 
+                              type="number" 
+                              value={svcAmount || ''} 
+                              onChange={e => setSvcAmount(parseFloat(e.target.value) || 0)}
+                              disabled={isPrepaid}
+                              className="w-full pl-8 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-lg font-black text-black focus:border-indigo-500 outline-none transition-all disabled:opacity-50"
+                            />
                           </div>
-                          {svcLunch && pricing?.lunch_price && pricing.lunch_price > 0 && (
-                            <span className="text-xs font-bold text-slate-500">
-                              ${(svcLunchCount * pricing.lunch_price).toFixed(2)}
-                              <span className="ml-1 opacity-50">(${pricing.lunch_price}/ea)</span>
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Dinner */}
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-3">
-                            <label className="flex items-center gap-2 cursor-pointer min-w-[100px]">
-                              <input type="checkbox" checked={svcDinner} onChange={e => {
-                                setSvcDinner(e.target.checked);
-                                if (e.target.checked && svcDinnerCount <= 0) setSvcDinnerCount(1);
-                              }} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
-                              <span className="text-sm font-bold text-slate-900">Dinner</span>
-                            </label>
-                            {svcDinner && (
-                              <input
-                                type="number"
-                                value={svcDinnerCount}
-                                onChange={e => setSvcDinnerCount(parseInt(e.target.value) || 0)}
-                                placeholder="Qty"
-                                className={`w-20 px-3 py-1.5 border-2 ${svcDinnerCount <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-sm font-bold text-black focus:border-indigo-500 transition-all`}
-                              />
-                            )}
-                          </div>
-                          {svcDinner && pricing?.dinner_price && pricing.dinner_price > 0 && (
-                            <span className="text-xs font-bold text-slate-500">
-                              ${(svcDinnerCount * pricing.dinner_price).toFixed(2)}
-                              <span className="ml-1 opacity-50">(${pricing.dinner_price}/ea)</span>
-                            </span>
-                          )}
-                        </div>
-
-
-
-                        {/* Guide */}
-                        <div className="space-y-2 pt-2 border-t border-slate-100">
-                          <div className="flex justify-between items-center">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input type="checkbox" checked={svcGuide} onChange={e => {
-                                setSvcGuide(e.target.checked);
-                                if (e.target.checked) {
-                                  setSvcGuidePrice(pricing?.guide_price || 0);
-                                  setSvcGuideNames(['']);
-                                }
-                              }} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
-                              <span className="text-sm font-bold text-slate-900">Guide Service</span>
-                            </label>
-                            {svcGuide && (
-                              <div className="flex items-center gap-2">
-                                <button type="button" onClick={() => setSvcGuidePrice(v => Math.max(0, v - 5))} className="w-8 h-8 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-black text-sm transition-all shadow-sm">－</button>
-                                <div className="relative">
-                                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px]">$</span>
-                                  <input
-                                    type="number"
-                                    value={svcGuidePrice}
-                                    onChange={e => setSvcGuidePrice(parseFloat(e.target.value) || 0)}
-                                    className="w-20 pl-5 pr-2 py-1.5 bg-white border-2 border-slate-200 rounded-xl text-xs font-black text-indigo-600 focus:border-indigo-500 outline-none text-center"
-                                  />
-                                </div>
-                                <button type="button" onClick={() => setSvcGuidePrice(v => v + 5)} className="w-8 h-8 flex items-center justify-center bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl font-black text-sm transition-all shadow-sm">＋</button>
-                              </div>
-                            )}
-                          </div>
-                          {svcGuide && (
-                            <div className="space-y-2">
-                              {svcGuideNames.map((name, ni) => (
-                                <div key={ni} className="flex gap-2">
-                                  <input
-                                    type="text"
-                                    value={name || ''}
-                                    onChange={e => {
-                                      const next = [...svcGuideNames];
-                                      next[ni] = e.target.value;
-                                      setSvcGuideNames(next);
-                                    }}
-                                    placeholder={`Guide ${ni + 1} name...`}
-                                    className={`flex-1 px-3 py-2 border-2 ${!name.trim() ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-sm font-bold text-black focus:border-indigo-500 transition-all`}
-                                  />
-                                  {svcGuideNames.length > 1 && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setSvcGuideNames(v => v.filter((_, i) => i !== ni));
-                                        setSvcGuidePrice(v => Math.max(0, v - (pricing?.guide_price || 0)));
-                                      }}
-                                      className="text-rose-500 hover:text-rose-600 font-black text-xl px-1"
-                                    >
-                                      ×
-                                    </button>
-                                  )}
-                                </div>
-                              ))}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSvcGuideNames(v => [...v, '']);
-                                  setSvcGuidePrice(v => v + (pricing?.guide_price || 0));
-                                }}
-                                className="w-full py-1.5 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:border-indigo-300 hover:text-indigo-500 transition-all"
-                              >
-                                + Add Another Guide
-                              </button>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Transport */}
-                        <div className="space-y-2 pt-2 border-t border-slate-100">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" checked={svcTransport} onChange={e => setSvcTransport(e.target.checked)} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
-                            <span className="text-sm font-bold text-slate-900">Transport</span>
-                          </label>
-                          
-                          {svcTransport && (
-                            <div className="space-y-3">
-                              {svcTransList.map((trans, ti) => (
-                                <div key={ti} className="p-3 border border-slate-100 rounded-xl bg-slate-50/50 space-y-2">
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Transfer {ti + 1}</span>
-                                    {svcTransList.length > 1 && (
-                                      <button type="button" onClick={() => setSvcTransList(v => v.filter((_, i) => i !== ti))} className="text-rose-600 hover:text-rose-700 font-bold text-xs">✕ Remove</button>
-                                    )}
-                                  </div>
-                                  <div className="space-y-2">
-                                    <input
-                                      type="text"
-                                      value={trans.name}
-                                      onChange={e => setSvcTransList(v => v.map((t, i) => i === ti ? { ...t, name: e.target.value } : t))}
-                                      placeholder="Driver Name..."
-                                      className={`w-full px-3 py-1.5 border-2 ${!trans.name.trim() ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-xs font-bold text-black focus:border-indigo-500 transition-all`}
-                                    />
-                                    <div className="flex gap-2">
-                                      <input
-                                        type="text"
-                                        value={trans.details}
-                                        onChange={e => setSvcTransList(v => v.map((t, i) => i === ti ? { ...t, details: e.target.value } : t))}
-                                        placeholder="From/To details..."
-                                        className={`flex-1 px-3 py-1.5 border-2 ${!trans.details.trim() ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-xs font-bold text-black focus:border-indigo-500 transition-all`}
-                                      />
-                                      <div className="flex items-center gap-1.5">
-                                        <span className="text-[10px] font-bold text-slate-400">$</span>
-                                        <input
-                                          type="number"
-                                          value={trans.price}
-                                          onChange={e => setSvcTransList(v => v.map((t, i) => i === ti ? { ...t, price: parseFloat(e.target.value) || 0 } : t))}
-                                          placeholder="Price"
-                                          className={`w-20 px-2 py-1.5 border-2 ${trans.price <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-xs font-bold text-black focus:border-indigo-500 transition-all`}
-                                        />
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                              <button
-                                type="button"
-                                onClick={() => setSvcTransList(v => [...v, { name: '', details: '', price: 0 }])}
-                                className="w-full py-1.5 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:border-indigo-300 hover:text-indigo-500 transition-all"
-                              >
-                                + Add Another Transfer
-                              </button>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Cooking Class */}
-                        <div className="space-y-2 pt-2 border-t border-slate-100">
-                          <div className="flex justify-between items-center">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input type="checkbox" checked={svcCooking} onChange={e => setSvcCooking(e.target.checked)} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
-                              <span className="text-sm font-bold text-slate-900">Cooking Class</span>
-                            </label>
-                            {svcCooking && (
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-slate-400">$</span>
-                                <input
-                                  type="number"
-                                  value={svcCookingPrice}
-                                  onChange={e => setSvcCookingPrice(parseFloat(e.target.value) || 0)}
-                                  placeholder="Price"
-                                  className={`w-24 px-3 py-1.5 border-2 ${svcCookingPrice <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-xs font-bold text-black focus:border-indigo-500 transition-all`}
-                                />
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Laundry */}
-                        <div className="space-y-2 pt-2 border-t border-slate-100">
-                          <div className="flex justify-between items-center">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input type="checkbox" checked={svcLaundry} onChange={e => setSvcLaundry(e.target.checked)} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
-                              <span className="text-sm font-bold text-slate-900">Laundry Service</span>
-                            </label>
-                            {svcLaundry && (
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-slate-400">$</span>
-                                <input
-                                  type="number"
-                                  value={svcLaundryPrice}
-                                  onChange={e => setSvcLaundryPrice(parseFloat(e.target.value) || 0)}
-                                  placeholder="Price"
-                                  className={`w-24 px-3 py-1.5 border-2 ${svcLaundryPrice <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-xs font-bold text-black focus:border-indigo-500 transition-all`}
-                                />
-                              </div>
-                            )}
-                          </div>
+                          <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest italic">
+                            {isPrepaid ? '* Accommodation is marked as pre-paid.' : '* Enter total price for the EXTENDED period.'}
+                          </p>
                         </div>
                       </div>
-                      
-                      <button
-                        onClick={handleSaveServices}
-                        disabled={loadingAction === 'saveservices'}
-                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-black rounded-xl transition-all disabled:opacity-60 flex items-center justify-center gap-2 shadow-lg shadow-indigo-100"
-                      >
-                        {loadingAction === 'saveservices' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '✓'}
-                        Update All Services
-                      </button>
                     </div>
                   )}
+
+                  <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-white">
+                    <div className="flex justify-between items-center">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Food</p>
+                      <button onClick={() => {
+                        const next = !(isLunchPrepaid || isDinnerPrepaid);
+                        setIsLunchPrepaid(next);
+                        setIsDinnerPrepaid(next);
+                      }}
+                        className={`px-2 py-0.5 text-[8px] font-black uppercase tracking-wider rounded-md border transition-all ${(isLunchPrepaid || isDinnerPrepaid) ? 'bg-emerald-100 text-emerald-700 border-emerald-300' : 'bg-slate-50 text-slate-400 border-slate-200 hover:border-slate-300'}`}>
+                        {(isLunchPrepaid || isDinnerPrepaid) ? '✓ Pre-paid' : 'Pre-paid'}
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <label className="flex items-center gap-2 cursor-pointer min-w-[80px]">
+                            <input type="checkbox" checked={svcLunch} onChange={e => { setSvcLunch(e.target.checked); if (e.target.checked && svcLunchCount <= 0) setSvcLunchCount(1); }} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
+                            <span className="text-sm font-bold text-slate-900">Lunch</span>
+                          </label>
+                          {svcLunch && <input type="number" value={svcLunchCount} onChange={e => setSvcLunchCount(parseInt(e.target.value) || 0)} placeholder="Qty"
+                            className={`w-16 px-2 py-1.5 border-2 ${svcLunchCount <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-sm font-bold text-black focus:border-indigo-500 transition-all`} />}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {svcLunch && pricing?.lunch_price && pricing.lunch_price > 0 && (
+                            <span className={`text-xs font-bold text-slate-500 ${isLunchPrepaid ? 'line-through opacity-50' : ''}`}>${(svcLunchCount * pricing.lunch_price).toFixed(2)}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <label className="flex items-center gap-2 cursor-pointer min-w-[80px]">
+                            <input type="checkbox" checked={svcDinner} onChange={e => { setSvcDinner(e.target.checked); if (e.target.checked && svcDinnerCount <= 0) setSvcDinnerCount(1); }} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
+                            <span className="text-sm font-bold text-slate-900">Dinner</span>
+                          </label>
+                          {svcDinner && <input type="number" value={svcDinnerCount} onChange={e => setSvcDinnerCount(parseInt(e.target.value) || 0)} placeholder="Qty"
+                            className={`w-16 px-2 py-1.5 border-2 ${svcDinnerCount <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-sm font-bold text-black focus:border-indigo-500 transition-all`} />}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {svcDinner && pricing?.dinner_price && pricing.dinner_price > 0 && (
+                            <span className={`text-xs font-bold text-slate-500 ${isDinnerPrepaid ? 'line-through opacity-50' : ''}`}>${(svcDinnerCount * pricing.dinner_price).toFixed(2)}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Other Services */}
+                  <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-white">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Other Services</p>
+                    <div className="grid grid-cols-1 gap-4">
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={svcGuide} onChange={e => { 
+                              setSvcGuide(e.target.checked); 
+                              if (e.target.checked) { 
+                                setSvcGuidePrice(pricing?.guide_price || 0); 
+                                setSvcGuideNames(['']); 
+                              } 
+                            }} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
+                            <div className="flex flex-col">
+                              <span className="text-sm font-bold text-slate-900">Guide Service</span>
+                              {pricing?.guide_price && pricing.guide_price > 0 && (
+                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">System Price: ${pricing.guide_price} / guide</span>
+                              )}
+                            </div>
+                          </label>
+                          {svcGuide && (
+                            <div className="flex items-center gap-2">
+                              <button type="button" onClick={() => setSvcGuidePrice(v => Math.max(0, v - 5))} className="w-8 h-8 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-black text-sm transition-all shadow-sm">－</button>
+                              <div className="relative">
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px]">$</span>
+                                <input type="number" value={svcGuidePrice} onChange={e => setSvcGuidePrice(parseFloat(e.target.value) || 0)}
+                                  className="w-20 pl-5 pr-2 py-1.5 bg-white border-2 border-slate-200 rounded-xl text-xs font-black text-black focus:border-indigo-500 outline-none text-center" />
+                              </div>
+                              <button type="button" onClick={() => setSvcGuidePrice(v => v + 5)} className="w-8 h-8 flex items-center justify-center bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl font-black text-sm transition-all shadow-sm">＋</button>
+                            </div>
+                          )}
+                        </div>
+                        {svcGuide && (
+                          <div className="space-y-2">
+                            {svcGuideNames.map((name, ni) => (
+                              <div key={ni} className="flex gap-2">
+                                <input type="text" value={name || ''} onChange={e => { const next = [...svcGuideNames]; next[ni] = e.target.value; setSvcGuideNames(next); }}
+                                  placeholder={`Guide ${ni + 1} name...`}
+                                  className={`flex-1 px-3 py-2 border-2 ${!name.trim() ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-sm font-bold text-black focus:border-indigo-500 transition-all`} />
+                                {svcGuideNames.length > 1 && <button type="button" onClick={() => { setSvcGuideNames(v => v.filter((_, i) => i !== ni)); setSvcGuidePrice(v => Math.max(0, v - 40)); }}
+                                  className="text-rose-500 hover:text-rose-600 font-black text-xl px-1">×</button>}
+                              </div>
+                            ))}
+                            <button type="button" onClick={() => { setSvcGuideNames(v => [...v, '']); setSvcGuidePrice(v => v + 40); }}
+                              className="w-full py-1.5 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:border-indigo-300 hover:text-indigo-500 transition-all">+ Add Another Guide ($40)</button>
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-2 pt-2 border-t border-slate-100">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={svcTransport} onChange={e => setSvcTransport(e.target.checked)} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
+                          <span className="text-sm font-bold text-slate-900">Transport</span>
+                        </label>
+                        {svcTransport && (
+                          <div className="space-y-3">
+                            {svcTransList.map((trans, ti) => (
+                              <div key={ti} className="p-3 border border-slate-100 rounded-xl bg-slate-50/50 space-y-2">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Transfer {ti + 1}</span>
+                                  {svcTransList.length > 1 && <button type="button" onClick={() => setSvcTransList(v => v.filter((_, i) => i !== ti))} className="text-rose-600 hover:text-rose-700 font-bold text-xs">✕ Remove</button>}
+                                </div>
+                                <input type="text" value={trans.name} onChange={e => setSvcTransList(v => v.map((t, i) => i === ti ? { ...t, name: e.target.value } : t))} placeholder="Driver Name..."
+                                  className={`w-full px-3 py-1.5 border-2 ${!trans.name.trim() ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-xs font-bold text-black focus:border-indigo-500 transition-all`} />
+                                <div className="flex gap-2">
+                                  <input type="text" value={trans.details} onChange={e => setSvcTransList(v => v.map((t, i) => i === ti ? { ...t, details: e.target.value } : t))} placeholder="From/To..."
+                                    className={`flex-1 px-3 py-1.5 border-2 ${!trans.details.trim() ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-xs font-bold text-black focus:border-indigo-500 transition-all`} />
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] font-bold text-slate-400">$</span>
+                                    <input type="number" value={trans.price} onChange={e => setSvcTransList(v => v.map((t, i) => i === ti ? { ...t, price: parseFloat(e.target.value) || 0 } : t))} placeholder="Price"
+                                      className={`w-20 px-2 py-1.5 border-2 ${trans.price <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-xs font-bold text-black focus:border-indigo-500 transition-all`} />
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                            <button type="button" onClick={() => setSvcTransList(v => [...v, { name: '', details: '', price: 0 }])}
+                              className="w-full py-1.5 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:border-indigo-300 hover:text-indigo-500 transition-all">+ Add Transfer</button>
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-2 pt-2 border-t border-slate-100">
+                        <div className="flex justify-between items-center">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={svcCooking} onChange={e => setSvcCooking(e.target.checked)} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
+                            <span className="text-sm font-bold text-slate-900">Cooking Class</span>
+                          </label>
+                          {svcCooking && <div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-400">$</span>
+                            <input type="number" value={svcCookingPrice} onChange={e => setSvcCookingPrice(parseFloat(e.target.value) || 0)} placeholder="Price"
+                              className={`w-24 px-3 py-1.5 border-2 ${svcCookingPrice <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-xs font-bold text-black focus:border-indigo-500 transition-all`} /></div>}
+                        </div>
+                      </div>
+                      <div className="space-y-2 pt-2 border-t border-slate-100">
+                        <div className="flex justify-between items-center">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={svcLaundry} onChange={e => setSvcLaundry(e.target.checked)} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
+                            <span className="text-sm font-bold text-slate-900">Laundry</span>
+                          </label>
+                          {svcLaundry && <div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-400">$</span>
+                            <input type="number" value={svcLaundryPrice} onChange={e => setSvcLaundryPrice(parseFloat(e.target.value) || 0)} placeholder="Price"
+                              className={`w-24 px-3 py-1.5 border-2 ${svcLaundryPrice <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-xs font-bold text-black focus:border-indigo-500 transition-all`} /></div>}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -1497,15 +1799,32 @@ export function GoogleGuestAgenda({
               {(userRole === 'Manager' || userRole === 'CEO') && (
                 <div className="bg-indigo-600 rounded-2xl p-5 text-white shadow-xl shadow-indigo-200 animate-in fade-in zoom-in duration-500">
                   <div className="flex justify-between items-center mb-4">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Final Tab (Total Sum)</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Tab Summary</p>
                     <svg className="w-5 h-5 text-indigo-300 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
                   </div>
                   
                   <div className="space-y-2">
-                    <div className="flex justify-between items-center opacity-90 border-b border-white/20 pb-2 mb-2">
-                      <span className="font-bold">Accommodation</span>
-                      <span className="font-black">${svcAmount.toFixed(2)}</span>
-                    </div>
+                    {(svcAmount > 0 || isPrepaid) && (
+                      <div className="flex justify-between items-center opacity-90 border-b border-white/20 pb-2 mb-2">
+                        <span className="font-bold">Accommodation</span>
+                        {isPrepaid ? (
+                          <span className="text-[10px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">Prepaid</span>
+                        ) : (
+                          <div className="flex items-center gap-1 group relative">
+                            <span className="text-white/40 font-bold text-[10px] uppercase tracking-tighter">Edit: $</span>
+                            <input 
+                              type="number" 
+                              value={svcAmount} 
+                              onChange={(e) => setSvcAmount(parseFloat(e.target.value) || 0)}
+                              className="bg-white/10 hover:bg-white/20 border-none text-right font-black w-24 focus:outline-none focus:ring-1 focus:ring-white/40 rounded px-2 py-0.5 text-white transition-all"
+                            />
+                            <div className="absolute -top-6 right-0 bg-black text-[8px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                              Click to edit Accommodation price
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     
                     {(() => {
                       const sTotal = (
@@ -1553,28 +1872,73 @@ export function GoogleGuestAgenda({
 
                   <div className="mt-4 pt-4 border-t border-indigo-400 flex justify-between items-end">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="text-[9px] font-black uppercase tracking-widest text-indigo-300 leading-none">Grand Total</p>
-                        <span className="text-[8px] font-black bg-white/20 px-1.5 py-0.5 rounded text-white/80 uppercase">Supposed to pay</span>
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-indigo-100">
+                            {gTotal > 0 ? 'Current Open Tab' : 'Tab Settled (Ready)'}
+                          </p>
+                          <span className="text-[8px] font-black bg-white/20 px-1.5 py-0.5 rounded text-white/80 uppercase">
+                            {gTotal > 0 ? 'Supposed to pay' : 'Balance: $0.00'}
+                          </span>
+                        </div>
+                        {((sel.collected_amount || 0) > 0 || gTotal > 0.01) && (
+                          <div className="flex flex-col items-end gap-2">
+                             {(() => {
+                                try {
+                                  const m = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
+                                  const rCount = m.settled_receipts?.length || 0;
+                                  return (
+                                    <div className="flex flex-col items-end gap-2">
+                                       <button 
+                                          onClick={() => { setSelectedReceipt(null); setShowFinalReceipt(true); }}
+                                          className={`bg-white/10 hover:bg-white/20 p-2 rounded-xl border border-white/20 transition-all group flex items-center gap-2 ${gTotal > 0.01 ? 'ring-2 ring-white/30 shadow-lg' : ''}`}
+                                        >
+                                          <svg className="w-4 h-4 text-white/80 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                          <span className="text-[9px] font-black text-white uppercase tracking-widest">{gTotal > 0.01 ? 'Current Folio' : 'Open Tab'}</span>
+                                        </button>
+                                        {rCount > 0 && (
+                                          <div className="flex flex-wrap justify-end gap-2 max-w-[160px]">
+                                            {m.settled_receipts.map((r: any, idx: number) => (
+                                              <button 
+                                                key={r.id || `tab-${idx}`}
+                                                onClick={(e) => { 
+                                                  e.preventDefault();
+                                                  e.stopPropagation(); 
+                                                  setSelectedReceipt(r); 
+                                                  setShowFinalReceipt(true); 
+                                                }}
+                                                className="bg-white/20 hover:bg-white/40 px-3 py-1.5 rounded-lg border border-white/30 text-[10px] font-black text-white transition-all uppercase tracking-widest shadow-sm active:scale-95"
+                                              >
+                                                Tab {idx + 1}
+                                              </button>
+                                            ))}
+                                          </div>
+                                        )}
+                                    </div>
+                                  );
+                                } catch { return null; }
+                             })()}
+                          </div>
+                        )}
                       </div>
                       <p className="text-3xl font-black tracking-tighter leading-none mb-2">
                         ${gTotal.toFixed(2)}
                       </p>
                       
-                      {/* Live Math */}
-                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-200 bg-black/10 rounded-lg px-2 py-1.5 w-fit">
-                        <span>${gTotal.toFixed(2)}</span>
-                        <span className="opacity-50">−</span>
-                        <span className={tPaidUsd > 0 ? 'text-white' : ''}>${tPaidUsd.toFixed(2)} (Paid)</span>
-                        <span className="opacity-50">=</span>
-                        {Math.abs(balance) < 0.01 ? (
-                          <span className="text-emerald-300 font-black">PAYMENT DONE</span>
-                        ) : (
-                          <span className={balance > 0 ? 'text-rose-300' : 'text-sky-300'}>
-                            ${Math.abs(balance).toFixed(2)} {balance > 0 ? 'REMAINING' : 'CHANGE'}
-                          </span>
-                        )}
-                      </div>
+                       {/* Status Display - Hide if completed or settled */}
+                       {sel.status !== 'completed' && gTotal > 0.01 && (
+                         <div className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-200 bg-black/10 rounded-lg px-2 py-1.5 w-fit">
+                           <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse" />
+                           TAB OPEN: ${gTotal.toFixed(2)}
+                         </div>
+                       )}
+                       
+                       {sel.status !== 'completed' && gTotal <= 0.01 && (sel.collected_amount || 0) > 0 && (
+                         <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-300 bg-emerald-950/20 rounded-lg px-2 py-1.5 w-fit border border-emerald-500/20">
+                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                           ALL TABS PAID
+                         </div>
+                       )}
                     </div>
                     <div className="bg-white/20 px-3 py-1.5 rounded-lg backdrop-blur-sm border border-white/10 ml-4">
                       <p className="text-[10px] font-bold text-indigo-100">USD</p>
@@ -1583,192 +1947,256 @@ export function GoogleGuestAgenda({
                 </div>
               )}
 
-              {/* Payment Collection */}
-              {(userRole === 'Manager' || userRole === 'CEO') && (
-                <div className="bg-white border-2 border-slate-100 rounded-2xl p-5 space-y-4 shadow-sm">
-                  <div className="flex justify-between items-center">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Payment Collection</p>
-                    {balance > 0.01 ? (
-                      <span className="text-[10px] font-black uppercase tracking-widest text-rose-500 bg-rose-50 px-2 py-1 rounded-lg border border-rose-100 animate-pulse">
-                        Remaining: ${balance.toFixed(2)}
-                      </span>
-                    ) : balance < -0.01 ? (
-                      <span className="text-[10px] font-black uppercase tracking-widest text-indigo-500 bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100">
-                        Change: ${Math.abs(balance).toFixed(2)}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100">
-                        ✓ Fully Paid
-                      </span>
-                    )}
-                  </div>
+              {/* Payment Collection Logic */}
+              {(userRole === 'Manager' || userRole === 'CEO') && sel.status !== 'completed' && (
+                  debtRemaining > 1.00 && (
+                    <div className="bg-white border-2 border-slate-100 rounded-2xl p-5 space-y-4 shadow-sm">
+                      <div className="flex justify-between items-center">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Payment Collection</p>
+                        {isBalanceMatched || (tPaidUsd >= debtRemaining - 1.00) ? (
+                          <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200">
+                            Paid
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-black uppercase tracking-widest text-rose-500 bg-rose-50 px-2 py-1 rounded-lg border border-rose-100">
+                            Remaining: ${(debtRemaining - tPaidUsd).toFixed(2)}
+                          </span>
+                        )}
+                      </div>
 
-                  <div className="space-y-4">
-                    {svcPayList.map((pay, pi) => {
-                      const usdAmt = parseFloat(pay.amount) || 0;
-                      const currentRate = pay.currency === 'USD' ? 1 : (pay.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92));
-                      const guestPays = usdAmt * currentRate;
-
-                      return (
-                        <div key={pi} className="space-y-3 p-4 bg-slate-50/50 rounded-2xl border border-slate-100 animate-in slide-in-from-top-2 duration-300">
-                          <div className="flex justify-between items-center">
-                            <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">Payment {pi + 1}</label>
-                            {svcPayList.length > 1 && (
-                              <button onClick={() => setSvcPayList(v => v.filter((_, i) => i !== pi))} className="text-[10px] font-bold text-rose-500 hover:text-rose-700">✕ Remove</button>
-                            )}
-                          </div>
-
-                          <div className="grid grid-cols-12 gap-3 items-end">
-                            {/* Amount Due in this currency */}
-                            <div className="col-span-12">
-                              <div className="flex items-center justify-between px-3 py-2 bg-slate-100 rounded-xl border border-slate-200">
-                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Amount Due in {pay.currency}</span>
-                                <span className="text-xs font-black text-indigo-600">
-                                  {(balance * currentRate).toLocaleString(undefined, { minimumFractionDigits: pay.currency === 'UZS' ? 0 : 2, maximumFractionDigits: pay.currency === 'UZS' ? 0 : 2 })} {pay.currency}
-                                </span>
+                      <div className="space-y-4">
+                        {svcPayList.map((pay, pi) => {
+                          const currentRate = pay.currency === 'USD' ? 1 : (pay.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92));
+                          
+                          return (
+                            <div key={pi} className="space-y-3 p-4 bg-slate-50/50 rounded-2xl border border-slate-100 animate-in slide-in-from-top-2 duration-300">
+                              <div className="flex justify-between items-center">
+                                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">Payment {pi + 1}</label>
+                                {svcPayList.length > 1 && (
+                                  <button onClick={() => setSvcPayList(v => v.filter((_, i) => i !== pi))} className="text-[10px] font-bold text-rose-500 hover:text-rose-700">✕ Remove</button>
+                                )}
                               </div>
-                            </div>
 
-                            {/* USD Target */}
-                            <div className="col-span-4 space-y-1.5">
-                              <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">
-                                {svcPayList.length === 1 ? 'Total Bill' : 'Amount (USD)'}
-                              </span>
-                              <div className="relative">
-                                <span className={`absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold ${pay.currency === 'UZS' ? 'text-[9px]' : 'text-xs'}`}>
-                                  {pay.currency === 'USD' ? '$' : pay.currency === 'UZS' ? 'SUM' : '€'}
-                                </span>
-                                <input
-                                  type="text"
-                                  inputMode="decimal"
-                                  value={pay.amount || ''}
-                                  onChange={e => {
-                                    const valStr = e.target.value;
-                                    setPayModified(true);
-                                    setSvcPayList(v => v.map((p, i) => i === pi ? { ...p, amount: valStr } : p));
-                                  }}
-                                  placeholder="0.00"
-                                  className={`w-full ${pay.currency === 'UZS' ? 'pl-9' : 'pl-6'} py-3 bg-white border-2 border-slate-200 rounded-2xl text-base font-black text-black focus:border-indigo-500 outline-none transition-all shadow-sm`}
-                                />
-                              </div>
-                            </div>
+                              <div className="grid grid-cols-12 gap-4 items-end">
+                                <div className="col-span-12 space-y-1.5">
+                                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Pay in</span>
+                                  <select 
+                                    value={pay.currency}
+                                      onChange={e => {
+                                        const newCurr = e.target.value as any;
+                                        const newRate = newCurr === 'USD' ? 1 : (newCurr === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92));
+                                        
+                                        // Calculate what is already covered by OTHER rows
+                                        const otherRowsPaidUsd = svcPayList
+                                          .filter((_, idx) => idx !== pi)
+                                          .reduce((sum, p) => {
+                                            const amt = parseFloat(p.amount) || 0;
+                                            const r = p.currency === 'USD' ? 1 : (p.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92));
+                                            return sum + (amt / r);
+                                          }, 0);
+                                        
+                                        const stillOwedUsd = Math.max(0, debtRemaining - otherRowsPaidUsd);
 
-                            {/* Currency Selector */}
-                            <div className="col-span-3 space-y-1.5">
-                              <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Pay in</span>
-                              <select 
-                                value={pay.currency}
-                                onChange={e => setSvcPayList(v => v.map((p, i) => i === pi ? { ...p, currency: e.target.value as any } : p))}
-                                className="w-full px-2 py-2 bg-white border border-slate-200 rounded-xl text-xs font-black text-indigo-600 outline-none"
-                              >
-                                <option value="USD">USD ($)</option>
-                                <option value="UZS">UZS (Sum)</option>
-                                <option value="EUR">EUR (€)</option>
-                              </select>
-                            </div>
-
-                            {/* Method Selector */}
-                            <div className="col-span-5 space-y-1.5">
-                              <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Method</span>
-                              <div className="flex gap-1.5">
-                                {(['Cash', 'Card/Online'] as const).map(m => (
-                                  <button
-                                    key={m}
-                                    onClick={() => setSvcPayList(v => v.map((p, i) => i === pi ? { ...p, method: m } : p))}
-                                    className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-tighter transition-all border-2 ${
-                                      pay.method === m 
-                                        ? 'bg-indigo-600 border-indigo-600 text-white' 
-                                        : 'bg-white border-slate-200 text-slate-400 hover:border-indigo-100 hover:text-indigo-500'
-                                    }`}
+                                        setSvcPayList(v => v.map((p, i) => {
+                                          if (i !== pi) return p;
+                                          const updates: any = { ...p, currency: newCurr };
+                                          // Auto-fill based on remaining balance
+                                          if (newCurr !== 'USD') {
+                                            updates.amount = (stillOwedUsd * newRate).toFixed(newCurr === 'UZS' ? 0 : 2);
+                                          } else {
+                                            updates.amount = stillOwedUsd.toFixed(2);
+                                          }
+                                          return updates;
+                                        }));
+                                      }}
+                                    className="w-full px-4 py-3 bg-white border-2 border-slate-200 rounded-2xl text-base font-black text-black outline-none focus:border-indigo-500 transition-all shadow-sm"
                                   >
-                                    {m === 'Card/Online' ? 'Card' : m}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-
-                            {/* Guest Pays (Result) */}
-                            <div className="col-span-12 space-y-1.5">
-                              <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Guest Pays</span>
-                              <div className="px-4 py-3 bg-indigo-600 rounded-2xl text-white shadow-xl shadow-indigo-100 flex justify-between items-center border border-white/20">
-                                <span className="text-sm font-black tracking-tight">
-                                  {guestPays.toLocaleString(undefined, { minimumFractionDigits: pay.currency === 'UZS' ? 0 : 2, maximumFractionDigits: pay.currency === 'UZS' ? 0 : 2 })}
-                                </span>
-                                <span className="text-[10px] font-black opacity-80 uppercase tracking-widest">{pay.currency}</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Rate Control (Only for non-USD) */}
-                          {pay.currency !== 'USD' && pricing && (
-                            <div className="flex flex-col gap-2 pt-2 border-t border-slate-100 mt-2">
-                              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center">
-                                Conversion: $1 = {currentRate.toLocaleString()} {pay.currency}
-                              </p>
-                              <div className="flex items-center gap-3">
-                                <div className="flex items-center gap-2 flex-1">
-                                  <span className="text-[9px] font-black text-slate-400 uppercase whitespace-nowrap">1 USD =</span>
-                                  <input
-                                    type="number"
-                                    value={pay.currency === 'UZS' ? pricing.usd_to_uzs : pricing.usd_to_eur}
-                                    onChange={e => {
-                                      const val = parseFloat(e.target.value) || 0;
-                                      setPricing((prev) => prev ? { ...prev, [pay.currency === 'UZS' ? 'usd_to_uzs' : 'usd_to_eur']: val } : prev);
-                                    }}
-                                    className="w-24 px-2 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-black text-indigo-600 outline-none"
-                                  />
-                                  <span className="text-[9px] font-black text-slate-400 uppercase">{pay.currency}</span>
+                                    <option value="USD">USD ($)</option>
+                                    <option value="UZS">UZS (Sum)</option>
+                                    <option value="EUR">EUR (€)</option>
+                                  </select>
                                 </div>
-                                <button 
-                                  onClick={() => fetchCbuRate(pay.currency as 'UZS' | 'EUR')}
-                                  disabled={fetchingRate === pay.currency}
-                                  className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[9px] font-black rounded-lg hover:bg-indigo-100 transition-all flex items-center gap-1 disabled:opacity-50 border border-indigo-100"
-                                >
-                                  {fetchingRate === pay.currency ? '...' : 'Fetch CBU Rate'}
-                                </button>
+
+                                {pay.currency !== 'USD' && (
+                                  <div className="col-span-12 space-y-1.5 animate-in slide-in-from-left-2">
+                                    <div className="flex justify-between items-center px-1">
+                                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Edit Exchange Rate (1 USD =)</span>
+                                      <button 
+                                        onClick={() => fetchCbuRate(pay.currency as 'UZS' | 'EUR')}
+                                        disabled={fetchingRate === pay.currency}
+                                        className="text-[9px] font-black text-indigo-600 hover:text-indigo-700 underline decoration-indigo-200 underline-offset-2"
+                                      >
+                                        {fetchingRate === pay.currency ? '...' : 'Get Live Rate'}
+                                      </button>
+                                    </div>
+                                    <div className="relative group">
+                                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs uppercase tracking-tight group-focus-within:text-indigo-500 transition-colors">Rate:</div>
+                                      <input
+                                        type="number"
+                                        value={pay.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92)}
+                                        onChange={e => {
+                                          const val = parseFloat(e.target.value) || 0;
+                                          setPricing((prev) => prev ? { ...prev, [pay.currency === 'UZS' ? 'usd_to_uzs' : 'usd_to_eur']: val } : prev);
+                                        }}
+                                        className="w-full pl-14 pr-3 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-sm font-black text-black outline-none focus:border-indigo-500 transition-all shadow-sm"
+                                      />
+                                    </div>
+                                    <p className="text-[8px] text-slate-400 font-bold px-1 uppercase tracking-wider italic">
+                                      * This rate is used to calculate the USD equivalent for your {pay.currency} payment.
+                                    </p>
+                                  </div>
+                                )}
+
+                                <div className="col-span-12 space-y-1.5 animate-in slide-in-from-top-1">
+                                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Method</span>
+                                  <div className="flex gap-2">
+                                    {(['Cash', 'Card/Online'] as const).map(m => (
+                                      <button
+                                        key={m}
+                                        onClick={() => setSvcPayList(v => v.map((p, i) => i === pi ? { ...p, method: m } : p))}
+                                        className={`flex-1 py-3 rounded-2xl text-xs font-black uppercase tracking-tighter transition-all border-2 ${
+                                          pay.method === m 
+                                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-100' 
+                                            : 'bg-white border-slate-200 text-slate-400 hover:border-indigo-100 hover:text-indigo-500'
+                                        }`}
+                                      >
+                                        {m === 'Card/Online' ? 'Card / Online' : m}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                <div className="col-span-12 space-y-1.5 animate-in fade-in zoom-in-95">
+                                  <div className="flex justify-between items-center px-1">
+                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Money to Collect ({pay.currency})</span>
+                                    <button 
+                                      onClick={() => {
+                                        const otherRowsPaidUsd = svcPayList
+                                          .filter((_, idx) => idx !== pi)
+                                          .reduce((sum, p) => {
+                                            const amt = parseFloat(p.amount) || 0;
+                                            const r = p.currency === 'USD' ? 1 : (p.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92));
+                                            return sum + (amt / r);
+                                          }, 0);
+                                        const stillOwedUsd = Math.max(0, debtRemaining - otherRowsPaidUsd);
+                                        const r = pay.currency === 'USD' ? 1 : (pay.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92));
+                                        const matchAmt = stillOwedUsd * r;
+                                        setSvcPayList(v => v.map((p, i) => i === pi ? { ...p, amount: matchAmt > 0 ? (pay.currency === 'UZS' ? Math.round(matchAmt).toString() : matchAmt.toFixed(2)) : '' } : p));
+                                      }}
+                                      className="text-[9px] font-black text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100 transition-all active:scale-95"
+                                    >
+                                      MATCH BALANCE
+                                    </button>
+                                  </div>
+                                  <div className="relative">
+                                    <span className={`absolute left-4 top-1/2 -translate-y-1/2 font-black text-slate-400 ${pay.currency === 'UZS' ? 'text-[9px]' : 'text-sm'}`}>
+                                      {pay.currency === 'USD' ? '$' : pay.currency === 'EUR' ? '€' : 'SUM'}
+                                    </span>
+                                    <input
+                                      type="text"
+                                      inputMode="decimal"
+                                      value={pay.amount || ''}
+                                      onChange={e => {
+                                        setPayModified(true);
+                                        setSvcPayList(v => v.map((p, i) => i === pi ? { ...p, amount: e.target.value } : p));
+                                      }}
+                                      placeholder="0.00"
+                                      className={`w-full ${pay.currency === 'UZS' ? 'pl-11' : 'pl-8'} pr-4 py-4 bg-white border-2 border-slate-200 rounded-3xl text-xl font-black text-black focus:border-indigo-500 outline-none transition-all shadow-md`}
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Row 5: Produced USD Equivalent or Summary */}
+                                {pay.currency !== 'USD' ? (
+                                  <div className="col-span-12 animate-in slide-in-from-bottom-2">
+                                    <div className="px-6 py-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex justify-between items-center">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600">
+                                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                        </div>
+                                        <span className="text-xs font-black text-emerald-700 uppercase tracking-tight">Covers USD Balance</span>
+                                      </div>
+                                      <span className="text-xl font-black text-emerald-600">
+                                        ${formatSpace(parseFloat(pay.amount || '0') / currentRate, 2)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ) : (
+                                    <div className="col-span-12 px-1">
+                                        <p className="text-[9px] text-slate-400 font-bold italic">Subtracts directly from USD total bill.</p>
+                                    </div>
+                                )}
                               </div>
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                          );
+                        })}
 
-                    <button
-                      onClick={() => setSvcPayList(v => [...v, { amount: '', currency: 'USD', method: 'Cash' }])}
-                      className="w-full py-3 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:border-indigo-300 hover:text-indigo-500 transition-all flex items-center justify-center gap-2 bg-slate-50/30"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-                      Add Another Currency
-                    </button>
+                        <button
+                          onClick={() => {
+                            const remaining = Math.max(0, debtRemaining - tPaidUsd);
+                            setSvcPayList(v => [...v, { 
+                              amount: remaining > 1.00 ? remaining.toFixed(2) : '', 
+                              currency: 'USD', 
+                              method: 'Cash' 
+                            }]);
+                          }}
+                          className="w-full py-3 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:border-indigo-300 hover:text-indigo-500 transition-all flex items-center justify-center gap-2 bg-slate-50/30"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                          Add Another Currency
+                        </button>
 
-                    <button
-                      onClick={() => setShowFinalReceipt(true)}
-                      className="w-full py-3 bg-indigo-600 text-white rounded-xl font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                      Paid
-                    </button>
-                  </div>
-                </div>
+                        <button
+                          onClick={() => {
+                            if (!isPrepaid && svcAmount <= 0 && (sel.collected_amount || 0) === 0) {
+                              setValError('Stay Price is missing. Please enter the guest\'s accommodation cost before proceeding.');
+                              return;
+                            }
+                            if (!isBalanceMatched) {
+                              setValError(`Payment balance mismatch. You are trying to collect ${tPaidUsd.toFixed(2)} USD, but the debt is ${debtRemaining.toFixed(2)} USD. Please use the "Match Balance" button to even the tab.`);
+                              return;
+                            }
+                            setSelectedReceipt(null);
+                            setShowFinalReceipt(true);
+                          }}
+                          disabled={loadingAction === 'checkout'}
+                          className={`w-full py-3 rounded-xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${loadingAction === 'checkout' ? 'bg-slate-400 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-100 hover:scale-[1.02] active:scale-95'}`}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          Paid
+                        </button>
+                      </div>
+                    </div>
+                  )
               )}
+
 
               {/* Receipt / Confirmation Modal */}
               {showFinalReceipt && sel && (
                 <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
                   <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowFinalReceipt(false)} />
-                  <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
-                    <div className="bg-indigo-600 px-6 py-8 text-white text-center relative">
-                      <div className="absolute top-4 right-4">
-                        <button onClick={() => setShowFinalReceipt(false)} className="text-white/60 hover:text-white transition-all text-2xl font-bold">×</button>
+                  <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+                      <div className="bg-indigo-600 px-6 py-8 text-white text-center relative">
+                        <div className="absolute top-4 right-4">
+                          <button onClick={() => setShowFinalReceipt(false)} className="text-white/60 hover:text-white transition-all text-2xl font-bold">×</button>
+                        </div>
+                        <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/30">
+                          <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        </div>
+                        <h3 className="text-xl font-black uppercase tracking-tight">Final Receipt</h3>
+                        <div className="flex flex-col items-center gap-1 mt-1">
+                          <p className="text-indigo-200 text-[10px] font-bold uppercase tracking-widest">
+                            {selectedReceipt ? `Receipt #${selectedReceipt.id}` : 'Statement of Account'}
+                          </p>
+                          <div className="px-2 py-0.5 bg-white/10 rounded text-[9px] font-black text-white/80 border border-white/20 uppercase tracking-tighter">
+                            {selectedReceipt ? `Settled: ${new Date(selectedReceipt.date).toLocaleString()}` : `Guest Folio: #${sel.id?.toString().padStart(4, '0')}`}
+                          </div>
+                        </div>
                       </div>
-                      <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/30">
-                        <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                      </div>
-                      <h3 className="text-xl font-black uppercase tracking-tight">Final Receipt</h3>
-                      <p className="text-indigo-200 text-xs font-bold uppercase tracking-widest mt-1">Payment Summary</p>
-                    </div>
 
                     <div className="p-6 space-y-4">
+
+                      {/* Guest Info */}
                       <div className="space-y-2 border-b border-slate-100 pb-4">
                         <div className="flex justify-between text-sm">
                           <span className="text-slate-500 font-bold">Guest</span>
@@ -1780,77 +2208,259 @@ export function GoogleGuestAgenda({
                         </div>
                       </div>
 
-                      <div className="space-y-3">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Charges Breakdown</p>
-                        <div className="space-y-1.5">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-slate-600">Accommodation</span>
-                            <span className="text-slate-900 font-bold">${svcAmount.toFixed(2)}</span>
-                          </div>
-                          {sTotal_calc > 0 && (
-                            <div className="flex justify-between text-sm">
-                              <span className="text-slate-600">Services & Food</span>
-                              <span className="text-slate-900 font-bold">${sTotal_calc.toFixed(2)}</span>
-                            </div>
-                          )}
-                          {dTotal_calc > 0 && (
-                            <div className="flex justify-between text-sm">
-                              <span className="text-slate-600">Drinks Tab</span>
-                              <span className="text-slate-900 font-bold">${dTotal_calc.toFixed(2)}</span>
-                            </div>
-                          )}
-                          {eTotal_calc > 0 && (
-                            <div className="flex justify-between text-sm">
-                              <span className="text-slate-600">Extra Services</span>
-                              <span className="text-slate-900 font-bold">${eTotal_calc.toFixed(2)}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="bg-indigo-50 rounded-2xl p-4 space-y-3">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Total Bill (USD)</span>
-                          <span className="text-xl font-black text-indigo-700">
-                            ${gTotal.toFixed(2)}
-                          </span>
-                        </div>
-                        
-                        <div className="pt-2 border-t border-indigo-100">
-                          <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">Collected Money</p>
-                          <div className="space-y-1.5">
-                            {svcPayList.map((p, i) => (
-                              <div key={i} className="flex justify-between text-xs font-bold text-slate-700">
-                                <span>{p.currency}</span>
-                                <span>{parseFloat(p.amount || '0').toLocaleString(undefined, { minimumFractionDigits: p.currency === 'UZS' ? 0 : 2 })} {p.currency}</span>
+                      {/* Charges Section */}
+                      {selectedReceipt ? (
+                        <div className="space-y-3">
+                          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-2 py-1 rounded w-fit">Tab #{selectedReceipt.id}</p>
+                            {/* Accommodation always first */}
+                            {((selectedReceipt.items?.accommodation || 0) > 0 || selectedReceipt.items?.isPrepaid) && (
+                              <div className="flex justify-between text-sm">
+                                <span className="text-slate-600 font-bold">Accommodation</span>
+                                {selectedReceipt.items?.isPrepaid ? (
+                                  <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">Prepaid</span>
+                                ) : (
+                                  <span className="text-slate-900 font-black">${(selectedReceipt.items.accommodation || 0).toFixed(2)}</span>
+                                )}
                               </div>
-                            ))}
-                          </div>
+                            )}
+                            {/* Food items */}
+                            {(selectedReceipt.items?.meals?.lunch || 0) > 0 && (
+                              <div className="flex justify-between text-xs text-slate-500"><span>Lunch ×{selectedReceipt.items.meals.lunch}</span><span>${(selectedReceipt.items.meals.lunch * (pricing?.lunch_price || 0)).toFixed(2)}</span></div>
+                            )}
+                            {(selectedReceipt.items?.meals?.dinner || 0) > 0 && (
+                              <div className="flex justify-between text-xs text-slate-500"><span>Dinner ×{selectedReceipt.items.meals.dinner}</span><span>${(selectedReceipt.items.meals.dinner * (pricing?.dinner_price || 0)).toFixed(2)}</span></div>
+                            )}
+                            {/* Services */}
+                            {Object.entries(selectedReceipt.items?.services || {}).map(([k, v]: [string, any]) => (v > 0 ? <div key={k} className="flex justify-between text-xs text-slate-500 capitalize"><span>{k}</span><span>${parseFloat(v).toFixed(2)}</span></div> : null))}
+                            {/* Drinks */}
+                            {(selectedReceipt.items?.drinks || []).map((d: any, i: number) => (<div key={i} className="flex justify-between text-xs text-slate-500"><span>{d.drink_name} ×{d.quantity}</span><span>${(d.price * d.quantity).toFixed(2)}</span></div>))}
+                            {/* Extras */}
+                            {(selectedReceipt.items?.extras || []).map((ex: any, i: number) => (<div key={i} className="flex justify-between text-xs text-slate-500"><span>{ex.name}</span><span>${parseFloat(ex.price || 0).toFixed(2)}</span></div>))}
+                            <div className="flex justify-between text-sm pt-2 border-t border-slate-100 mt-2"><span className="font-bold text-slate-900">Tab Total</span><span className="font-black text-indigo-600">${(selectedReceipt.total || 0).toFixed(2)}</span></div>
+                            <div className="bg-emerald-50 rounded-xl p-3 space-y-1.5 mt-2">
+                              <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest text-center">Payments Received</p>
+                              {(selectedReceipt.payments || []).map((p: any, i: number) => (
+                                <div key={i} className="flex justify-between text-xs font-bold text-emerald-700"><span>{p.currency} · {p.method}</span><span>{formatSpace(parseFloat(p.amount || '0'), p.currency === 'UZS' ? 0 : 2)} {p.currency}</span></div>
+                              ))}
+                              <div className="flex justify-between text-xs font-black text-emerald-600 pt-1.5 border-t border-emerald-100">
+                                <span>Total Paid (USD Equiv.)</span>
+                                <span>${(selectedReceipt.total || 0).toFixed(2)}</span>
+                              </div>
+                            </div>
                         </div>
+                      ) : (
+                        <div className="space-y-4">
 
-                        {Math.abs(balance) > 0.01 && (
-                          <div className={`pt-2 border-t ${balance > 0 ? 'border-rose-100' : 'border-indigo-100'} flex justify-between items-center`}>
-                            <span className={`text-[10px] font-black uppercase tracking-widest ${balance > 0 ? 'text-rose-500' : 'text-indigo-500'}`}>
-                              {balance > 0 ? 'Remaining' : 'Change Due'}
-                            </span>
-                            <span className={`text-sm font-black ${balance > 0 ? 'text-rose-600' : 'text-indigo-600'}`}>
-                              ${Math.abs(balance).toFixed(2)}
-                            </span>
+
+                          {/* Current Tab Charges */}
+                          <div className="space-y-2">
+                            <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest text-center">{(sel.collected_amount || 0) > 0 ? 'Current Open Tab' : 'Charges Breakdown'}</p>
+                            <div className="space-y-1.5 bg-white rounded-xl border border-slate-100 p-3">
+                              {/* Accommodation first */}
+                              {(svcAmount > 0 || (isPrepaid && (sel.collected_amount || 0) === 0)) && (
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-slate-600 font-bold">{(sel.collected_amount || 0) > 0 ? 'Extended Stay' : 'Accommodation'}</span>
+                                  {isPrepaid && (sel.collected_amount || 0) === 0 ? (
+                                    <span className="text-[10px] font-black bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded uppercase tracking-wider">Prepaid</span>
+                                  ) : (
+                                    <span className="text-slate-900 font-black">${svcAmount.toFixed(2)}</span>
+                                  )}
+                                </div>
+                              )}
+                              {/* Food */}
+                              {svcLunch && svcLunchCount > 0 && <div className="flex justify-between text-xs text-slate-500"><span>Lunch ×{svcLunchCount}</span><span>${(svcLunchCount * (pricing?.lunch_price || 0)).toFixed(2)}</span></div>}
+                              {svcDinner && svcDinnerCount > 0 && <div className="flex justify-between text-xs text-slate-500"><span>Dinner ×{svcDinnerCount}</span><span>${(svcDinnerCount * (pricing?.dinner_price || 0)).toFixed(2)}</span></div>}
+                              {/* Services */}
+                              {svcGuide && svcGuidePrice > 0 && <div className="flex justify-between text-xs text-slate-500"><span>Guide</span><span>${svcGuidePrice.toFixed(2)}</span></div>}
+                              {(() => {
+                                const tPrice = svcTransList.reduce((s, t) => s + (t.price || 0), 0);
+                                if (!svcTransport || tPrice <= 0) return null;
+                                return <div className="flex justify-between text-xs text-slate-500"><span>Transport</span><span>${tPrice.toFixed(2)}</span></div>;
+                              })()}
+                              {svcCooking && svcCookingPrice > 0 && <div className="flex justify-between text-xs text-slate-500"><span>Cooking Class</span><span>${svcCookingPrice.toFixed(2)}</span></div>}
+                              {svcLaundry && svcLaundryPrice > 0 && <div className="flex justify-between text-xs text-slate-500"><span>Laundry</span><span>${svcLaundryPrice.toFixed(2)}</span></div>}
+                              {/* Drinks & Extras */}
+                              {dTotal_calc > 0 && <div className="flex justify-between text-xs text-slate-500"><span>Drinks</span><span>${dTotal_calc.toFixed(2)}</span></div>}
+                              {extraServices.map((ex, i) => {
+                                const p = parseFloat(ex.price) || 0;
+                                if (p <= 0) return null;
+                                return <div key={i} className="flex justify-between text-xs text-slate-500"><span>{ex.name}</span><span>${p.toFixed(2)}</span></div>;
+                              })}
+                              {svcDiscount > 0 && <div className="flex justify-between text-xs text-rose-500"><span>Discount</span><span>-${svcDiscount.toFixed(2)}</span></div>}
+                              <div className="flex justify-between text-sm pt-2 border-t border-slate-100 mt-1"><span className="font-bold text-slate-900">Tab Total</span><span className="font-black text-indigo-600">${gTotal.toFixed(2)}</span></div>
+                              {gTotal === 0 && (sel.collected_amount || 0) > 0 && (
+                                <p className="text-[10px] text-indigo-400 italic text-center mt-2">This folio is currently empty. View settled tabs in the history below.</p>
+                              )}
+                            </div>
                           </div>
-                        )}
-                      </div>
 
-                      <button
-                        onClick={async () => {
-                          setShowFinalReceipt(false);
-                          await handleCheckOut();
-                        }}
-                        disabled={loadingAction === 'checkout'}
-                        className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black uppercase tracking-widest transition-all shadow-xl shadow-emerald-100 flex items-center justify-center gap-2"
-                      >
-                        {loadingAction === 'checkout' ? <span className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin" /> : 'Confirm & Check Out'}
-                      </button>
-                      <p className="text-[10px] text-center text-slate-400 font-bold">This action is permanent and cannot be undone.</p>
+                          {/* Collected Payments */}
+                          <div className="bg-indigo-50 rounded-xl p-3 space-y-2">
+                            <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest text-center">Payments Received</p>
+                            <div className="space-y-1.5">
+                              {svcPayList.filter(p => parseFloat(p.amount) > 0).length > 0 ? (
+                                <>
+                                  {svcPayList.filter(p => parseFloat(p.amount) > 0).map((p, i) => (
+                                    <div key={i} className="flex justify-between text-xs font-bold text-indigo-700"><span>{p.currency} · {p.method}</span><span>{formatSpace(parseFloat(p.amount || '0'), p.currency === 'UZS' ? 0 : 2)} {p.currency}</span></div>
+                                  ))}
+                                  <div className="flex justify-between text-xs font-black text-indigo-600 pt-1.5 border-t border-indigo-100 mt-1">
+                                    <span>Total Received</span>
+                                    <span>${tPaidUsd.toFixed(2)}</span>
+                                  </div>
+                                </>
+                              ) : (
+                                <p className="text-xs text-indigo-400 italic text-center">No payments entered yet</p>
+                              )}
+                            </div>
+                            {debtRemaining > 0.01 && !isBalanceMatched && (
+                              <div className="flex justify-between text-xs font-bold text-rose-600 pt-1 border-t border-indigo-100"><span>Still Owed</span><span>${(debtRemaining - tPaidUsd).toFixed(2)}</span></div>
+                            )}
+                          </div>
+
+                          {(() => {
+                            try {
+                              const m = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
+                              const s = m.settled_receipts || [];
+                              if (!s.length) return null;
+                              return (
+                                <div className="space-y-3">
+                                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Settled Tabs History</p>
+                                  <div className="space-y-2">
+                                    {s.map((r: any, idx: number) => (
+                                      <button
+                                        key={r.id || idx}
+                                        onClick={() => setSelectedReceipt(r)}
+                                        className="w-full text-left bg-white rounded-2xl border border-slate-200 p-3 hover:bg-slate-50 transition-all"
+                                      >
+                                        <div className="flex items-start justify-between gap-3">
+                                          <div className="min-w-0">
+                                            <p className="text-xs font-black text-slate-900 truncate">Tab {idx + 1}</p>
+                                            <p className="text-[10px] text-slate-400 font-bold">
+                                              {r.date ? new Date(r.date).toLocaleString() : '—'}
+                                            </p>
+                                          </div>
+                                          <div className="text-right shrink-0">
+                                            <p className="text-xs font-black text-emerald-700">${(r.total || 0).toFixed(2)}</p>
+                                            <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">paid</p>
+                                          </div>
+                                        </div>
+
+                                        <div className="mt-2 space-y-1">
+                                          {((r.items?.accommodation || 0) > 0 || r.items?.isPrepaid) && (
+                                            <div className="flex justify-between text-[10px] font-bold text-slate-500">
+                                              <span>Accommodation</span>
+                                              <span>{r.items?.isPrepaid ? 'Prepaid' : `$${(r.items?.accommodation || 0).toFixed(2)}`}</span>
+                                            </div>
+                                          )}
+                                          {(r.items?.meals?.lunch || 0) > 0 && (
+                                            <div className="flex justify-between text-[10px] font-bold text-slate-500">
+                                              <span>Lunch ×{r.items.meals.lunch}</span>
+                                              <span>${(r.items.meals.lunch * (pricing?.lunch_price || 0)).toFixed(2)}</span>
+                                            </div>
+                                          )}
+                                          {(r.items?.meals?.dinner || 0) > 0 && (
+                                            <div className="flex justify-between text-[10px] font-bold text-slate-500">
+                                              <span>Dinner ×{r.items.meals.dinner}</span>
+                                              <span>${(r.items.meals.dinner * (pricing?.dinner_price || 0)).toFixed(2)}</span>
+                                            </div>
+                                          )}
+                                          {Object.entries(r.items?.services || {}).map(([k, v]: [string, any]) => (v > 0 ? (
+                                            <div key={k} className="flex justify-between text-[10px] font-bold text-slate-500 capitalize">
+                                              <span>{k}</span>
+                                              <span>${parseFloat(v).toFixed(2)}</span>
+                                            </div>
+                                          ) : null))}
+                                          {(r.items?.drinks || []).slice(0, 3).map((d: any, i: number) => (
+                                            <div key={i} className="flex justify-between text-[10px] font-bold text-slate-500">
+                                              <span>{d.drink_name} ×{d.quantity}</span>
+                                              <span>${(d.price * d.quantity).toFixed(2)}</span>
+                                            </div>
+                                          ))}
+                                          {(r.items?.drinks || []).length > 3 && (
+                                            <div className="text-[10px] font-bold text-slate-400">+{(r.items.drinks.length - 3)} more drinks</div>
+                                          )}
+                                          {(r.items?.extras || []).slice(0, 2).map((ex: any, i: number) => (
+                                            <div key={i} className="flex justify-between text-[10px] font-bold text-slate-500">
+                                              <span>{ex.name}</span>
+                                              <span>${parseFloat(ex.price || 0).toFixed(2)}</span>
+                                            </div>
+                                          ))}
+                                          {(r.items?.extras || []).length > 2 && (
+                                            <div className="text-[10px] font-bold text-slate-400">+{(r.items.extras.length - 2)} more extras</div>
+                                          )}
+                                        </div>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            } catch (e) {
+                              console.error('History parse error:', e);
+                              return null;
+                            }
+                          })()}
+                        </div>
+                      )}
+
+                      {(selectedReceipt || sel.status === 'completed' || (sel.status === 'checked_in' && gTotal === 0 && (sel.collected_amount || 0) > 0)) ? (
+                        <div className="w-full py-4 bg-emerald-50 text-emerald-700 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 border-2 border-emerald-200 shadow-inner">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                          PAID & SETTLED
+                        </div>
+                      ) : (
+                        <button
+                          onClick={async () => {
+                            const needsAccom = (sel.collected_amount || 0) === 0 && !isPrepaid && svcAmount <= 0;
+                            if (needsAccom) {
+                              setValError('Stay Price is missing. Please enter the guest\'s accommodation cost before proceeding.');
+                              setShowFinalReceipt(false);
+                              setShowServices(true);
+                              return;
+                            }
+                            await handleCheckOut();
+                          }}
+                          disabled={loadingAction === 'checkout' || !isBalanceMatched || gTotal <= 0}
+                          className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-xl ${(!isBalanceMatched || gTotal <= 0) ? 'bg-slate-400 text-slate-200 cursor-not-allowed opacity-50 shadow-none' : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-100'}`}
+                        >
+                          {loadingAction === 'checkout' ? <span className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin" /> : 'Confirm & Settle Tab'}
+                        </button>
+                      )}
+                      {/* Small View Check Buttons at the bottom */}
+                      {(() => {
+                        try {
+                          const m = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
+                          const s = m.settled_receipts || [];
+                          if (!s.length) return null;
+                          return (
+                            <div className="pt-4 border-t border-slate-100 space-y-3">
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Settled Receipts History</p>
+                              <div className="flex flex-wrap justify-center gap-2">
+                                <button 
+                                  onClick={() => setSelectedReceipt(null)}
+                                  className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all border ${!selectedReceipt ? 'bg-indigo-600 border-indigo-700 text-white shadow-md' : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-slate-100'}`}
+                                >
+                                  Current Folio
+                                </button>
+                                {s.map((r: any, idx: number) => (
+                                  <button 
+                                    key={r.id || idx} 
+                                    onClick={() => setSelectedReceipt(r)}
+                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all border ${selectedReceipt?.id === r.id ? 'bg-emerald-600 border-emerald-700 text-white shadow-md' : 'bg-emerald-50 border-emerald-100 text-emerald-600 hover:bg-emerald-100'}`}
+                                  >
+                                    Tab {idx + 1}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        } catch (e) { 
+                          console.error('History parse error:', e);
+                          return null; 
+                        }
+                      })()}
+                      <p className="text-[10px] text-center text-slate-400 font-bold">
+                        {sel.status === 'completed' ? 'This receipt is finalized.' : 'Settling the tab clears the current bill. Guest stays checked-in for extensions.'}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -1858,17 +2468,39 @@ export function GoogleGuestAgenda({
 
 
 
-              {(sel.notes || sel.description) && (
-                <div className="bg-slate-50 rounded-xl p-3">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Notes</p>
-                  <p className="text-sm text-black whitespace-pre-wrap">{sel.notes || sel.description}</p>
-                </div>
-              )}
+
             </>
           );
         })()}
             </div>
           )}
+        </div>
+      </div>
+    )}
+
+    {/* Stylish Validation Error Modal */}
+    {valError && (
+      <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setValError(null)} />
+        <div className="relative bg-white rounded-[32px] shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+          <div className="bg-rose-500 p-8 text-white text-center relative">
+            <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-white/30 animate-bounce">
+              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            </div>
+            <h3 className="text-2xl font-black uppercase tracking-tight">Checkout Blocked</h3>
+            <p className="text-rose-100 text-[10px] font-bold uppercase tracking-widest mt-1">Validation Required</p>
+          </div>
+          <div className="p-8 space-y-6">
+            <p className="text-slate-600 text-sm font-medium leading-relaxed text-center">
+              {valError}
+            </p>
+            <button 
+              onClick={() => setValError(null)}
+              className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95 shadow-xl shadow-slate-200"
+            >
+              I Understand
+            </button>
+          </div>
         </div>
       </div>
     )}

@@ -63,3 +63,43 @@ export async function GET() {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+export async function PATCH(request: Request) {
+  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  const rawKey = process.env.GOOGLE_PRIVATE_KEY;
+  const calendarId = process.env.GOOGLE_CALENDAR_ID;
+
+  if (!email || !rawKey || !calendarId) {
+    return NextResponse.json({ error: 'Missing credentials' }, { status: 500 });
+  }
+
+  try {
+    const { eventId, start, end } = await request.json();
+    if (!eventId || !start || !end) {
+      return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
+    }
+
+    const auth = new google.auth.JWT({
+      email,
+      key: rawKey.replace(/\\n/g, '\n'),
+      scopes: ['https://www.googleapis.com/auth/calendar'],
+    });
+
+    const calendar = google.calendar({ version: 'v3', auth });
+    
+    // Google Calendar API expects 'end' to be exclusive for all-day events.
+    // If 'start' and 'end' are date strings like 'YYYY-MM-DD', we use 'date' field.
+    await calendar.events.patch({
+      calendarId,
+      eventId,
+      requestBody: {
+        start: { date: start },
+        end: { date: end },
+      },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+    console.error('GC Patch Error:', err.message);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}

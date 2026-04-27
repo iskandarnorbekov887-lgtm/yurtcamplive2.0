@@ -21,7 +21,8 @@
 **Mitigation Steps:**
 1. Immediately add a `CHECK` constraint or application-level validator to categorize all new writes.
 2. Run the backfill migration script (Doc B) to extract JSON into `booking_day_services`.
-3. Rename `special_requests` → `special_requests_legacy` after validation.
+3. Rename `special_requests` → 
+`special_requests_legacy` after validation.
 4. Drop after 60 days.
 
 **30/60/90-Day Plan:**
