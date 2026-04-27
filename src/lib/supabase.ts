@@ -168,3 +168,13 @@ export interface Notification {
   read: boolean;
   created_at: string;
 }
+
+// Helper function to clear test data (use only in development/testing)
+export async function clearTestReceipts() {
+  try {
+    await supabase.from('booking_receipts').delete().neq('id', 0);
+    console.log('Test receipts cleared');
+  } catch (error) {
+    console.error('Failed to clear test receipts:', error);
+  }
+}
