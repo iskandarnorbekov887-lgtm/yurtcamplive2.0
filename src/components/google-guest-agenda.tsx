@@ -142,6 +142,7 @@ export function GoogleGuestAgenda({
   const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
   const [historyPayments, setHistoryPayments] = useState<any[]>([]);
   const [dateAdjAmount, setDateAdjAmount] = useState('');
+  const [dbSettledReceipts, setDbSettledReceipts] = useState<any[]>([]);
 
   useEffect(() => {
     if (sel?.id) {
@@ -154,6 +155,40 @@ export function GoogleGuestAgenda({
       setHistoryPayments([]);
     }
   }, [sel?.id, showFinalReceipt]);
+
+  useEffect(() => {
+    if (!sel?.id) { setDbSettledReceipts([]); return; }
+    const loadReceipts = async () => {
+      try {
+        const { data } = await supabase
+          .from('booking_receipts')
+          .select('*')
+          .eq('booking_id', sel.id)
+          .order('created_at', { ascending: false });
+        const rows = (data as any[]) || [];
+        const snapshots = rows.map(r => r.snapshot).filter(Boolean);
+        setDbSettledReceipts(snapshots);
+      } catch {
+        // Table may not exist yet in some environments; fall back to special_requests
+        setDbSettledReceipts([]);
+      }
+    };
+    loadReceipts();
+  }, [sel?.id]);
+
+  const getSettledReceiptsForSel = () => {
+    if (dbSettledReceipts.length) return dbSettledReceipts;
+    try {
+      if (!sel?.special_requests) return [];
+      const parsed = typeof sel.special_requests === 'string'
+        ? JSON.parse(sel.special_requests || '{}')
+        : (sel.special_requests || {});
+      const meta = Array.isArray(parsed) ? {} : (parsed || {});
+      return meta.settled_receipts || [];
+    } catch {
+      return [];
+    }
+  };
   
   const DEFAULT_PRICING = {
     lunch_price: 10,
@@ -852,7 +887,15 @@ export function GoogleGuestAgenda({
         payments: svcPayList.filter(p => parseFloat(p.amount) > 0)
       };
 
-      const currentMeta = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
+      let currentMeta: any = {};
+      try {
+        const parsed = typeof sel.special_requests === 'string'
+          ? JSON.parse(sel.special_requests || '{}')
+          : (sel.special_requests || {});
+        currentMeta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
+      } catch {
+        currentMeta = {};
+      }
       const settledReceipts = [...(currentMeta.settled_receipts || []), snapshot];
 
       const totalPaidUsd = svcPayList.reduce((sum, p) => {
@@ -876,6 +919,18 @@ export function GoogleGuestAgenda({
           amount_usd_equivalent: usdEquiv,
           note: `Receipt #${receiptId}`
         });
+      }
+
+      // Persist the receipt snapshot so closed tabs are never lost
+      try {
+        await supabase.from('booking_receipts').insert({
+          booking_id: sel.id,
+          receipt_id: receiptId,
+          snapshot,
+          total_usd: gTotal,
+        });
+      } catch {
+        // If the table doesn't exist yet, we still keep the fallback in special_requests
       }
 
       const updates: Partial<Booking> = {
@@ -1311,8 +1366,7 @@ export function GoogleGuestAgenda({
                           </span>
                           {(() => {
                             try {
-                              const m = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
-                              const rCount = m.settled_receipts?.length || 0;
+                              const rCount = getSettledReceiptsForSel().length || 0;
                               if (rCount > 0) return (
                                 <span className="text-[10px] font-black bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl border border-indigo-200 uppercase tracking-widest flex items-center gap-2 w-fit shadow-sm animate-in fade-in slide-in-from-left-2">
                                   <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
@@ -1413,7 +1467,15 @@ export function GoogleGuestAgenda({
                                 flash('✓ Dates updated.');
                               }
 
-                                const currentMeta = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
+                                let currentMeta: any = {};
+                                try {
+                                  const parsed = typeof sel.special_requests === 'string'
+                                    ? JSON.parse(sel.special_requests || '{}')
+                                    : (sel.special_requests || {});
+                                  currentMeta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
+                                } catch {
+                                  currentMeta = {};
+                                }
                                 updates.special_requests = JSON.stringify({ ...currentMeta, is_manual_dates: true, days: dayEntries });
                                 await onUpdateBooking?.(sel.id, updates);
 
@@ -1871,40 +1933,37 @@ export function GoogleGuestAgenda({
                         {((sel.collected_amount || 0) > 0 || gTotal > 0.01) && (
                           <div className="flex flex-col items-end gap-2">
                              {(() => {
-                                try {
-                                  const m = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
-                                  const rCount = m.settled_receipts?.length || 0;
-                                  return (
-                                    <div className="flex flex-col items-end gap-2">
-                                       <button 
-                                          onClick={() => { setSelectedReceipt(null); setShowFinalReceipt(true); }}
-                                          className={`bg-white/10 hover:bg-white/20 p-2 rounded-xl border border-white/20 transition-all group flex items-center gap-2 ${gTotal > 0.01 ? 'ring-2 ring-white/30 shadow-lg' : ''}`}
-                                        >
-                                          <svg className="w-4 h-4 text-white/80 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                                          <span className="text-[9px] font-black text-white uppercase tracking-widest">{gTotal > 0.01 ? 'Current Folio' : 'Open Tab'}</span>
-                                        </button>
-                                        {rCount > 0 && (
-                                          <div className="flex flex-wrap justify-end gap-2 max-w-[160px]">
-                                            {m.settled_receipts.map((r: any, idx: number) => (
-                                              <button 
-                                                key={r.id || `tab-${idx}`}
-                                                onClick={(e) => { 
-                                                  e.preventDefault();
-                                                  e.stopPropagation(); 
-                                                  setSelectedReceipt(r); 
-                                                  setShowFinalReceipt(true); 
-                                                }}
-                                                className="bg-white/20 hover:bg-white/40 px-3 py-1.5 rounded-lg border border-white/30 text-[10px] font-black text-white transition-all uppercase tracking-widest shadow-sm active:scale-95"
-                                              >
-                                                Tab {idx + 1}
-                                              </button>
-                                            ))}
-                                          </div>
-                                        )}
-                                    </div>
-                                  );
-                                } catch { return null; }
-                             })()}
+                                const rCount = getSettledReceiptsForSel().length;
+                                return (
+                                  <div className="flex flex-col items-end gap-2">
+                                     <button 
+                                        onClick={() => { setSelectedReceipt(null); setShowFinalReceipt(true); }}
+                                        className={`bg-white/10 hover:bg-white/20 p-2 rounded-xl border border-white/20 transition-all group flex items-center gap-2 ${gTotal > 0.01 ? 'ring-2 ring-white/30 shadow-lg' : ''}`}
+                                      >
+                                        <svg className="w-4 h-4 text-white/80 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                        <span className="text-[9px] font-black text-white uppercase tracking-widest">{gTotal > 0.01 ? 'Current Folio' : 'Open Tab'}</span>
+                                      </button>
+                                      {rCount > 0 && (
+                                        <div className="flex flex-wrap justify-end gap-2 max-w-[160px]">
+                                          {getSettledReceiptsForSel().map((r: any, idx: number) => (
+                                            <button 
+                                              key={r.id || `tab-${idx}`}
+                                              onClick={(e) => { 
+                                                e.preventDefault();
+                                                e.stopPropagation(); 
+                                                setSelectedReceipt(r); 
+                                                setShowFinalReceipt(true); 
+                                              }}
+                                              className="bg-white/20 hover:bg-white/40 px-3 py-1.5 rounded-lg border border-white/30 text-[10px] font-black text-white transition-all uppercase tracking-widest shadow-sm active:scale-95"
+                                            >
+                                              Tab {idx + 1}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      )}
+                                  </div>
+                                );
+                              })()}
                           </div>
                         )}
                       </div>
@@ -2306,8 +2365,7 @@ export function GoogleGuestAgenda({
 
                           {(() => {
                             try {
-                              const m = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
-                              const s = m.settled_receipts || [];
+                              const s = getSettledReceiptsForSel();
                               if (!s.length) return null;
                               return (
                                 <div className="space-y-3">
@@ -2415,8 +2473,7 @@ export function GoogleGuestAgenda({
                       {/* Small View Check Buttons at the bottom */}
                       {(() => {
                         try {
-                          const m = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
-                          const s = m.settled_receipts || [];
+                          const s = getSettledReceiptsForSel();
                           if (!s.length) return null;
                           return (
                             <div className="pt-4 border-t border-slate-100 space-y-3">
