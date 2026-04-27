@@ -172,8 +172,34 @@ export interface Notification {
 // Helper function to clear test data (use only in development/testing)
 export async function clearTestReceipts() {
   try {
+    // Clear from booking_receipts table
     await supabase.from('booking_receipts').delete().neq('id', 0);
-    console.log('Test receipts cleared');
+    
+    // Clear settled_receipts from special_requests in bookings table
+    const { data: bookings } = await supabase.from('bookings').select('id, special_requests');
+    if (bookings) {
+      for (const booking of bookings) {
+        if (booking.special_requests) {
+          try {
+            const parsed = typeof booking.special_requests === 'string'
+              ? JSON.parse(booking.special_requests || '{}')
+              : (booking.special_requests || {});
+            const meta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
+            
+            if (meta.settled_receipts && meta.settled_receipts.length > 0) {
+              delete meta.settled_receipts;
+              await supabase.from('bookings').update({
+                special_requests: JSON.stringify(meta)
+              }).eq('id', booking.id);
+            }
+          } catch {
+            // Skip if parsing fails
+          }
+        }
+      }
+    }
+    
+    console.log('Test receipts cleared from both database and special_requests');
   } catch (error) {
     console.error('Failed to clear test receipts:', error);
   }
