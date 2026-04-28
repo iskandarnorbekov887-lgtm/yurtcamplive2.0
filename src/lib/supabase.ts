@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 // Create a complete mock for server/build side
 const createMockClient = () => {
   const mockChain = {
-    select: () => mockChain,
+    select: () => Promise.resolve({ data: [], error: null }),
     eq: () => mockChain,
     neq: () => mockChain,
     gt: () => mockChain,
@@ -28,7 +28,6 @@ const createMockClient = () => {
     single: () => Promise.resolve({ data: null, error: null }),
     maybeSingle: () => Promise.resolve({ data: null, error: null }),
     csv: () => Promise.resolve(''),
-    then: (cb: any) => Promise.resolve({ data: [], error: null }).then(cb),
     insert: () => Promise.resolve({ data: null, error: null }),
     upsert: () => Promise.resolve({ data: null, error: null }),
     update: () => mockChain,
