@@ -26,7 +26,9 @@ export default function LoginPage() {
         'Cook': '/cook',
         'Reserver': '/bookings',
       };
-      router.push(rolePaths[user.role] || '/login');
+      const path = rolePaths[user.role] || '/login';
+      console.log('🚀 Redirecting to:', path, 'for role:', user.role);
+      router.push(path);
     }
   }, [user, router]);
 
