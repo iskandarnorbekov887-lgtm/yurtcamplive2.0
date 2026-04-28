@@ -22,7 +22,7 @@ export const supabase = !isConfigured
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
-        storageKey: 'yurt-camp-auth-token', // Simplified key to prevent crashes
+        storageKey: 'yurt-camp-LIVE-v2', // Unique key to prevent any mock confusion
       }
     });
 
