@@ -40,26 +40,9 @@ function CEODashboard() {
       fetchData();
     }, 5000);
     
-    // Check for automatic check-outs and overdue check-ins every minute
+    // Alert for guests not checked in within 24 hours of check-in date
     const checkInterval = setInterval(async () => {
       const now = new Date();
-      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      const currentHour = now.getHours();
-      
-      // Automatic check-out: if it's past 12:00 noon on check-out date
-      if (currentHour >= 12) {
-        const { data: checkedInBookings } = await supabase.from('bookings').select('*').eq('status', 'checked_in');
-        if (checkedInBookings) {
-          for (const booking of checkedInBookings) {
-            if (booking.check_out === today) {
-              console.log('🕐 Auto-checking out guest:', booking.guest_name);
-              await supabase.from('bookings').update({ status: 'completed' }).eq('id', booking.id);
-            }
-          }
-        }
-      }
-      
-      // Alert for guests not checked in within 24 hours of check-in date
       const { data: confirmedBookings } = await supabase.from('bookings').select('*').eq('status', 'confirmed');
       if (confirmedBookings) {
         for (const booking of confirmedBookings) {
@@ -69,25 +52,14 @@ function CEODashboard() {
           // If check-in date was yesterday (1 day passed) and still not checked in
           if (daysDiff >= 1 && daysDiff <= 2) {
             console.warn('⚠️ Guest not checked in within 24 hours:', booking.guest_name, 'Check-in was:', booking.check_in);
-            // You could show a UI alert here if needed
           }
         }
       }
     }, 60000); // Check every minute
-    
-    // Listen for localStorage changes from other tabs for instant sync
-    const handleStorageChange = (e: StorageEvent) => {
-      console.log(' CEO Storage event:', e.key);
-      if (e.key === 'camp_bookings' || e.key === 'camp_profiles') {
-        fetchData();
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    
+
     return () => {
       clearInterval(interval);
       clearInterval(checkInterval);
-      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 
@@ -112,9 +84,9 @@ function CEODashboard() {
         return Array.from(map.values());
       };
 
-      setBookings(deDuplicate(bookingsData.data));
+      setBookings(deDuplicate(bookingsData.data || []));
       setStaff(staffData.data || []);
-      setNotifications((notificationsData.data || []).slice(0, 10));
+      setNotifications((notificationsData.data || []).slice(0, 10) || []);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {

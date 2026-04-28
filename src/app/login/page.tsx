@@ -4,8 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
-import { isUsingLocalStorage } from '@/lib/supabase';
-import { DEFAULT_CEO } from '@/lib/local-supabase';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
 
@@ -74,33 +72,6 @@ export default function LoginPage() {
             <p className={`text-sm ${configError.includes('local storage') ? 'text-blue-800' : 'text-yellow-800'}`}>
               {configError}
             </p>
-          </div>
-        )}
-
-        {/* Quick CEO Login - One Click Access */}
-        {isUsingLocalStorage && !isSignUp && (
-          <div className="mb-6 p-4 bg-gradient-to-r from-purple-100 to-blue-100 rounded-xl border border-purple-200">
-            <p className="text-sm font-semibold text-purple-900 mb-2">⚡ Quick Access (Testing)</p>
-            <p className="text-xs text-purple-700 mb-3">
-              Email: {DEFAULT_CEO.email}<br/>
-              Password: {DEFAULT_CEO.password}
-            </p>
-            <button
-              onClick={async () => {
-                setLoading(true);
-                try {
-                  await signIn(DEFAULT_CEO.email, DEFAULT_CEO.password);
-                } catch (err: any) {
-                  setError(err.message);
-                } finally {
-                  setLoading(false);
-                }
-              }}
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 px-4 rounded-lg hover:from-purple-700 hover:to-blue-700 disabled:opacity-50 font-bold"
-            >
-              {loading ? 'Logging in...' : '🔑 Login as CEO (Instant Access)'}
-            </button>
           </div>
         )}
 
@@ -211,61 +182,6 @@ export default function LoginPage() {
             {isSignUp ? t('login.has_account') : t('login.no_account')}
           </button>
         </div>
-
-        <div className="mt-6 text-xs text-gray-500 text-center">
-          <p>{t('login.manager_default')}</p>
-          <p>Contact your CEO to change roles.</p>
-        </div>
-
-        {/* Quick Access - Local Testing Only */}
-        {isUsingLocalStorage && !isSignUp && (
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 text-center">Development Quick Access</p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => { setEmail('ceo@camp.com'); setPassword('ceo123'); }}
-                className="px-3 py-2 bg-indigo-50 text-indigo-700 rounded-xl hover:bg-indigo-100 text-[10px] font-black tracking-tight transition-all border border-indigo-100"
-              >
-                🔑 CEO ACCESS
-              </button>
-              <button
-                onClick={() => { setEmail('manager@camp.com'); setPassword('manager123'); }}
-                className="px-3 py-2 bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-100 text-[10px] font-black tracking-tight transition-all border border-blue-100"
-              >
-                💼 MANAGER
-              </button>
-              <button
-                onClick={() => { setEmail('cook@camp.com'); setPassword('cook123'); }}
-                className="px-3 py-2 bg-orange-50 text-orange-700 rounded-xl hover:bg-orange-100 text-[10px] font-black tracking-tight transition-all border border-orange-100"
-              >
-                🍳 COOK
-              </button>
-              <button
-                onClick={() => { setEmail('reserver@camp.com'); setPassword('reserver123'); }}
-                className="px-3 py-2 bg-green-50 text-green-700 rounded-xl hover:bg-green-100 text-[10px] font-black tracking-tight transition-all border border-green-100"
-              >
-                📝 RESERVER
-              </button>
-
-            </div>
-            
-            <button
-              onClick={() => {
-                if (confirm('Clear all local data? This will reset everything including your custom bookings.')) {
-                  Object.keys(localStorage).forEach(key => {
-                    if (key.startsWith('camp_') || key.startsWith('storage_')) {
-                      localStorage.removeItem(key);
-                    }
-                  });
-                  window.location.reload();
-                }
-              }}
-              className="w-full mt-4 px-4 py-2 bg-slate-100 text-slate-500 rounded-xl hover:bg-rose-50 hover:text-rose-600 text-[10px] font-black tracking-widest transition-all border border-slate-200 uppercase"
-            >
-              🗑️ {t('btn.reset_data')}
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );

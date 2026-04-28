@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ProtectedRoute } from '@/components/protected-route';
-import { supabase, type Finance, isUsingLocalStorage } from '@/lib/supabase';
+import { supabase, type Finance } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 
@@ -29,16 +29,13 @@ function CEODeletedRecords() {
 
   const fetchDeletedRecords = async () => {
     try {
-      if (isUsingLocalStorage) {
-        const items = JSON.parse(localStorage.getItem('camp_deleted_records') || '[]');
-        setDeletedRecords(items);
-      } else {
-        const { data } = await supabase
-          .from('deleted_records')
-          .select('*')
-          .order('deleted_at', { ascending: false });
-        setDeletedRecords(data || []);
-      }
+      const { data, error } = await supabase
+        .from('deleted_records')
+        .select('*')
+        .order('deleted_at', { ascending: false });
+
+      if (error) throw error;
+      setDeletedRecords(data || []);
     } catch (error) {
       console.error('Error fetching deleted records:', error);
     } finally {
@@ -48,28 +45,19 @@ function CEODeletedRecords() {
 
   const handlePermanentDelete = async (id: number) => {
     if (!confirm('Are you sure you want to permanently delete this record? This action cannot be undone.')) return;
-    
+
     setDeletingId(id);
-    setMessage('');
-
     try {
-      if (isUsingLocalStorage) {
-        const items = JSON.parse(localStorage.getItem('camp_deleted_records') || '[]');
-        const filtered = items.filter((item: any) => item.id !== id);
-        localStorage.setItem('camp_deleted_records', JSON.stringify(filtered));
-      } else {
-        const { error } = await supabase
-          .from('deleted_records')
-          .delete()
-          .eq('id', id);
-        if (error) throw error;
-      }
+      const { error } = await supabase
+        .from('deleted_records')
+        .delete()
+        .eq('id', id);
 
-      setMessage('Record permanently deleted.');
+      if (error) throw error;
+      setMessage('Record permanently deleted');
       fetchDeletedRecords();
-      setTimeout(() => setMessage(''), 3000);
-    } catch (err: any) {
-      setMessage(`Error: ${err.message}`);
+    } catch (error) {
+      setMessage('Error deleting record');
     } finally {
       setDeletingId(null);
     }

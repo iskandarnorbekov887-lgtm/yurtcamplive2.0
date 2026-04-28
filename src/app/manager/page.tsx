@@ -34,18 +34,9 @@ function ManagerPortal() {
     const interval = setInterval(() => {
       fetchData();
     }, 5000);
-    
-    // Listen for localStorage changes from other tabs for instant sync
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'camp_bookings') {
-        fetchData();
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    
+
     return () => {
       clearInterval(interval);
-      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 

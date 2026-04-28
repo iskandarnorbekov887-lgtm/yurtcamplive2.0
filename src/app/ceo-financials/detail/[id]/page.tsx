@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ProtectedRoute } from '@/components/protected-route';
-import { supabase, type Finance, isUsingLocalStorage } from '@/lib/supabase';
+import { supabase, type Finance } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { useRouter, useParams } from 'next/navigation';
@@ -53,38 +53,14 @@ function CEOFinancialDetail() {
 
   const fetchPricing = async () => {
     try {
-      if (isUsingLocalStorage) {
-        // Use localStorage
-        const items = JSON.parse(localStorage.getItem('camp_service_pricing') || '[]');
-        const pricing = items.find((item: any) => item.id === 1);
+      const { data, error } = await supabase
+        .from('service_pricing')
+        .select('*')
+        .eq('id', 1)
+        .single();
 
-        if (pricing) {
-          setPricing({
-            guide_price: pricing.guide_price || 0,
-            lunch_price: pricing.lunch_price || 0,
-            dinner_price: pricing.dinner_price || 0,
-            night_stay_price: pricing.night_stay_price || 0,
-            laundry_price: pricing.laundry_price || 0,
-            pricing_enabled: pricing.pricing_enabled || false,
-          });
-        }
-      } else {
-        // Use real Supabase
-        const { data } = await supabase
-          .from('service_pricing')
-          .select('*')
-          .eq('id', 1);
-
-        if (data && data.length > 0) {
-          setPricing({
-            guide_price: data[0].guide_price || 0,
-            lunch_price: data[0].lunch_price || 0,
-            dinner_price: data[0].dinner_price || 0,
-            night_stay_price: data[0].night_stay_price || 0,
-            laundry_price: data[0].laundry_price || 0,
-            pricing_enabled: data[0].pricing_enabled || false,
-          });
-        }
+      if (data && !error) {
+        setPricing(data);
       }
     } catch (error) {
       console.error('Error fetching pricing:', error);

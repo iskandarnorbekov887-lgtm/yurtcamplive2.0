@@ -358,13 +358,11 @@ export function GoogleGuestAgenda({
       
       // Auto-checkout if:
       // 1. Status is 'checked_in'
-      // 2. Checkout day is today (or past)
-      // 3. It's past 12:00 PM
-      // 4. Debt is basically 0
+      // 2. Checkout day is BEFORE today (past days)
+      // 3. Debt is basically 0
       const toAutoCO = bookings.filter(b => {
         if (b.status !== 'checked_in') return false;
-        if (b.check_out > todayStr) return false;
-        if (b.check_out === todayStr && !isPostNoon) return false;
+        if (b.check_out >= todayStr) return false; // Stay active if checkout is today or future
         const debt = (b.total_price || 0) - (b.collected_amount || 0);
         return debt < 1.00;
       });
@@ -872,8 +870,16 @@ export function GoogleGuestAgenda({
         items: {
           accommodation: svcAmount,
           isPrepaid: isPrepaid,
-          meals: { lunch: svcLunchCount, dinner: svcDinnerCount },
-          services: { guide: svcGuidePrice, transport: svcTransList.reduce((s, t) => s + (t.price || 0), 0), laundry: svcLaundryPrice, cooking: svcCookingPrice },
+          meals: { 
+            lunch: svcLunch ? svcLunchCount : 0, 
+            dinner: svcDinner ? svcDinnerCount : 0 
+          },
+          services: { 
+            guide: svcGuide ? svcGuidePrice : 0, 
+            transport: svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0, 
+            laundry: svcLaundry ? svcLaundryPrice : 0, 
+            cooking: svcCooking ? svcCookingPrice : 0 
+          },
           extras: [...extraServices],
           drinks: drinkTab
         },
@@ -1501,6 +1507,21 @@ export function GoogleGuestAgenda({
                       className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition-all disabled:opacity-60 flex items-center gap-2">
                       {loadingAction === 'checkin' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '→'}
                       Check In
+                    </button>
+                  )}
+                  {canCheckOut && (
+                    <button onClick={async () => { 
+                        if (!confirm(`Complete stay for ${sel.guest_name}?`)) return; 
+                        setLoadingAction('checkout_manual');
+                        try { await onCheckOut?.(sel.id); flash('✓ Guest checked out.'); setSelectedItem(null); }
+                        catch { flash('⚠ Check-out failed.'); }
+                        finally { setLoadingAction(''); }
+                      }} 
+                      disabled={loadingAction === 'checkout_manual'}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-all disabled:opacity-60 flex items-center gap-2"
+                    >
+                      {loadingAction === 'checkout_manual' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '✈'}
+                      Check Out
                     </button>
                   )}
                   {isComingSoon && (

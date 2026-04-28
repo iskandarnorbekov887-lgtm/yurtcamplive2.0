@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { supabase, isUsingLocalStorage, type Profile, type UserRole } from './supabase';
+import { supabase, type Profile, type UserRole } from './supabase';
 
 interface AuthContextType {
   user: Profile | null;
@@ -22,10 +22,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [configError, setConfigError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Show local storage mode info (this is NOT an error, just info)
-    if (isUsingLocalStorage) {
-      setConfigError('Using local storage mode. All data is saved to your browser.');
-    }
 
     const fetchUser = async () => {
       try {

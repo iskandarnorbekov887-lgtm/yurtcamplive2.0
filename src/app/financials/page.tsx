@@ -20,13 +20,7 @@ function ManagerFinancials() {
   const { user, signOut } = useAuth();
   const { t } = useLanguage();
   const router = useRouter();
-  const [type, setType] = useState<'expense' | 'income'>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('financialsType');
-      return saved === 'income' ? 'income' : 'expense';
-    }
-    return 'expense';
-  });
+  const [type, setType] = useState<'expense' | 'income'>('expense');
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
   
@@ -104,11 +98,6 @@ function ManagerFinancials() {
   useEffect(() => {
     fetchRecentExpenses();
   }, []);
-
-  // Save type to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem('financialsType', type);
-  }, [type]);
 
   const fetchRecentExpenses = async () => {
     setLoadingRecent(true);

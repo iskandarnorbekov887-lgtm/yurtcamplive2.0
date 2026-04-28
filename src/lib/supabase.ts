@@ -1,16 +1,21 @@
 import { createClient } from '@supabase/supabase-js';
-import { createLocalClient } from './local-supabase';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-const isConfigured = supabaseUrl && !supabaseUrl.includes('placeholder') && supabaseKey && supabaseKey.length > 20;
+let supabaseInstance: any = null;
 
-export const supabase = isConfigured 
-  ? createClient(supabaseUrl, supabaseKey)
-  : createLocalClient() as any;
-
-export const isUsingLocalStorage = !isConfigured;
+export const supabase = new Proxy({} as any, {
+  get(target, prop) {
+    if (!supabaseInstance) {
+      if (!supabaseUrl || supabaseUrl.includes('placeholder') || !supabaseKey || supabaseKey.length <= 20) {
+        throw new Error('Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your environment variables.');
+      }
+      supabaseInstance = createClient(supabaseUrl, supabaseKey);
+    }
+    return supabaseInstance[prop];
+  }
+});
 
 export type UserRole = 'CEO' | 'Manager' | 'Cook' | 'Reserver';
 

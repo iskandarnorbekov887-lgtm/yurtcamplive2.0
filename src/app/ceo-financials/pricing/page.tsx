@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { ProtectedRoute } from '@/components/protected-route';
-import { supabase, isUsingLocalStorage } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 
@@ -36,38 +36,21 @@ function CEOPricing() {
 
   const fetchPricing = async () => {
     try {
-      if (isUsingLocalStorage) {
-        // Use localStorage
-        const items = JSON.parse(localStorage.getItem('camp_service_pricing') || '[]');
-        const pricing = items.find((item: any) => item.id === 1);
+      const { data, error } = await supabase
+        .from('service_pricing')
+        .select('*')
+        .eq('id', 1)
+        .single();
 
-        if (pricing) {
-          setGuidePrice(pricing.guide_price?.toString() || '');
-          setLunchPrice(pricing.lunch_price?.toString() || '');
-          setDinnerPrice(pricing.dinner_price?.toString() || '');
-          setNightStayPrice(pricing.night_stay_price?.toString() || '');
-          setLaundryPrice(pricing.laundry_price?.toString() || '');
-          setUsdToUzs(pricing.usd_to_uzs?.toString() || '12500');
-          setUsdToEur(pricing.usd_to_eur?.toString() || '0.92');
-          setPricingEnabled(pricing.pricing_enabled || false);
-        }
-      } else {
-        // Use real Supabase
-        const { data } = await supabase
-          .from('service_pricing')
-          .select('*')
-          .eq('id', 1);
-
-        if (data && data.length > 0) {
-          setGuidePrice(data[0].guide_price?.toString() || '');
-          setLunchPrice(data[0].lunch_price?.toString() || '');
-          setDinnerPrice(data[0].dinner_price?.toString() || '');
-          setNightStayPrice(data[0].night_stay_price?.toString() || '');
-          setLaundryPrice(data[0].laundry_price?.toString() || '');
-          setUsdToUzs(data[0].usd_to_uzs?.toString() || '12500');
-          setUsdToEur(data[0].usd_to_eur?.toString() || '0.92');
-          setPricingEnabled(data[0].pricing_enabled || false);
-        }
+      if (data && !error) {
+        setGuidePrice(data.guide_price?.toString() || '');
+        setLunchPrice(data.lunch_price?.toString() || '');
+        setDinnerPrice(data.dinner_price?.toString() || '');
+        setNightStayPrice(data.night_stay_price?.toString() || '');
+        setLaundryPrice(data.laundry_price?.toString() || '');
+        setUsdToUzs(data.usd_to_uzs?.toString() || '12500');
+        setUsdToEur(data.usd_to_eur?.toString() || '0.92');
+        setPricingEnabled(data.pricing_enabled || false);
       }
     } catch (error) {
       console.error('Error fetching pricing:', error);
@@ -81,83 +64,26 @@ function CEOPricing() {
     setMessage('');
 
     try {
-      if (isUsingLocalStorage) {
-        // Use localStorage
-        const items = JSON.parse(localStorage.getItem('camp_service_pricing') || '[]');
-        const existingIndex = items.findIndex((item: any) => item.id === 1);
+      const { error } = await supabase
+        .from('service_pricing')
+        .upsert({
+          id: 1,
+          guide_price: parseFloat(guidePrice) || 0,
+          lunch_price: parseFloat(lunchPrice) || 0,
+          dinner_price: parseFloat(dinnerPrice) || 0,
+          night_stay_price: parseFloat(nightStayPrice) || 0,
+          laundry_price: parseFloat(laundryPrice) || 0,
+          usd_to_uzs: parseFloat(usdToUzs) || 12500,
+          usd_to_eur: parseFloat(usdToEur) || 0.92,
+          pricing_enabled: pricingEnabled,
+          updated_at: new Date().toISOString()
+        });
 
-        if (existingIndex >= 0) {
-          // Update existing record
-          items[existingIndex] = {
-            ...items[existingIndex],
-            guide_price: parseFloat(guidePrice) || 0,
-            lunch_price: parseFloat(lunchPrice) || 0,
-            dinner_price: parseFloat(dinnerPrice) || 0,
-            night_stay_price: parseFloat(nightStayPrice) || 0,
-            laundry_price: parseFloat(laundryPrice) || 0,
-            usd_to_uzs: parseFloat(usdToUzs) || 0,
-            usd_to_eur: parseFloat(usdToEur) || 0,
-            pricing_enabled: true,
-          };
-        } else {
-          // Insert new record
-          items.push({
-            id: 1,
-            guide_price: parseFloat(guidePrice) || 0,
-            lunch_price: parseFloat(lunchPrice) || 0,
-            dinner_price: parseFloat(dinnerPrice) || 0,
-            night_stay_price: parseFloat(nightStayPrice) || 0,
-            laundry_price: parseFloat(laundryPrice) || 0,
-            usd_to_uzs: parseFloat(usdToUzs) || 0,
-            usd_to_eur: parseFloat(usdToEur) || 0,
-            pricing_enabled: true,
-          });
-        }
-
-        localStorage.setItem('camp_service_pricing', JSON.stringify(items));
+      if (error) {
+        setMessage('Error saving pricing: ' + error.message);
       } else {
-        // Use real Supabase
-        const { data: existing } = await supabase
-          .from('service_pricing')
-          .select('*')
-          .eq('id', 1);
-
-        if (existing && existing.length > 0) {
-          // Update existing record
-          const { error } = await supabase
-            .from('service_pricing')
-            .update({
-              guide_price: parseFloat(guidePrice) || 0,
-              lunch_price: parseFloat(lunchPrice) || 0,
-              dinner_price: parseFloat(dinnerPrice) || 0,
-              night_stay_price: parseFloat(nightStayPrice) || 0,
-              laundry_price: parseFloat(laundryPrice) || 0,
-              usd_to_uzs: parseFloat(usdToUzs) || 0,
-              usd_to_eur: parseFloat(usdToEur) || 0,
-              pricing_enabled: true,
-            })
-            .eq('id', 1);
-          if (error) throw error;
-        } else {
-          // Insert new record
-          const { error } = await supabase
-            .from('service_pricing')
-            .insert({
-              id: 1,
-              guide_price: parseFloat(guidePrice) || 0,
-              lunch_price: parseFloat(lunchPrice) || 0,
-              dinner_price: parseFloat(dinnerPrice) || 0,
-              night_stay_price: parseFloat(nightStayPrice) || 0,
-              laundry_price: parseFloat(laundryPrice) || 0,
-              usd_to_uzs: parseFloat(usdToUzs) || 0,
-              usd_to_eur: parseFloat(usdToEur) || 0,
-              pricing_enabled: true,
-            });
-          if (error) throw error;
-        }
+        setMessage('Pricing saved successfully!');
       }
-
-      setMessage('Pricing saved successfully!');
     } catch (err: any) {
       setMessage(`Error: ${err.message}`);
     } finally {

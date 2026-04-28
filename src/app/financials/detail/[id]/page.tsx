@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ProtectedRoute } from '@/components/protected-route';
-import { supabase, type Finance, isUsingLocalStorage } from '@/lib/supabase';
+import { supabase, type Finance } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter, useParams } from 'next/navigation';
 
