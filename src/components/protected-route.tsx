@@ -25,11 +25,7 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
   }, [user, loading, router, allowedRoles]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
+    return null; // Don't show a spinner, just stay on the current page or blank
   }
 
   if (!user || !allowedRoles.includes(user.role)) {
