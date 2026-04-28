@@ -1,69 +1,14 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 // Create a complete mock for server/build side
-// PostgrestFilterBuilder is both chainable AND a valid Promise.
-// We replicate that by creating a proper Promise subclass with filter methods.
-class MockBuilder<T> extends Promise<T> {
-  static __proto__ = Promise.prototype;
-  constructor(executor: (resolve: (value: T) => void, reject: (reason?: any) => void) => void) {
-    super(executor);
-  }
-  private chain(): MockBuilder<T> {
-    return new MockBuilder<T>((resolve) => resolve(null as any));
-  }
-  eq = () => this.chain() as any;
-  neq = () => this.chain() as any;
-  gt = () => this.chain() as any;
-  lt = () => this.chain() as any;
-  gte = () => this.chain() as any;
-  lte = () => this.chain() as any;
-  like = () => this.chain() as any;
-  ilike = () => this.chain() as any;
-  is = () => this.chain() as any;
-  in = () => this.chain() as any;
-  contains = () => this.chain() as any;
-  containedBy = () => this.chain() as any;
-  range = () => this.chain() as any;
-  overlap = () => this.chain() as any;
-  textSearch = () => this.chain() as any;
-  match = () => this.chain() as any;
-  not = () => this.chain() as any;
-  or = () => this.chain() as any;
-  and = () => this.chain() as any;
-  order = () => this.chain() as any;
-  limit = () => this.chain() as any;
-  single = () => MockBuilder.resolve({ data: null, error: null }) as any;
-  maybeSingle = () => MockBuilder.resolve({ data: null, error: null }) as any;
-  csv = () => MockBuilder.resolve('') as any;
-  select = () => this.chain() as any;
-  insert = () => MockBuilder.resolve({ data: null, error: null }) as any;
-  upsert = () => MockBuilder.resolve({ data: null, error: null }) as any;
-  update = () => this.chain() as any;
-  delete = () => this.chain() as any;
-}
-
-const createMockClient = () => {
-  return {
-    from: () => new MockBuilder<any>((resolve) => resolve({ data: [], error: null })),
-    rpc: () => Promise.resolve({ data: null, error: null }),
-    auth: {
-      getSession: () => Promise.resolve({ data: { session: null }, error: null }),
-      getUser: () => Promise.resolve({ data: { user: null }, error: null }),
-      signInWithPassword: () => Promise.resolve({ data: null, error: null }),
-      signUp: () => Promise.resolve({ data: null, error: null }),
-      signOut: () => Promise.resolve({ error: null }),
-      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-    },
-    storage: {
-      from: () => ({
-        upload: () => Promise.resolve({ data: null, error: null }),
-        download: () => Promise.resolve({ data: null, error: null }),
-        getPublicUrl: () => ({ data: { publicUrl: '' } }),
-        remove: () => Promise.resolve({ data: null, error: null }),
-        list: () => Promise.resolve({ data: [], error: null }),
-      }),
+// Cast to SupabaseClient so TypeScript only sees real Supabase types.
+const createMockClient = (): SupabaseClient => {
+  const handler: ProxyHandler<object> = {
+    get() {
+      return () => new Proxy({}, handler);
     },
   };
+  return new Proxy({}, handler) as unknown as SupabaseClient;
 };
 
 function createBrowserClient() {
@@ -86,7 +31,8 @@ function createBrowserClient() {
 }
 
 // SSR/build: return mock. Browser: create singleton once.
-export const supabase = typeof window === 'undefined'
+// Both branches return SupabaseClient type so TypeScript sees consistent types.
+export const supabase: SupabaseClient = typeof window === 'undefined'
   ? createMockClient()
   : createBrowserClient();
 
