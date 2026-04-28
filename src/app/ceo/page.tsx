@@ -64,15 +64,21 @@ function CEODashboard() {
   }, []);
 
   const fetchData = async () => {
+    // Safety timeout to prevent dashboard hang
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 3000);
+
     try {
+      console.log('🔄 Dashboard: Fetching data...');
       const [bookingsData, staffData, notificationsData] = await Promise.all([
-        supabase.from('bookings').select('*'),
+        supabase.from('bookings').select('*').order('check_in', { ascending: false }),
         supabase.from('profiles').select('*'),
         supabase.from('notifications').select('*').eq('user_id', currentUserId || '').order('created_at', { ascending: false })
       ]);
 
-      console.log('🔄 CEO Fetched bookings:', bookingsData.data?.length);
-
+      console.log('✅ Dashboard: Data received!');
+      
       const deDuplicate = (arr: any[]) => {
         if (!arr) return [];
         const map = new Map();
@@ -88,9 +94,10 @@ function CEODashboard() {
       setStaff(staffData.data || []);
       setNotifications((notificationsData.data || []).slice(0, 10) || []);
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Dashboard Fetch error:', error);
     } finally {
       setLoading(false);
+      clearTimeout(timer);
     }
   };
 
