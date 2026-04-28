@@ -11,7 +11,7 @@ const createMockClient = (): SupabaseClient => {
   return new Proxy({}, handler) as unknown as SupabaseClient;
 };
 
-function createBrowserClient() {
+function createBrowserClient(): SupabaseClient {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
@@ -20,17 +20,22 @@ function createBrowserClient() {
     throw new Error('Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables.');
   }
 
-  return createClient(supabaseUrl, supabaseKey, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: false,
-      storageKey: 'yurt-camp-v3-final',
-    },
-  });
+  // Use global singleton to prevent multiple instances fighting over the gotrue-js lock
+  const globalKey = '__yurt_camp_supabase__' as any;
+  if (!(window as any)[globalKey]) {
+    (window as any)[globalKey] = createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: false,
+        storageKey: 'yurt-camp-v3-final',
+      },
+    });
+  }
+  return (window as any)[globalKey];
 }
 
-// SSR/build: return mock. Browser: create singleton once.
+// SSR/build: return mock. Browser: return singleton.
 // Both branches return SupabaseClient type so TypeScript sees consistent types.
 export const supabase: SupabaseClient = typeof window === 'undefined'
   ? createMockClient()
