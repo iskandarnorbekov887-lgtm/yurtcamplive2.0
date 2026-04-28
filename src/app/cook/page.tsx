@@ -7,6 +7,9 @@ import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
 
+// Force dynamic rendering to avoid SSR issues with auth
+export const dynamic = 'force-dynamic';
+
 export default function CookPage() {
   return (
     <ProtectedRoute allowedRoles={['Cook', 'CEO']}>

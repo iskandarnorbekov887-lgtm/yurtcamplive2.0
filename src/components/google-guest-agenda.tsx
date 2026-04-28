@@ -264,7 +264,7 @@ export function GoogleGuestAgenda({
   }
 
   useEffect(() => {
-    fetch('/api/calendar/events')
+    fetch('/api/calendar/events', { cache: 'no-store' })
       .then(r => r.json())
       .then((data: CalEvent[] | { error: string }) => {
         if ('error' in data) { setEventsError(data.error); setGcEvents([]); }

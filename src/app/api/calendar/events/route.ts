@@ -2,6 +2,7 @@ import { google } from 'googleapis';
 import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
@@ -56,11 +57,16 @@ export async function GET() {
     });
     });
 
-    return NextResponse.json(items);
+    return NextResponse.json(items, {
+      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate', 'Pragma': 'no-cache' },
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error('Google Calendar API error:', message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: message }, {
+      status: 500,
+      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate', 'Pragma': 'no-cache' },
+    });
   }
 }
 export async function PATCH(request: Request) {
@@ -97,9 +103,14 @@ export async function PATCH(request: Request) {
       },
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true }, {
+      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate', 'Pragma': 'no-cache' },
+    });
   } catch (err: any) {
     console.error('GC Patch Error:', err.message);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message }, {
+      status: 500,
+      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate', 'Pragma': 'no-cache' },
+    });
   }
 }

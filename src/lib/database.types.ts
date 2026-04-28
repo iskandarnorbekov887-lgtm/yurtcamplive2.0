@@ -13,20 +13,26 @@ export interface Database {
         Row: {
           id: string
           email: string
-          role: 'CEO' | 'Manager' | 'Cook'
+          role: 'CEO' | 'Manager' | 'Reserver' | 'Cook'
           full_name: string | null
+          created_at: string
+          updated_at: string
         }
         Insert: {
           id: string
           email: string
-          role?: 'CEO' | 'Manager' | 'Cook'
+          role?: 'CEO' | 'Manager' | 'Reserver' | 'Cook'
           full_name?: string | null
+          created_at?: string
+          updated_at?: string
         }
         Update: {
           id?: string
           email?: string
-          role?: 'CEO' | 'Manager' | 'Cook'
+          role?: 'CEO' | 'Manager' | 'Reserver' | 'Cook'
           full_name?: string | null
+          created_at?: string
+          updated_at?: string
         }
       }
       yurts: {

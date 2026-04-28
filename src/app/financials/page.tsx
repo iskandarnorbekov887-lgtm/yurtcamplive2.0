@@ -8,6 +8,9 @@ import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { useRouter } from 'next/navigation';
 
+// Force dynamic rendering to avoid SSR issues with auth
+export const dynamic = 'force-dynamic';
+
 export default function FinancialsPage() {
   return (
     <ProtectedRoute allowedRoles={['Manager']}>

@@ -9,6 +9,9 @@ import { LanguageSwitcher } from '@/components/language-switcher';
 import { GoogleGuestAgenda } from '@/components/google-guest-agenda';
 import type { UserRole } from '@/lib/supabase';
 
+// Force dynamic rendering to avoid SSR issues with auth
+export const dynamic = 'force-dynamic';
+
 export default function CEOPage() {
   return (
     <ProtectedRoute allowedRoles={['CEO']}>
@@ -29,6 +32,11 @@ function CEODashboard() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAllNotifications, setShowAllNotifications] = useState(false);
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [showEditUserModal, setShowEditUserModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<Profile | null>(null);
+  const [newUser, setNewUser] = useState({ email: '', password: '', fullName: '', role: 'Manager' as UserRole });
+  const [loadingUser, setLoadingUser] = useState(false);
 
 
   useEffect(() => {
@@ -160,6 +168,74 @@ function CEODashboard() {
     // Then mark booking as completed
     await supabase.from('bookings').update({ status: 'completed' }).eq('id', id);
     fetchData();
+  };
+
+  const handleAddUser = async () => {
+    setLoadingUser(true);
+    try {
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newUser)
+      });
+      const data = await response.json();
+      if (data.error) {
+        alert(data.error);
+      } else {
+        setShowAddUserModal(false);
+        setNewUser({ email: '', password: '', fullName: '', role: 'Manager' });
+        fetchData();
+      }
+    } catch (error) {
+      alert('Failed to create user');
+    } finally {
+      setLoadingUser(false);
+    }
+  };
+
+  const handleUpdateUser = async () => {
+    if (!editingUser) return;
+    setLoadingUser(true);
+    try {
+      const response = await fetch('/api/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingUser.id,
+          fullName: editingUser.full_name,
+          role: editingUser.role
+        })
+      });
+      const data = await response.json();
+      if (data.error) {
+        alert(data.error);
+      } else {
+        setShowEditUserModal(false);
+        setEditingUser(null);
+        fetchData();
+      }
+    } catch (error) {
+      alert('Failed to update user');
+    } finally {
+      setLoadingUser(false);
+    }
+  };
+
+  const handleDeleteUser = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this user?')) return;
+    try {
+      const response = await fetch(`/api/users?id=${id}`, {
+        method: 'DELETE'
+      });
+      const data = await response.json();
+      if (data.error) {
+        alert(data.error);
+      } else {
+        fetchData();
+      }
+    } catch (error) {
+      alert('Failed to delete user');
+    }
   };
 
 
@@ -446,13 +522,20 @@ function CEODashboard() {
         {activeTab === 'team' && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
              <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/60 border border-slate-100 overflow-hidden">
-              <div className="p-8 border-b border-slate-50 bg-gradient-to-r from-slate-50/50 to-white">
+              <div className="p-8 border-b border-slate-50 bg-gradient-to-r from-slate-50/50 to-white flex justify-between items-center">
                 <h3 className="text-xl font-black text-slate-800 flex items-center gap-3">
                   <span className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
                   </span>
                   Operational Taskforce
                 </h3>
+                <button
+                  onClick={() => setShowAddUserModal(true)}
+                  className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                  Add Staff Member
+                </button>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
@@ -461,6 +544,7 @@ function CEODashboard() {
                       <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('table.name')}</th>
                       <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('table.email')}</th>
                       <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('table.role')}</th>
+                      <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
@@ -485,6 +569,29 @@ function CEODashboard() {
                             {member.role}
                           </span>
                         </td>
+                        <td className="px-8 py-5">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => {
+                                setEditingUser(member);
+                                setShowEditUserModal(true);
+                              }}
+                              className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all"
+                              title="Edit"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                            </button>
+                            {member.id !== currentUserId && (
+                              <button
+                                onClick={() => handleDeleteUser(member.id)}
+                                className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-all"
+                                title="Delete"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              </button>
+                            )}
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -499,6 +606,132 @@ function CEODashboard() {
           </div>
         )}
       </main>
+
+      {/* Add User Modal */}
+      {showAddUserModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+            <h3 className="text-xl font-black text-slate-800 mb-6">Add New Staff Member</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-black uppercase tracking-widest text-slate-400">Full Name</label>
+                <input
+                  type="text"
+                  value={newUser.fullName}
+                  onChange={(e) => setNewUser({ ...newUser, fullName: e.target.value })}
+                  className="w-full mt-1 px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-indigo-500 outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-black uppercase tracking-widest text-slate-400">Email</label>
+                <input
+                  type="email"
+                  value={newUser.email}
+                  onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                  className="w-full mt-1 px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-indigo-500 outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-black uppercase tracking-widest text-slate-400">Password</label>
+                <input
+                  type="password"
+                  value={newUser.password}
+                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                  className="w-full mt-1 px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-indigo-500 outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-black uppercase tracking-widest text-slate-400">Role</label>
+                <select
+                  value={newUser.role}
+                  onChange={(e) => setNewUser({ ...newUser, role: e.target.value as UserRole })}
+                  className="w-full mt-1 px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-indigo-500 outline-none transition-all"
+                >
+                  <option value="Manager">Manager</option>
+                  <option value="Reserver">Reserver</option>
+                  <option value="Cook">Cook</option>
+                  <option value="CEO">CEO</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-8">
+              <button
+                onClick={() => setShowAddUserModal(false)}
+                className="flex-1 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddUser}
+                disabled={loadingUser || !newUser.email || !newUser.password || !newUser.fullName}
+                className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all disabled:opacity-50"
+              >
+                {loadingUser ? 'Creating...' : 'Create User'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit User Modal */}
+      {showEditUserModal && editingUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+            <h3 className="text-xl font-black text-slate-800 mb-6">Edit Staff Member</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-black uppercase tracking-widest text-slate-400">Full Name</label>
+                <input
+                  type="text"
+                  value={editingUser.full_name || ''}
+                  onChange={(e) => setEditingUser({ ...editingUser, full_name: e.target.value })}
+                  className="w-full mt-1 px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-indigo-500 outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-black uppercase tracking-widest text-slate-400">Email (Read-only)</label>
+                <input
+                  type="email"
+                  value={editingUser.email || ''}
+                  disabled
+                  className="w-full mt-1 px-4 py-3 bg-slate-100 border-2 border-slate-100 rounded-xl font-black text-slate-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-black uppercase tracking-widest text-slate-400">Role</label>
+                <select
+                  value={editingUser.role}
+                  onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as UserRole })}
+                  className="w-full mt-1 px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-indigo-500 outline-none transition-all"
+                >
+                  <option value="Manager">Manager</option>
+                  <option value="Reserver">Reserver</option>
+                  <option value="Cook">Cook</option>
+                  <option value="CEO">CEO</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-8">
+              <button
+                onClick={() => {
+                  setShowEditUserModal(false);
+                  setEditingUser(null);
+                }}
+                className="flex-1 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdateUser}
+                disabled={loadingUser}
+                className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all disabled:opacity-50"
+              >
+                {loadingUser ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
 
     </div>

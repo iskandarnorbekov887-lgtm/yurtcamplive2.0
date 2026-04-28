@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import type { UserRole } from '@/lib/supabase';
@@ -12,20 +12,30 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading) {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted && !loading) {
       if (!user) {
         router.push('/login');
       } else if (!allowedRoles.includes(user.role)) {
         router.push('/unauthorized');
       }
     }
-  }, [user, loading, router, allowedRoles]);
+  }, [user, loading, mounted, router, allowedRoles]);
 
-  if (loading) {
-    return null; // Don't show a spinner, just stay on the current page or blank
+  // During SSR/hydration, show a loading state to prevent hydration mismatch
+  if (!mounted || loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
   }
 
   if (!user || !allowedRoles.includes(user.role)) {

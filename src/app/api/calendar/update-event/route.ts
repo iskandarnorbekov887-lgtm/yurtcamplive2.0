@@ -2,6 +2,7 @@ import { google } from 'googleapis';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function PATCH(req: NextRequest) {
   const { eventId, colorId } = await req.json();
@@ -29,10 +30,15 @@ export async function PATCH(req: NextRequest) {
       requestBody: { colorId: colorId ?? null },
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true }, {
+      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate', 'Pragma': 'no-cache' },
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error('Calendar color update error:', message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: message }, {
+      status: 500,
+      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate', 'Pragma': 'no-cache' },
+    });
   }
 }

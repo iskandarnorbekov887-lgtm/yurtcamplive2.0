@@ -8,7 +8,11 @@ import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { OccupancyCalendar } from '@/components/occupancy-calendar';
 import { ReserverIncomeForm } from '@/components/reserver-income-form';
+
 import type { UserRole } from '@/lib/supabase';
+
+// Force dynamic rendering to avoid SSR issues with auth
+export const dynamic = 'force-dynamic';
 
 export default function BookingsPage() {
   return (

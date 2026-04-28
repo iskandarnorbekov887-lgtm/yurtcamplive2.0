@@ -7,6 +7,9 @@ import { supabase } from '@/lib/supabase';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
 
+// Force dynamic rendering to avoid SSR issues with auth
+export const dynamic = 'force-dynamic';
+
 export default function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
@@ -14,12 +17,18 @@ export default function LoginPage() {
   const [fullName, setFullName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn, signUp, user, configError } = useAuth();
+  const [mounted, setMounted] = useState(false);
+  const { signIn, signUp, user, loading: authLoading } = useAuth();
   const { t } = useLanguage();
   const router = useRouter();
 
   useEffect(() => {
-    if (user) {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    // Only redirect after client-side mount to avoid hydration mismatch
+    if (mounted && user && !authLoading) {
       const rolePaths: Record<string, string> = {
         'CEO': '/ceo',
         'Manager': '/manager',
@@ -30,7 +39,12 @@ export default function LoginPage() {
       console.log('🚀 Redirecting to:', path, 'for role:', user.role);
       router.push(path);
     }
-  }, [user, router]);
+  }, [user, authLoading, mounted, router]);
+
+  // Show nothing during SSR/hydration to prevent mismatch
+  if (!mounted) {
+    return <div className="min-h-screen bg-gradient-to-br from-blue-900 to-purple-900" />;
+  }
 
   if (user) {
     return null;

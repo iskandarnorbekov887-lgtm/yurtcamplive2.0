@@ -65,7 +65,7 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelect
 
   useEffect(() => {
     if (gcEventsProp !== undefined) return;
-    fetch('/api/calendar/events')
+    fetch('/api/calendar/events', { cache: 'no-store' })
       .then(r => r.json())
       .then((data: CalEvent[] | { error: string }) => {
         if ('error' in data) setApiError(data.error);
