@@ -348,24 +348,6 @@ function ManagerFinancialDetail() {
                 </div>
               )}
 
-              {finance.type === 'income' && (
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Services</p>
-                  <div className="space-y-2">
-                    {finance.guide_service && <p className="text-lg font-semibold text-slate-800">Guide Service</p>}
-                    {finance.guide_names && <p className="text-sm text-slate-600 ml-4">Guide names: {finance.guide_names}</p>}
-                    {finance.transportation && <p className="text-lg font-semibold text-slate-800">Transportation</p>}
-                    {finance.transportation_details && <p className="text-sm text-slate-600 ml-4">Transportation details: {finance.transportation_details}</p>}
-                    {finance.lunch && <p className="text-lg font-semibold text-slate-800">Lunch ({finance.lunch_count})</p>}
-                    {finance.dinner && <p className="text-lg font-semibold text-slate-800">Dinner ({finance.dinner_count})</p>}
-                    {finance.laundry && <p className="text-lg font-semibold text-slate-800">Laundry (Price: {finance.laundry_price})</p>}
-                    {!finance.guide_service && !finance.transportation && !finance.lunch && !finance.dinner && !finance.laundry && (
-                      <p className="text-sm text-slate-500 italic">No services selected</p>
-                    )}
-                  </div>
-                </div>
-              )}
-
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Description</p>
                 {editing ? (
