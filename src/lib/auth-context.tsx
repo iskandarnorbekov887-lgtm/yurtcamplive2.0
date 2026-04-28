@@ -114,26 +114,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(data.session);
         console.log('Step 3: Fetching profile for UID:', data.session.user.id);
         
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', data.session.user.id)
-          .single();
-        
-        if (profileError) {
-          console.error('Step 3 Error: Profile fetch failed', profileError);
-          // Don't hang the app, just set the user with minimal info if profile fails
+        try {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', data.session.user.id)
+            .single();
+          
+          if (profileError) {
+            console.error('Step 3 Error: Profile fetch failed', profileError);
+            setUser({ id: data.session.user.id, email: data.session.user.email, role: 'Manager' } as any);
+          } else {
+            console.log('Step 4: Profile loaded successfully:', profile.role);
+            setUser(profile);
+          }
+        } catch (profileCatch) {
+          console.error('Step 3 Catch: Profile fetch crashed', profileCatch);
           setUser({ id: data.session.user.id, email: data.session.user.email, role: 'Manager' } as any);
-        } else {
-          console.log('Step 4: Profile loaded successfully:', profile.role);
-          setUser(profile);
         }
       } else {
         console.warn('Step 2 Warning: No session returned');
       }
     } catch (err: any) {
       console.error('Sign In Crash:', err);
+      setLoading(false); // Make sure we stop loading!
       throw err;
+    } finally {
+      setLoading(false);
     }
   };
 
