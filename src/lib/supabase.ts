@@ -17,11 +17,6 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
     autoRefreshToken: true,
     detectSessionInUrl: true,
     storageKey: 'yurt-camp-LIVE-v2',
-    // Disable the lock to prevent the 5000ms hang we are seeing in the console
-    lock: {
-      acquire: async () => ({ error: null }),
-      release: async () => {}
-    }
   }
 });
 
