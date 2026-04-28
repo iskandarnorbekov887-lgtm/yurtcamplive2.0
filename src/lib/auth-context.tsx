@@ -22,78 +22,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [configError, setConfigError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Strict 2-second timeout to prevent ANY loading hang
-    const forceUnfreeze = setTimeout(() => {
-      setLoading(false);
-    }, 2000);
+    let mounted = true;
 
-    const fetchUser = async () => {
+    // Use a single initialization function
+    const initAuth = async () => {
       try {
-        console.log('🔄 Auth: Fetching session...');
-        const { data, error: sessionError } = await supabase.auth.getSession();
+        // 1. Get the initial session
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
         
-        if (sessionError) {
-          console.error('Session error:', sessionError);
-          setLoading(false);
-          return;
-        }
+        if (!mounted) return;
 
-        const currentSession = data?.session;
-        setSession(currentSession);
-        
-        if (currentSession?.user) {
-          console.log('🔄 Auth: User found, fetching profile...');
-          const { data: profile, error: profileError } = await supabase
+        if (initialSession?.user) {
+          setSession(initialSession);
+          const { data: profile } = await supabase
             .from('profiles')
             .select('*')
-            .eq('id', currentSession.user.id)
+            .eq('id', initialSession.user.id)
             .single();
           
-          if (profileError) {
-            console.error('Profile fetch error:', profileError);
-          } else {
+          if (mounted && profile) {
             setUser(profile);
           }
         }
-      } catch (err: any) {
-        console.error('Auth crash:', err);
+      } catch (err) {
+        console.error('Auth initialization error:', err);
       } finally {
-        setLoading(false);
-        clearTimeout(forceUnfreeze);
+        if (mounted) setLoading(false);
       }
     };
 
-    fetchUser();
+    initAuth();
 
-    const timeout = setTimeout(() => {
-      setLoading(false);
-    }, 5000);
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: string, newSession: any) => {
-      setSession(newSession);
-      if (newSession?.user) {
-        try {
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', newSession.user.id)
-            .single();
-          
-          if (profileError) {
-            console.error('Auth state profile error:', profileError);
-          } else {
-            setUser(profile);
-          }
-        } catch (err) {
-          console.error('Auth state change crash:', err);
-        }
-      } else {
+    // 2. Set up the listener for future changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      if (event === 'SIGNED_OUT') {
         setUser(null);
+        setSession(null);
+        return;
+      }
+
+      if (newSession?.user) {
+        setSession(newSession);
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', newSession.user.id)
+          .single();
+        
+        if (profile) setUser(profile);
       }
     });
 
     return () => {
-      clearTimeout(timeout);
+      mounted = false;
       subscription.unsubscribe();
     };
   }, []);
