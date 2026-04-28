@@ -1,21 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
+import { createLocalClient } from './local-supabase';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-let supabaseInstance: any = null;
+// Fallback to local mock client if Supabase is not configured
+export const supabase = (!supabaseUrl || supabaseUrl.includes('placeholder') || !supabaseKey || supabaseKey.length <= 20)
+  ? createLocalClient() as any
+  : createClient(supabaseUrl, supabaseKey);
 
-export const supabase = new Proxy({} as any, {
-  get(target, prop) {
-    if (!supabaseInstance) {
-      if (!supabaseUrl || supabaseUrl.includes('placeholder') || !supabaseKey || supabaseKey.length <= 20) {
-        throw new Error('Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your environment variables.');
-      }
-      supabaseInstance = createClient(supabaseUrl, supabaseKey);
-    }
-    return supabaseInstance[prop];
-  }
-});
 
 export type UserRole = 'CEO' | 'Manager' | 'Cook' | 'Reserver';
 
