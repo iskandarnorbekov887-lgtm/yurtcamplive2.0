@@ -25,21 +25,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const fetchUser = async () => {
       try {
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        const { data, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('Session error:', sessionError);
+          setConfigError(`Database connection error: ${sessionError.message}`);
+          setLoading(false);
+          return;
+        }
+
+        const currentSession = data?.session;
         setSession(currentSession);
         
         if (currentSession?.user) {
-          const { data: profile } = await supabase
+          const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', currentSession.user.id)
             .single();
           
-          setUser(profile);
+          if (profileError) {
+            console.error('Profile fetch error:', profileError);
+          } else {
+            setUser(profile);
+          }
         }
-      } catch (err) {
-        console.error('Auth error:', err);
-        setConfigError('Error connecting to database. Please check your configuration.');
+      } catch (err: any) {
+        console.error('Auth crash:', err);
+        setConfigError(err.message || 'Error connecting to database.');
       } finally {
         setLoading(false);
       }
@@ -52,19 +65,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     }, 5000);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: string, newSession: { user: { id: string } } | null) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: string, newSession: any) => {
       setSession(newSession);
       if (newSession?.user) {
         try {
-          const { data: profile } = await supabase
+          const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', newSession.user.id)
             .single();
           
-          setUser(profile);
+          if (profileError) {
+            console.error('Auth state profile error:', profileError);
+          } else {
+            setUser(profile);
+          }
         } catch (err) {
-          console.error('Profile fetch error:', err);
+          console.error('Auth state change crash:', err);
         }
       } else {
         setUser(null);
@@ -78,18 +95,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw new Error(error.message);
-    
-    // Fetch profile after successful login
-    if (data.session?.user) {
-      setSession(data.session);
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', data.session.user.id)
-        .single();
-      setUser(profile);
+    console.log('Step 1: Starting Sign In for', email);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      
+      if (error) {
+        console.error('Step 2 Error: Sign In failed', error);
+        throw new Error(error.message);
+      }
+      
+      console.log('Step 2: Sign In successful, fetching session...');
+      
+      if (data.session?.user) {
+        setSession(data.session);
+        console.log('Step 3: Fetching profile for UID:', data.session.user.id);
+        
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.session.user.id)
+          .single();
+        
+        if (profileError) {
+          console.error('Step 3 Error: Profile fetch failed', profileError);
+          // Don't hang the app, just set the user with minimal info if profile fails
+          setUser({ id: data.session.user.id, email: data.session.user.email, role: 'Manager' } as any);
+        } else {
+          console.log('Step 4: Profile loaded successfully:', profile.role);
+          setUser(profile);
+        }
+      } else {
+        console.warn('Step 2 Warning: No session returned');
+      }
+    } catch (err: any) {
+      console.error('Sign In Crash:', err);
+      throw err;
     }
   };
 

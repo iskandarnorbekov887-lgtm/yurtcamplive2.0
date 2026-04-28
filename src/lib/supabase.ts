@@ -4,10 +4,23 @@ import { createLocalClient } from './local-supabase';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
+if (!supabaseUrl || !supabaseKey) {
+  console.warn('⚠️ Supabase credentials missing from environment variables!');
+}
+
 // Fallback to local mock client if Supabase is not configured
-export const supabase = (!supabaseUrl || supabaseUrl.includes('placeholder') || !supabaseKey || supabaseKey.length <= 20)
+const isConfigured = supabaseUrl && !supabaseUrl.includes('placeholder') && supabaseKey && supabaseKey.length > 20;
+
+export const supabase = !isConfigured
   ? createLocalClient() as any
-  : createClient(supabaseUrl, supabaseKey);
+  : createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storageKey: 'yurt-camp-auth-token', // Simplified key to prevent crashes
+      }
+    });
 
 
 export type UserRole = 'CEO' | 'Manager' | 'Cook' | 'Reserver';
