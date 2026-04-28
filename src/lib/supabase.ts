@@ -1,41 +1,50 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Create a complete mock for server/build side
+// PostgrestFilterBuilder is both chainable AND a valid Promise.
+// We replicate that by creating a proper Promise subclass with filter methods.
+class MockBuilder<T> extends Promise<T> {
+  static __proto__ = Promise.prototype;
+  constructor(executor: (resolve: (value: T) => void, reject: (reason?: any) => void) => void) {
+    super(executor);
+  }
+  private chain(): MockBuilder<T> {
+    return new MockBuilder<T>((resolve) => resolve(null as any));
+  }
+  eq = () => this.chain() as any;
+  neq = () => this.chain() as any;
+  gt = () => this.chain() as any;
+  lt = () => this.chain() as any;
+  gte = () => this.chain() as any;
+  lte = () => this.chain() as any;
+  like = () => this.chain() as any;
+  ilike = () => this.chain() as any;
+  is = () => this.chain() as any;
+  in = () => this.chain() as any;
+  contains = () => this.chain() as any;
+  containedBy = () => this.chain() as any;
+  range = () => this.chain() as any;
+  overlap = () => this.chain() as any;
+  textSearch = () => this.chain() as any;
+  match = () => this.chain() as any;
+  not = () => this.chain() as any;
+  or = () => this.chain() as any;
+  and = () => this.chain() as any;
+  order = () => this.chain() as any;
+  limit = () => this.chain() as any;
+  single = () => MockBuilder.resolve({ data: null, error: null }) as any;
+  maybeSingle = () => MockBuilder.resolve({ data: null, error: null }) as any;
+  csv = () => MockBuilder.resolve('') as any;
+  select = () => this.chain() as any;
+  insert = () => MockBuilder.resolve({ data: null, error: null }) as any;
+  upsert = () => MockBuilder.resolve({ data: null, error: null }) as any;
+  update = () => this.chain() as any;
+  delete = () => this.chain() as any;
+}
+
 const createMockClient = () => {
-  const mockChain = {
-    select: () => Promise.resolve({ data: [], error: null }),
-    eq: () => mockChain,
-    neq: () => mockChain,
-    gt: () => mockChain,
-    lt: () => mockChain,
-    gte: () => mockChain,
-    lte: () => mockChain,
-    like: () => mockChain,
-    ilike: () => mockChain,
-    is: () => mockChain,
-    in: () => mockChain,
-    contains: () => mockChain,
-    containedBy: () => mockChain,
-    range: () => mockChain,
-    overlap: () => mockChain,
-    textSearch: () => mockChain,
-    match: () => mockChain,
-    not: () => mockChain,
-    or: () => mockChain,
-    and: () => mockChain,
-    order: () => mockChain,
-    limit: () => mockChain,
-    single: () => Promise.resolve({ data: null, error: null }),
-    maybeSingle: () => Promise.resolve({ data: null, error: null }),
-    csv: () => Promise.resolve(''),
-    insert: () => Promise.resolve({ data: null, error: null }),
-    upsert: () => Promise.resolve({ data: null, error: null }),
-    update: () => mockChain,
-    delete: () => mockChain,
-  };
-  
   return {
-    from: () => mockChain,
+    from: () => new MockBuilder<any>((resolve) => resolve({ data: [], error: null })),
     rpc: () => Promise.resolve({ data: null, error: null }),
     auth: {
       getSession: () => Promise.resolve({ data: { session: null }, error: null }),
