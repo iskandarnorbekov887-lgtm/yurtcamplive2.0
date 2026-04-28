@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ProtectedRoute } from '@/components/protected-route';
-import { supabase, type Finance, type Booking, type BookingReceipt, clearTestReceipts, deleteReceiptById, findBookingWithReceipt } from '@/lib/supabase';
+import { supabase, type Finance, type Booking } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
@@ -24,10 +24,9 @@ function CEOFinancialCalendar() {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [dayFinances, setDayFinances] = useState<Finance[]>([]);
   const [dayBookings, setDayBookings] = useState<Booking[]>([]);
-  const [dayReceipts, setDayReceipts] = useState<BookingReceipt[]>([]);
+  const [dayReceipts, setDayReceipts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [cashBox, setCashBox] = useState<{ USD: number; UZS: number; EUR: number }>({ USD: 0, UZS: 0, EUR: 0 });
-  const [receiptToDelete, setReceiptToDelete] = useState('');
 
   useEffect(() => {
     fetchCashBox();
@@ -142,81 +141,6 @@ function CEOFinancialCalendar() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               Pricing
-            </button>
-            <button
-              onClick={() => router.push('/ceo-financials/deleted-records')}
-              className="px-5 py-2.5 bg-amber-600/90 hover:bg-amber-600 rounded-xl text-xs font-black transition-all shadow-lg hover:shadow-amber-500/20 active:scale-95 flex items-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              Deleted Records
-            </button>
-            <button
-              onClick={async () => {
-                if (!confirm('⚠️ WARNING: This will delete ALL test receipt data from the database. This cannot be undone. Continue?')) return;
-                await clearTestReceipts();
-                alert('Test receipts cleared successfully.');
-              }}
-              className="px-5 py-2.5 bg-slate-600/90 hover:bg-slate-600 rounded-xl text-xs font-black transition-all shadow-lg hover:shadow-slate-500/20 active:scale-95 flex items-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              Clear Test Data
-            </button>
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                placeholder="Receipt ID (e.g., RCP-KLX9M)"
-                value={receiptToDelete}
-                onChange={(e) => setReceiptToDelete(e.target.value.toUpperCase())}
-                className="px-3 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-xs font-black text-slate-900 focus:border-indigo-500 outline-none w-40"
-              />
-              <button
-                onClick={async () => {
-                  if (!receiptToDelete.trim()) {
-                    alert('Please enter a Receipt ID');
-                    return;
-                  }
-                  const found = await findBookingWithReceipt(receiptToDelete);
-                  if (found.length > 0) {
-                    alert(`Found in ${found.length} booking(s):\n\n${found.map(b => `Booking #${b.booking_id}: ${b.guest_name} (${b.receipt_count} receipts)`).join('\n')}`);
-                  } else {
-                    alert(`Receipt ${receiptToDelete} not found in any booking's special_requests. Check booking_receipts table directly.`);
-                  }
-                }}
-                className="px-3 py-2.5 bg-blue-600/90 hover:bg-blue-600 rounded-xl text-xs font-black transition-all shadow-lg hover:shadow-blue-500/20 active:scale-95"
-              >
-                Find
-              </button>
-              <button
-                onClick={async () => {
-                  if (!receiptToDelete.trim()) {
-                    alert('Please enter a Receipt ID');
-                    return;
-                  }
-                  if (!confirm(`⚠️ Delete receipt ${receiptToDelete}? This cannot be undone.`)) return;
-                  const success = await deleteReceiptById(receiptToDelete);
-                  if (success) {
-                    alert(`Receipt ${receiptToDelete} deleted successfully.`);
-                    setReceiptToDelete('');
-                  } else {
-                    alert('Failed to delete receipt. Check console for details.');
-                  }
-                }}
-                className="px-5 py-2.5 bg-orange-600/90 hover:bg-orange-600 rounded-xl text-xs font-black transition-all shadow-lg hover:shadow-orange-500/20 active:scale-95"
-              >
-                Delete
-              </button>
-            </div>
-            <button
-              onClick={() => {
-                alert('This feature has been removed. All data is now stored in Supabase database.');
-              }}
-              className="px-5 py-2.5 bg-red-600/90 hover:bg-red-600 rounded-xl text-xs font-black transition-all shadow-lg hover:shadow-red-500/20 active:scale-95"
-            >
-              Clear Local Storage
             </button>
             <LanguageSwitcher variant="light" />
             <button
