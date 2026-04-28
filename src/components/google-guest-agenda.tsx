@@ -249,7 +249,7 @@ export function GoogleGuestAgenda({
     fetchPricing();
   }, []);
 
-  const fetchPricing = async () => {
+  async function fetchPricing() {
     try {
       const { data } = await supabase.from('service_pricing').select('*').eq('id', 1);
       if (data && data.length > 0) {
@@ -261,7 +261,7 @@ export function GoogleGuestAgenda({
     } catch (err) {
       console.error('Error fetching pricing:', err);
     }
-  };
+  }
 
   useEffect(() => {
     fetch('/api/calendar/events')
@@ -325,7 +325,7 @@ export function GoogleGuestAgenda({
       const saved = (b.notes || '').trim() || null;
       return live !== saved;
     });
-    if (toSync.length === 0) { setDidSyncNotes(true); return; }
+    if (toSync.length === 0) { setTimeout(() => setDidSyncNotes(true), 0); return; }
     (async () => {
       for (const b of toSync) {
         const ev = gcEvents.find(e => e.id === b.google_event_id)!;
@@ -333,7 +333,7 @@ export function GoogleGuestAgenda({
         try { await supabase.from('bookings').update({ notes: live }).eq('id', b.id); }
         catch (err) { console.error('Notes sync failed for booking', b.id, err); }
       }
-      setDidSyncNotes(true);
+      setTimeout(() => setDidSyncNotes(true), 0);
       onRefresh?.();
     })();
   }, [gcEvents, bookings, didSyncNotes, onRefresh]);
@@ -346,7 +346,7 @@ export function GoogleGuestAgenda({
         const currentStr = JSON.stringify(selectedItem.booking);
         const updatedStr = JSON.stringify(updated);
         if (currentStr !== updatedStr) {
-          setSelectedItem(prev => prev ? { ...prev, booking: updated } : prev);
+          setTimeout(() => setSelectedItem(prev => prev ? { ...prev, booking: updated } : prev), 0);
         }
       }
     }
@@ -354,7 +354,7 @@ export function GoogleGuestAgenda({
 
   // Reset receipt view only when guest ID actually changes
   useEffect(() => {
-    setSelectedReceipt(null);
+    setTimeout(() => setSelectedReceipt(null), 0);
   }, [sel?.id]);
 
   // --- AUTO-CHECKOUT WORKER ---
@@ -1117,7 +1117,7 @@ export function GoogleGuestAgenda({
         }, 0) +
         extraServices.reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0) - svcDiscount
       );
-      setSvcPayList([{ amount: gTotal.toString(), currency: 'USD', method: 'Cash' }]);
+      setTimeout(() => setSvcPayList([{ amount: gTotal.toString(), currency: 'USD', method: 'Cash' }]), 0);
     }
   }, [svcAmount, svcDiscount, svcLunch, svcLunchCount, svcDinner, svcDinnerCount, svcGuide, svcGuidePrice, svcTransport, svcTransList, svcLaundry, svcLaundryPrice, svcCooking, svcCookingPrice, selectedDrinks, extraServices, pricing, payModified]);
 
