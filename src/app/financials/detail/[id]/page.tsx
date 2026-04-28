@@ -318,35 +318,6 @@ function ManagerFinancialDetail() {
                 )}
               </div>
 
-              {finance.guest_count && (
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Total Number of Guests</p>
-                  <p className="text-lg font-semibold text-slate-800">{finance.guest_count}</p>
-                </div>
-              )}
-
-              {finance.children_under_12 && (
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Children Under 12</p>
-                  <p className="text-lg font-semibold text-slate-800">{finance.children_under_12}</p>
-                </div>
-              )}
-
-              {finance.nights && (
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Nights Stayed</p>
-                  <p className="text-lg font-semibold text-slate-800">{finance.nights}</p>
-                </div>
-              )}
-
-              {finance.payment_method && (
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Payment Method</p>
-                  <p className="text-lg font-semibold text-slate-800">
-                    {finance.payment_method === 'in_camp' ? 'In Camp' : 'Online'}
-                  </p>
-                </div>
-              )}
 
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Description</p>
