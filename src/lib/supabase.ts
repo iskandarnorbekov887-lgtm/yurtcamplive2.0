@@ -1,3 +1,4 @@
+// Supabase client initialization - Version 2.1 (Sequential Auth Fix)
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
