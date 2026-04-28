@@ -711,7 +711,6 @@ export function GoogleGuestAgenda({
         });
       }
       setDayEntries(entries);
-      setSvcAmount(b.total_price - (b.collected_amount || 0));
 
       // Load draft/saved states with priority for draft
       setIsPrepaid(draft?.isPrepaid ?? (b.payment_note?.includes('Accommodation') || false));
@@ -751,7 +750,8 @@ export function GoogleGuestAgenda({
       setSvcLaundryPrice(draft?.svcLaundryPrice ?? (parseFloat(b.laundry_price || '0') || 0));
       setSvcAdults(draft?.svcAdults ?? b.number_of_people ?? 1);
       setSvcChildren(draft?.svcChildren ?? b.children_under_12 ?? 0);
-      setSvcAmount(draft?.svcAmount ?? b.amount ?? 0);
+      setSvcAmount(draft?.svcAmount ?? Math.max(0, b.total_price - (b.collected_amount || 0)));
+
       setSvcDiscount(draft?.svcDiscount ?? 0);
 
       // Always start with a fresh payment input list for the current tab
@@ -1610,7 +1610,7 @@ export function GoogleGuestAgenda({
                   {showServices && (sel.status === 'checked_in' || sel.status === 'confirmed') && (userRole === 'Manager' || userRole === 'CEO') && (
                     <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300 mt-4">
                   {/* Accommodation - Always show on first tab or if extended */}
-                  {(svcAmount > 0 || (sel.collected_amount || 0) === 0) && (
+                  {(svcAmount > 0 || isPrepaid || (sel.collected_amount || 0) === 0) && (
                     <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-white animate-in slide-in-from-top-2">
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
