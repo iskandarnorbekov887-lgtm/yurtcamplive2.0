@@ -64,18 +64,7 @@ export default function LoginPage() {
           <p className="text-gray-600 mt-2">{t('login.subtitle')}</p>
         </div>
 
-        {configError && (
-          <div className={`mb-4 p-4 rounded-lg ${configError.includes('local storage') ? 'bg-blue-100 border border-blue-300' : 'bg-yellow-100 border-2 border-yellow-400'}`}>
-            <p className={`font-bold mb-1 ${configError.includes('local storage') ? 'text-blue-900' : 'text-yellow-900'}`}>
-              {configError.includes('local storage') ? 'ℹ️ Offline Mode' : '⚠️ Setup Required'}
-            </p>
-            <p className={`text-sm ${configError.includes('local storage') ? 'text-blue-800' : 'text-yellow-800'}`}>
-              {configError}
-            </p>
-          </div>
-        )}
-
-        {error && !configError && (
+        {error && (
           <div className={`mb-4 p-3 rounded-lg text-sm ${error.includes('created') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
             {error}
           </div>

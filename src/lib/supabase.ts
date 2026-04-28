@@ -1,30 +1,24 @@
 import { createClient } from '@supabase/supabase-js';
-import { createLocalClient } from './local-supabase';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-if (!supabaseUrl || !supabaseKey) {
-  console.warn('⚠️ Supabase credentials missing from environment variables!');
-}
-
-// Fallback to local mock client if Supabase is not configured
-const isConfigured = supabaseUrl && !supabaseUrl.includes('placeholder') && supabaseKey && supabaseKey.length > 20;
-
 if (typeof window !== 'undefined') {
-  console.log(`📡 Database Mode: ${isConfigured ? 'REAL (Supabase)' : 'MOCK (Local)'}`);
+  if (!supabaseUrl || !supabaseKey) {
+    console.error('❌ Supabase configuration missing! Please set your environment variables.');
+  } else {
+    console.log('📡 Connected to Real Supabase');
+  }
 }
 
-export const supabase = !isConfigured
-  ? createLocalClient() as any
-  : createClient(supabaseUrl, supabaseKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-        storageKey: 'yurt-camp-LIVE-v2', // Unique key to prevent any mock confusion
-      }
-    });
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storageKey: 'yurt-camp-LIVE-v2',
+  }
+});
 
 
 export type UserRole = 'CEO' | 'Manager' | 'Cook' | 'Reserver';
