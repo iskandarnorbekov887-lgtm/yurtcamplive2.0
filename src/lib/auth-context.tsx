@@ -22,14 +22,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [configError, setConfigError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Strict 2-second timeout to prevent ANY loading hang
+    const forceUnfreeze = setTimeout(() => {
+      setLoading(false);
+    }, 2000);
 
     const fetchUser = async () => {
       try {
+        console.log('🔄 Auth: Fetching session...');
         const { data, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
           console.error('Session error:', sessionError);
-          setConfigError(`Database connection error: ${sessionError.message}`);
           setLoading(false);
           return;
         }
@@ -38,6 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(currentSession);
         
         if (currentSession?.user) {
+          console.log('🔄 Auth: User found, fetching profile...');
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('*')
@@ -52,15 +57,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (err: any) {
         console.error('Auth crash:', err);
-        setConfigError(err.message || 'Error connecting to database.');
       } finally {
         setLoading(false);
+        clearTimeout(forceUnfreeze);
       }
     };
 
     fetchUser();
 
-    // Add timeout to prevent infinite loading
     const timeout = setTimeout(() => {
       setLoading(false);
     }, 5000);
