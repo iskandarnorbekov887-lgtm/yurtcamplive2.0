@@ -1,22 +1,98 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+let supabaseInstance: any = null;
 
-if (typeof window !== 'undefined') {
-  if (!supabaseUrl || !supabaseKey) {
-    console.error('❌ Supabase configuration missing!');
-  } else {
-    console.log('📡 Connected to Real Supabase (v3.0)');
+// Create a complete mock for server/build side
+const createMockClient = () => {
+  const mockChain = {
+    select: () => mockChain,
+    eq: () => mockChain,
+    neq: () => mockChain,
+    gt: () => mockChain,
+    lt: () => mockChain,
+    gte: () => mockChain,
+    lte: () => mockChain,
+    like: () => mockChain,
+    ilike: () => mockChain,
+    is: () => mockChain,
+    in: () => mockChain,
+    contains: () => mockChain,
+    containedBy: () => mockChain,
+    range: () => mockChain,
+    overlap: () => mockChain,
+    textSearch: () => mockChain,
+    match: () => mockChain,
+    not: () => mockChain,
+    or: () => mockChain,
+    and: () => mockChain,
+    order: () => mockChain,
+    limit: () => mockChain,
+    single: () => Promise.resolve({ data: null, error: null }),
+    maybeSingle: () => Promise.resolve({ data: null, error: null }),
+    csv: () => Promise.resolve(''),
+    then: (cb: any) => Promise.resolve({ data: [], error: null }).then(cb),
+    insert: () => Promise.resolve({ data: null, error: null }),
+    upsert: () => Promise.resolve({ data: null, error: null }),
+    update: () => mockChain,
+    delete: () => mockChain,
+  };
+  
+  return {
+    from: () => mockChain,
+    rpc: () => Promise.resolve({ data: null, error: null }),
+    auth: {
+      getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+      getUser: () => Promise.resolve({ data: { user: null }, error: null }),
+      signInWithPassword: () => Promise.resolve({ data: null, error: null }),
+      signUp: () => Promise.resolve({ data: null, error: null }),
+      signOut: () => Promise.resolve({ error: null }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+    },
+    storage: {
+      from: () => ({
+        upload: () => Promise.resolve({ data: null, error: null }),
+        download: () => Promise.resolve({ data: null, error: null }),
+        getPublicUrl: () => ({ data: { publicUrl: '' } }),
+        remove: () => Promise.resolve({ data: null, error: null }),
+        list: () => Promise.resolve({ data: [], error: null }),
+      }),
+    },
+  };
+};
+
+const getSupabaseClient = () => {
+  // During build/SSR, use mock client
+  if (typeof window === 'undefined') {
+    return createMockClient();
   }
-}
+  
+  if (!supabaseInstance) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('❌ Supabase configuration missing!');
+      throw new Error('Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables.');
+    }
+    
+    console.log('📡 Connected to Real Supabase (v3.0)');
+    
+    supabaseInstance = createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storageKey: 'yurt-camp-v3-final',
+      }
+    });
+  }
+  return supabaseInstance;
+};
 
-export const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-    storageKey: 'yurt-camp-v3-final',
+export const supabase = new Proxy({} as any, {
+  get(target, prop) {
+    const client = getSupabaseClient();
+    return client[prop];
   }
 });
 

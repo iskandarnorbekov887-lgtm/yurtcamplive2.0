@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { supabase, type Profile, type UserRole } from './supabase';
 
 interface AuthContextType {
@@ -20,9 +20,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [configError, setConfigError] = useState<string | null>(null);
+  const initStarted = useRef(false);
 
   useEffect(() => {
     let mounted = true;
+
+    // Prevent double initialization in React Strict Mode
+    if (initStarted.current) return;
+    initStarted.current = true;
 
     // Use a single initialization function
     const initAuth = async () => {
@@ -51,10 +56,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    initAuth();
+    // Small delay to let any previous Strict Mode cleanup complete
+    const timer = setTimeout(initAuth, 100);
 
     // 2. Set up the listener for future changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, newSession: any) => {
       if (event === 'SIGNED_OUT') {
         setUser(null);
         setSession(null);
@@ -75,6 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       mounted = false;
+      clearTimeout(timer);
       subscription.unsubscribe();
     };
   }, []);

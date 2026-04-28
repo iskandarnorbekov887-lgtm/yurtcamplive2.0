@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
-import { supabase, type Booking, type UserRole, type Drink } from '@/lib/supabase';
+import { supabase, type Booking, type UserRole } from '@/lib/supabase';
 import { PrivateCalendarView } from '@/components/private-calendar-view';
 
 interface CalEvent {
@@ -14,6 +14,15 @@ interface CalEvent {
   location?: string | null;
   colorId?: string | null;
   status?: string | null;
+}
+
+interface Drink {
+  id: number;
+  name: string;
+  original_price: number;
+  sold_price: number;
+  currency: 'UZS' | 'USD' | 'EUR';
+  available: boolean;
 }
 
 interface DayEntry {
@@ -584,7 +593,7 @@ export function GoogleGuestAgenda({
         return;
       }
 
-      const payload = {
+      const payload: any = {
         guest_name: ev.summary,
         check_in: ev.start,
         check_out: ev.end || ev.start,
@@ -598,8 +607,14 @@ export function GoogleGuestAgenda({
         created_by_id: currentUserId,
         notes: (ev.description && !ev.description.includes('tasks.google.com')) ? ev.description : null,
       };
+      // Ensure id is never sent (let database auto-generate it)
+      delete payload.id;
       const insertResp: { data: unknown; error: unknown } = await supabase.from('bookings').insert(payload);
-      if (insertResp?.error) throw insertResp.error;
+      if (insertResp?.error) {
+        const err = insertResp.error as any;
+        const errMsg = err?.message || err?.details || err?.hint || JSON.stringify(err) || 'Unknown error';
+        throw new Error(errMsg);
+      }
       // Resolve inserted id — local fallback returns it; real Supabase needs a follow-up query
       let insertedId: number | undefined;
       const d = insertResp?.data as Array<{ id?: number }> | { id?: number } | null;
@@ -612,7 +627,18 @@ export function GoogleGuestAgenda({
       flash(doCheckIn ? '✓ Guest checked in from calendar event.' : '✓ Booking created from calendar event.');
       setSelectedItem(null);
       onRefresh?.();
-    } catch (e: unknown) { const msg = e instanceof Error ? e.message : String(e); console.error('Create from event:', msg); flash(`⚠ ${msg.slice(0, 100)}`); }
+    } catch (e: unknown) {
+      let msg: string;
+      if (e instanceof Error) {
+        msg = e.message;
+      } else if (typeof e === 'object' && e !== null) {
+        msg = JSON.stringify(e).slice(0, 200);
+      } else {
+        msg = String(e);
+      }
+      console.error('Create from event:', e);
+      flash(`⚠ ${msg.slice(0, 100)}`);
+    }
     finally { setLoadingAction(''); }
   };
 

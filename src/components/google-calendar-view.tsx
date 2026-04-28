@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase, type Booking, type UserRole, type Drink } from '@/lib/supabase';
+import { supabase, type Booking, type UserRole } from '@/lib/supabase';
 
 function localDateStr(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -17,6 +17,15 @@ interface Props {
   onUpdateBooking?: (id: number, updates: Partial<Booking>) => Promise<void> | void;
   onCancelBooking?: (id: number) => Promise<void> | void;
   onAddNewBooking?: (date: string) => void;
+}
+
+interface Drink {
+  id: number;
+  name: string;
+  original_price: number;
+  sold_price: number;
+  currency: 'UZS' | 'USD' | 'EUR';
+  available: boolean;
 }
 
 export function GoogleCalendarView({
