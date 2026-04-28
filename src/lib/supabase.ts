@@ -1,7 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
 
-let supabaseInstance: any = null;
-
 // Create a complete mock for server/build side
 const createMockClient = () => {
   const mockChain = {
@@ -60,41 +58,29 @@ const createMockClient = () => {
   };
 };
 
-const getSupabaseClient = () => {
-  // During build/SSR, use mock client
-  if (typeof window === 'undefined') {
-    return createMockClient();
-  }
-  
-  if (!supabaseInstance) {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-    
-    if (!supabaseUrl || !supabaseKey) {
-      console.error('❌ Supabase configuration missing!');
-      throw new Error('Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables.');
-    }
-    
-    console.log('📡 Connected to Real Supabase (v3.0)');
-    
-    supabaseInstance = createClient(supabaseUrl, supabaseKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-        storageKey: 'yurt-camp-v3-final',
-      }
-    });
-  }
-  return supabaseInstance;
-};
+function createBrowserClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-export const supabase = new Proxy({} as any, {
-  get(target, prop) {
-    const client = getSupabaseClient();
-    return client[prop];
+  if (!supabaseUrl || !supabaseKey) {
+    console.error('❌ Supabase configuration missing!');
+    throw new Error('Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables.');
   }
-});
+
+  return createClient(supabaseUrl, supabaseKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: false,
+      storageKey: 'yurt-camp-v3-final',
+    },
+  });
+}
+
+// SSR/build: return mock. Browser: create singleton once.
+export const supabase = typeof window === 'undefined'
+  ? createMockClient()
+  : createBrowserClient();
 
 export type UserRole = 'CEO' | 'Manager' | 'Cook' | 'Reserver';
 
