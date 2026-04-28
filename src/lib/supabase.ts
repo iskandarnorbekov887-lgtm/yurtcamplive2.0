@@ -115,3 +115,14 @@ export interface Notification {
   read: boolean;
   created_at: string;
 }
+
+export interface Payment {
+  id: number;
+  booking_id: number;
+  amount_original: number;
+  currency_original: string;
+  amount_usd_equivalent: number;
+  exchange_rate_used: number;
+  method: string;
+  created_at?: string;
+}

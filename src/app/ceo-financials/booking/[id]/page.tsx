@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ProtectedRoute } from '@/components/protected-route';
-import { supabase, type Booking, type BookingReceipt, type Payment } from '@/lib/supabase';
+import { supabase, type Booking, type Payment } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 
@@ -18,7 +18,7 @@ function BookingTabView({ bookingId }: { bookingId: number }) {
   const { user } = useAuth();
   const router = useRouter();
   const [booking, setBooking] = useState<Booking | null>(null);
-  const [receipts, setReceipts] = useState<BookingReceipt[]>([]);
+  const [receipts, setReceipts] = useState<any[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
 
