@@ -115,6 +115,15 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
   const [newExtraService, setNewExtraService] = useState({ name: '', price: '', currency: 'USD' as 'UZS' | 'USD' | 'EUR' });
   const [collectedAmount, setCollectedAmount] = useState('');
   const [collectedCurrency, setCollectedCurrency] = useState<'UZS' | 'USD' | 'EUR'>('USD');
+  const [activeTabIdx, setActiveTabIdx] = useState<number>(-1); // -1 = Open Tab
+
+  const getTabs = (booking: Booking | null) => {
+    if (!booking) return [];
+    try {
+      const meta = typeof booking.special_requests === 'string' ? JSON.parse(booking.special_requests || '{}') : (booking.special_requests || {});
+      return meta.settled_receipts || [];
+    } catch { return []; }
+  };
 
   const year  = cur.getFullYear();
   const month = cur.getMonth();
@@ -427,24 +436,26 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
 
               {/* Title + stats + date */}
               <div className="flex items-start gap-4 mb-5">
-                <div className="w-5 h-5 rounded flex-shrink-0 mt-1.5" style={{ backgroundColor: color(sel, today).bg }} />
+                <div className="w-6 h-6 rounded-lg flex-shrink-0 mt-1 shadow-sm" style={{ backgroundColor: color(sel, today).bg }} />
                 <div>
-                  <h3 className="text-2xl font-black text-slate-900 leading-tight">{sel.guest_name}</h3>
-                  <p className="text-sm font-bold text-slate-700 mt-1.5 flex flex-wrap gap-x-3">
-                    {(sel.num_people || sel.number_of_people || sel.guest_count) ? <span>+ {String(sel.num_people || sel.number_of_people || sel.guest_count)} people</span> : null}
-                    {sel.nights ? <span>+ {String(sel.nights)} night{Number(sel.nights) !== 1 ? 's' : ''}</span> : null}
-                    {sel.children_under_12 ? <span>+ {String(sel.children_under_12)} under 12</span> : null}
-                  </p>
-                  <p className="text-sm text-slate-500 mt-0.5 font-medium">
-                    {(() => {
-                      const ci = new Date(sel.check_in + 'T00:00:00');
-                      const co = new Date(sel.check_out + 'T00:00:00');
-                      const sameMonth = ci.getMonth() === co.getMonth() && ci.getFullYear() === co.getFullYear();
-                      if (sel.check_in === sel.check_out) return `${ci.getDate()} ${ci.toLocaleString('en-US', { month: 'long' })}`;
-                      if (sameMonth) return `${ci.getDate()}–${co.getDate()} ${ci.toLocaleString('en-US', { month: 'long' })}`;
-                      return `${ci.getDate()} ${ci.toLocaleString('en-US', { month: 'long' })} – ${co.getDate()} ${co.toLocaleString('en-US', { month: 'long' })}`;
-                    })()}
-                  </p>
+                  <h3 className="text-2xl font-black text-slate-900 leading-none">{String(sel.guest_name)}</h3>
+                  <div className="flex items-center gap-2 mt-2">
+                    <p className="text-sm font-black text-slate-600">
+                      {String(sel.num_people || sel.number_of_people || sel.guest_count)} Pax
+                      {sel.children_under_12 ? ` + ${String(sel.children_under_12)} Child` : ''}
+                    </p>
+                    <span className="w-1 h-1 bg-slate-300 rounded-full" />
+                    <p className="text-sm font-bold text-slate-500">
+                      {(() => {
+                        const ci = new Date(sel.check_in + 'T00:00:00');
+                        const co = new Date(sel.check_out + 'T00:00:00');
+                        const sameMonth = ci.getMonth() === co.getMonth() && ci.getFullYear() === co.getFullYear();
+                        if (sel.check_in === sel.check_out) return `${ci.getDate()} ${ci.toLocaleString('en-US', { month: 'short' })}`;
+                        if (sameMonth) return `${ci.getDate()}–${co.getDate()} ${ci.toLocaleString('en-US', { month: 'short' })}`;
+                        return `${ci.getDate()} ${ci.toLocaleString('en-US', { month: 'short' })} – ${co.getDate()} ${co.toLocaleString('en-US', { month: 'short' })}`;
+                      })()}
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -504,311 +515,133 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
             </div>
 
             <div className="grid grid-cols-2 gap-6 mb-8">
-              {/* Manager-specific layout */}
-              {userRole === 'Manager' ? (
-                <>
-                  {/* Payment Status - Top priority for manager */}
-                  <div className="col-span-2 p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-3">
-                    <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Payment Status</label>
-                      <div className="flex items-center gap-3">
-                        <span className={`px-3 py-1 rounded-lg text-sm font-black uppercase ${sel.payment_status === 'Paid' ? 'bg-emerald-100 text-emerald-700' : sel.payment_status === 'Partial' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>
-                          {sel.payment_status === 'Paid' ? 'PAID' : sel.payment_status === 'Partial' ? 'PARTIALLY PAID' : 'NEED TO COLLECT'}
-                        </span>
-                        <span className="text-lg font-black text-black">${String(sel.total_price)} USD</span>
-                      </div>
-                    </div>
-                    {sel.payment_method && (
-                      <div className="pt-1 border-t border-slate-200">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Reserver Payment Method</label>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className={`px-3 py-1 rounded-lg text-xs font-black ${sel.payment_method === 'all_paid' ? 'bg-emerald-100 text-emerald-700' : sel.payment_method === 'partially_paid' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
-                            {sel.payment_method === 'in_camp' ? 'To be paid in camp' : sel.payment_method === 'all_paid' ? 'All paid' : 'Partially paid'}
-                          </span>
-                          {sel.payment_method === 'in_camp' && sel.amount && (
-                            <span className="text-sm font-black text-black">{sel.amount} {sel.currency || 'USD'}</span>
-                          )}
-                        </div>
-                        {sel.payment_note && (
-                          <p className="mt-1 text-xs font-bold text-black italic">{sel.payment_note}</p>
-                        )}
-                      </div>
-                    )}
-                    {/* Manager: Collected Amount Input */}
-                    <div className="pt-1 border-t border-slate-200">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Collected Amount (Manager Input)</label>
-                      <div className="flex gap-2 items-center">
-                        <input
-                          type="number"
-                          placeholder="Amount collected"
-                          value={collectedAmount}
-                          onChange={e => setCollectedAmount(e.target.value)}
-                          className="flex-1 px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black"
-                        />
-                        <select
-                          value={collectedCurrency}
-                          onChange={e => setCollectedCurrency(e.target.value as 'UZS' | 'USD' | 'EUR')}
-                          className="px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black"
-                        >
-                          <option value="USD">USD</option>
-                          <option value="UZS">UZS</option>
-                          <option value="EUR">EUR</option>
-                        </select>
-                        <button
-                          onClick={async () => {
-                            if (sel && onUpdateBooking && collectedAmount) {
-                              await onUpdateBooking(sel.id, { collected_amount: parseFloat(collectedAmount), collected_currency: collectedCurrency });
-                              setSel({ ...sel, collected_amount: parseFloat(collectedAmount), collected_currency: collectedCurrency });
-                            }
-                          }}
-                          className="px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-all"
-                        >
-                          Save
-                        </button>
-                      </div>
-                      {sel.collected_amount && (
-                        <p className="mt-1 text-xs font-bold text-emerald-700">Last saved: {sel.collected_amount} {sel.collected_currency || 'USD'}</p>
-                      )}
-                    </div>
+              {/* Professional Hotel Folio Ledger */}
+              {(userRole === 'Manager' || userRole === 'CEO') && (
+                <div className="col-span-2 space-y-6">
+                  {/* Tab Navigation */}
+                  <div className="flex flex-wrap gap-2 items-center border-b border-slate-100 pb-4">
+                    {getTabs(sel).map((tab: any, idx: number) => (
+                      <button 
+                        key={idx}
+                        onClick={() => setActiveTabIdx(idx)}
+                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all shadow-sm ${activeTabIdx === idx ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+                      >
+                        Tab {String(idx + 1)}
+                      </button>
+                    ))}
+                    <button 
+                      onClick={() => setActiveTabIdx(-1)}
+                      className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all shadow-sm ${activeTabIdx === -1 ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'}`}
+                    >
+                      {getTabs(sel).length > 0 ? 'Open Folio' : 'Current Tab'}
+                    </button>
                   </div>
 
+                  {/* Tab Content Section */}
+                  <div className={`p-6 rounded-[2.5rem] border-2 transition-all ${activeTabIdx === -1 ? 'bg-white border-indigo-100 shadow-xl shadow-indigo-50' : 'bg-slate-50 border-slate-100 grayscale-[0.5]'}`}>
+                    {(() => {
+                      const tabs = getTabs(sel);
+                      const isHistory = activeTabIdx !== -1;
+                      const activeTab = isHistory ? tabs[activeTabIdx] : null;
+                      const isClosed = isHistory;
+                      const isTab1Closed = tabs.length > 0;
+                      
+                      // Extension Rule Logic
+                      const originalCheckout = isTab1Closed ? (tabs[0].original_checkout || tabs[0].check_out) : sel.check_out;
+                      const hasExtension = sel.check_out > originalCheckout;
+                      
+                      return (
+                        <div className="space-y-6">
+                          <div className="flex justify-between items-center">
+                            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                              {isClosed ? `Receipt Archive: Tab ${String(activeTabIdx + 1)}` : 'Active Guest Folio'}
+                            </h4>
+                            {isClosed && <span className="px-2 py-0.5 bg-slate-200 text-slate-600 text-[8px] font-black rounded uppercase">Read Only</span>}
+                          </div>
 
-                  {/* Per-Day Services from Reserver */}
-                  {(() => {
-                    let days: any[] = [];
-                    try { if (sel.special_requests) days = JSON.parse(sel.special_requests); } catch {}
-                    const filledDays = days.filter((d: any) => d.lunch || d.dinner || d.guideService || d.transportation || d.cookingClass || d.specialRequest?.trim());
-                    if (filledDays.length === 0) return null;
-                    return (
-                      <div className="col-span-2 space-y-2">
-                        <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block">Services by Day</label>
-                        {filledDays.map((day: any, i: number) => {
-                          const d = new Date(day.date + 'T00:00:00');
-                          const label = `${d.getDate()} ${d.toLocaleString('en-US', { month: 'long' })}`;
-                          return (
-                            <div key={i} className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-                              <p className="font-black text-slate-800 text-sm">{label}</p>
-                              <div className="flex flex-wrap gap-2 text-xs">
-                                {day.lunch && <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold">Lunch {day.lunchCount > 0 ? `×${day.lunchCount}` : ''}</span>}
-                                {day.dinner && <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold">Dinner {day.dinnerCount > 0 ? `×${day.dinnerCount}` : ''}</span>}
-                                {day.cookingClass && <span className="px-2 py-0.5 bg-pink-100 text-pink-800 rounded-full font-bold">Cooking Class</span>}
-                                {day.guideService && <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full font-bold">Guide{day.guideNames?.filter((n: string) => n.trim()).length > 0 ? `: ${day.guideNames.filter((n: string) => n.trim()).join(', ')}` : ''}</span>}
-                                {day.transportation && <span className="px-2 py-0.5 bg-cyan-100 text-cyan-800 rounded-full font-bold">Transport</span>}
+                          {/* Accommodation Logic (Master Tab Locking) */}
+                          <div className="space-y-4">
+                            {(!isTab1Closed || activeTabIdx === 0) ? (
+                              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Primary Stay (Master Tab)</label>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div className="opacity-75">
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase">Pax & Base Price</p>
+                                    <p className="text-sm font-black text-slate-900">{String(sel.num_people || sel.number_of_people || 0)} Guests @ ${String(sel.total_price)}</p>
+                                  </div>
+                                  <button 
+                                    disabled={isTab1Closed}
+                                    onClick={() => !isTab1Closed && setIsEditing(true)}
+                                    className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${isTab1Closed ? 'bg-slate-100 text-slate-300 cursor-not-allowed' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'}`}
+                                  >
+                                    {isTab1Closed ? 'Stay Locked' : 'Edit Base Stay'}
+                                  </button>
+                                </div>
                               </div>
-                              {day.lunchDietary && <p className="text-xs text-black font-bold italic">Food request: {day.lunchDietary}</p>}
-                              {day.cookingClassDescription && <p className="text-xs text-black font-bold">Cooking: {day.cookingClassDescription}</p>}
-                              {day.transportation && day.transEntries?.map((e: any, ei: number) => {
-                                const parts: string[] = [];
-                                if (e.driver?.trim()) parts.push(`Driver: ${e.driver}`);
-                                if (e.time && !e.time.startsWith(':') && !e.time.endsWith(':')) parts.push(`Pickup: ${e.time}`);
-                                if (e.from?.trim()) parts.push(`From: ${e.from}`);
-                                if (e.to?.trim()) parts.push(`To: ${e.to}`);
-                                if (e.arrivalTime && !e.arrivalTime.startsWith(':') && !e.arrivalTime.endsWith(':')) parts.push(`Arrival: ${e.arrivalTime}`);
-                                if (e.price?.trim()) parts.push(`${e.price} USD`);
-                                return parts.length > 0 ? <p key={ei} className="text-xs text-black font-bold">🚗 {parts.join(' · ')}</p> : null;
-                              })}
-                              {day.specialRequest?.trim() && <p className="text-xs text-black font-bold italic">Note: {day.specialRequest}</p>}
+                            ) : activeTabIdx === -1 && isTab1Closed ? (
+                              /* Extension Fee for Open Tab */
+                              hasExtension && (
+                                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 animate-in fade-in slide-in-from-top-2">
+                                  <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest block mb-2">Stay Extension Fee</label>
+                                  <div className="flex gap-3">
+                                    <input 
+                                      type="number"
+                                      placeholder="Extra nights fee..."
+                                      className="flex-1 px-4 py-2 bg-white border-2 border-amber-200 rounded-xl text-sm font-black text-amber-700 outline-none focus:border-amber-400"
+                                    />
+                                    <button className="px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-black uppercase shadow-sm">Apply</button>
+                                  </div>
+                                  <p className="mt-2 text-[9px] text-amber-500 font-bold italic">* Compulsory: Guest extended stay from {String(originalCheckout)} to {String(sel.check_out)}</p>
+                                </div>
+                              )
+                            ) : null}
+                          </div>
+
+                          {/* Services, Drinks, Meals */}
+                          <div className="space-y-4 pt-4 border-t border-slate-100">
+                             <div className="flex justify-between items-center">
+                               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Charges & Services</p>
+                               {!isClosed && (
+                                 <button onClick={() => setIsEditing(true)} className="text-[9px] font-black text-indigo-600 uppercase hover:underline">Add Items</button>
+                               )}
+                             </div>
+                             
+                             <div className="space-y-2">
+                                {(isClosed ? activeTab.items?.drinks : sel.drinks_tab)?.map((line: any, lidx: number) => (
+                                  <div key={lidx} className="flex justify-between text-xs font-bold text-slate-700">
+                                    <span>{String(line.drink_name)} x{String(line.quantity)}</span>
+                                    <span>${String(line.price * line.quantity)}</span>
+                                  </div>
+                                ))}
+                                {(isClosed ? activeTab.items?.extras : sel.extra_services)?.map((line: any, lidx: number) => (
+                                  <div key={lidx} className="flex justify-between text-xs font-bold text-slate-700">
+                                    <span>{String(line.name)}</span>
+                                    <span>${String(line.price)}</span>
+                                  </div>
+                                ))}
+                             </div>
+                          </div>
+
+                          {/* Tab Footer (Pay & Close) */}
+                          <div className="pt-6 border-t border-slate-100 flex justify-between items-end">
+                            <div>
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tab Total</p>
+                              <p className="text-2xl font-black text-slate-900">${String(isClosed ? activeTab.total : (sel.total_price || 0))}</p>
                             </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })()}
-
-                  {/* Guide Service */}
-                  <div className="col-span-2 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
-                    <label className="text-[10px] font-black text-blue-400 uppercase tracking-widest block mb-1">Guide Service</label>
-                    {isEditing && canEdit(sel) ? (
-                      <div className="space-y-2">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={editData.guide_required || editData.guide_service || false}
-                            onChange={e => setEditData({...editData, guide_required: e.target.checked, guide_service: e.target.checked})}
-                            className="w-4 h-4 rounded border-2 border-slate-300 text-blue-600"
-                          />
-                          <span className="text-black font-semibold text-sm">Guide Required</span>
-                        </label>
-                        {(editData.guide_required || editData.guide_service) && (
-                          <input
-                            type="text"
-                            value={editData.guide_names || ''}
-                            onChange={e => setEditData({...editData, guide_names: e.target.value})}
-                            placeholder="Guide names"
-                            className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black"
-                          />
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-sm font-bold text-black">{sel.guide_service ? (sel.guide_names || 'Find a guide') : 'No guide service'}</p>
-                    )}
-                  </div>
-
-                  {/* Transportation */}
-                  <div className="col-span-2 p-4 bg-cyan-50/50 rounded-2xl border border-cyan-100">
-                    <label className="text-[10px] font-black text-cyan-400 uppercase tracking-widest block mb-1">Transportation</label>
-                    {isEditing && canEdit(sel) ? (
-                      <div className="space-y-2">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={editData.has_transportation || false}
-                            onChange={e => setEditData({...editData, has_transportation: e.target.checked})}
-                            className="w-4 h-4 rounded border-2 border-slate-300 text-cyan-600"
-                          />
-                          <span className="text-black font-semibold text-sm">Transportation Required</span>
-                        </label>
-                        {editData.has_transportation && (
-                          <textarea
-                            value={editData.transportation_details || ''}
-                            onChange={e => setEditData({...editData, transportation_details: e.target.value})}
-                            placeholder="Transportation details"
-                            className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black"
-                            rows={2}
-                          />
-                        )}
-                      </div>
-                    ) : sel.has_transportation ? (
-                      <div className="space-y-2">
-                        {sel.transportation_details
-                          ? sel.transportation_details.split('\n').map((trip, i) => (
-                              <p key={i} className="text-xs font-bold text-black leading-relaxed">{trip}</p>
-                            ))
-                          : <p className="text-xs font-bold text-black italic">No details provided</p>
-                        }
-                      </div>
-                    ) : (
-                      <p className="text-xs text-black italic">No transportation</p>
-                    )}
-                  </div>
-
-                  {/* Cooking Class */}
-                  {sel.cooking_class && (
-                    <div className="col-span-2 p-4 bg-pink-50/50 rounded-2xl border border-pink-100">
-                      <label className="text-[10px] font-black text-pink-400 uppercase tracking-widest block mb-1">Cooking Class</label>
-                      {isEditing && canEdit(sel) ? (
-                        <textarea
-                          value={editData.cooking_class_description || ''}
-                          onChange={e => setEditData({...editData, cooking_class_description: e.target.value})}
-                          placeholder="Description (optional)"
-                          className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black"
-                          rows={2}
-                        />
-                      ) : <p className="text-sm font-bold text-black">{sel.cooking_class_description || 'No description'}</p>}
-                    </div>
-                  )}
-
-                  {/* Drinks Tab */}
-                  <div className="col-span-2 p-4 bg-rose-50/50 rounded-2xl border border-rose-100">
-                    <div className="flex justify-between items-center mb-2">
-                      <label className="text-[10px] font-black text-rose-400 uppercase tracking-widest">Drinks Tab</label>
-                      {userRole === 'Manager' && (
-                        <button
-                          onClick={() => setShowDrinksPopup(true)}
-                          className="px-3 py-1 bg-rose-600 text-white rounded-lg text-xs font-bold hover:bg-rose-700 transition-all"
-                        >
-                          + Add Drinks
-                        </button>
-                      )}
-                    </div>
-                    {sel.drinks_tab && sel.drinks_tab.length > 0 ? (
-                      <div className="space-y-1">
-                        {sel.drinks_tab.map((drink: any, idx: number) => (
-                          <div key={idx} className="flex justify-between items-center text-xs">
-                            <span className="font-bold text-black">{String(drink.drink_name)} x{String(drink.quantity)}</span>
-                            <span className="font-bold text-black">${String(drink.price)} {String(drink.currency)}</span>
+                            {!isClosed && (
+                              <button 
+                                onClick={handleCheckOut} // Placeholder for Pay & Close
+                                className="px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs shadow-lg shadow-indigo-100 hover:scale-105 transition-all active:scale-95"
+                              >
+                                Pay & Close Tab
+                              </button>
+                            )}
                           </div>
-                        ))}
-                      </div>
-                    ) : <p className="text-black italic text-xs">No drinks added</p>}
+                        </div>
+                      );
+                    })()}
                   </div>
-
-                  {/* Extra Services */}
-                  <div className="col-span-2 p-4 bg-orange-50/50 rounded-2xl border border-orange-100">
-                    <div className="flex justify-between items-center mb-2">
-                      <label className="text-[10px] font-black text-orange-400 uppercase tracking-widest">Extra Services</label>
-                      {userRole === 'Manager' && (
-                        <button
-                          onClick={() => setShowExtraServicesPopup(true)}
-                          className="px-3 py-1 bg-orange-600 text-white rounded-lg text-xs font-bold hover:bg-orange-700 transition-all"
-                        >
-                          + Add Service
-                        </button>
-                      )}
-                    </div>
-                    {sel.extra_services && sel.extra_services.length > 0 ? (
-                      <div className="space-y-1">
-                        {sel.extra_services.map((service: any, idx: number) => (
-                          <div key={idx} className="flex justify-between items-center text-xs">
-                            <span className="font-bold text-black">{String(service.name)}</span>
-                            <span className="font-bold text-black">${String(service.price)} {String(service.currency)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : <p className="text-black italic text-xs">No extra services</p>}
-                  </div>
-
-                </>
-              ) : (
-                <>
-
-                  {/* Service Editing (for Cook) */}
-                  {isEditing && canEdit(sel) && userRole === 'Cook' && (
-                    <div className="col-span-2 p-4 bg-amber-50/50 rounded-2xl border border-amber-100 space-y-4">
-                      <label className="text-[10px] font-black text-amber-400 uppercase tracking-widest block mb-2">Cook Services</label>
-                      <div className="space-y-3">
-                        <label className="flex items-center gap-3 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={editData.drinks || false}
-                            onChange={e => setEditData({...editData, drinks: e.target.checked, drinks_count: e.target.checked ? (editData.drinks_count || 1) : 0})}
-                            className="w-5 h-5 rounded border-2 border-slate-300 text-amber-600"
-                          />
-                          <span className="text-slate-900 font-semibold text-sm">Drinks</span>
-                          {editData.drinks && (
-                            <input
-                              type="number"
-                              min="1"
-                              value={editData.drinks_count || 1}
-                              onChange={e => setEditData({...editData, drinks_count: parseInt(e.target.value) || 1})}
-                              className="w-16 px-2 py-1 border-2 border-slate-300 rounded-lg text-sm font-bold text-black"
-                            />
-                          )}
-                        </label>
-                        <label className="flex items-center gap-3 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={editData.laundry || false}
-                            onChange={e => setEditData({...editData, laundry: e.target.checked})}
-                            className="w-5 h-5 rounded border-2 border-slate-300 text-amber-600"
-                          />
-                          <span className="text-slate-900 font-semibold text-sm">Laundry</span>
-                        </label>
-                        {editData.laundry && (
-                          <div className="flex gap-2 items-center pl-8">
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={editData.laundry_price || ''}
-                              onChange={e => setEditData({...editData, laundry_price: e.target.value})}
-                              placeholder="Price"
-                              className="flex-1 px-4 py-2 border-2 border-slate-300 rounded-xl text-sm font-bold text-black"
-                            />
-                            <select
-                              value={editData.laundry_currency || 'UZS'}
-                              onChange={e => setEditData({...editData, laundry_currency: e.target.value as 'UZS' | 'USD'})}
-                              className="px-4 py-2 border-2 border-slate-300 rounded-xl text-sm font-bold text-black"
-                            >
-                              <option value="UZS">UZS</option>
-                              <option value="USD">USD</option>
-                            </select>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </>
+                </div>
               )}
             </div>
             
