@@ -842,6 +842,7 @@ export function GoogleGuestAgenda({
   };
 
   const handleCheckOut = async () => {
+    if (!sel || !onCheckOut) return;
     if (isFirstTab) {
       if (svcAdults <= 0) {
         flash('⚠ Number of adults is required for the first tab.');
@@ -923,6 +924,7 @@ export function GoogleGuestAgenda({
         payments: svcPayList.filter(p => parseFloat(p.amount) > 0)
       };
 
+      if (!sel) return;
       let currentMeta: any = {};
       try {
         const parsed = typeof sel.special_requests === 'string'
@@ -947,7 +949,7 @@ export function GoogleGuestAgenda({
         const rate = p.currency === 'USD' ? 1 : (p.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92));
         const usdEquiv = p.currency === 'USD' ? amt : (amt / rate);
         await supabase.from('payments').insert({
-          booking_id: sel.id,
+          booking_id: sel?.id,
           amount_original: amt,
           currency_original: p.currency,
           method: p.method,
@@ -970,8 +972,8 @@ export function GoogleGuestAgenda({
       }
 
       const updates: any = {
-        total_price: (sel.total_price || 0) + gTotal,
-        collected_amount: (sel.collected_amount || 0) + totalPaidUsd,
+        total_price: ((sel as any)?.total_price || 0) + gTotal,
+        collected_amount: ((sel as any)?.collected_amount || 0) + totalPaidUsd,
         collected_currency: 'USD',
         payment_status: 'Paid',
         lunch: false, lunch_count: 0,
