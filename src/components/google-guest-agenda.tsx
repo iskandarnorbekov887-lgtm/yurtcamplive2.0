@@ -236,8 +236,8 @@ export function GoogleGuestAgenda({
   // Logic for what is ALREADY accounted for (Pre-paid or DB)
   // For the active tab, we only care about pre-paid items for THIS tab.
   // Previous stay payments (sel.collected_amount) should NOT offset the current tab's items.
-  const recordedPaid = (isPrepaid ? svcAmount : 0) + prepaidLunchAmt + prepaidDinnerAmt;
-  const debtRemaining = gTotal - recordedPaid;
+  // MATCH BALANCE should always get the current open tab (gTotal)
+  const debtRemaining = gTotal;
 
   const canFinalize = isPrepaid || (svcAmount > 0) || (sTotal_calc + dTotal_calc + eTotal_calc > 0);
   const isBalanceMatched = Math.abs(tPaidUsd - debtRemaining) < 1.00;
@@ -660,8 +660,11 @@ export function GoogleGuestAgenda({
       }
       setDayEntries(entries);
 
+      const receipts = getSettledReceiptsForSel();
+      const hasSettled = receipts.length > 0 || (b.collected_amount || 0) > 0;
+
       // Load draft/saved states with priority for draft
-      setIsPrepaid(draft?.isPrepaid ?? (b.payment_note?.includes('Accommodation') || false));
+      setIsPrepaid(draft?.isPrepaid ?? (hasSettled ? true : (b.payment_note?.includes('Accommodation') || false)));
       setIsLunchPrepaid(draft?.isLunchPrepaid ?? (b.payment_note?.includes('Lunch') || false));
       setIsDinnerPrepaid(draft?.isDinnerPrepaid ?? (b.payment_note?.includes('Dinner') || false));
       
@@ -698,7 +701,9 @@ export function GoogleGuestAgenda({
       setSvcLaundryPrice(draft?.svcLaundryPrice ?? (parseFloat(b.laundry_price || '0') || 0));
       setSvcAdults(draft?.svcAdults ?? b.number_of_people ?? 1);
       setSvcChildren(draft?.svcChildren ?? b.children_under_12 ?? 0);
-      setSvcAmount(draft?.svcAmount ?? Math.max(0, b.total_price - (b.collected_amount || 0)));
+      
+      // If already settled Tab 1, new tab starts at $0 accommodation by default
+      setSvcAmount(draft?.svcAmount ?? (hasSettled ? 0 : Math.max(0, b.total_price - (b.collected_amount || 0))));
 
       setSvcDiscount(draft?.svcDiscount ?? 0);
 
@@ -837,10 +842,15 @@ export function GoogleGuestAgenda({
       );
 
       // --- GENERATE RECEIPT SNAPSHOT ---
-      const receiptId = 'RCP-' + Math.random().toString(36).substring(2, 7).toUpperCase();
+      const now = new Date();
+      const datePart = now.toISOString().split('T')[0].replace(/-/g, '').slice(2); // YYMMDD
+      const randPart = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const receiptId = `RCP-${datePart}-${randPart}`;
+      
       const snapshot = {
         id: receiptId,
-        date: new Date().toISOString(),
+        date: now.toISOString(),
+        settled_at: now.toISOString(),
         items: {
           accommodation: svcAmount,
           isPrepaid: isPrepaid,
@@ -925,6 +935,11 @@ export function GoogleGuestAgenda({
       };
       
       if (onUpdateBooking) await onUpdateBooking(sel.id, updates);
+      if (onRefresh) await onRefresh();
+      
+      // Update local selectedItem so the Modal sees the new collected_amount immediately
+      const updatedBooking = { ...sel, ...updates };
+      setSelectedItem(prev => prev ? { ...prev, booking: updatedBooking } : null);
       
       confetti({ particleCount: 150, spread: 100, origin: { y: 0.7 } });
       flash('✓ Tab Settled & Archived. Receipt is ready below.');
@@ -1071,7 +1086,7 @@ export function GoogleGuestAgenda({
   }, [svcAmount, svcDiscount, svcLunch, svcLunchCount, svcDinner, svcDinnerCount, svcGuide, svcGuidePrice, svcTransport, svcTransList, svcLaundry, svcLaundryPrice, svcCooking, svcCookingPrice, selectedDrinks, extraServices, pricing, payModified]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-24 lg:pb-8">
       {/* Header bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-2xl border border-slate-200 px-5 py-4 shadow-sm">
         <div>
@@ -1085,7 +1100,7 @@ export function GoogleGuestAgenda({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4">
         {/* Left — Today's Guest List */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col max-h-[680px]">
           <div className="px-5 py-3 border-b border-slate-100 bg-slate-50">
@@ -1146,16 +1161,18 @@ export function GoogleGuestAgenda({
           </div>
         </div>
 
-        <PrivateCalendarView
-          bookings={bookings}
-          gcEvents={gcEvents}
-          onDayChange={day => setSelectedCalendarDay(day)}
-          onSelectBooking={b => handleSelect({ key: `db-${b.id}`, name: b.guest_name, start: b.check_in, end: b.check_out, source: 'db', booking: b, event: null })}
-          onSelectCalendarEvent={ev => {
-            const linked = bookings.find(b => b.google_event_id === ev.id) || null;
-            handleSelect({ key: linked ? `db-${linked.id}` : `ev-${ev.id}`, name: linked ? linked.guest_name : ev.summary, start: linked ? linked.check_in : ev.start, end: linked ? linked.check_out : ev.end, source: linked ? 'both' : 'calendar', booking: linked, event: ev });
-          }}
-        />
+        <div className="overflow-x-auto pb-4 lg:pb-0">
+          <PrivateCalendarView
+            bookings={bookings}
+            gcEvents={gcEvents}
+            onDayChange={day => setSelectedCalendarDay(day)}
+            onSelectBooking={b => handleSelect({ key: `db-${b.id}`, name: b.guest_name, start: b.check_in, end: b.check_out, source: 'db', booking: b, event: null })}
+            onSelectCalendarEvent={ev => {
+              const linked = bookings.find(b => b.google_event_id === ev.id) || null;
+              handleSelect({ key: linked ? `db-${linked.id}` : `ev-${ev.id}`, name: linked ? linked.guest_name : ev.summary, start: linked ? linked.check_in : ev.start, end: linked ? linked.check_out : ev.end, source: linked ? 'both' : 'calendar', booking: linked, event: ev });
+            }}
+          />
+        </div>
       </div>
 
       <BookingModal 

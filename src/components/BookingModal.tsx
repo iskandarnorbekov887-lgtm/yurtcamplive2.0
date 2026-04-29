@@ -175,7 +175,8 @@ export function BookingModal(props: BookingModalProps) {
   const isGracePeriodActive = false;
   const canCheckIn = sel?.status === 'confirmed' && daysUntilCheckIn <= 2 && !!onCheckIn;
   const isComingSoon = sel?.status === 'confirmed' && daysUntilCheckIn > 2;
-  const canCheckOut = (sel?.status === 'checked_in' || isGracePeriodActive) && !!onCheckOut;
+  const isCheckOutDay = sel ? today >= sel.check_out : false;
+  const canCheckOut = (sel?.status === 'checked_in' || isGracePeriodActive) && isCheckOutDay && !!onCheckOut;
   const canCancel = sel && ['confirmed', 'pending'].includes(sel.status) && !!onCancelBooking;
   const isAfterNoon = new Date().getHours() >= 12;
   const isAfterTwo = new Date().getHours() >= 14;
@@ -187,9 +188,9 @@ export function BookingModal(props: BookingModalProps) {
 
   return (
     <>
-      <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-16" onClick={() => setSelectedItem(null)}>
+      <div className="fixed inset-0 z-[100] flex items-center sm:items-start justify-center p-0 sm:p-4 sm:pt-16 pb-safe" onClick={() => setSelectedItem(null)}>
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-        <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="relative bg-white sm:rounded-2xl shadow-2xl w-full sm:max-w-md h-full sm:h-auto sm:max-h-[85vh] overflow-y-auto pb-20 sm:pb-0" onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 sticky top-0 bg-white rounded-t-2xl z-10">
             <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500">
               {sel ? 'Booking Details' : 'Google Calendar Event'}
@@ -408,7 +409,7 @@ export function BookingModal(props: BookingModalProps) {
                               setEditCheckOut(v);
                               if (v === sel.check_out) setDateAdjAmount('');
                             }}
-                            className="w-full px-2 py-1.5 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 text-black"
+                            className="w-full px-2 py-2 text-base rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 text-black"
                           />
                         </div>
                       </div>
@@ -425,7 +426,7 @@ export function BookingModal(props: BookingModalProps) {
                               value={String(dateAdjAmount)}
                               onChange={e => setDateAdjAmount(e.target.value)}
                               placeholder="0.00 (required)"
-                              className={`w-full pl-7 pr-3 py-2 bg-white border-2 ${!dateAdjAmount || parseFloat(dateAdjAmount) <= 0 ? 'border-rose-300 bg-rose-50' : 'border-emerald-300'} rounded-lg text-sm font-black text-black focus:border-indigo-500 outline-none transition-all`}
+                              className={`w-full pl-7 pr-3 py-2 bg-white border-2 ${!dateAdjAmount || parseFloat(dateAdjAmount) <= 0 ? 'border-rose-300 bg-rose-50' : 'border-emerald-300'} rounded-lg text-base font-black text-black focus:border-indigo-500 outline-none transition-all`}
                             />
                           </div>
                           <p className="text-[8px] text-slate-400 font-bold mt-1 uppercase italic">
@@ -446,7 +447,7 @@ export function BookingModal(props: BookingModalProps) {
                               value={String(dateAdjAmount)}
                               onChange={e => setDateAdjAmount(e.target.value)}
                               placeholder="0.00 (leave blank if no refund)"
-                              className="w-full pl-7 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-black text-black focus:border-rose-400 outline-none transition-all"
+                              className="w-full pl-7 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-base font-black text-black focus:border-rose-400 outline-none transition-all"
                             />
                           </div>
                           <p className="text-[8px] text-rose-400 font-bold mt-1 uppercase italic">
@@ -629,32 +630,68 @@ export function BookingModal(props: BookingModalProps) {
                         </div>
                       </div>
                       <div className="space-y-4 pt-2">
-                        <div className="grid grid-cols-2 gap-4 pb-4 border-b border-slate-100">
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Adults *</label>
-                            <input 
-                              type="number" 
-                              value={String(svcAdults || '')} 
-                              onChange={e => setSvcAdults(parseInt(e.target.value) || 0)}
-                              disabled={(sel.collected_amount || 0) > 0}
-                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-black text-black focus:border-indigo-500 outline-none transition-all disabled:opacity-50"
-                            />
+                        {(sel.collected_amount || 0) > 0 ? (
+                          <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white shrink-0">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2 mb-0.5">
+                                  <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest leading-none">Room Prepaid</p>
+                                  <span className="w-1 h-1 bg-emerald-300 rounded-full" />
+                                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">{svcAdults} Adults {svcChildren > 0 ? `· ${svcChildren} Children` : ''}</p>
+                                </div>
+                                <p className="text-sm font-black text-slate-900">Original Stay Settled</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[10px] font-bold text-slate-400 uppercase">Paid Total</p>
+                              <p className="text-sm font-black text-emerald-600">${String((sel.collected_amount || 0).toFixed(2))}</p>
+                            </div>
                           </div>
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Children</label>
-                            <input 
-                              type="number" 
-                              value={String(svcChildren || '')} 
-                              onChange={e => setSvcChildren(parseInt(e.target.value) || 0)}
-                              disabled={(sel.collected_amount || 0) > 0}
-                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-black text-black focus:border-indigo-500 outline-none transition-all disabled:opacity-50"
-                            />
+                        ) : (
+                          <div className="grid grid-cols-2 gap-4 pb-4 border-b border-slate-100">
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Adults *</label>
+                              <input 
+                                type="number" 
+                                value={String(svcAdults || '')} 
+                                onChange={e => setSvcAdults(parseInt(e.target.value) || 0)}
+                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-base font-black text-black focus:border-indigo-500 outline-none transition-all"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Children</label>
+                              <input 
+                                type="number" 
+                                value={String(svcChildren || '')} 
+                                onChange={e => setSvcChildren(parseInt(e.target.value) || 0)}
+                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-base font-black text-black focus:border-indigo-500 outline-none transition-all"
+                              />
+                            </div>
                           </div>
-                        </div>
+                        )}
+
+                        {/* Dashboard Lockdown: Show original price as disabled if settled */}
+                        {(sel.collected_amount || 0) > 0 && (
+                          <div className="space-y-1.5 opacity-60">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Base Stay Price (Locked)</label>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                              <input 
+                                type="text" 
+                                value={String((sel.total_price || 0).toFixed(2))}
+                                disabled 
+                                className="w-full pl-8 pr-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-base font-black text-slate-500 cursor-not-allowed"
+                              />
+                            </div>
+                          </div>
+                        )}
 
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                            {(sel.collected_amount || 0) > 0 ? 'Extension Price (USD)' : 'Stay Price (USD)'}
+                            {(sel.collected_amount || 0) > 0 ? 'Stay Extension Price (USD)' : 'Stay Price (USD)'}
                           </label>
                           <div className="relative">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
@@ -662,12 +699,13 @@ export function BookingModal(props: BookingModalProps) {
                               type="number" 
                               value={String(svcAmount || '')} 
                               onChange={e => setSvcAmount(parseFloat(e.target.value) || 0)}
-                              disabled={isPrepaid || ((sel.collected_amount || 0) > 0 && svcAmount <= 0)}
-                              className="w-full pl-8 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-lg font-black text-black focus:border-indigo-500 outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                              disabled={isPrepaid}
+                              className="w-full pl-8 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-base font-black text-black focus:border-indigo-500 outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                              placeholder="0.00"
                             />
                           </div>
                           <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest italic">
-                            {isPrepaid ? '* Accommodation is marked as pre-paid.' : (sel.collected_amount || 0) > 0 ? '* Extra nights only — Tab 1 accommodation already settled.' : '* Enter total price for the stay.'}
+                            {isPrepaid ? '* Accommodation is marked as pre-paid.' : (sel.collected_amount || 0) > 0 ? '* Tab 1 is settled. Enter fee for extra night(s) only.' : '* Enter total price for the stay.'}
                           </p>
                         </div>
                       </div>
@@ -694,7 +732,7 @@ export function BookingModal(props: BookingModalProps) {
                             <span className="text-sm font-bold text-slate-900">Lunch</span>
                           </label>
                           {svcLunch && <input type="number" value={String(svcLunchCount)} onChange={e => setSvcLunchCount(parseInt(e.target.value) || 0)} placeholder="Qty"
-                            className={`w-16 px-2 py-1.5 border-2 ${svcLunchCount <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-sm font-bold text-black focus:border-indigo-500 transition-all`} />}
+                            className={`w-16 px-2 py-2 border-2 ${svcLunchCount <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} />}
                         </div>
                         <div className="flex items-center gap-2">
                           {svcLunch && pricing?.lunch_price && pricing.lunch_price > 0 && (
@@ -709,7 +747,7 @@ export function BookingModal(props: BookingModalProps) {
                             <span className="text-sm font-bold text-slate-900">Dinner</span>
                           </label>
                           {svcDinner && <input type="number" value={String(svcDinnerCount)} onChange={e => setSvcDinnerCount(parseInt(e.target.value) || 0)} placeholder="Qty"
-                            className={`w-16 px-2 py-1.5 border-2 ${svcDinnerCount <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-sm font-bold text-black focus:border-indigo-500 transition-all`} />}
+                            className={`w-16 px-2 py-2 border-2 ${svcDinnerCount <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} />}
                         </div>
                         <div className="flex items-center gap-2">
                           {svcDinner && pricing?.dinner_price && pricing.dinner_price > 0 && (
@@ -746,7 +784,7 @@ export function BookingModal(props: BookingModalProps) {
                               <div className="relative">
                                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px]">$</span>
                                 <input type="number" value={String(svcGuidePrice)} onChange={e => setSvcGuidePrice(parseFloat(e.target.value) || 0)}
-                                  className="w-20 pl-5 pr-2 py-1.5 bg-white border-2 border-slate-200 rounded-xl text-xs font-black text-black focus:border-indigo-500 outline-none text-center" />
+                                  className="w-20 pl-5 pr-2 py-2 bg-white border-2 border-slate-200 rounded-xl text-base font-black text-black focus:border-indigo-500 outline-none text-center" />
                               </div>
                               <button type="button" onClick={() => setSvcGuidePrice(svcGuidePrice + 5)} className="w-8 h-8 flex items-center justify-center bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl font-black text-sm transition-all shadow-sm">＋</button>
                             </div>
@@ -758,7 +796,7 @@ export function BookingModal(props: BookingModalProps) {
                               <div key={ni} className="flex gap-2">
                                 <input type="text" value={String(name || '')} onChange={e => { const next = [...svcGuideNames]; next[ni] = e.target.value; setSvcGuideNames(next); }}
                                   placeholder={`Guide ${ni + 1} name...`}
-                                  className={`flex-1 px-3 py-2 border-2 ${!String(name).trim() ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-sm font-bold text-black focus:border-indigo-500 transition-all`} />
+                                  className={`flex-1 px-3 py-2 border-2 ${!String(name).trim() ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} />
                                 {svcGuideNames.length > 1 && <button type="button" onClick={() => { setSvcGuideNames(svcGuideNames.filter((_: any, i: number) => i !== ni)); setSvcGuidePrice(Math.max(0, svcGuidePrice - 40)); }}
                                   className="text-rose-500 hover:text-rose-600 font-black text-xl px-1">×</button>}
                               </div>
@@ -782,14 +820,14 @@ export function BookingModal(props: BookingModalProps) {
                                   {svcTransList.length > 1 && <button type="button" onClick={() => setSvcTransList(svcTransList.filter((_: any, i: number) => i !== ti))} className="text-rose-600 hover:text-rose-700 font-bold text-xs">✕ Remove</button>}
                                 </div>
                                 <input type="text" value={String(trans.name)} onChange={e => setSvcTransList(svcTransList.map((t: any, i: number) => i === ti ? { ...t, name: e.target.value } : t))} placeholder="Driver Name..."
-                                  className={`w-full px-3 py-1.5 border-2 ${!String(trans.name).trim() ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-xs font-bold text-black focus:border-indigo-500 transition-all`} />
+                                  className={`w-full px-3 py-2 border-2 ${!String(trans.name).trim() ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} />
                                 <div className="flex gap-2">
                                   <input type="text" value={String(trans.details)} onChange={e => setSvcTransList(svcTransList.map((t: any, i: number) => i === ti ? { ...t, details: e.target.value } : t))} placeholder="From/To..."
-                                    className={`flex-1 px-3 py-1.5 border-2 ${!String(trans.details).trim() ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-xs font-bold text-black focus:border-indigo-500 transition-all`} />
+                                    className={`flex-1 px-3 py-2 border-2 ${!String(trans.details).trim() ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} />
                                   <div className="flex items-center gap-1.5">
                                     <span className="text-[10px] font-bold text-slate-400">$</span>
                                     <input type="number" value={String(trans.price)} onChange={e => setSvcTransList(svcTransList.map((t: any, i: number) => i === ti ? { ...t, price: parseFloat(e.target.value) || 0 } : t))} placeholder="Price"
-                                      className={`w-20 px-2 py-1.5 border-2 ${trans.price <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-xs font-bold text-black focus:border-indigo-500 transition-all`} />
+                                      className={`w-20 px-2 py-2 border-2 ${trans.price <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} />
                                   </div>
                                 </div>
                               </div>
@@ -807,7 +845,7 @@ export function BookingModal(props: BookingModalProps) {
                           </label>
                           {svcCooking && <div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-400">$</span>
                             <input type="number" value={String(svcCookingPrice)} onChange={e => setSvcCookingPrice(parseFloat(e.target.value) || 0)} placeholder="Price"
-                              className={`w-24 px-3 py-1.5 border-2 ${svcCookingPrice <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-xs font-bold text-black focus:border-indigo-500 transition-all`} /></div>}
+                              className={`w-24 px-3 py-2 border-2 ${svcCookingPrice <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} /></div>}
                         </div>
                       </div>
                       <div className="space-y-2 pt-2 border-t border-slate-100">
@@ -818,7 +856,7 @@ export function BookingModal(props: BookingModalProps) {
                           </label>
                           {svcLaundry && <div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-400">$</span>
                             <input type="number" value={String(svcLaundryPrice)} onChange={e => setSvcLaundryPrice(parseFloat(e.target.value) || 0)} placeholder="Price"
-                              className={`w-24 px-3 py-1.5 border-2 ${svcLaundryPrice <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-xs font-bold text-black focus:border-indigo-500 transition-all`} /></div>}
+                              className={`w-24 px-3 py-2 border-2 ${svcLaundryPrice <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} /></div>}
                         </div>
                       </div>
                     </div>
@@ -846,9 +884,9 @@ export function BookingModal(props: BookingModalProps) {
                   )}
                   <div className="flex gap-2">
                     <input type="text" value={String(newExtraName)} onChange={e => setNewExtraName(e.target.value)} placeholder="Service name"
-                      className="flex-1 px-3 py-2 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 text-black" />
+                      className="flex-1 px-3 py-2 text-base rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 text-black" />
                     <input type="number" value={String(newExtraPrice)} onChange={e => setNewExtraPrice(e.target.value)} placeholder="Price"
-                      className="w-20 px-3 py-2 text-xs rounded-lg border border-slate-200 focus:outline-none text-black" />
+                      className="w-20 px-3 py-2 text-base rounded-lg border border-slate-200 focus:outline-none text-black" />
                     <button onClick={() => { if (!newExtraName.trim()) return; setExtraServices([...extraServices, { name: newExtraName.trim(), price: newExtraPrice, currency: 'USD' }]); setNewExtraName(''); setNewExtraPrice(''); }}
                       className="px-3 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700">Add</button>
                   </div>
@@ -1111,24 +1149,51 @@ export function BookingModal(props: BookingModalProps) {
                           + Add Another Currency
                         </button>
 
-                        <button
-                          onClick={() => {
-                            if (!isPrepaid && svcAmount <= 0 && (sel.collected_amount || 0) === 0) {
-                              setValError('Stay Price is missing. Please enter the guest\'s accommodation cost before proceeding.');
-                              return;
-                            }
-                            if (!isBalanceMatched) {
-                              setValError(`Payment balance mismatch. You are trying to collect ${tPaidUsd.toFixed(2)} USD, but the debt is ${debtRemaining.toFixed(2)} USD. Please use the "Match Balance" button to even the tab.`);
-                              return;
-                            }
-                            setSelectedReceipt(null);
-                            setShowFinalReceipt(true);
-                          }}
-                          disabled={loadingAction === 'checkout'}
-                          className={`w-full py-3 rounded-xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${loadingAction === 'checkout' ? 'bg-slate-400 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-100 hover:scale-[1.02] active:scale-95'}`}
-                        >
-                          Paid
-                        </button>
+                        <div className="sticky bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-slate-100 -mx-4 -mb-4 rounded-b-[24px] z-30 flex flex-col gap-2">
+                          {!isBalanceMatched && gTotal > 0 && (
+                            <div className="flex items-center justify-between px-2">
+                              <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest">
+                                ⚠ Balance Mismatch: ${Math.abs(debtRemaining - tPaidUsd).toFixed(2)}
+                              </p>
+                              <button 
+                                onClick={() => {
+                                  const lastIdx = svcPayList.length - 1;
+                                  const otherRowsPaidUsd = svcPayList.slice(0, -1).reduce((sum: number, p: any) => {
+                                    const amt = parseFloat(p.amount) || 0;
+                                    const r = p.currency === 'USD' ? 1 : (p.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92));
+                                    return sum + (amt / r);
+                                  }, 0);
+                                  const stillOwedUsd = Math.max(0, debtRemaining - otherRowsPaidUsd);
+                                  const lastPay = svcPayList[lastIdx];
+                                  const r = lastPay.currency === 'USD' ? 1 : (lastPay.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92));
+                                  const matchAmt = stillOwedUsd * r;
+                                  setSvcPayList(svcPayList.map((p: any, i: number) => i === lastIdx ? { ...p, amount: matchAmt > 0 ? (lastPay.currency === 'UZS' ? Math.round(matchAmt).toString() : matchAmt.toFixed(2)) : '' } : p));
+                                }}
+                                className="text-[9px] font-black text-indigo-600 underline uppercase"
+                              >
+                                Auto-Fix
+                              </button>
+                            </div>
+                          )}
+                          <button
+                            onClick={() => {
+                              if (!isPrepaid && svcAmount <= 0 && (sel.collected_amount || 0) === 0) {
+                                setValError('Stay Price is missing. Please enter the guest\'s accommodation cost before proceeding.');
+                                return;
+                              }
+                              if (!isBalanceMatched) {
+                                setValError(`Payment balance mismatch. You are trying to collect ${tPaidUsd.toFixed(2)} USD, but the debt is ${debtRemaining.toFixed(2)} USD. Please use the "Match Balance" button to even the tab.`);
+                                return;
+                              }
+                              setSelectedReceipt(null);
+                              setShowFinalReceipt(true);
+                            }}
+                            disabled={loadingAction === 'checkout' || gTotal <= 0}
+                            className={`w-full py-4 rounded-2xl font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 shadow-xl ${(!isBalanceMatched || gTotal <= 0) ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' : 'bg-indigo-600 text-white hover:bg-indigo-700 hover:scale-[1.02] active:scale-95 shadow-indigo-100'}`}
+                          >
+                            {loadingAction === 'checkout' ? 'Processing...' : 'Review & Pay Tab'}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )
@@ -1175,66 +1240,186 @@ export function BookingModal(props: BookingModalProps) {
               {showFinalReceipt && sel && (
                 <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
                   <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowFinalReceipt(false)} />
-                  <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
-                      <div className="bg-indigo-600 px-6 py-8 text-white text-center relative">
-                        <div className="absolute top-4 right-4">
-                          <button onClick={() => setShowFinalReceipt(false)} className="text-white/60 hover:text-white transition-all text-2xl font-bold">×</button>
+                  <div className="relative bg-white rounded-[32px] shadow-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+                      <div className="bg-[#6366f1] px-6 py-10 text-white text-center relative overflow-hidden">
+                        <div className="absolute top-4 right-4 z-10">
+                          <button onClick={() => setShowFinalReceipt(false)} className="text-white/40 hover:text-white transition-all text-2xl font-bold">×</button>
                         </div>
-                        <h3 className="text-xl font-black uppercase tracking-tight">Final Receipt</h3>
+                        
+                        <div className="relative z-10 flex flex-col items-center">
+                          <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mb-4 backdrop-blur-sm border border-white/20">
+                            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                          </div>
+                          
+                          <h3 className="text-2xl font-black uppercase tracking-tight mb-2">Final Receipt</h3>
+                          <p className="text-[10px] font-black tracking-widest text-white/60 uppercase mb-4">Receipt #{selectedReceipt?.id || 'PENDING'}</p>
+                          
+                          {selectedReceipt && (
+                            <div className="bg-white/20 backdrop-blur-md border border-white/30 rounded-lg px-3 py-1.5 text-[9px] font-black uppercase tracking-widest">
+                              Settled: {new Date(selectedReceipt.settled_at || selectedReceipt.date || Date.now()).toLocaleString()}
+                            </div>
+                          )}
+                        </div>
                       </div>
 
-                    <div className="p-6 space-y-4">
-                      <div className="space-y-2 border-b border-slate-100 pb-4">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-slate-500 font-bold">Guest</span>
-                          <span className="text-slate-900 font-black">{String(sel.guest_name)}</span>
+                    <div className="p-6 space-y-6">
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Guest</span>
+                          <span className="text-base font-black text-slate-900">{String(sel.guest_name)}</span>
                         </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-slate-500 font-bold">Stay</span>
-                          <span className="text-slate-900 font-black">{String(sel.check_in)} → {String(sel.check_out)}</span>
+                        <div className="flex justify-between items-center">
+                          <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Stay</span>
+                          <span className="text-base font-black text-slate-900 flex items-center gap-2">
+                            {String(sel.check_in)}
+                            <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                            </svg>
+                            {String(sel.check_out)}
+                          </span>
                         </div>
                       </div>
 
                       {selectedReceipt ? (
-                        <div className="space-y-3">
-                          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-2 py-1 rounded w-fit">Tab #{String(selectedReceipt.id)}</p>
-                            {((selectedReceipt.items?.accommodation || 0) > 0 || selectedReceipt.items?.isPrepaid) && (
-                              <div className="flex justify-between text-sm">
-                                <span className="text-slate-600 font-bold">Accommodation</span>
-                                {selectedReceipt.items?.isPrepaid ? (
-                                  <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">Prepaid</span>
-                                ) : (
-                                  <span className="text-slate-900 font-black">${String((selectedReceipt.items.accommodation || 0).toFixed(2))}</span>
-                                )}
+                        <div className="space-y-6">
+                          <div className="space-y-4">
+                            <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-2.5 py-1 rounded-md w-fit border border-indigo-100">
+                              Tab #{String(selectedReceipt.id)}
+                            </p>
+                            
+                            <div className="space-y-3">
+                              {((selectedReceipt.items?.accommodation || 0) > 0 || selectedReceipt.items?.isPrepaid) && (
+                                <div className="flex justify-between items-center text-sm">
+                                  <span className="text-slate-600 font-bold">Accommodation</span>
+                                  {selectedReceipt.items?.isPrepaid ? (
+                                    <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">Prepaid</span>
+                                  ) : (
+                                    <span className="text-slate-900 font-black">${String((selectedReceipt.items.accommodation || 0).toFixed(2))}</span>
+                                  )}
+                                </div>
+                              )}
+                              
+                              {(() => {
+                                const meals = selectedReceipt.items?.meals || {};
+                                return Object.entries(meals).map(([type, count]: [string, any]) => {
+                                  if (!count) return null;
+                                  const price = type === 'lunch' ? (pricing?.lunch_price || 10) : (pricing?.dinner_price || 10);
+                                  return (
+                                    <div key={type} className="flex justify-between items-center text-sm">
+                                      <span className="text-slate-400 font-medium capitalize">{type} ×{String(count)}</span>
+                                      <span className="text-slate-500 font-bold">${String((count * price).toFixed(2))}</span>
+                                    </div>
+                                  );
+                                });
+                              })()}
+
+                              {(() => {
+                                const svcs = selectedReceipt.items?.services || {};
+                                return Object.entries(svcs).map(([name, price]: [string, any]) => {
+                                  if (!price) return null;
+                                  return (
+                                    <div key={name} className="flex justify-between items-center text-sm">
+                                      <span className="text-slate-400 font-medium capitalize">{name}</span>
+                                      <span className="text-slate-500 font-bold">${String(price.toFixed(2))}</span>
+                                    </div>
+                                  );
+                                });
+                              })()}
+
+                              {(selectedReceipt.items?.drinks?.length > 0) && (
+                                <div className="flex justify-between items-center text-sm">
+                                  <span className="text-slate-400 font-medium">Drinks</span>
+                                  <span className="text-slate-500 font-bold">${String(selectedReceipt.items.drinks.reduce((s: number, d: any) => s + (d.price * d.qty), 0).toFixed(2))}</span>
+                                </div>
+                              )}
+
+                              <div className="flex justify-between items-center pt-4 border-t border-slate-100 mt-2">
+                                <span className="text-base font-black text-slate-900">Tab Total</span>
+                                <span className="text-lg font-black text-[#6366f1]">${String((selectedReceipt.total || 0).toFixed(2))}</span>
                               </div>
-                            )}
-                            {(selectedReceipt.items?.meals?.lunch || 0) > 0 && (
-                              <div className="flex justify-between text-xs text-slate-500"><span>Lunch ×{String(selectedReceipt.items.meals.lunch)}</span><span>${String((selectedReceipt.items.meals.lunch * (pricing?.lunch_price || 0)).toFixed(2))}</span></div>
-                            )}
-                            <div className="flex justify-between text-sm pt-2 border-t border-slate-100 mt-2"><span className="font-bold text-slate-900">Tab Total</span><span className="font-black text-indigo-600">${String((selectedReceipt.total || 0).toFixed(2))}</span></div>
+                            </div>
+                          </div>
+
+                          <div className="bg-[#f0fdf4] rounded-[24px] p-5 border border-emerald-100/50 space-y-4">
+                            <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em]">Payments Received</p>
+                            <div className="space-y-2">
+                              {selectedReceipt.payments?.map((p: any, i: number) => (
+                                <div key={i} className="flex justify-between items-center text-sm">
+                                  <span className="text-emerald-700 font-bold">{p.currency} · {p.method}</span>
+                                  <span className="text-emerald-800 font-black">{parseFloat(p.amount).toLocaleString()} {p.currency}</span>
+                                </div>
+                              ))}
+                              <div className="flex justify-between items-center pt-3 border-t border-emerald-200/50 mt-1">
+                                <span className="text-sm font-black text-emerald-700">Total Paid (USD Equiv.)</span>
+                                <span className="text-base font-black text-emerald-600">${String((selectedReceipt.total || 0).toFixed(2))}</span>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       ) : (
-                        <div className="space-y-4">
-                          <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest text-center">Charges Breakdown</p>
-                          <div className="space-y-1.5 bg-white rounded-xl border border-slate-100 p-3">
-                            {(svcAmount > 0 || (isPrepaid && (sel.collected_amount || 0) === 0)) && (
-                              <div className="flex justify-between text-sm">
-                                <span className="text-slate-600 font-bold">Accommodation</span>
-                                {isPrepaid && (sel.collected_amount || 0) === 0 ? (
-                                  <span className="text-[10px] font-black bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded uppercase">Prepaid</span>
-                                ) : (
-                                  <span className="text-slate-900 font-black">${String(svcAmount.toFixed(2))}</span>
-                                )}
+                        <div className="space-y-6">
+                          <div className="space-y-4">
+                            <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-2.5 py-1 rounded-md w-fit border border-indigo-100">
+                              Active Tab Breakdown
+                            </p>
+                            <div className="space-y-3 bg-slate-50/50 rounded-2xl p-4 border border-slate-100">
+                              {(svcAmount > 0 || (isPrepaid && (sel.collected_amount || 0) === 0)) && (
+                                <div className="flex justify-between items-center text-sm">
+                                  <span className="text-slate-600 font-bold">Accommodation</span>
+                                  {isPrepaid && (sel.collected_amount || 0) === 0 ? (
+                                    <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">Prepaid</span>
+                                  ) : (
+                                    <span className="text-slate-900 font-black">${String(svcAmount.toFixed(2))}</span>
+                                  )}
+                                </div>
+                              )}
+                              
+                              {(() => {
+                                const items = [
+                                  svcLunch && { name: 'Lunch', count: svcLunchCount, price: pricing.lunch_price, prepaid: isLunchPrepaid },
+                                  svcDinner && { name: 'Dinner', count: svcDinnerCount, price: pricing.dinner_price, prepaid: isDinnerPrepaid },
+                                  svcGuide && { name: 'Guide', price: svcGuidePrice },
+                                  svcTransport && { name: 'Transport', price: svcTransList.reduce((s: number, t: any) => s + (t.price || 0), 0) },
+                                  svcLaundry && { name: 'Laundry', price: svcLaundryPrice },
+                                  svcCooking && { name: 'Cooking Class', price: svcCookingPrice }
+                                ].filter(Boolean) as any[];
+
+                                return items.map((item, i) => (
+                                  <div key={i} className="flex justify-between items-center text-sm">
+                                    <span className="text-slate-400 font-medium">{item.name} {item.count ? `×${item.count}` : ''}</span>
+                                    {item.prepaid ? (
+                                      <span className="text-[9px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">Prepaid</span>
+                                    ) : (
+                                      <span className="text-slate-500 font-bold">${String((item.count ? item.count * item.price : item.price).toFixed(2))}</span>
+                                    )}
+                                  </div>
+                                ));
+                              })()}
+
+                              {dTotal_calc > 0 && (
+                                <div className="flex justify-between items-center text-sm">
+                                  <span className="text-slate-400 font-medium">Drinks</span>
+                                  <span className="text-slate-500 font-bold">${String(dTotal_calc.toFixed(2))}</span>
+                                </div>
+                              )}
+
+                              <div className="flex justify-between items-center pt-3 border-t border-slate-200 mt-1">
+                                <span className="text-sm font-black text-slate-900">Current Total</span>
+                                <span className="text-base font-black text-[#6366f1]">${String(gTotal.toFixed(2))}</span>
                               </div>
-                            )}
-                            <div className="flex justify-between text-sm pt-2 border-t border-slate-100 mt-1"><span className="font-bold text-slate-900">Tab Total</span><span className="font-black text-indigo-600">${String(gTotal.toFixed(2))}</span></div>
+                            </div>
                           </div>
                         </div>
                       )}
 
                       {(selectedReceipt || sel.status === 'completed' || (sel.status === 'checked_in' && gTotal === 0 && (sel.collected_amount || 0) > 0)) ? (
-                        <div className="w-full py-4 bg-emerald-50 text-emerald-700 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 border-2 border-emerald-200">
-                          PAID & SETTLED
+                        <div className="w-full py-5 bg-[#f0fdf4] text-emerald-700 rounded-[20px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 border-2 border-emerald-100 shadow-sm shadow-emerald-100/50">
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Paid & Settled
                         </div>
                       ) : (
                         <button
@@ -1249,7 +1434,7 @@ export function BookingModal(props: BookingModalProps) {
                             if (handleCheckOut) await handleCheckOut();
                           }}
                           disabled={loadingAction === 'checkout' || !isBalanceMatched || gTotal <= 0}
-                          className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${(!isBalanceMatched || gTotal <= 0) ? 'bg-slate-400 opacity-50 cursor-not-allowed' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
+                          className={`w-full py-5 rounded-[20px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 shadow-lg ${(!isBalanceMatched || gTotal <= 0) ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' : 'bg-[#6366f1] text-white hover:bg-[#4f46e5] active:scale-95 shadow-indigo-200'}`}
                         >
                           Confirm & Settle Tab
                         </button>

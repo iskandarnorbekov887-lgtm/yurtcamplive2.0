@@ -75,21 +75,40 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelect
       .finally(() => setLoading(false));
   }, [gcEventsProp]);
 
-  const dayStr = (day: number) => `${year}-${pad(month + 1)}-${pad(day)}`;
+  const getFullDateStr = (y: number, m: number, d: number) => {
+    const dt = new Date(y, m, d);
+    return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+  };
 
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const cells: (number | null)[] = [
-    ...Array(firstDay).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
-  ];
-  while (cells.length % 7 !== 0) cells.push(null);
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+  
+  const cells: { day: number; dateStr: string; currentMonth: boolean }[] = [];
+  
+  // Prev month padding
+  for (let i = firstDay - 1; i >= 0; i--) {
+    const d = daysInPrevMonth - i;
+    cells.push({ day: d, dateStr: getFullDateStr(year, month - 1, d), currentMonth: false });
+  }
+  
+  // Current month
+  for (let i = 1; i <= daysInMonth; i++) {
+    cells.push({ day: i, dateStr: getFullDateStr(year, month, i), currentMonth: true });
+  }
+  
+  // Next month padding
+  let nextD = 1;
+  while (cells.length < 42) {
+    cells.push({ day: nextD, dateStr: getFullDateStr(year, month + 1, nextD), currentMonth: false });
+    nextD++;
+  }
 
-  const weeks: (number | null)[][] = [];
+  const weeks: { day: number; dateStr: string; currentMonth: boolean }[][] = [];
   for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
 
-  const getWeekLanes = (week: (number | null)[]): EventBar[][] => {
-    const days = week.map(d => d ? dayStr(d) : null);
+  const getWeekLanes = (week: { day: number; dateStr: string; currentMonth: boolean }[]): EventBar[][] => {
+    const days = week.map(c => c.dateStr);
     const validDays = days.filter(Boolean) as string[];
     if (!validDays.length) return [];
     const weekStart = validDays[0];
@@ -205,9 +224,8 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelect
             return (
               <div key={wi} className="relative grid grid-cols-7" style={{ minHeight: `${Math.max(cellHeight, 110)}px` }}>
                 {/* Day cells (background grid with borders) */}
-                {week.map((day, col) => {
-                  if (!day) return <div key={col} className="border-r border-b border-slate-200 bg-slate-50/40" />;
-                  const d = dayStr(day);
+                {week.map((cell, col) => {
+                  const d = cell.dateStr;
                   const isToday = d === todayStr;
                   const isSelected = d === selectedDay;
                   const totalInCol = lanes.filter(lane => lane.some(b => b.startCol <= col && b.endCol >= col)).length;
@@ -216,14 +234,14 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelect
                     <div key={col} onClick={() => handleDayClick(d)}
                       className={`border-r border-b border-slate-200 px-1 pt-1 cursor-pointer transition-colors relative ${
                         isSelected ? 'bg-indigo-50/70' : 'hover:bg-slate-50/60'
-                      }`}>
+                      } ${!cell.currentMonth ? 'bg-slate-50/40 opacity-50' : ''}`}>
                       <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-black transition-all ${
                         isToday ? 'bg-indigo-600 text-white' : isSelected ? 'text-indigo-700' : 'text-slate-700'
-                      }`}>{day}</span>
+                      }`}>{cell.day}</span>
                       {hidden > 0 && (
                         <button onClick={e => { e.stopPropagation(); setMoreDay(d); }}
                           style={{ position: 'absolute', bottom: 2, left: 4, right: 4 }}
-                          className="text-[10px] font-bold text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded px-1 py-0.5 text-left transition-colors z-10">
+                          className="text-[10px] font-bold text-slate-500 hover:text-indigo-600 hover:bg-indigo-100 rounded px-1 py-0.5 text-left transition-colors z-10">
                           +{hidden} more
                         </button>
                       )}
