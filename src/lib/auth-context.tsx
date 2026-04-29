@@ -38,13 +38,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             lastUserId.current = newSession.user.id;
             
             // Fetch Profile
+            // Fetch Profile
             const { data: profile } = await supabase
               .from('profiles')
               .select('*')
               .eq('id', newSession.user.id)
               .single();
             
-            if (mounted) setUser(profile);
+            if (mounted && profile) {
+              // Safety Check: Treat legacy 'Reserver' role as 'Manager'
+              const userProfile = { ...profile };
+              if (userProfile.role === 'Reserver' as any) {
+                userProfile.role = 'Manager';
+              }
+              setUser(userProfile);
+            }
           }
         } else {
           setUser(null);

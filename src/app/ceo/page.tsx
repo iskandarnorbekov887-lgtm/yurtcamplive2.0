@@ -648,7 +648,6 @@ function CEODashboard() {
                   className="w-full mt-1 px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-indigo-500 outline-none transition-all"
                 >
                   <option value="Manager">Manager</option>
-                  <option value="Reserver">Reserver</option>
                   <option value="Cook">Cook</option>
                   <option value="CEO">CEO</option>
                 </select>
@@ -705,7 +704,6 @@ function CEODashboard() {
                   className="w-full mt-1 px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-indigo-500 outline-none transition-all"
                 >
                   <option value="Manager">Manager</option>
-                  <option value="Reserver">Reserver</option>
                   <option value="Cook">Cook</option>
                   <option value="CEO">CEO</option>
                 </select>

@@ -222,8 +222,8 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
     if (userRole === 'CEO') return true;
     if (userRole === 'Cook') return false;
     if (!currentUserId) return false;
-    // Manager and Reserver can edit any booking regardless of original creator
-    if (userRole === 'Manager' || userRole === 'Reserver') {
+    // Manager can edit any booking regardless of original creator
+    if (userRole === 'Manager') {
       return true;
     }
     return false;
@@ -233,8 +233,8 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
     if (userRole === 'CEO') return true;
     if (userRole === 'Cook') return false;
     if (!currentUserId) return false;
-    // Manager and Reserver can cancel any booking regardless of original creator
-    if (userRole === 'Manager' || userRole === 'Reserver') {
+    // Manager can cancel any booking regardless of original creator
+    if (userRole === 'Manager') {
       return true;
     }
     return false;
@@ -1125,7 +1125,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
               );
             })()}
 
-            {userRole === 'Reserver' && selectedDay >= today && onAddNewBooking && (
+            {userRole === 'Manager' && selectedDay >= today && onAddNewBooking && (
               <div className="mt-6 pt-6 border-t border-slate-100">
                 <button
                   onClick={() => {

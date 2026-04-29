@@ -37,7 +37,7 @@ function createSafeBrowserClient(): SupabaseClient {
 
 export const supabase: SupabaseClient = createSafeBrowserClient();
 
-export type UserRole = 'CEO' | 'Manager' | 'Cook' | 'Reserver';
+export type UserRole = 'CEO' | 'Manager' | 'Cook';
 
 export interface Profile {
   id: string;
