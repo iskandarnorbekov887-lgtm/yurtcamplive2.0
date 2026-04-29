@@ -617,7 +617,7 @@ export function BookingModal(props: BookingModalProps) {
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
                           <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                            {(sel.collected_amount || 0) > 0 ? 'Stay Extension' : 'Accommodation'}
+                            {(sel.collected_amount || 0) > 0 ? 'Stay Extension' : 'Stay Price'}
                           </p>
                           <button onClick={() => { 
                               const next = !isPrepaid;
@@ -638,7 +638,7 @@ export function BookingModal(props: BookingModalProps) {
                               </div>
                               <div>
                                 <div className="flex items-center gap-2 mb-0.5">
-                                  <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest leading-none">Room Prepaid</p>
+                                  <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest leading-none">Stay Prepaid</p>
                                   <span className="w-1 h-1 bg-emerald-300 rounded-full" />
                                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">{svcAdults} Adults {svcChildren > 0 ? `· ${svcChildren} Children` : ''}</p>
                                 </div>
@@ -1292,7 +1292,7 @@ export function BookingModal(props: BookingModalProps) {
                             <div className="space-y-3">
                               {((selectedReceipt.items?.accommodation || 0) > 0 || selectedReceipt.items?.isPrepaid) && (
                                 <div className="flex justify-between items-center text-sm">
-                                  <span className="text-slate-600 font-bold">Accommodation</span>
+                                  <span className="text-slate-600 font-bold">Stay Price</span>
                                   {selectedReceipt.items?.isPrepaid ? (
                                     <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">Prepaid</span>
                                   ) : (
@@ -1367,7 +1367,7 @@ export function BookingModal(props: BookingModalProps) {
                             <div className="space-y-3 bg-slate-50/50 rounded-2xl p-4 border border-slate-100">
                               {(svcAmount > 0 || (isPrepaid && (sel.collected_amount || 0) === 0)) && (
                                 <div className="flex justify-between items-center text-sm">
-                                  <span className="text-slate-600 font-bold">Accommodation</span>
+                                  <span className="text-slate-600 font-bold">Stay Price</span>
                                   {isPrepaid && (sel.collected_amount || 0) === 0 ? (
                                     <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">Prepaid</span>
                                   ) : (
