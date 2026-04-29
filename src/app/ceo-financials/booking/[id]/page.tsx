@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useEffect, useState } from 'react';
 import { ProtectedRoute } from '@/components/protected-route';
 import { supabase, type Booking, type Payment } from '@/lib/supabase';
