@@ -123,7 +123,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
   const confirmed = bookings.filter(b => b.status === 'confirmed' || b.status === 'checked_in');
   const completed = bookings.filter(b => b.status === 'completed');
   const cancelled = bookings.filter(b => b.status === 'cancelled');
-  const totalYurts = 0;
+  const totalIskyCamps = 0;
 
   const eventsForWeek = (week: Date[]): EventInfo[] => {
     const strs  = week.map(dateToStr);
@@ -303,7 +303,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
               {week.map((day, di) => {
                 const ds    = dateToStr(day);
                 const occ   = dayOccupancy(ds);
-                const full  = totalYurts > 0 && occ >= totalYurts;
+                const full  = totalIskyCamps > 0 && occ >= totalIskyCamps;
                 const isToday = ds === today;
                 const isCurrentMonth = day.getMonth() === month;
                 return (
@@ -431,9 +431,9 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                 <div>
                   <h3 className="text-2xl font-black text-slate-900 leading-tight">{sel.guest_name}</h3>
                   <p className="text-sm font-bold text-slate-700 mt-1.5 flex flex-wrap gap-x-3">
-                    {(sel.num_people || sel.number_of_people || sel.guest_count) ? <span>+ {sel.num_people || sel.number_of_people || sel.guest_count} people</span> : null}
-                    {sel.nights ? <span>+ {sel.nights} night{Number(sel.nights) !== 1 ? 's' : ''}</span> : null}
-                    {sel.children_under_12 ? <span>+ {sel.children_under_12} under 12</span> : null}
+                    {(sel.num_people || sel.number_of_people || sel.guest_count) ? <span>+ {String(sel.num_people || sel.number_of_people || sel.guest_count)} people</span> : null}
+                    {sel.nights ? <span>+ {String(sel.nights)} night{Number(sel.nights) !== 1 ? 's' : ''}</span> : null}
+                    {sel.children_under_12 ? <span>+ {String(sel.children_under_12)} under 12</span> : null}
                   </p>
                   <p className="text-sm text-slate-500 mt-0.5 font-medium">
                     {(() => {
@@ -515,7 +515,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                         <span className={`px-3 py-1 rounded-lg text-sm font-black uppercase ${sel.payment_status === 'Paid' ? 'bg-emerald-100 text-emerald-700' : sel.payment_status === 'Partial' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>
                           {sel.payment_status === 'Paid' ? 'PAID' : sel.payment_status === 'Partial' ? 'PARTIALLY PAID' : 'NEED TO COLLECT'}
                         </span>
-                        <span className="text-lg font-black text-black">${sel.total_price} USD</span>
+                        <span className="text-lg font-black text-black">${String(sel.total_price)} USD</span>
                       </div>
                     </div>
                     {sel.payment_method && (
@@ -713,10 +713,10 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                     </div>
                     {sel.drinks_tab && sel.drinks_tab.length > 0 ? (
                       <div className="space-y-1">
-                        {sel.drinks_tab.map((drink, idx) => (
+                        {sel.drinks_tab.map((drink: any, idx: number) => (
                           <div key={idx} className="flex justify-between items-center text-xs">
-                            <span className="font-bold text-black">{drink.drink_name} x{drink.quantity}</span>
-                            <span className="font-bold text-black">${drink.price} {drink.currency}</span>
+                            <span className="font-bold text-black">{String(drink.drink_name)} x{String(drink.quantity)}</span>
+                            <span className="font-bold text-black">${String(drink.price)} {String(drink.currency)}</span>
                           </div>
                         ))}
                       </div>
@@ -738,10 +738,10 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                     </div>
                     {sel.extra_services && sel.extra_services.length > 0 ? (
                       <div className="space-y-1">
-                        {sel.extra_services.map((service, idx) => (
+                        {sel.extra_services.map((service: any, idx: number) => (
                           <div key={idx} className="flex justify-between items-center text-xs">
-                            <span className="font-bold text-black">{service.name}</span>
-                            <span className="font-bold text-black">${service.price} {service.currency}</span>
+                            <span className="font-bold text-black">{String(service.name)}</span>
+                            <span className="font-bold text-black">${String(service.price)} {String(service.currency)}</span>
                           </div>
                         ))}
                       </div>
@@ -837,9 +837,16 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                         </div>
                       )}
                       {onCheckOut && sel.status === 'checked_in' && (
-                        <button onClick={handleCheckOut} disabled={!!loadingAction} className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
-                          {loadingAction === 'checkout' ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : t('btn.check_out')}
-                        </button>
+                        today === sel.check_out ? (
+                          <button onClick={handleCheckOut} disabled={!!loadingAction} className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
+                            {loadingAction === 'checkout' ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : t('btn.check_out')}
+                          </button>
+                        ) : (
+                          <div className="flex-1 py-3 bg-indigo-50 text-indigo-600 rounded-xl font-bold text-center flex items-center justify-center gap-2 border-2 border-indigo-100">
+                             <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse" />
+                             Active Stay
+                          </div>
+                        )
                       )}
                       {sel.status === 'completed' && (
                         <div className="flex-1 py-3 bg-blue-500 text-white rounded-xl font-bold text-center flex items-center justify-center cursor-not-allowed">

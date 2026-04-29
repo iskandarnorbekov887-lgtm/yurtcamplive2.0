@@ -103,6 +103,26 @@ export interface Booking {
   collected_amount?: number;
   collected_currency?: 'UZS' | 'USD' | 'EUR';
   payments?: any[];
+  is_prepaid?: boolean;
+  lunch_prepaid?: boolean;
+  dinner_prepaid?: boolean;
+}
+
+export interface Tab {
+  id: string;
+  date: string;
+  is_prepaid: boolean;
+  lunch_prepaid: boolean;
+  dinner_prepaid: boolean;
+  items: {
+    accommodation: number;
+    meals: { lunch: number; dinner: number };
+    services: { guide: number; transport: number; laundry: number; cooking: number };
+    extras: Array<{ name: string; price: number; currency: string }>;
+    drinks: Array<{ drink_id: number; drink_name: string; quantity: number; price: number; currency: string }>;
+  };
+  total: number;
+  payments: Array<{ amount: number; currency: string; method: string }>;
 }
 
 export interface Finance {

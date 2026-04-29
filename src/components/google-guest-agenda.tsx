@@ -210,18 +210,18 @@ export function GoogleGuestAgenda({
 
   // Calculate totals at top level for scope availability
   const sTotal_calc = (
-    (svcLunch ? svcLunchCount * (pricing.lunch_price) : 0) +
-    (svcDinner ? svcDinnerCount * (pricing.dinner_price) : 0) +
+    (svcLunch && !isLunchPrepaid ? svcLunchCount * (pricing.lunch_price) : 0) +
+    (svcDinner && !isDinnerPrepaid ? svcDinnerCount * (pricing.dinner_price) : 0) +
     (svcGuide ? svcGuidePrice : 0) +
-    (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0) +
+    (svcTransport ? svcTransList.reduce((s: number, t: any) => s + (t.price || 0), 0) : 0) +
     (svcLaundry ? svcLaundryPrice : 0) +
     (svcCooking ? svcCookingPrice : 0)
   );
-  const dTotal_calc = Object.entries(selectedDrinks).reduce((sum, [id, qty]) => {
-    const drink = drinks.find(d => d.id === parseInt(id));
+  const dTotal_calc = Object.entries(selectedDrinks).reduce((sum: number, [id, qty]: [string, number]) => {
+    const drink = drinks.find((d: any) => d.id === parseInt(id));
     return sum + (qty * (drink?.sold_price || 0));
   }, 0);
-  const eTotal_calc = extraServices.reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0);
+  const eTotal_calc = extraServices.reduce((sum: number, s: any) => sum + (parseFloat(s.price) || 0), 0);
   const gTotal = Math.max(0, (isPrepaid ? 0 : svcAmount) + sTotal_calc + dTotal_calc + eTotal_calc - svcDiscount);
   
   const tPaidUsd = svcPayList.reduce((sum, p) => {
@@ -482,20 +482,7 @@ export function GoogleGuestAgenda({
                 ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600 border border-red-200">cancelled</span>
                 : booking && (
                     <div className="flex flex-col items-end gap-1">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${statusColor(booking.status)}`}>{booking.status.replace('_', ' ')}</span>
-                      {(() => {
-                        try {
-                          const m = typeof booking.special_requests === 'string' ? JSON.parse(booking.special_requests || '{}') : (booking.special_requests || {});
-                          const rCount = m.settled_receipts?.length || 0;
-                          if (rCount > 0) return (
-                            <span className="text-[9px] font-black bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md border border-indigo-200 uppercase tracking-widest flex items-center gap-1.5 shadow-sm animate-in fade-in slide-in-from-right-1">
-                              <svg className="w-3 h-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                              TAB {rCount}
-                            </span>
-                          );
-                        } catch { return null; }
-                        return null;
-                      })()}
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${statusColor(booking.status)}`}>{String(booking.status).replace('_', ' ')}</span>
                     </div>
                   )
               }
@@ -585,61 +572,42 @@ export function GoogleGuestAgenda({
     const ev = selectedItem.event;
     setLoadingAction('creating');
     try {
-      // Guard: check if a booking for this event already exists
-      const existing = bookings.find(b => b.google_event_id === ev.id) ?? null;
+      // MASTER FIX: Check if google_event_id already exists before inserting
+      const { data: existing } = await supabase.from('bookings').select('*').eq('google_event_id', ev.id).maybeSingle();
       if (existing) {
-        flash('⚠ Booking for this event already exists — opening it.');
+        flash('⚠ Booking already exists — opening it.');
         handleSelect({ key: `db-${existing.id}`, name: existing.guest_name, start: existing.check_in, end: existing.check_out, source: 'db', booking: existing as Booking, event: ev });
         return;
       }
 
       const payload: any = {
-        guest_name: ev.summary,
-        check_in: ev.start,
-        check_out: ev.end || ev.start,
+        guest_name: String(ev.summary || "Unnamed Guest"),
+        check_in: String(ev.start),
+        check_out: String(ev.end || ev.start),
         status: doCheckIn ? 'checked_in' : 'confirmed',
         source: 'Manual',
-        google_event_id: ev.id,
+        google_event_id: String(ev.id),
         total_price: 0,
         number_of_people: 1,
         payment_status: 'Unpaid',
         approved_by_manager: true,
-        created_by_id: currentUserId,
-        notes: (ev.description && !ev.description.includes('tasks.google.com')) ? ev.description : null,
+        created_by_id: String(currentUserId),
+        notes: String(ev.description || ""),
       };
-      // Ensure id is never sent (let database auto-generate it)
-      delete payload.id;
-      const insertResp: { data: unknown; error: unknown } = await supabase.from('bookings').insert(payload);
-      if (insertResp?.error) {
-        const err = insertResp.error as any;
-        const errMsg = err?.message || err?.details || err?.hint || JSON.stringify(err) || 'Unknown error';
-        throw new Error(errMsg);
-      }
-      // Resolve inserted id — local fallback returns it; real Supabase needs a follow-up query
-      let insertedId: number | undefined;
-      const d = insertResp?.data as Array<{ id?: number }> | { id?: number } | null;
-      insertedId = Array.isArray(d) ? d[0]?.id : d?.id;
-      if (!insertedId) {
-        const findResp: { data: Array<{ id: number }> | null } = await supabase.from('bookings').select('id').eq('google_event_id', ev.id);
-        insertedId = findResp?.data?.[0]?.id;
-      }
+
+      // MASTER FIX: Use .select() to retrieve the auto-generated ID
+      const { data: inserted, error: insertErr } = await supabase.from('bookings').insert(payload).select().single();
+      if (insertErr) throw new Error(insertErr.message);
+      
+      const insertedId = inserted?.id;
       if (doCheckIn && insertedId && onCheckIn) await onCheckIn(insertedId);
       flash(doCheckIn ? '✓ Guest checked in from calendar event.' : '✓ Booking created from calendar event.');
       setSelectedItem(null);
       onRefresh?.();
-    } catch (e: unknown) {
-      let msg: string;
-      if (e instanceof Error) {
-        msg = e.message;
-      } else if (typeof e === 'object' && e !== null) {
-        msg = JSON.stringify(e).slice(0, 200);
-      } else {
-        msg = String(e);
-      }
-      console.error('Create from event:', e);
-      flash(`⚠ ${msg.slice(0, 100)}`);
-    }
-    finally { setLoadingAction(''); }
+    } catch (e: any) {
+      console.error('Create from event error:', e);
+      flash(`⚠ ${String(e.message || e).slice(0, 100)}`);
+    } finally { setLoadingAction(''); }
   };
 
   const fetchCbuRate = async (currency: 'UZS' | 'EUR') => {
@@ -1897,21 +1865,27 @@ export function GoogleGuestAgenda({
                     )}
                     
                     {(() => {
-                      const sTotal = (
-                        (svcLunch ? svcLunchCount * (pricing?.lunch_price || 0) : 0) +
-                        (svcDinner ? svcDinnerCount * (pricing?.dinner_price || 0) : 0) +
-                        (svcGuide ? svcGuidePrice : 0) +
-                        (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0) +
-                        (svcLaundry ? svcLaundryPrice : 0) +
-                        (svcCooking ? svcCookingPrice : 0)
-                      );
-                      if (sTotal <= 0) return null;
-                      return (
-                        <div className="flex justify-between items-center opacity-90">
-                          <span className="font-bold">Services & Food</span>
-                          <span className="font-black">${sTotal.toFixed(2)}</span>
+                      const sItems = [
+                        svcLunch && { name: 'Lunch', count: svcLunchCount, price: pricing.lunch_price, prepaid: isLunchPrepaid },
+                        svcDinner && { name: 'Dinner', count: svcDinnerCount, price: pricing.dinner_price, prepaid: isDinnerPrepaid },
+                        svcGuide && { name: 'Guide', price: svcGuidePrice, prepaid: false },
+                        svcTransport && { name: 'Transport', price: svcTransList.reduce((s: number, t: any) => s + (t.price || 0), 0), prepaid: false },
+                        svcLaundry && { name: 'Laundry', price: svcLaundryPrice, prepaid: false },
+                        svcCooking && { name: 'Cooking Class', price: svcCookingPrice, prepaid: false }
+                      ].filter(Boolean) as any[];
+
+                      if (sItems.length === 0) return null;
+
+                      return sItems.map((item, idx) => (
+                        <div key={idx} className="flex justify-between items-center opacity-90 border-b border-white/10 pb-1 mb-1 last:border-none last:pb-0 last:mb-0">
+                          <span className="font-bold">{item.name} {item.count ? `x${item.count}` : ''}</span>
+                          {item.prepaid ? (
+                            <span className="text-[9px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">Prepaid</span>
+                          ) : (
+                            <span className="font-black">${String((item.count ? item.count * item.price : item.price).toFixed(2))}</span>
+                          )}
                         </div>
-                      );
+                      ));
                     })()}
 
                     {(() => {
@@ -1989,7 +1963,7 @@ export function GoogleGuestAgenda({
                         )}
                       </div>
                       <p className="text-3xl font-black tracking-tighter leading-none mb-2">
-                        ${gTotal.toFixed(2)}
+                        ${String(gTotal.toFixed(2))}
                       </p>
                       
                        {/* Status Display - Hide if completed or settled */}

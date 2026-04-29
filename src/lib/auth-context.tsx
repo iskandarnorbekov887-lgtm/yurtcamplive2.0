@@ -61,15 +61,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const { data: { subscription: sub } } = supabase.auth.onAuthStateChange(
-      async (event: any, newSession: any) => {
+      async (event: any, session: any) => {
         if (!mounted) return;
 
-        if (newSession?.user) {
-          setSession(newSession);
+        if (session?.user) {
+          setSession(session);
           // Only fetch profile if the ID is different from last time
-          if (newSession.user.id !== lastUserId.current) {
-            lastUserId.current = newSession.user.id;
-            const profile = await fetchProfile(newSession.user.id, newSession.user.email);
+          if (session.user.id !== lastUserId.current) {
+            lastUserId.current = session.user.id;
+            const profile = await fetchProfile(session.user.id, session.user.email);
             if (mounted) setUser(profile as Profile);
           }
         } else {
