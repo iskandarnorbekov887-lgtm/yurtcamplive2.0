@@ -1,7 +1,5 @@
 export const dynamic = 'force-dynamic';
 
-import { redirect } from 'next/navigation';
-
 export default function Home() {
-  redirect('/login');
+  return null; // Let the middleware handle the redirect
 }

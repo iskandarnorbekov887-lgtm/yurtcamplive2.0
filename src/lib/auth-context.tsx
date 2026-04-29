@@ -64,25 +64,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event: any, newSession: any) => {
         if (!mounted) return;
 
-        // ONLY update state, DO NOT redirect or reload here
         if (newSession?.user) {
           setSession(newSession);
-          
-          // Only fetch if the user ID actually changed
+          // Only fetch profile if the ID is different from last time
           if (newSession.user.id !== lastUserId.current) {
             lastUserId.current = newSession.user.id;
             const profile = await fetchProfile(newSession.user.id, newSession.user.email);
-            if (mounted && profile) {
-              setUser(profile as Profile);
-            }
+            if (mounted) setUser(profile as Profile);
           }
         } else {
-          // If no session, clear user data
           setUser(null);
           setSession(null);
           lastUserId.current = null;
         }
-        
         setLoading(false);
       }
     );

@@ -21,18 +21,28 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  // Use getUser() to verify the session
   const { data: { user } } = await supabase.auth.getUser();
   const { pathname } = request.nextUrl;
 
-  // LOOP PROTECTION: Only redirect if truly necessary
+  // 1. Not logged in -> Go to Login
   if (!user && pathname !== '/login' && !pathname.startsWith('/auth')) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // If user is logged in, only move them if they are stuck on /login
-  if (user && pathname === '/login') {
-    return NextResponse.redirect(new URL('/bookings', request.url));
+  // 2. Logged in -> Route based on Role (Prevents being stuck)
+  if (user && (pathname === '/login' || pathname === '/')) {
+    // Fetch profile to get role
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+    
+    const rolePaths: Record<string, string> = {
+      'CEO': '/ceo',
+      'Manager': '/manager',
+      'Cook': '/cook',
+      'Reserver': '/bookings',
+    };
+
+    const targetPath = rolePaths[profile?.role as string] || '/bookings';
+    return NextResponse.redirect(new URL(targetPath, request.url));
   }
 
   return supabaseResponse;
