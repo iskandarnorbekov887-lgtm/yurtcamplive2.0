@@ -61,13 +61,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const { data: { subscription: sub } } = supabase.auth.onAuthStateChange(
-      async (event, newSession) => {
+      async (event: any, newSession: any) => {
         if (!mounted) return;
 
         // ONLY update state, DO NOT redirect or reload here
         if (newSession?.user) {
           setSession(newSession);
-          // Check if we need to fetch a new profile
+          
+          // Only fetch if the user ID actually changed
           if (newSession.user.id !== lastUserId.current) {
             lastUserId.current = newSession.user.id;
             const profile = await fetchProfile(newSession.user.id, newSession.user.email);
