@@ -37,21 +37,40 @@ function CheckinPortal() {
   }, []);
 
   const fetchData = async () => {
-    const { data: bookingsData } = await supabase.from('bookings').select('*');
+    // Optimization for Speed (Uzbekistan Connectivity): 
+    // Data Pruning: Load only current month and next month to save bandwidth and memory.
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const end = new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString();
+    
+    const { data: bookingsData } = await supabase
+      .from('bookings')
+      .select('*')
+      .gte('check_out', start)
+      .lte('check_in', end);
+      
     setBookings(bookingsData || []);
   };
 
   const checkIn = async (id: number) => {
-    await supabase.from('bookings').update({ status: 'checked_in' }).eq('id', id);
-    fetchData();
+    // Optimistic UI: Update state instantly for Uzbekistan Speed
+    setBookings(prev => prev.map(b => b.id === id ? { ...b, status: 'checked_in' } : b));
+    
+    const { error } = await supabase.from('bookings').update({ status: 'checked_in' }).eq('id', id);
+    if (error) {
+      console.error(error);
+      fetchData(); // Rollback if error
+    }
   };
 
   const checkOut = async (id: number) => {
-    // First get the booking data
+    // Optimistic UI: Mark as completed instantly
+    setBookings(prev => prev.map(b => b.id === id ? { ...b, status: 'completed' } : b));
+
+    // Get booking data for finance entry
     const { data: booking } = await supabase.from('bookings').select('*').eq('id', id).single();
     if (!booking) return;
 
-    // Create camp_finances record from booking data
     const amountValue = booking.amount || booking.total_price || 0;
     const rateValue = booking.exchange_rate || 1;
     const amountUZS = booking.currency === 'UZS' ? amountValue : amountValue * rateValue;
@@ -86,14 +105,16 @@ function CheckinPortal() {
       created_by: booking.created_by_role || 'System',
     }]);
 
-    // Then mark booking as completed
-    await supabase.from('bookings').update({ status: 'completed' }).eq('id', id);
-    fetchData();
+    const { error } = await supabase.from('bookings').update({ status: 'completed' }).eq('id', id);
+    if (error) fetchData();
   };
 
   const handleUpdateBooking = async (id: number, updates: Partial<Booking>) => {
-    await supabase.from('bookings').update({ ...updates, last_edited_by_id: currentUserId || '', last_edited_at: new Date().toISOString() }).eq('id', id);
-    fetchData();
+    // Optimistic UI update
+    setBookings(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
+    
+    const { error } = await supabase.from('bookings').update({ ...updates, last_edited_by_id: currentUserId || '', last_edited_at: new Date().toISOString() }).eq('id', id);
+    if (error) fetchData();
   };
 
   return (

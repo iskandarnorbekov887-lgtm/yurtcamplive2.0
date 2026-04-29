@@ -151,49 +151,45 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
   const handleCancel = async () => {
     if (!sel || !onCancelBooking) return;
     if (confirm('Are you sure you want to cancel this trip?')) {
-      setLoadingAction('cancel');
+      // Optimistic UI: Remove from view immediately
+      const id = sel.id;
+      setSel(null); 
+      
       try {
-        await onCancelBooking(sel.id);
-        setSel(null);
+        await onCancelBooking(id);
       } catch (err) {
-        alert('Failed to cancel booking');
-      } finally {
-        setLoadingAction(null);
+        console.error(err);
       }
     }
   };
 
   const handleCheckIn = async () => {
     if (!sel || !onCheckIn) return;
-    if (!confirm('Are you sure you want to check in ' + sel.guest_name + '?')) return;
-    setLoadingAction('checkin');
+    if (!confirm('Are you sure you want to check in ' + String(sel.guest_name) + '?')) return;
+    
+    // Optimistic UI: Update local state immediately
+    const id = sel.id;
+    setSel({ ...sel, status: 'checked_in' });
+    
     try {
-      await onCheckIn(sel.id);
-      // Immediately update local state to show checkmark
-      setSel({ ...sel, status: 'checked_in' });
-      alert('Check-in successful!');
-      setSel(null);
+      await onCheckIn(id);
     } catch (err) {
-      alert('Failed to check in');
-    } finally {
-      setLoadingAction(null);
+      console.error(err);
     }
   };
 
   const handleCheckOut = async () => {
     if (!sel || !onCheckOut) return;
-    if (!confirm('Are you sure you want to check out ' + sel.guest_name + '?')) return;
-    setLoadingAction('checkout');
+    if (!confirm('Are you sure you want to check out ' + String(sel.guest_name) + '?')) return;
+    
+    // Optimistic UI: Update local state immediately
+    const id = sel.id;
+    setSel({ ...sel, status: 'completed' });
+    
     try {
-      await onCheckOut(sel.id);
-      // Immediately update local state to show completed status
-      setSel({ ...sel, status: 'completed' });
-      alert('Check-out successful!');
-      setSel(null);
+      await onCheckOut(id);
     } catch (err) {
-      alert('Failed to check out');
-    } finally {
-      setLoadingAction(null);
+      console.error(err);
     }
   };
 
@@ -208,17 +204,17 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
 
   const handleUpdate = async () => {
     if (!sel || !onUpdateBooking) return;
-    setLoadingAction('update');
+    
+    // Optimistic UI: Update modal state immediately
+    const updatedSel = { ...sel, ...editData } as Booking;
+    setSel(updatedSel);
+    setIsEditing(false);
+    
     try {
       await onUpdateBooking(sel.id, editData);
-      alert('Changes saved successfully!');
-      setIsEditing(false);
-      setSel(null);
-      syncToGoogleCalendar({ ...sel, ...editData } as Booking);
+      syncToGoogleCalendar(updatedSel);
     } catch (err) {
-      alert('Failed to update booking');
-    } finally {
-      setLoadingAction(null);
+      console.error(err);
     }
   };
 
@@ -547,8 +543,9 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                       const isTab1Closed = tabs.length > 0;
                       
                       // Extension Rule Logic
-                      const originalCheckout = isTab1Closed ? (tabs[0].original_checkout || tabs[0].check_out) : sel.check_out;
-                      const hasExtension = sel.check_out > originalCheckout;
+                      const originalCheckout = isTab1Closed ? (tabs[0]?.original_checkout || tabs[0]?.check_out) : sel?.check_out;
+                      const hasExtension = (sel?.check_out || '') > (originalCheckout || '');
+                      const hasReduction = (sel?.check_out || '') < (originalCheckout || '') && (originalCheckout !== '');
                       
                       return (
                         <div className="space-y-6">
@@ -579,7 +576,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                                 </div>
                               </div>
                             ) : activeTabIdx === -1 && isTab1Closed ? (
-                              /* Extension Fee for Open Tab */
+                              /* Extension/Reduction Fee for Open Tab */
                               <>
                                 {hasExtension && (
                                   <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 animate-in fade-in slide-in-from-top-2">
@@ -593,6 +590,20 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                                       <button className="px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-black uppercase shadow-sm">Apply</button>
                                     </div>
                                     <p className="mt-2 text-[9px] text-amber-500 font-bold italic">* Compulsory: Guest extended stay from {String(originalCheckout)} to {String(sel?.check_out)}</p>
+                                  </div>
+                                )}
+                                {hasReduction && (
+                                  <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 animate-in fade-in slide-in-from-top-2">
+                                    <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block mb-2">Stay Reduction (Discount)</label>
+                                    <div className="flex gap-3">
+                                      <input 
+                                        type="number"
+                                        placeholder="Discount amount..."
+                                        className="flex-1 px-4 py-2 bg-white border-2 border-emerald-200 rounded-xl text-sm font-black text-emerald-700 outline-none focus:border-emerald-400"
+                                      />
+                                      <button className="px-4 py-2 bg-emerald-500 text-white rounded-xl text-xs font-black uppercase shadow-sm">Apply</button>
+                                    </div>
+                                    <p className="mt-2 text-[9px] text-emerald-500 font-bold italic">* Optional: Guest shortened stay from {String(originalCheckout)} to {String(sel?.check_out)}</p>
                                   </div>
                                 )}
                                 <div className="mt-4 p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
@@ -675,10 +686,10 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                           Upcoming Guest
                         </div>
                       )}
-                      {onCheckOut && sel.status === 'checked_in' && (
-                        today === sel.check_out ? (
-                          <button onClick={handleCheckOut} disabled={!!loadingAction} className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
-                            {loadingAction === 'checkout' ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : t('btn.check_out')}
+                      {onCheckOut && sel?.status === 'checked_in' && (
+                        today === sel?.check_out ? (
+                          <button onClick={handleCheckOut} className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
+                            Check Out Now
                           </button>
                         ) : (
                           <div className="flex-1 py-3 bg-indigo-50 text-indigo-600 rounded-xl font-bold text-center flex items-center justify-center gap-2 border-2 border-indigo-100">
