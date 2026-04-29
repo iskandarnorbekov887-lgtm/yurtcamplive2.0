@@ -61,34 +61,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const { data: { subscription: sub } } = supabase.auth.onAuthStateChange(
-      async (event: string, newSession: any) => {
+      async (event, newSession) => {
         if (!mounted) return;
 
-        // FORCE SYNC: If we just signed in, force a hard reload to /bookings
-        if (event === 'SIGNED_IN' && newSession) {
-          setSession(newSession);
-          window.location.href = '/bookings'; 
-          return;
-        }
-
-        if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setSession(null);
-          setLoading(false);
-          window.location.href = '/login';
-          return;
-        }
-
+        // ONLY update state, DO NOT redirect or reload here
         if (newSession?.user) {
           setSession(newSession);
-          const profile = await fetchProfile(newSession.user.id, newSession.user.email);
-          if (mounted && profile) {
-            setUser(profile as Profile);
-            setLoading(false);
+          // Check if we need to fetch a new profile
+          if (newSession.user.id !== lastUserId.current) {
+            lastUserId.current = newSession.user.id;
+            const profile = await fetchProfile(newSession.user.id, newSession.user.email);
+            if (mounted && profile) {
+              setUser(profile as Profile);
+            }
           }
         } else {
-          setLoading(false);
+          // If no session, clear user data
+          setUser(null);
+          setSession(null);
+          lastUserId.current = null;
         }
+        
+        setLoading(false);
       }
     );
 
