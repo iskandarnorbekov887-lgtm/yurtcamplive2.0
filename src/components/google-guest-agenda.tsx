@@ -1075,6 +1075,7 @@ export function GoogleGuestAgenda({
         currency: 'USD',
         total_price: svcAmount + sTotal + dTotal + eTotal - svcDiscount
       };
+      if (!sel) return;
       await onUpdateBooking(sel.id, updates);
       flash('✓ Services updated.');
       setShowServices(false);
