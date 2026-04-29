@@ -441,7 +441,7 @@ export function GoogleGuestAgenda({
   const renderCard = (item: ListItem, isCancelled: boolean) => {
     const isSelected = selectedItem?.key === item.key;
     const booking = item.booking;
-    const showApprove = !!booking && booking.status === 'checked_in' && syncWarnings[booking.id] === 'dates_changed' && (userRole === 'Manager' || userRole === 'CEO' || userRole === 'Reserver');
+    const showApprove = !!booking && booking.status === 'checked_in' && syncWarnings[booking.id] === 'dates_changed' && (userRole === 'Manager' || userRole === 'CEO');
     return (
       <div key={item.key} className={`w-full px-4 py-3 transition-all border-l-4 ${
         isCancelled
@@ -932,6 +932,7 @@ export function GoogleGuestAgenda({
       
       // Reset local UI states for the new tab
       setSvcAmount(0); setSvcDiscount(0);
+      setIsPrepaid(false); setIsLunchPrepaid(false); setIsDinnerPrepaid(false);
       setSvcLunch(false); setSvcLunchCount(0); setSvcDinner(false); setSvcDinnerCount(0);
       setSvcGuide(false); setSvcGuidePrice(40); setSvcGuideNames(['']);
       setSvcTransport(false); setSvcTransList([{ name: '', details: '', price: 0 }]);
@@ -1160,7 +1161,7 @@ export function GoogleGuestAgenda({
       <BookingModal 
         selectedItem={selectedItem}
         setSelectedItem={setSelectedItem}
-        userRole={String(userRole === 'Reserver' ? 'Manager' : userRole)}
+        userRole={String(userRole || 'Manager')}
         currentUserId={String(currentUserId)}
         pricing={pricing}
         setPricing={setPricing}

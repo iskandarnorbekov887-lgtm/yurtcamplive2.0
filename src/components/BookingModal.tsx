@@ -533,18 +533,26 @@ export function BookingModal(props: BookingModalProps) {
                     </button>
                   )}
                   {canCheckOut && (
-                    <button onClick={async () => { 
-                        if (!confirm(`Complete stay for ${sel.guest_name}?`)) return; 
+                    <button onClick={async () => {
+                        if (gTotal > 0.01) {
+                          flash(`⚠ Guest has an open tab of $${gTotal.toFixed(2)}. Please settle Tab before checking out.`);
+                          return;
+                        }
+                        if (!confirm(`Complete stay for ${sel.guest_name}?`)) return;
                         setLoadingAction('checkout_manual');
                         try { if (onCheckOut) await onCheckOut(sel.id); flash('✓ Guest checked out.'); setSelectedItem(null); }
                         catch { flash('⚠ Check-out failed.'); }
                         finally { setLoadingAction(''); }
-                      }} 
+                      }}
                       disabled={loadingAction === 'checkout_manual'}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-all disabled:opacity-60 flex items-center gap-2"
+                      className={`px-4 py-2 text-sm font-bold rounded-xl transition-all disabled:opacity-60 flex items-center gap-2 ${
+                        gTotal > 0.01
+                          ? 'bg-rose-100 border-2 border-rose-300 text-rose-700 cursor-not-allowed'
+                          : 'bg-blue-600 hover:bg-blue-700 text-white'
+                      }`}
                     >
                       {loadingAction === 'checkout_manual' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '✈'}
-                      Check Out
+                      {gTotal > 0.01 ? `Open Tab $${gTotal.toFixed(2)}` : 'Check Out'}
                     </button>
                   )}
                   {isComingSoon && (
@@ -607,7 +615,9 @@ export function BookingModal(props: BookingModalProps) {
                     <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-white animate-in slide-in-from-top-2">
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Accommodation Extension</p>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                            {(sel.collected_amount || 0) > 0 ? 'Stay Extension' : 'Accommodation'}
+                          </p>
                           <button onClick={() => { 
                               const next = !isPrepaid;
                               setIsPrepaid(next);
@@ -643,19 +653,21 @@ export function BookingModal(props: BookingModalProps) {
                         </div>
 
                         <div className="space-y-1.5">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Stay Price (USD)</label>
+                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                            {(sel.collected_amount || 0) > 0 ? 'Extension Price (USD)' : 'Stay Price (USD)'}
+                          </label>
                           <div className="relative">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
                             <input 
                               type="number" 
                               value={String(svcAmount || '')} 
                               onChange={e => setSvcAmount(parseFloat(e.target.value) || 0)}
-                              disabled={isPrepaid}
-                              className="w-full pl-8 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-lg font-black text-black focus:border-indigo-500 outline-none transition-all disabled:opacity-50"
+                              disabled={isPrepaid || ((sel.collected_amount || 0) > 0 && svcAmount <= 0)}
+                              className="w-full pl-8 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-lg font-black text-black focus:border-indigo-500 outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                           </div>
                           <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest italic">
-                            {isPrepaid ? '* Accommodation is marked as pre-paid.' : '* Enter total price for the EXTENDED period.'}
+                            {isPrepaid ? '* Accommodation is marked as pre-paid.' : (sel.collected_amount || 0) > 0 ? '* Extra nights only — Tab 1 accommodation already settled.' : '* Enter total price for the stay.'}
                           </p>
                         </div>
                       </div>
@@ -920,50 +932,9 @@ export function BookingModal(props: BookingModalProps) {
 
                   <div className="mt-4 pt-4 border-t border-indigo-400 flex justify-between items-end">
                     <div className="flex-1">
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <div>
-                          <p className="text-[10px] font-black uppercase tracking-widest text-indigo-100">
-                            {gTotal > 0 ? 'Current Open Tab' : 'Tab Settled (Ready)'}
-                          </p>
-                        </div>
-                        {((sel.collected_amount || 0) > 0 || gTotal > 0.01) && (
-                          <div className="flex flex-col items-end gap-2">
-                             {(() => {
-                                const receipts = getSettledReceiptsForSel();
-                                const rCount = receipts.length;
-                                return (
-                                  <div className="flex flex-col items-end gap-2">
-                                     <button 
-                                        onClick={() => { setSelectedReceipt(null); setShowFinalReceipt(true); }}
-                                        className={`bg-white/10 hover:bg-white/20 p-2 rounded-xl border border-white/20 transition-all group flex items-center gap-2 ${gTotal > 0.01 ? 'ring-2 ring-white/30 shadow-lg' : ''}`}
-                                      >
-                                        <svg className="w-4 h-4 text-white/80 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                                        <span className="text-[9px] font-black text-white uppercase tracking-widest">{gTotal > 0.01 ? 'Current Folio' : 'Open Tab'}</span>
-                                      </button>
-                                      {rCount > 0 && (
-                                        <div className="flex flex-wrap justify-end gap-2 max-w-[160px]">
-                                          {receipts.map((r: any, idx: number) => (
-                                            <button 
-                                              key={r.id || `tab-${idx}`}
-                                              onClick={(e) => { 
-                                                e.preventDefault();
-                                                e.stopPropagation(); 
-                                                setSelectedReceipt(r); 
-                                                setShowFinalReceipt(true); 
-                                              }}
-                                              className="bg-white/20 hover:bg-white/40 px-3 py-1.5 rounded-lg border border-white/30 text-[10px] font-black text-white transition-all uppercase tracking-widest shadow-sm active:scale-95"
-                                            >
-                                              Tab {String(idx + 1)}
-                                            </button>
-                                          ))}
-                                        </div>
-                                      )}
-                                  </div>
-                                );
-                              })()}
-                          </div>
-                        )}
-                      </div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-indigo-100 mb-1">
+                        {gTotal > 0 ? 'Current Open Tab' : 'Tab Settled (Ready)'}
+                      </p>
                       <p className="text-3xl font-black tracking-tighter leading-none mb-2">
                         ${String(gTotal.toFixed(2))}
                       </p>
@@ -1162,6 +1133,44 @@ export function BookingModal(props: BookingModalProps) {
                     </div>
                   )
               )}
+
+              {/* FOLIO HISTORY — settled tabs (green) + active tab (indigo) */}
+              {isStaff && (() => {
+                const receipts = getSettledReceiptsForSel();
+                const tabCount = receipts.length;
+                if (tabCount === 0 && gTotal <= 0.01 && (sel.collected_amount || 0) === 0) return null;
+                return (
+                  <div className="border border-slate-100 rounded-2xl p-4 bg-slate-50/50 space-y-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Guest Folio</p>
+                    <div className="flex flex-wrap gap-2">
+                      {receipts.map((r: any, idx: number) => (
+                        <button
+                          key={r.id || `folio-tab-${idx}`}
+                          onClick={() => { setSelectedReceipt(r); setShowFinalReceipt(true); }}
+                          className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border-2 border-emerald-200 text-emerald-700 text-xs font-black rounded-xl hover:bg-emerald-100 transition-all active:scale-95"
+                        >
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                          Tab {String(idx + 1)} — Settled
+                        </button>
+                      ))}
+                      {sel.status === 'checked_in' && (
+                        <button
+                          onClick={() => { setSelectedReceipt(null); setShowFinalReceipt(true); }}
+                          className="flex items-center gap-2 px-3 py-2 bg-indigo-50 border-2 border-indigo-300 text-indigo-700 text-xs font-black rounded-xl hover:bg-indigo-100 transition-all active:scale-95"
+                        >
+                          <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse shrink-0" />
+                          Tab {String(tabCount + 1)} — Active {gTotal > 0.01 ? `($${gTotal.toFixed(2)})` : '(Empty)'}
+                        </button>
+                      )}
+                    </div>
+                    {gTotal > 0.01 && (
+                      <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-1">
+                        ⚠ Guest cannot check out until active tab is settled
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
 
               {showFinalReceipt && sel && (
                 <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
