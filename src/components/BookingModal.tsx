@@ -612,107 +612,93 @@ export function BookingModal(props: BookingModalProps) {
 
               {showServices && (sel.status === 'checked_in' || sel.status === 'confirmed') && isStaff && (
                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300 mt-4">
-                  {((sel.collected_amount || 0) === 0 || svcAmount > 0) && (
-                    <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-white animate-in slide-in-from-top-2">
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                            {(sel.collected_amount || 0) > 0 ? 'Stay Extension' : 'Stay Price'}
-                          </p>
-                          {(sel.collected_amount || 0) === 0 && (
-                            <button onClick={() => { 
-                                const next = !isPrepaid;
-                                setIsPrepaid(next);
-                                if (next) setSvcAmount(0); 
-                              }}
-                              className={`px-2 py-0.5 text-[8px] font-black uppercase tracking-wider rounded-md border transition-all ${isPrepaid ? 'bg-emerald-100 text-emerald-700 border-emerald-300' : 'bg-slate-50 text-slate-400 border-slate-200 hover:border-slate-300'}`}>
-                              {isPrepaid ? '✓ Pre-paid' : 'Pre-paid'}
-                            </button>
+                  {(() => {
+                    const isStayLocked = isPrepaid || (sel.collected_amount || 0) > 0;
+                    
+                    if (!isStayLocked) {
+                      // FIRST TAB — Not yet paid, show full editable form
+                      return (
+                        <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-white animate-in slide-in-from-top-2">
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Stay Price</p>
+                              <button onClick={() => { 
+                                  const next = !isPrepaid;
+                                  setIsPrepaid(next);
+                                  if (next) setSvcAmount(0); 
+                                }}
+                                className={`px-2 py-0.5 text-[8px] font-black uppercase tracking-wider rounded-md border transition-all ${isPrepaid ? 'bg-emerald-100 text-emerald-700 border-emerald-300' : 'bg-slate-50 text-slate-400 border-slate-200 hover:border-slate-300'}`}>
+                                {isPrepaid ? '✓ Pre-paid' : 'Pre-paid'}
+                              </button>
+                            </div>
+                          </div>
+                          <div className="space-y-4 pt-2">
+                            <div className="grid grid-cols-2 gap-4 pb-4 border-b border-slate-100">
+                              <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Adults *</label>
+                                <input 
+                                  type="number" 
+                                  value={String(svcAdults || '')} 
+                                  onChange={e => setSvcAdults(parseInt(e.target.value) || 0)}
+                                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-base font-black text-black focus:border-indigo-500 outline-none transition-all"
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Children</label>
+                                <input 
+                                  type="number" 
+                                  value={String(svcChildren || '')} 
+                                  onChange={e => setSvcChildren(parseInt(e.target.value) || 0)}
+                                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-base font-black text-black focus:border-indigo-500 outline-none transition-all"
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Stay Price (USD)</label>
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                                <input 
+                                  type="number" 
+                                  value={String(svcAmount || '')} 
+                                  onChange={e => setSvcAmount(parseFloat(e.target.value) || 0)}
+                                  className="w-full pl-8 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-base font-black text-black focus:border-indigo-500 outline-none transition-all"
+                                  placeholder="0.00"
+                                />
+                              </div>
+                              <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest italic">* Enter total price for the stay.</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // LOCKED — Stay is already paid (Pre-paid toggle or Tab 1 settled)
+                    return (
+                      <div className="border border-emerald-200 rounded-xl p-4 bg-emerald-50/50 animate-in slide-in-from-top-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white shrink-0">
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest leading-none">Stay Paid</p>
+                                <span className="w-1 h-1 bg-emerald-300 rounded-full" />
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">{svcAdults} Adults{svcChildren > 0 ? ` · ${svcChildren} Children` : ''}</p>
+                              </div>
+                              <p className="text-xs font-bold text-slate-500">{(sel.collected_amount || 0) > 0 ? 'Settled in previous tab' : 'Marked as pre-paid'}</p>
+                            </div>
+                          </div>
+                          {(sel.collected_amount || 0) > 0 && (
+                            <div className="text-right">
+                              <p className="text-[9px] font-bold text-slate-400 uppercase">Paid</p>
+                              <p className="text-sm font-black text-emerald-600">${String((sel.collected_amount || 0).toFixed(2))}</p>
+                            </div>
                           )}
                         </div>
                       </div>
-                      <div className="space-y-4 pt-2">
-                        {(sel.collected_amount || 0) > 0 ? (
-                          <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white shrink-0">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-2 mb-0.5">
-                                  <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest leading-none">Stay Prepaid</p>
-                                  <span className="w-1 h-1 bg-emerald-300 rounded-full" />
-                                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">{svcAdults} Adults {svcChildren > 0 ? `· ${svcChildren} Children` : ''}</p>
-                                </div>
-                                <p className="text-sm font-black text-slate-900">Original Stay Settled</p>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-[10px] font-bold text-slate-400 uppercase">Paid Total</p>
-                              <p className="text-sm font-black text-emerald-600">${String((sel.collected_amount || 0).toFixed(2))}</p>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-2 gap-4 pb-4 border-b border-slate-100">
-                            <div className="space-y-1.5">
-                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Adults *</label>
-                              <input 
-                                type="number" 
-                                value={String(svcAdults || '')} 
-                                onChange={e => setSvcAdults(parseInt(e.target.value) || 0)}
-                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-base font-black text-black focus:border-indigo-500 outline-none transition-all"
-                              />
-                            </div>
-                            <div className="space-y-1.5">
-                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Children</label>
-                              <input 
-                                type="number" 
-                                value={String(svcChildren || '')} 
-                                onChange={e => setSvcChildren(parseInt(e.target.value) || 0)}
-                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-base font-black text-black focus:border-indigo-500 outline-none transition-all"
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Dashboard Lockdown: Show original price as disabled if settled */}
-                        {(sel.collected_amount || 0) > 0 && (
-                          <div className="space-y-1.5 opacity-60">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Base Stay Price (Locked)</label>
-                            <div className="relative">
-                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
-                              <input 
-                                type="text" 
-                                value={String((sel.total_price || 0).toFixed(2))}
-                                disabled 
-                                className="w-full pl-8 pr-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-base font-black text-slate-500 cursor-not-allowed"
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                            {(sel.collected_amount || 0) > 0 ? 'Stay Extension Price (USD)' : 'Stay Price (USD)'}
-                          </label>
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
-                            <input 
-                              type="number" 
-                              value={String(svcAmount || '')} 
-                              onChange={e => setSvcAmount(parseFloat(e.target.value) || 0)}
-                              disabled={isPrepaid}
-                              className="w-full pl-8 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-base font-black text-black focus:border-indigo-500 outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                              placeholder="0.00"
-                            />
-                          </div>
-                          <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest italic">
-                            {isPrepaid ? '* Accommodation is marked as pre-paid.' : (sel.collected_amount || 0) > 0 ? '* Tab 1 is settled. Enter fee for extra night(s) only.' : '* Enter total price for the stay.'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-white">
                     <div className="flex justify-between items-center">
