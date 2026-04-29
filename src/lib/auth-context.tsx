@@ -46,10 +46,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               .single();
             
             if (mounted && profile) {
-              // Safety Check: Treat legacy 'Reserver' role as 'Manager'
               const userProfile = { ...profile };
-              if (userProfile.role === 'Reserver' as any) {
-                userProfile.role = 'Manager';
+              // THE FIX: If the DB says Reserver, force it to Manager
+              if (userProfile && (userProfile.role as any) === 'Reserver') {
+                userProfile.role = 'Manager'; 
               }
               setUser(userProfile);
             }
