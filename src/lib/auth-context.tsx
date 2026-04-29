@@ -1,7 +1,9 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
-import { supabase, type Profile, type UserRole } from './supabase';
+import { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { createBrowserClient } from '@supabase/ssr';
+import type { Profile, UserRole } from './supabase';
 
 interface AuthContextType {
   user: Profile | null;
@@ -16,10 +18,24 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  
+  // CRITICAL: Initialize Supabase client in state to prevent infinite loops!
+  // This ensures the client is created exactly once during the component lifecycle.
+  const [supabase] = useState(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) {
+      throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY');
+    }
+    return createBrowserClient(url, key);
+  });
+
   const [user, setUser] = useState<Profile | null>(null);
   const [session, setSession] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-  const [configError, setConfigError] = useState<string | null>(null);
+  const [configError] = useState<string | null>(null);
+  const lastUserId = useRef<string | null>(null);
   useEffect(() => {
     // Skip auth init on server/SSR - only run in browser
     if (typeof window === 'undefined') {
@@ -65,9 +81,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // separately — doing so acquires a second navigator.lock that races
     // with the listener's lock and causes deadlocks in React Strict Mode.
     const { data: { subscription: sub } } = supabase.auth.onAuthStateChange(
-      async (event: string, newSession: any) => {
+      async (event, newSession) => {
         if (!mounted) return;
 
+        const currentUserId = newSession?.user?.id || null;
+
+        // Throttle updates: only proceed if the user or session actually changed
+        if (currentUserId === lastUserId.current && event !== 'SIGNED_OUT') {
+          return;
+        }
+        
+        lastUserId.current = currentUserId;
         console.log('🔔 Auth state change:', event, newSession?.user?.email);
 
         if (event === 'SIGNED_OUT') {
@@ -75,6 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setSession(null);
           setLoading(false);
           clearTimeout(safetyTimeout);
+          router.refresh(); // Tell the server the cookie is gone
           return;
         }
 
@@ -85,9 +110,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (profile) setUser(profile as Profile);
             setLoading(false);
             clearTimeout(safetyTimeout);
+            router.refresh(); // Sync cookies with the server
           }
         } else if (event === 'INITIAL_SESSION' && !newSession) {
-          // No initial session — user is not logged in.
           console.log('🔍 No initial session found');
           setLoading(false);
           clearTimeout(safetyTimeout);
@@ -105,7 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(safetyTimeout);
       subscription?.unsubscribe();
     };
-  }, []);
+  }, [supabase, router]);
 
   const signIn = async (email: string, password: string) => {
     console.log('Step 1: Starting Sign In for', email);
@@ -146,7 +171,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err: any) {
       console.error('Sign In Crash:', err);
-      setLoading(false); // Make sure we stop loading!
+      setLoading(false);
       throw err;
     } finally {
       setLoading(false);
@@ -176,6 +201,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
+    setSession(null);
+    lastUserId.current = null;
+    router.refresh();
   };
 
   return (
