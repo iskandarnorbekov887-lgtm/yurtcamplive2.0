@@ -44,3 +44,5 @@ next-env.d.ts
 electron/dist/
 /release/
 /out/
+
+.vercel

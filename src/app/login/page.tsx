@@ -4,11 +4,11 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
+import type { UserRole } from '@/lib/supabase';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
 
-// Force dynamic rendering to avoid SSR issues with auth
-export const dynamic = 'force-dynamic';
+
 
 export default function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -61,6 +61,9 @@ export default function LoginPage() {
         setError('Account created! Please check your email to confirm.');
       } else {
         await signIn(email, password);
+        // Let the server re-read the freshly minted cookie BEFORE
+        // navigating. This prevents the server/client redirect tug-of-war.
+        router.refresh();
       }
     } catch (err: any) {
       setError(err.message || 'An error occurred');
@@ -155,7 +158,7 @@ export default function LoginPage() {
                   const { error } = await supabase.auth.signInWithOAuth({
                     provider: 'google',
                     options: {
-                      redirectTo: `${window.location.origin}/ceo`,
+                      redirectTo: `${window.location.origin}/auth/callback`,
                       scopes: 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events',
                     },
                   });

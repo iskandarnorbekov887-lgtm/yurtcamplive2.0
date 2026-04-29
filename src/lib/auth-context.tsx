@@ -28,15 +28,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     let mounted = true;
-    let authStateSubscription: any = null;
+    // Track the subscription in a mutable ref so cleanup can always reach it,
+    // even if the async `initAuth` hasn't finished when React Strict Mode
+    // tears the component down on the first mount.
+    let subscription: { unsubscribe: () => void } | null = null;
 
-    // Safety timeout: ensure loading is always resolved within 8 seconds
+    // Safety timeout: ensure loading is always resolved within 6 seconds
     const safetyTimeout = setTimeout(() => {
       if (mounted) {
         console.warn('⚠️ Auth init safety timeout triggered');
         setLoading(false);
       }
-    }, 8000);
+    }, 6000);
 
     const fetchProfile = async (userId: string, email?: string) => {
       try {
@@ -57,78 +60,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    const initAuth = async () => {
-      try {
-        // Set up auth state listener FIRST before getting session
-        // This ensures we catch any auth events
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, newSession: any) => {
-          console.log('🔔 Auth state change:', event, newSession?.user?.email);
-          
-          if (event === 'SIGNED_OUT') {
-            setUser(null);
-            setSession(null);
-            setLoading(false);
-            return;
-          }
-
-          if (newSession?.user) {
-            setSession(newSession);
-            const profile = await fetchProfile(newSession.user.id, newSession.user.email);
-            if (mounted) {
-              if (profile) setUser(profile as Profile);
-              setLoading(false);
-            }
-          } else if (event === 'INITIAL_SESSION' && !newSession) {
-            // No initial session, we're done loading
-            if (mounted) setLoading(false);
-          }
-        });
-        
-        authStateSubscription = subscription;
-
-        // Then get the initial session
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
-        
-        console.log('🔍 Initial session:', initialSession?.user?.email || 'none');
-        
+    // The ONLY source of truth for initial session is the `INITIAL_SESSION`
+    // event fired by `onAuthStateChange`. We do NOT call `getSession()`
+    // separately — doing so acquires a second navigator.lock that races
+    // with the listener's lock and causes deadlocks in React Strict Mode.
+    const { data: { subscription: sub } } = supabase.auth.onAuthStateChange(
+      async (event: string, newSession: any) => {
         if (!mounted) return;
 
-        if (initialSession?.user) {
-          setSession(initialSession);
-          const profile = await fetchProfile(initialSession.user.id, initialSession.user.email);
-          if (mounted && profile) {
-            setUser(profile as Profile);
-          }
-          // Only set loading false if we have a session and processed it
-          if (mounted) setLoading(false);
+        console.log('🔔 Auth state change:', event, newSession?.user?.email);
+
+        if (event === 'SIGNED_OUT') {
+          setUser(null);
+          setSession(null);
+          setLoading(false);
+          clearTimeout(safetyTimeout);
+          return;
         }
-        // If no session, the auth state listener will eventually trigger with INITIAL_SESSION
-        // But set a shorter timeout to ensure we don't wait forever
-        setTimeout(() => {
+
+        if (newSession?.user) {
+          setSession(newSession);
+          const profile = await fetchProfile(newSession.user.id, newSession.user.email);
           if (mounted) {
-            setLoading((prev) => {
-              if (prev) console.log('⏱️ Auth init timeout - no session found');
-              return false;
-            });
+            if (profile) setUser(profile as Profile);
+            setLoading(false);
+            clearTimeout(safetyTimeout);
           }
-        }, 2000);
-        
-      } catch (err) {
-        console.error('Auth initialization error:', err);
-        if (mounted) setLoading(false);
-      } finally {
-        clearTimeout(safetyTimeout);
+        } else if (event === 'INITIAL_SESSION' && !newSession) {
+          // No initial session — user is not logged in.
+          console.log('🔍 No initial session found');
+          setLoading(false);
+          clearTimeout(safetyTimeout);
+        }
       }
-    };
+    );
 
-    initAuth();
+    // Store subscription immediately (synchronous — no race).
+    subscription = sub;
 
+    // Cleanup: React Strict Mode will call this on the first mount's teardown.
+    // The subscription MUST be unsubscribed to release the navigator.lock.
     return () => {
       mounted = false;
       clearTimeout(safetyTimeout);
-      if (authStateSubscription) {
-        authStateSubscription.unsubscribe();
-      }
+      subscription?.unsubscribe();
     };
   }, []);
 

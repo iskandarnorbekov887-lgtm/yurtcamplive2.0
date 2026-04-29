@@ -1,45 +1,41 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
-// Create a complete mock for server/build side
-// Cast to SupabaseClient so TypeScript only sees real Supabase types.
-const createMockClient = (): SupabaseClient => {
-  const handler: ProxyHandler<object> = {
-    get() {
-      return () => new Proxy({}, handler);
-    },
-  };
-  return new Proxy({}, handler) as unknown as SupabaseClient;
-};
-
-function createBrowserClient(): SupabaseClient {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-  if (!supabaseUrl || !supabaseKey) {
-    console.error('❌ Supabase configuration missing!');
-    throw new Error('Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables.');
-  }
-
-  // Use global singleton to prevent multiple instances fighting over the gotrue-js lock
-  const globalKey = '__yurt_camp_supabase__' as any;
-  if (!(window as any)[globalKey]) {
-    (window as any)[globalKey] = createClient(supabaseUrl, supabaseKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: false,
-        storageKey: 'yurt-camp-v3-final',
+/**
+ * Browser-side Supabase client.
+ *
+ * Uses `@supabase/ssr`'s `createBrowserClient` which automatically syncs
+ * the auth session to **browser cookies** (not just localStorage).
+ * This ensures the Vercel server can read the session on every request.
+ *
+ * `createBrowserClient` is a singleton by default — safe to call from
+ * multiple components without navigator.locks contention.
+ *
+ * On the server (SSR/build), we return a no-op proxy so that imports
+ * from 'use client' modules don't crash during the server render pass.
+ */
+function createSafeBrowserClient(): SupabaseClient {
+  if (typeof window === 'undefined') {
+    // Server-side: return a no-op proxy (never used for real calls)
+    const handler: ProxyHandler<object> = {
+      get() {
+        return () => new Proxy({}, handler);
       },
-    });
+    };
+    return new Proxy({}, handler) as unknown as SupabaseClient;
   }
-  return (window as any)[globalKey];
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Missing Supabase Environment Variables: NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY');
+  }
+
+  return createBrowserClient(supabaseUrl, supabaseAnonKey);
 }
 
-// SSR/build: return mock. Browser: return singleton.
-// Both branches return SupabaseClient type so TypeScript sees consistent types.
-export const supabase: SupabaseClient = typeof window === 'undefined'
-  ? createMockClient()
-  : createBrowserClient();
+export const supabase: SupabaseClient = createSafeBrowserClient();
 
 export type UserRole = 'CEO' | 'Manager' | 'Cook' | 'Reserver';
 
