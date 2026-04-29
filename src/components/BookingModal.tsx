@@ -619,14 +619,16 @@ export function BookingModal(props: BookingModalProps) {
                           <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                             {(sel.collected_amount || 0) > 0 ? 'Stay Extension' : 'Stay Price'}
                           </p>
-                          <button onClick={() => { 
-                              const next = !isPrepaid;
-                              setIsPrepaid(next);
-                              if (next) setSvcAmount(0); 
-                            }}
-                            className={`px-2 py-0.5 text-[8px] font-black uppercase tracking-wider rounded-md border transition-all ${isPrepaid ? 'bg-emerald-100 text-emerald-700 border-emerald-300' : 'bg-slate-50 text-slate-400 border-slate-200 hover:border-slate-300'}`}>
-                            {isPrepaid ? '✓ Pre-paid' : 'Pre-paid'}
-                          </button>
+                          {(sel.collected_amount || 0) === 0 && (
+                            <button onClick={() => { 
+                                const next = !isPrepaid;
+                                setIsPrepaid(next);
+                                if (next) setSvcAmount(0); 
+                              }}
+                              className={`px-2 py-0.5 text-[8px] font-black uppercase tracking-wider rounded-md border transition-all ${isPrepaid ? 'bg-emerald-100 text-emerald-700 border-emerald-300' : 'bg-slate-50 text-slate-400 border-slate-200 hover:border-slate-300'}`}>
+                              {isPrepaid ? '✓ Pre-paid' : 'Pre-paid'}
+                            </button>
+                          )}
                         </div>
                       </div>
                       <div className="space-y-4 pt-2">
@@ -1188,7 +1190,7 @@ export function BookingModal(props: BookingModalProps) {
                               setSelectedReceipt(null);
                               setShowFinalReceipt(true);
                             }}
-                            disabled={loadingAction === 'checkout' || gTotal <= 0}
+                            disabled={loadingAction === 'checkout'}
                             className={`w-full py-4 rounded-2xl font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 shadow-xl ${(!isBalanceMatched || gTotal <= 0) ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' : 'bg-indigo-600 text-white hover:bg-indigo-700 hover:scale-[1.02] active:scale-95 shadow-indigo-100'}`}
                           >
                             {loadingAction === 'checkout' ? 'Processing...' : 'Review & Pay Tab'}
