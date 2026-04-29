@@ -96,17 +96,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [supabase, router]);
 
   const signIn = async (email: string, password: string) => {
+    setLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw new Error(error.message);
-      if (data.session?.user) {
-        setSession(data.session);
-        const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.session.user.id).single();
-        setUser(profile || { id: data.session.user.id, email: data.session.user.email, role: 'Manager' } as any);
-      }
+      if (error) throw error;
+      
+      // Successfully signed in. The middleware will now see the cookie 
+      // and handle the redirect to /bookings automatically.
+      router.refresh(); 
     } catch (err: any) {
-      setLoading(false);
-      throw err;
+      alert(err.message);
     } finally {
       setLoading(false);
     }
