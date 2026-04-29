@@ -64,30 +64,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event: string, newSession: any) => {
         if (!mounted) return;
 
-        const currentUserId = newSession?.user?.id || null;
-        if (currentUserId === lastUserId.current && event !== 'SIGNED_OUT') return;
-        
-        lastUserId.current = currentUserId;
+        // FORCE SYNC: If we just signed in, force a hard reload to /bookings
+        if (event === 'SIGNED_IN' && newSession) {
+          setSession(newSession);
+          window.location.href = '/bookings'; 
+          return;
+        }
 
         if (event === 'SIGNED_OUT') {
           setUser(null);
           setSession(null);
           setLoading(false);
-          clearTimeout(safetyTimeout);
+          window.location.href = '/login';
           return;
         }
 
         if (newSession?.user) {
           setSession(newSession);
           const profile = await fetchProfile(newSession.user.id, newSession.user.email);
-          if (mounted) {
-            if (profile) setUser(profile as Profile);
+          if (mounted && profile) {
+            setUser(profile as Profile);
             setLoading(false);
-            clearTimeout(safetyTimeout);
           }
-        } else if (event === 'INITIAL_SESSION' && !newSession) {
+        } else {
           setLoading(false);
-          clearTimeout(safetyTimeout);
         }
       }
     );
