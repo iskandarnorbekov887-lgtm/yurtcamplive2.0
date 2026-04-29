@@ -533,7 +533,9 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess }:
               </div>
               <div className="flex gap-3">
                 <button type="button" onClick={() => setDuplicateWarning(null)} className="flex-1 px-4 py-2 bg-white border-2 border-amber-300 text-amber-700 rounded-lg font-bold text-sm hover:bg-amber-50 transition-all">Go Back</button>
-                <button type="button" onClick={() => { setDuplicateWarning(null); setBypassDuplicateCheck(true); setTimeout(() => formRef.current?.requestSubmit(), 50); }} className="flex-1 px-4 py-2 bg-amber-500 text-white rounded-lg font-bold text-sm hover:bg-amber-600 transition-all">Book Anyway</button>
+                <button type="button" onClick={() => { setDuplicateWarning(null); setBypassDuplicateCheck(true); setTimeout(() => formRef.current?.requestSubmit(), 50); }} disabled={submitting} className="flex-1 px-4 py-2 bg-amber-500 text-white rounded-lg font-bold text-sm hover:bg-amber-600 transition-all disabled:opacity-50">
+                  {submitting ? '...' : 'Book Anyway'}
+                </button>
               </div>
             </div>
           )}

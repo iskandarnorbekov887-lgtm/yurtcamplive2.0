@@ -46,6 +46,19 @@ export interface Profile {
   full_name: string;
 }
 
+export interface Tab {
+  tab_id: number;
+  status: 'open' | 'closed';
+  accommodation: number;
+  is_prepaid?: boolean;
+  meals?: { lunch: boolean; dinner: boolean };
+  lunch_prepaid?: boolean;
+  dinner_prepaid?: boolean;
+  services?: Array<{ name: string; price: number }>;
+  total: number;
+  closed_at?: string;
+}
+
 export interface Booking {
   id: number;
   guest_name: string;
@@ -99,10 +112,11 @@ export interface Booking {
   amount?: number;
   description?: string;
   drinks_tab?: Array<{ drink_id: number; drink_name: string; quantity: number; price: number; currency: 'UZS' | 'USD' | 'EUR' }>;
-  extra_services?: Array<{ name: string; price: number; currency: 'UZS' | 'USD' | 'EUR' }>;
+  services?: Array<{ name: string; price: number; currency: 'UZS' | 'USD' | 'EUR' }>;
   collected_amount?: number;
   collected_currency?: 'UZS' | 'USD' | 'EUR';
   payments?: any[];
+  tabs?: Tab[];
 }
 
 export interface Finance {

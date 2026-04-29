@@ -115,6 +115,20 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
   const [newExtraService, setNewExtraService] = useState({ name: '', price: '', currency: 'USD' as 'UZS' | 'USD' | 'EUR' });
   const [collectedAmount, setCollectedAmount] = useState('');
   const [collectedCurrency, setCollectedCurrency] = useState<'UZS' | 'USD' | 'EUR'>('USD');
+  const [activeTabId, setActiveTabId] = useState<number>(1);
+  const [pricing, setPricing] = useState<{ lunch_price: number; dinner_price: number } | null>(null);
+
+  useEffect(() => {
+    const fetchPricing = async () => {
+      try {
+        const { data } = await supabase.from('service_pricing').select('*').eq('id', 1).single();
+        if (data) setPricing(data);
+      } catch (err) {
+        console.error('Error fetching pricing:', err);
+      }
+    };
+    fetchPricing();
+  }, []);
 
   const year  = cur.getFullYear();
   const month = cur.getMonth();
@@ -450,6 +464,28 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
 
               {/* Icon rows */}
               <div className="space-y-3 ml-9">
+                {/* Status and Tab Navigation */}
+                <div className="flex items-center gap-3 mb-6">
+                  <span className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-xl text-xs font-black flex items-center gap-2">
+                    <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                    {sel.status === 'checked_in' ? 'Checked In' : sel.status === 'completed' ? 'Completed' : 'Confirmed'}
+                  </span>
+                  
+                  <button 
+                    onClick={() => {
+                      const newId = (sel.tabs?.length || 1) + 1;
+                      const newTabs = [...(sel.tabs || [{ tab_id: 1, status: 'closed', accommodation: sel.total_price || 0, total: sel.total_price || 0 }]), { tab_id: newId, status: 'open', accommodation: 0, total: 0 }];
+                      if (onUpdateBooking) onUpdateBooking(sel.id, { tabs: newTabs });
+                      setSel({ ...sel, tabs: newTabs });
+                      setActiveTabId(newId);
+                    }}
+                    className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-all ml-auto"
+                    title="Add New Tab"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+                  </button>
+                </div>
+
                 {/* Notes + Day-by-day itinerary */}
                 {(() => {
                   let days: any[] = [];
@@ -501,6 +537,179 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                 })()}
 
               </div>
+            </div>
+
+            {/* Tab-Specific Content (Premium UI) */}
+            <div className="space-y-6 mb-8">
+              {/* Add to Tab Card */}
+              <div className="p-6 bg-white border border-slate-100 rounded-3xl shadow-sm relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                   <svg className="w-16 h-16 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                </div>
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-black text-slate-800 uppercase tracking-tight">Add to Tab</h4>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Post new charges for this guest</p>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      const newId = (sel.tabs?.length || 1) + 1;
+                      const newTabs = [...(sel.tabs || [{ tab_id: 1, status: 'closed', accommodation: sel.total_price || 0, total: sel.total_price || 0 }]), { tab_id: newId, status: 'open', accommodation: 0, total: 0 }];
+                      if (onUpdateBooking) onUpdateBooking(sel.id, { tabs: newTabs });
+                      setSel({ ...sel, tabs: newTabs });
+                      setActiveTabId(newId);
+                    }}
+                    className="ml-auto px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+                  >
+                    Start New Order
+                  </button>
+                </div>
+                
+                <div className="border-2 border-dashed border-slate-100 rounded-2xl p-8 flex flex-col items-center justify-center gap-3 bg-slate-50/30">
+                  <button className="w-10 h-10 bg-white text-indigo-600 rounded-full flex items-center justify-center shadow-md border border-slate-100 hover:scale-110 transition-transform">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+                  </button>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Select Meals or Services</span>
+                </div>
+              </div>
+
+              {/* Tab Summary Card */}
+              {(() => {
+                const currentTab = (sel.tabs || [{ tab_id: 1, status: 'open', accommodation: sel.total_price || 0, total: sel.total_price || 0 }]).find((t: any) => t.tab_id === activeTabId);
+                const accommodationVal = currentTab?.accommodation || 0;
+                const accommodationPrepaid = currentTab?.is_prepaid || false;
+                
+                // Calculate services for this tab (services + drinks + non-prepaid meals)
+                const servicesListVal = (currentTab?.services || []).reduce((acc: number, s: any) => acc + (s.price || 0), 0);
+                const drinksVal = (currentTab?.drinks_tab || []).reduce((acc: number, d: any) => acc + (d.price * d.quantity), 0);
+                
+                // Meal costs (if not prepaid)
+                let mealCosts = 0;
+                const guestCount = sel.num_people || sel.number_of_people || 1;
+                if (currentTab?.meals?.lunch && !currentTab.lunch_prepaid && pricing) {
+                  mealCosts += pricing.lunch_price * guestCount;
+                }
+                if (currentTab?.meals?.dinner && !currentTab.dinner_prepaid && pricing) {
+                  mealCosts += pricing.dinner_price * guestCount;
+                }
+
+                const servicesVal = servicesListVal + drinksVal + mealCosts;
+                const totalVal = (accommodationPrepaid ? 0 : accommodationVal) + servicesVal;
+                const isClosed = currentTab?.status === 'closed';
+
+                return (
+                  <div className="p-8 bg-indigo-600 rounded-[2.5rem] shadow-2xl shadow-indigo-200 text-white relative overflow-hidden">
+                    <div className="absolute -bottom-10 -right-10 opacity-10 rotate-12">
+                       <svg className="w-48 h-48 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    </div>
+                    
+                    <div className="flex justify-between items-center mb-8">
+                      <h4 className="text-xs font-black uppercase tracking-[0.2em] opacity-70">Tab Summary</h4>
+                      <div className="w-10 h-10 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md">
+                        <svg className="w-5 h-5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 7h1m-1 4h1m-1 4h1m-5 1h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                      </div>
+                    </div>
+
+                    <div className="space-y-6">
+                      {/* Accommodation Row */}
+                      {accommodationVal > 0 && (
+                        <>
+                          <div className="flex items-center justify-between group">
+                            <div className="flex flex-col">
+                                <span className="text-xl font-black tracking-tight">Accommodation</span>
+                                {accommodationPrepaid && <span className="mt-1 inline-block w-fit px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[9px] font-black uppercase tracking-widest rounded border border-emerald-500/30">PREPAID</span>}
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <div className="bg-white/10 backdrop-blur-md px-6 py-2.5 rounded-2xl border border-white/5 text-xl font-black min-w-[80px] text-center">
+                                {accommodationVal}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="h-px bg-white/10" />
+                        </>
+                      )}
+
+                      {/* Services & Food Row */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-xl font-black tracking-tight">Services & Food</span>
+                        <span className="text-2xl font-black tracking-tighter">${servicesVal.toFixed(2)}</span>
+                      </div>
+
+                      {/* Food Section (Prepaid Logic) */}
+                      {currentTab?.meals && (currentTab.meals.lunch || currentTab.meals.dinner) && (
+                        <div className="pt-2 pb-2 pl-4 border-l-2 border-white/20 space-y-2">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-white/50 mb-1">Food Details</p>
+                          {currentTab.meals.lunch && (
+                            <div className="flex justify-between items-center text-sm font-bold">
+                              <span>Lunch {currentTab.lunch_prepaid && <span className="ml-2 px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 text-[10px] rounded border border-emerald-500/30">PREPAID</span>}</span>
+                              <span className="text-xs opacity-60">{sel.num_people || sel.number_of_people} guests</span>
+                            </div>
+                          )}
+                          {currentTab.meals.dinner && (
+                            <div className="flex justify-between items-center text-sm font-bold">
+                              <span>Dinner {currentTab.dinner_prepaid && <span className="ml-2 px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 text-[10px] rounded border border-emerald-500/30">PREPAID</span>}</span>
+                              <span className="text-xs opacity-60">{sel.num_people || sel.number_of_people} guests</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="h-px bg-white/10" />
+
+                      {/* Footer Totals */}
+                      <div className="pt-2">
+                        <div className="flex items-start justify-between">
+                          <div className="space-y-4">
+                            <h5 className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Current Open Tab</h5>
+                            <div>
+                              <span className="inline-block px-3 py-1 bg-indigo-500 rounded-lg text-[9px] font-black uppercase tracking-widest mb-3">{isClosed ? 'Paid Total' : 'Supposed to Pay'}</span>
+                              <div className="flex items-baseline gap-1">
+                                <span className="text-5xl font-black tracking-tighter">${totalVal.toFixed(2)}</span>
+                              </div>
+                            </div>
+                            <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/5 ${isClosed ? 'bg-emerald-500/30' : 'bg-indigo-700/50'}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${isClosed ? 'bg-emerald-400' : 'bg-white/40'}`} />
+                              {isClosed ? 'Tab Closed' : `Tab Open: $${totalVal.toFixed(2)}`}
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col items-end gap-12">
+                            {!isClosed && (
+                              <button 
+                                onClick={async () => {
+                                  if (window.confirm('Close this tab and mark as paid?')) {
+                                    const currentTabs = [...(sel.tabs || [{ tab_id: 1, status: 'open', accommodation: sel.total_price || 0, total: sel.total_price || 0 }])];
+                                    const tabIndex = currentTabs.findIndex(t => t.tab_id === activeTabId);
+                                    if (tabIndex !== -1) {
+                                      currentTabs[tabIndex] = { ...currentTabs[tabIndex], status: 'closed', closed_at: new Date().toISOString() };
+                                      if (onUpdateBooking) await onUpdateBooking(sel.id, { tabs: currentTabs });
+                                      setSel({ ...sel, tabs: currentTabs });
+                                    }
+                                  }
+                                }}
+                                className="flex items-center gap-3 px-6 py-4 bg-emerald-500 hover:bg-emerald-600 backdrop-blur-xl border border-white/10 rounded-3xl font-black uppercase tracking-widest text-[11px] transition-all group shadow-xl"
+                              >
+                                <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                                Pay & Close
+                              </button>
+                            )}
+                            {isClosed && (
+                                <button className="flex items-center gap-3 px-6 py-4 bg-white/10 backdrop-blur-xl border border-white/10 rounded-3xl font-black uppercase tracking-widest text-[11px] hover:bg-white/20 transition-all group shadow-xl">
+                                    <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                    View Receipt
+                                </button>
+                            )}
+                            <span className="px-4 py-2 bg-white/10 rounded-2xl text-xs font-black tracking-widest">USD</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="grid grid-cols-2 gap-6 mb-8">
@@ -557,13 +766,19 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                         <button
                           onClick={async () => {
                             if (sel && onUpdateBooking && collectedAmount) {
-                              await onUpdateBooking(sel.id, { collected_amount: parseFloat(collectedAmount), collected_currency: collectedCurrency });
-                              setSel({ ...sel, collected_amount: parseFloat(collectedAmount), collected_currency: collectedCurrency });
+                              setLoadingAction('save_collected');
+                              try {
+                                await onUpdateBooking(sel.id, { collected_amount: parseFloat(collectedAmount), collected_currency: collectedCurrency });
+                                setSel({ ...sel, collected_amount: parseFloat(collectedAmount), collected_currency: collectedCurrency });
+                              } finally {
+                                setLoadingAction(null);
+                              }
                             }
                           }}
-                          className="px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-all"
+                          disabled={!!loadingAction}
+                          className="px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-all disabled:opacity-50"
                         >
-                          Save
+                          {loadingAction === 'save_collected' ? '...' : 'Save'}
                         </button>
                       </div>
                       {sel.collected_amount && (
@@ -723,10 +938,10 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                     ) : <p className="text-black italic text-xs">No drinks added</p>}
                   </div>
 
-                  {/* Extra Services */}
+                  {/* Services */}
                   <div className="col-span-2 p-4 bg-orange-50/50 rounded-2xl border border-orange-100">
                     <div className="flex justify-between items-center mb-2">
-                      <label className="text-[10px] font-black text-orange-400 uppercase tracking-widest">Extra Services</label>
+                      <label className="text-[10px] font-black text-orange-400 uppercase tracking-widest">Services</label>
                       {userRole === 'Manager' && (
                         <button
                           onClick={() => setShowExtraServicesPopup(true)}
@@ -736,16 +951,16 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                         </button>
                       )}
                     </div>
-                    {sel.extra_services && sel.extra_services.length > 0 ? (
+                    {sel.services && sel.services.length > 0 ? (
                       <div className="space-y-1">
-                        {sel.extra_services.map((service, idx) => (
+                        {sel.services.map((service, idx) => (
                           <div key={idx} className="flex justify-between items-center text-xs">
                             <span className="font-bold text-black">{service.name}</span>
                             <span className="font-bold text-black">${service.price} {service.currency}</span>
                           </div>
                         ))}
                       </div>
-                    ) : <p className="text-black italic text-xs">No extra services</p>}
+                    ) : <p className="text-black italic text-xs">No services added</p>}
                   </div>
 
                 </>
@@ -817,7 +1032,9 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                 {isEditing ? (
                   <div className="flex gap-3">
                     <button onClick={() => setIsEditing(false)} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all">Cancel</button>
-                    <button onClick={handleUpdate} className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all">Save Changes</button>
+                    <button onClick={handleUpdate} disabled={!!loadingAction} className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all disabled:opacity-50">
+                      {loadingAction === 'update' ? 'Saving...' : 'Save Changes'}
+                    </button>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-3">
@@ -1112,25 +1329,43 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
               <button
                 onClick={async () => {
                   if (sel && onUpdateBooking && selectedDrinks.length > 0) {
-                    const currentDrinks = sel.drinks_tab || [];
-                    const updatedDrinks = [...currentDrinks];
-                    selectedDrinks.forEach(selected => {
-                      const existing = updatedDrinks.find(d => d.drink_id === selected.drink_id);
-                      if (existing) {
-                        existing.quantity += selected.quantity;
-                      } else {
-                        updatedDrinks.push(selected);
+                    setLoadingAction('drinks');
+                    try {
+                      const currentTabs = [...(sel.tabs || [{ tab_id: 1, status: 'open', extra_services: [], drinks_tab: [] }])];
+                      const tabIndex = currentTabs.findIndex(t => t.tab_id === activeTabId);
+                      
+                      if (tabIndex !== -1) {
+                        const tab = { ...currentTabs[tabIndex] };
+                        const currentDrinks = tab.drinks_tab || [];
+                        const updatedDrinks = [...currentDrinks];
+                        
+                        selectedDrinks.forEach(selected => {
+                          const existing = updatedDrinks.find(d => d.drink_id === selected.drink_id);
+                          if (existing) {
+                            existing.quantity += selected.quantity;
+                          } else {
+                            updatedDrinks.push(selected);
+                          }
+                        });
+                        
+                        tab.drinks_tab = updatedDrinks;
+                        currentTabs[tabIndex] = tab;
+                        
+                        await onUpdateBooking(sel.id, { tabs: currentTabs });
+                        setSel({ ...sel, tabs: currentTabs });
                       }
-                    });
-                    await onUpdateBooking(sel.id, { drinks_tab: updatedDrinks });
-                    setShowDrinksPopup(false);
-                    setSelectedDrinks([]);
-                    setSel({ ...sel, drinks_tab: updatedDrinks });
+                      
+                      setShowDrinksPopup(false);
+                      setSelectedDrinks([]);
+                    } finally {
+                      setLoadingAction(null);
+                    }
                   }
                 }}
-                className="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-all"
+                disabled={!!loadingAction}
+                className="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-all disabled:opacity-50"
               >
-                Add to Tab
+                {loadingAction === 'drinks' ? 'Adding...' : 'Add to Tab'}
               </button>
             </div>
           </div>
@@ -1143,7 +1378,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-black text-black">Add Extra Service</h3>
+              <h3 className="text-xl font-black text-black">Add Service</h3>
               <button onClick={() => setShowExtraServicesPopup(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-all">
                 <svg className="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
@@ -1195,17 +1430,34 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
               <button
                 onClick={async () => {
                   if (sel && onUpdateBooking && newExtraService.name && newExtraService.price) {
-                    const currentServices = sel.extra_services || [];
-                    const updatedServices = [...currentServices, { name: newExtraService.name, price: parseFloat(newExtraService.price), currency: newExtraService.currency }];
-                    await onUpdateBooking(sel.id, { extra_services: updatedServices });
-                    setShowExtraServicesPopup(false);
-                    setNewExtraService({ name: '', price: '', currency: 'USD' });
-                    setSel({ ...sel, extra_services: updatedServices });
+                    setLoadingAction('extra_service');
+                    try {
+                      const currentTabs = [...(sel.tabs || [{ tab_id: 1, status: 'open', extra_services: [], drinks_tab: [] }])];
+                      const tabIndex = currentTabs.findIndex(t => t.tab_id === activeTabId);
+
+                      if (tabIndex !== -1) {
+                        const tab = { ...currentTabs[tabIndex] };
+                        const currentServices = tab.extra_services || [];
+                        const updatedServices = [...currentServices, { name: newExtraService.name, price: parseFloat(newExtraService.price), currency: newExtraService.currency }];
+                        
+                        tab.services = updatedServices;
+                        currentTabs[tabIndex] = tab;
+
+                        await onUpdateBooking(sel.id, { tabs: currentTabs });
+                        setSel({ ...sel, tabs: currentTabs });
+                      }
+
+                      setShowExtraServicesPopup(false);
+                      setNewExtraService({ name: '', price: '', currency: 'USD' });
+                    } finally {
+                      setLoadingAction(null);
+                    }
                   }
                 }}
-                className="flex-1 py-3 bg-orange-600 text-white rounded-xl font-bold hover:bg-orange-700 transition-all"
+                disabled={!!loadingAction}
+                className="flex-1 py-3 bg-orange-600 text-white rounded-xl font-bold hover:bg-orange-700 transition-all disabled:opacity-50"
               >
-                Add Service
+                {loadingAction === 'extra_service' ? 'Adding...' : 'Add Service'}
               </button>
             </div>
           </div>
