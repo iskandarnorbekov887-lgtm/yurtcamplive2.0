@@ -2,14 +2,13 @@
 
 import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/utils/supabase/client'; // Verify this path matches your project
-import type { Profile, UserRole } from './supabase';
+import { createClient } from '@/utils/supabase/client'; 
+import type { Profile } from './supabase';
 
 interface AuthContextType {
   user: Profile | null;
   session: any | null;
   loading: boolean;
-  configError: string | null;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -19,96 +18,64 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  
-  // Use the singleton client
-  const supabase = createClient();
-
+  const [supabase] = useState(() => createClient()); // Initialize ONCE and hold in state
   const [user, setUser] = useState<Profile | null>(null);
   const [session, setSession] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-  const [configError] = useState<string | null>(null);
   const lastUserId = useRef<string | null>(null);
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      setLoading(false);
-      return;
-    }
-
     let mounted = true;
-    let subscription: { unsubscribe: () => void } | null = null;
 
-    const safetyTimeout = setTimeout(() => {
-      if (mounted) {
-        console.warn('⚠️ Auth init safety timeout');
-        setLoading(false);
-      }
-    }, 6000);
-
-    const fetchProfile = async (userId: string, email?: string) => {
-      try {
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .single();
-
-        if (error) return { id: userId, email: email || '', role: 'Manager' as UserRole, full_name: email || 'User' };
-        return profile;
-      } catch (err) {
-        return { id: userId, email: email || '', role: 'Manager' as UserRole, full_name: email || 'User' };
-      }
-    };
-
-    const { data: { subscription: sub } } = supabase.auth.onAuthStateChange(
-      async (event: any, session: any) => {
+    // Listen for Auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event: any, newSession: any) => {
         if (!mounted) return;
 
-        if (session?.user) {
-          setSession(session);
-          // Only fetch profile if the ID is different from last time
-          if (session.user.id !== lastUserId.current) {
-            lastUserId.current = session.user.id;
-            const profile = await fetchProfile(session.user.id, session.user.email);
-            if (mounted) setUser(profile as Profile);
+        if (newSession?.user) {
+          setSession(newSession);
+          if (newSession.user.id !== lastUserId.current) {
+            lastUserId.current = newSession.user.id;
+            
+            // Fetch Profile
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', newSession.user.id)
+              .single();
+            
+            if (mounted) setUser(profile);
           }
         } else {
           setUser(null);
           setSession(null);
           lastUserId.current = null;
         }
-        setLoading(false);
+        
+        setLoading(false); // Only set loading false once we have a definitive answer
       }
     );
 
-    subscription = sub;
-
     return () => {
       mounted = false;
-      clearTimeout(safetyTimeout);
       subscription?.unsubscribe();
     };
-  }, [supabase, router]);
+  }, [supabase]); // ONLY depend on the static supabase client
 
   const signIn = async (email: string, password: string) => {
     setLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      
-      // Successfully signed in. The middleware will now see the cookie 
-      // and handle the redirect to /bookings automatically.
-      router.refresh(); 
-    } catch (err: any) {
-      alert(err.message);
-    } finally {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      alert(error.message);
       setLoading(false);
+    } else {
+      router.refresh();
     }
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
     const { data: { user: newUser }, error } = await supabase.auth.signUp({ email, password });
-    if (error) throw new Error(error.message);
+    if (error) throw error;
     if (newUser) {
       await supabase.from('profiles').insert({ id: newUser.id, email, full_name: fullName, role: 'Manager' });
     }
@@ -119,10 +86,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setSession(null);
     lastUserId.current = null;
+    router.push('/login');
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, configError, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut }}>
+      {/* Safety: If loading takes too long, we still need to render to avoid permanent black screen */}
       {children}
     </AuthContext.Provider>
   );
