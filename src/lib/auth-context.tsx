@@ -99,7 +99,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setSession(null);
           setLoading(false);
           clearTimeout(safetyTimeout);
-          router.refresh(); // Tell the server the cookie is gone
           return;
         }
 
@@ -110,7 +109,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (profile) setUser(profile as Profile);
             setLoading(false);
             clearTimeout(safetyTimeout);
-            router.refresh(); // Sync cookies with the server
           }
         } else if (event === 'INITIAL_SESSION' && !newSession) {
           console.log('🔍 No initial session found');
@@ -203,7 +201,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setSession(null);
     lastUserId.current = null;
-    router.refresh();
   };
 
   return (

@@ -26,20 +26,7 @@ export default function LoginPage() {
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    // Only redirect after client-side mount to avoid hydration mismatch
-    if (mounted && user && !authLoading) {
-      const rolePaths: Record<string, string> = {
-        'CEO': '/ceo',
-        'Manager': '/manager',
-        'Cook': '/cook',
-        'Reserver': '/bookings',
-      };
-      const path = rolePaths[user.role] || '/login';
-      console.log('🚀 Redirecting to:', path, 'for role:', user.role);
-      router.push(path);
-    }
-  }, [user, authLoading, mounted, router]);
+
 
   // Show nothing during SSR/hydration to prevent mismatch
   if (!mounted) {
@@ -61,9 +48,6 @@ export default function LoginPage() {
         setError('Account created! Please check your email to confirm.');
       } else {
         await signIn(email, password);
-        // Let the server re-read the freshly minted cookie BEFORE
-        // navigating. This prevents the server/client redirect tug-of-war.
-        router.refresh();
       }
     } catch (err: any) {
       setError(err.message || 'An error occurred');
