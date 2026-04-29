@@ -107,7 +107,7 @@ export function GoogleCalendarView({
           const d = drinks.find(d => d.id === parseInt(id));
           return { drink_id: parseInt(id), drink_name: d?.name || '', quantity: qty, price: d?.sold_price || 0, currency: d?.currency || 'USD' };
         });
-      const updates: Partial<Booking> = {};
+      const updates: any = {};
       if (collectedAmount) { updates.amount = parseFloat(collectedAmount); updates.currency = collectedCurrency; }
       if (drinkTab.length > 0) updates.drinks_tab = drinkTab;
       if (extraServices.length > 0) {

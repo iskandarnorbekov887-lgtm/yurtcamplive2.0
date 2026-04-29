@@ -112,6 +112,7 @@ export interface Booking {
   amount?: number;
   description?: string;
   drinks_tab?: Array<{ drink_id: number; drink_name: string; quantity: number; price: number; currency: 'UZS' | 'USD' | 'EUR' }>;
+  extra_services?: Array<{ name: string; price: number; currency: 'UZS' | 'USD' | 'EUR' }>;
   services?: Array<{ name: string; price: number; currency: 'UZS' | 'USD' | 'EUR' }>;
   collected_amount?: number;
   collected_currency?: 'UZS' | 'USD' | 'EUR';

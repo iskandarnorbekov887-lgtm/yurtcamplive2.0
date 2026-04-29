@@ -210,8 +210,8 @@ export function GoogleGuestAgenda({
 
   // Calculate totals at top level for scope availability
   const sTotal_calc = (
-    (svcLunch ? svcLunchCount * (pricing.lunch_price) : 0) +
-    (svcDinner ? svcDinnerCount * (pricing.dinner_price) : 0) +
+    (svcLunch && !isLunchPrepaid ? svcLunchCount * (pricing.lunch_price) : 0) +
+    (svcDinner && !isDinnerPrepaid ? svcDinnerCount * (pricing.dinner_price) : 0) +
     (svcGuide ? svcGuidePrice : 0) +
     (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0) +
     (svcLaundry ? svcLaundryPrice : 0) +
@@ -237,11 +237,13 @@ export function GoogleGuestAgenda({
   // Logic for what is ALREADY accounted for (Pre-paid or DB)
   // For the active tab, we only care about pre-paid items for THIS tab.
   // Previous stay payments (sel.collected_amount) should NOT offset the current tab's items.
-  const recordedPaid = (isPrepaid ? svcAmount : 0) + prepaidLunchAmt + prepaidDinnerAmt;
+  const recordedPaid = (isPrepaid ? svcAmount : 0);
   const debtRemaining = gTotal - recordedPaid;
 
   const canFinalize = isPrepaid || (svcAmount > 0) || (sTotal_calc + dTotal_calc + eTotal_calc > 0);
   const isBalanceMatched = Math.abs(tPaidUsd - debtRemaining) < 1.00;
+  
+  const isFirstTab = (sel?.collected_amount || 0) === 0 && getSettledReceiptsForSel().length === 0;
   
   const today = localDateStr(new Date());
 
@@ -840,11 +842,17 @@ export function GoogleGuestAgenda({
   };
 
   const handleCheckOut = async () => {
-    if (!sel || !onCheckOut) return;
-    if (svcAdults <= 0 && (sel.collected_amount || 0) === 0) {
-      flash('⚠ Number of adults is required for check-out.');
-      setShowServices(true);
-      return;
+    if (isFirstTab) {
+      if (svcAdults <= 0) {
+        flash('⚠ Number of adults is required for the first tab.');
+        setShowServices(true);
+        return;
+      }
+      if (!isPrepaid && svcAmount <= 0) {
+        flash('⚠ Stay price is required for the first tab.');
+        setShowServices(true);
+        return;
+      }
     }
     if ((svcLunch && svcLunchCount <= 0) || (svcDinner && svcDinnerCount <= 0)) {
       flash('⚠ Quantity is required for selected meals.');
@@ -880,8 +888,8 @@ export function GoogleGuestAgenda({
       const dTotal = drinkTab.reduce((s, d) => s + (d.price * d.quantity), 0);
       const eTotal = extraServices.reduce((s, e) => s + (parseFloat(e.price) || 0), 0);
       const sTotal = (
-        (svcLunch ? svcLunchCount * (pricing.lunch_price) : 0) +
-        (svcDinner ? svcDinnerCount * (pricing.dinner_price) : 0) +
+        (svcLunch && !isLunchPrepaid ? svcLunchCount * (pricing.lunch_price) : 0) +
+        (svcDinner && !isDinnerPrepaid ? svcDinnerCount * (pricing.dinner_price) : 0) +
         (svcGuide ? svcGuidePrice : 0) +
         (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0) +
         (svcLaundry ? svcLaundryPrice : 0) +
@@ -898,7 +906,9 @@ export function GoogleGuestAgenda({
           isPrepaid: isPrepaid,
           meals: { 
             lunch: svcLunch ? svcLunchCount : 0, 
-            dinner: svcDinner ? svcDinnerCount : 0 
+            lunchPrepaid: isLunchPrepaid,
+            dinner: svcDinner ? svcDinnerCount : 0,
+            dinnerPrepaid: isDinnerPrepaid
           },
           services: { 
             guide: svcGuide ? svcGuidePrice : 0, 
@@ -959,7 +969,7 @@ export function GoogleGuestAgenda({
         // If the table doesn't exist yet, we still keep the fallback in special_requests
       }
 
-      const updates: Partial<Booking> = {
+      const updates: any = {
         total_price: (sel.total_price || 0) + gTotal,
         collected_amount: (sel.collected_amount || 0) + totalPaidUsd,
         collected_currency: 'USD',
@@ -1030,15 +1040,15 @@ export function GoogleGuestAgenda({
       }, 0);
       const eTotal = extraServices.reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0);
       const sTotal = (
-        (svcLunch ? svcLunchCount * (pricing.lunch_price) : 0) +
-        (svcDinner ? svcDinnerCount * (pricing.dinner_price) : 0) +
+        (svcLunch && !isLunchPrepaid ? svcLunchCount * (pricing.lunch_price) : 0) +
+        (svcDinner && !isDinnerPrepaid ? svcDinnerCount * (pricing.dinner_price) : 0) +
         (svcGuide ? svcGuidePrice : 0) +
         (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0) +
         (svcLaundry ? svcLaundryPrice : 0) +
         (svcCooking ? svcCookingPrice : 0)
       );
 
-      const updates: Partial<Booking> = {
+      const updates: any = {
         lunch: svcLunch,
         lunch_count: svcLunch ? svcLunchCount : 0,
         dinner: svcDinner,
@@ -1106,8 +1116,8 @@ export function GoogleGuestAgenda({
     if (!payModified && svcPayList.length === 1 && svcPayList[0].currency === 'USD') {
       const gTotal = (
         svcAmount + 
-        ((svcLunch ? svcLunchCount * (pricing.lunch_price) : 0) +
-        (svcDinner ? svcDinnerCount * (pricing.dinner_price) : 0) +
+        ((svcLunch && !isLunchPrepaid ? svcLunchCount * (pricing.lunch_price) : 0) +
+        (svcDinner && !isDinnerPrepaid ? svcDinnerCount * (pricing.dinner_price) : 0) +
         (svcGuide ? svcGuidePrice : 0) +
         (svcLaundry ? svcLaundryPrice : 0) +
         (svcCooking ? svcCookingPrice : 0)) +
@@ -1444,14 +1454,14 @@ export function GoogleGuestAgenda({
                         </div>
                       </div>
 
-                      {editCheckOut > sel.check_out && (
+                      {editCheckOut !== sel.check_out && (
                         <div className="pt-2 border-t border-slate-200 animate-in fade-in slide-in-from-top-1">
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-tight mb-1 block">
-                            Stay Extension Price (USD)
+                            {editCheckOut > sel.check_out ? 'Stay Extension Price (USD)' : 'Stay Shortening Refund (USD)'}
                           </label>
                           <div className="relative">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">
-                              +
+                              {editCheckOut > sel.check_out ? '+' : '−'}
                             </span>
                             <input
                               type="number"
@@ -1462,7 +1472,7 @@ export function GoogleGuestAgenda({
                             />
                           </div>
                           <p className="text-[8px] text-slate-400 font-bold mt-1 uppercase italic">
-                            * This amount will be added to the current open tab as Accommodation.
+                            * This amount will {editCheckOut > sel.check_out ? 'be added to' : 'be subtracted from'} the current open tab as Accommodation.
                           </p>
                         </div>
                       )}
@@ -1480,13 +1490,15 @@ export function GoogleGuestAgenda({
                                 check_out: editCheckOut
                               };
 
-                              if (isExtension) {
-                                if (adj > 0) {
-                                  updates.total_price = (sel.total_price || 0) + adj;
-                                  setSvcAmount(v => (parseFloat(String(v)) || 0) + adj);
-                                  flash(`✓ Extended to ${editCheckOut}. +$${adj} added to Open Tab (Accommodation).`);
+                              if (editCheckOut !== sel.check_out) {
+                                if (adj !== 0) {
+                                  const multiplier = editCheckOut > sel.check_out ? 1 : -1;
+                                  const finalAdj = adj * multiplier;
+                                  updates.total_price = (sel.total_price || 0) + finalAdj;
+                                  setSvcAmount(v => (parseFloat(String(v)) || 0) + finalAdj);
+                                  flash(`✓ Dates adjusted. $${adj} ${editCheckOut > sel.check_out ? 'added to' : 'refunded in'} Open Tab (Accommodation).`);
                                 } else {
-                                  flash(`✓ Extended to ${editCheckOut}.`);
+                                  flash(`✓ Dates updated to ${editCheckOut}.`);
                                 }
                               } else {
                                 flash('✓ Dates updated.');
@@ -1609,60 +1621,69 @@ export function GoogleGuestAgenda({
 
                   {showServices && (sel.status === 'checked_in' || sel.status === 'confirmed') && (userRole === 'Manager' || userRole === 'CEO') && (
                     <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300 mt-4">
-                  {/* Accommodation - Always show on first tab or if extended */}
-                  {(svcAmount > 0 || isPrepaid || (sel.collected_amount || 0) === 0) && (
-                    <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-white animate-in slide-in-from-top-2">
+                  {/* Accommodation - Show on first tab or if there's an adjustment */}
+                  {(isFirstTab || Math.abs(svcAmount) > 0.01) && (
+                    <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-white animate-in slide-in-from-top-2 shadow-sm">
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Accommodation Extension</p>
-                          <button onClick={() => { 
-                              const next = !isPrepaid;
-                              setIsPrepaid(next);
-                              if (next) setSvcAmount(0); 
-                            }}
-                            className={`px-2 py-0.5 text-[8px] font-black uppercase tracking-wider rounded-md border transition-all ${isPrepaid ? 'bg-emerald-100 text-emerald-700 border-emerald-300' : 'bg-slate-50 text-slate-400 border-slate-200 hover:border-slate-300'}`}>
-                            {isPrepaid ? '✓ Pre-paid' : 'Pre-paid'}
-                          </button>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                            {isFirstTab ? 'Accommodation' : (svcAmount > 0 ? 'Stay Extension' : 'Stay Refund')}
+                          </p>
+                          {isFirstTab && (
+                            <button onClick={() => { 
+                                const next = !isPrepaid;
+                                setIsPrepaid(next);
+                                if (next) setSvcAmount(0); 
+                              }}
+                              className={`px-2 py-0.5 text-[8px] font-black uppercase tracking-wider rounded-md border transition-all ${isPrepaid ? 'bg-emerald-100 text-emerald-700 border-emerald-300' : 'bg-slate-50 text-slate-400 border-slate-200 hover:border-slate-300'}`}>
+                              {isPrepaid ? '✓ Pre-paid' : 'Pre-paid'}
+                            </button>
+                          )}
                         </div>
                       </div>
                       <div className="space-y-4 pt-2">
-                        <div className="grid grid-cols-2 gap-4 pb-4 border-b border-slate-100">
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Adults *</label>
-                            <input 
-                              type="number" 
-                              value={svcAdults || ''} 
-                              onChange={e => setSvcAdults(parseInt(e.target.value) || 0)}
-                              disabled={(sel.collected_amount || 0) > 0}
-                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-black text-black focus:border-indigo-500 outline-none transition-all disabled:opacity-50"
-                            />
+                        {isFirstTab && (
+                          <div className="grid grid-cols-2 gap-4 pb-4 border-b border-slate-100">
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Adults *</label>
+                              <input 
+                                type="number" 
+                                value={svcAdults || ''} 
+                                onChange={e => setSvcAdults(parseInt(e.target.value) || 0)}
+                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-black text-black focus:border-indigo-500 outline-none transition-all"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Children</label>
+                              <input 
+                                type="number" 
+                                value={svcChildren || ''} 
+                                onChange={e => setSvcChildren(parseInt(e.target.value) || 0)}
+                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-black text-black focus:border-indigo-500 outline-none transition-all"
+                              />
+                            </div>
                           </div>
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Children</label>
-                            <input 
-                              type="number" 
-                              value={svcChildren || ''} 
-                              onChange={e => setSvcChildren(parseInt(e.target.value) || 0)}
-                              disabled={(sel.collected_amount || 0) > 0}
-                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-black text-black focus:border-indigo-500 outline-none transition-all disabled:opacity-50"
-                            />
-                          </div>
-                        </div>
+                        )}
 
                         <div className="space-y-1.5">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Stay Price (USD)</label>
+                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                            {svcAmount >= 0 ? 'Stay Price (USD)' : 'Refund Amount (USD)'}
+                          </label>
                           <div className="relative">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
                             <input 
                               type="number" 
-                              value={svcAmount || ''} 
-                              onChange={e => setSvcAmount(parseFloat(e.target.value) || 0)}
-                              disabled={isPrepaid}
-                              className="w-full pl-8 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-lg font-black text-black focus:border-indigo-500 outline-none transition-all disabled:opacity-50"
+                              value={Math.abs(svcAmount) || ''} 
+                              onChange={e => {
+                                const val = parseFloat(e.target.value) || 0;
+                                setSvcAmount(svcAmount >= 0 ? val : -val);
+                              }}
+                              disabled={isPrepaid && isFirstTab}
+                              className={`w-full pl-8 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-lg font-black focus:border-indigo-500 outline-none transition-all ${svcAmount < 0 ? 'text-rose-600' : 'text-black'}`}
                             />
                           </div>
                           <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest italic">
-                            {isPrepaid ? '* Accommodation is marked as pre-paid.' : '* Enter total price for the EXTENDED period.'}
+                            {isPrepaid && isFirstTab ? '* Accommodation is marked as pre-paid.' : (isFirstTab ? '* Enter total price for the stay.' : '* Adjustment based on date changes.')}
                           </p>
                         </div>
                       </div>
@@ -1874,43 +1895,68 @@ export function GoogleGuestAgenda({
                   </div>
                   
                   <div className="space-y-2">
-                    {(svcAmount > 0 || isPrepaid) && (
+                    {(Math.abs(svcAmount) > 0.01 || isPrepaid) && (
                       <div className="flex justify-between items-center opacity-90 border-b border-white/20 pb-2 mb-2">
-                        <span className="font-bold">Accommodation</span>
-                        {isPrepaid ? (
+                        <span className="font-bold">
+                          {isFirstTab ? 'Accommodation' : (svcAmount > 0 ? 'Stay Extension' : 'Stay Refund')}
+                        </span>
+                        {isPrepaid && isFirstTab ? (
                           <span className="text-[10px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">Prepaid</span>
                         ) : (
-                          <div className="flex items-center gap-1 group relative">
-                            <span className="text-white/40 font-bold text-[10px] uppercase tracking-tighter">Edit: $</span>
-                            <input 
-                              type="number" 
-                              value={svcAmount} 
-                              onChange={(e) => setSvcAmount(parseFloat(e.target.value) || 0)}
-                              className="bg-white/10 hover:bg-white/20 border-none text-right font-black w-24 focus:outline-none focus:ring-1 focus:ring-white/40 rounded px-2 py-0.5 text-white transition-all"
-                            />
-                            <div className="absolute -top-6 right-0 bg-black text-[8px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-                              Click to edit Accommodation price
-                            </div>
-                          </div>
+                          <span className={`font-black ${svcAmount < 0 ? 'text-rose-300' : ''}`}>
+                            {svcAmount < 0 ? '-' : ''}${Math.abs(svcAmount).toFixed(2)}
+                          </span>
                         )}
                       </div>
                     )}
                     
                     {(() => {
-                      const sTotal = (
-                        (svcLunch ? svcLunchCount * (pricing?.lunch_price || 0) : 0) +
-                        (svcDinner ? svcDinnerCount * (pricing?.dinner_price || 0) : 0) +
+                      const otherServicesTotal = (
                         (svcGuide ? svcGuidePrice : 0) +
                         (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0) +
                         (svcLaundry ? svcLaundryPrice : 0) +
                         (svcCooking ? svcCookingPrice : 0)
                       );
-                      if (sTotal <= 0) return null;
+                      
                       return (
-                        <div className="flex justify-between items-center opacity-90">
-                          <span className="font-bold">Services & Food</span>
-                          <span className="font-black">${sTotal.toFixed(2)}</span>
-                        </div>
+                        <>
+                          {/* Lunch Rendering */}
+                          {svcLunch && (
+                            <div className="flex justify-between items-center opacity-90 border-b border-white/10 pb-1.5 mb-1.5">
+                              <div className="flex flex-col">
+                                <span className="font-bold">Lunch {svcLunchCount}x</span>
+                                {!isLunchPrepaid && <span className="text-[9px] text-white/50">{svcLunchCount}x ${pricing.lunch_price} USD</span>}
+                              </div>
+                              {isLunchPrepaid ? (
+                                <span className="text-[9px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded uppercase tracking-wider">Prepaid</span>
+                              ) : (
+                                <span className="font-black">${(svcLunchCount * pricing.lunch_price).toFixed(2)}</span>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Dinner Rendering */}
+                          {svcDinner && (
+                            <div className="flex justify-between items-center opacity-90 border-b border-white/10 pb-1.5 mb-1.5">
+                              <div className="flex flex-col">
+                                <span className="font-bold">Dinner {svcDinnerCount}x</span>
+                                {!isDinnerPrepaid && <span className="text-[9px] text-white/50">{svcDinnerCount}x ${pricing.dinner_price} USD</span>}
+                              </div>
+                              {isDinnerPrepaid ? (
+                                <span className="text-[9px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded uppercase tracking-wider">Prepaid</span>
+                              ) : (
+                                <span className="font-black">${(svcDinnerCount * pricing.dinner_price).toFixed(2)}</span>
+                              )}
+                            </div>
+                          )}
+
+                          {otherServicesTotal > 0 && (
+                            <div className="flex justify-between items-center opacity-90">
+                              <span className="font-bold">Other Services</span>
+                              <span className="font-black">${otherServicesTotal.toFixed(2)}</span>
+                            </div>
+                          )}
+                        </>
                       );
                     })()}
 
@@ -2292,10 +2338,30 @@ export function GoogleGuestAgenda({
                             )}
                             {/* Food items */}
                             {(selectedReceipt.items?.meals?.lunch || 0) > 0 && (
-                              <div className="flex justify-between text-xs text-slate-500"><span>Lunch ×{selectedReceipt.items.meals.lunch}</span><span>${(selectedReceipt.items.meals.lunch * (pricing?.lunch_price || 0)).toFixed(2)}</span></div>
+                              <div className="flex justify-between text-xs border-b border-slate-50 pb-1 mb-1">
+                                <div className="flex flex-col">
+                                  <span className="text-slate-600 font-bold">Lunch {selectedReceipt.items.meals.lunch}x</span>
+                                  {!selectedReceipt.items.meals.lunchPrepaid && <span className="text-[9px] text-slate-400">{selectedReceipt.items.meals.lunch}x ${pricing?.lunch_price || 10} USD</span>}
+                                </div>
+                                {selectedReceipt.items.meals.lunchPrepaid ? (
+                                  <span className="text-[9px] font-black bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded uppercase tracking-wider h-fit">Prepaid</span>
+                                ) : (
+                                  <span className="text-slate-900 font-black">${(selectedReceipt.items.meals.lunch * (pricing?.lunch_price || 10)).toFixed(2)}</span>
+                                )}
+                              </div>
                             )}
                             {(selectedReceipt.items?.meals?.dinner || 0) > 0 && (
-                              <div className="flex justify-between text-xs text-slate-500"><span>Dinner ×{selectedReceipt.items.meals.dinner}</span><span>${(selectedReceipt.items.meals.dinner * (pricing?.dinner_price || 0)).toFixed(2)}</span></div>
+                              <div className="flex justify-between text-xs border-b border-slate-50 pb-1 mb-1">
+                                <div className="flex flex-col">
+                                  <span className="text-slate-600 font-bold">Dinner {selectedReceipt.items.meals.dinner}x</span>
+                                  {!selectedReceipt.items.meals.dinnerPrepaid && <span className="text-[9px] text-slate-400">{selectedReceipt.items.meals.dinner}x ${pricing?.dinner_price || 10} USD</span>}
+                                </div>
+                                {selectedReceipt.items.meals.dinnerPrepaid ? (
+                                  <span className="text-[9px] font-black bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded uppercase tracking-wider h-fit">Prepaid</span>
+                                ) : (
+                                  <span className="text-slate-900 font-black">${(selectedReceipt.items.meals.dinner * (pricing?.dinner_price || 10)).toFixed(2)}</span>
+                                )}
+                              </div>
                             )}
                             {/* Services */}
                             {Object.entries(selectedReceipt.items?.services || {}).map(([k, v]: [string, any]) => (v > 0 ? <div key={k} className="flex justify-between text-xs text-slate-500 capitalize"><span>{k}</span><span>${parseFloat(v).toFixed(2)}</span></div> : null))}
@@ -2324,19 +2390,47 @@ export function GoogleGuestAgenda({
                             <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest text-center">{(sel.collected_amount || 0) > 0 ? 'Current Open Tab' : 'Charges Breakdown'}</p>
                             <div className="space-y-1.5 bg-white rounded-xl border border-slate-100 p-3">
                               {/* Accommodation first */}
-                              {(svcAmount > 0 || (isPrepaid && (sel.collected_amount || 0) === 0)) && (
+                              {(Math.abs(svcAmount) > 0.01 || (isPrepaid && isFirstTab)) && (
                                 <div className="flex justify-between text-sm">
-                                  <span className="text-slate-600 font-bold">{(sel.collected_amount || 0) > 0 ? 'Extended Stay' : 'Accommodation'}</span>
-                                  {isPrepaid && (sel.collected_amount || 0) === 0 ? (
+                                  <span className="text-slate-600 font-bold">
+                                    {isFirstTab ? 'Accommodation' : (svcAmount > 0 ? 'Stay Extension' : 'Stay Refund')}
+                                  </span>
+                                  {isPrepaid && isFirstTab ? (
                                     <span className="text-[10px] font-black bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded uppercase tracking-wider">Prepaid</span>
                                   ) : (
-                                    <span className="text-slate-900 font-black">${svcAmount.toFixed(2)}</span>
+                                    <span className={`font-black ${svcAmount < 0 ? 'text-rose-600' : 'text-slate-900'}`}>
+                                      {svcAmount < 0 ? '-' : ''}${Math.abs(svcAmount).toFixed(2)}
+                                    </span>
                                   )}
                                 </div>
                               )}
                               {/* Food */}
-                              {svcLunch && svcLunchCount > 0 && <div className="flex justify-between text-xs text-slate-500"><span>Lunch ×{svcLunchCount}</span><span>${(svcLunchCount * (pricing?.lunch_price || 0)).toFixed(2)}</span></div>}
-                              {svcDinner && svcDinnerCount > 0 && <div className="flex justify-between text-xs text-slate-500"><span>Dinner ×{svcDinnerCount}</span><span>${(svcDinnerCount * (pricing?.dinner_price || 0)).toFixed(2)}</span></div>}
+                              {svcLunch && svcLunchCount > 0 && (
+                                <div className="flex justify-between text-xs border-b border-slate-50 pb-1 mb-1">
+                                  <div className="flex flex-col">
+                                    <span className="text-slate-600 font-bold">Lunch {svcLunchCount}x</span>
+                                    {!isLunchPrepaid && <span className="text-[9px] text-slate-400">{svcLunchCount}x ${pricing.lunch_price} USD</span>}
+                                  </div>
+                                  {isLunchPrepaid ? (
+                                    <span className="text-[9px] font-black bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded uppercase tracking-wider h-fit">Prepaid</span>
+                                  ) : (
+                                    <span className="text-slate-900 font-black">${(svcLunchCount * pricing.lunch_price).toFixed(2)}</span>
+                                  )}
+                                </div>
+                              )}
+                              {svcDinner && svcDinnerCount > 0 && (
+                                <div className="flex justify-between text-xs border-b border-slate-50 pb-1 mb-1">
+                                  <div className="flex flex-col">
+                                    <span className="text-slate-600 font-bold">Dinner {svcDinnerCount}x</span>
+                                    {!isDinnerPrepaid && <span className="text-[9px] text-slate-400">{svcDinnerCount}x ${pricing.dinner_price} USD</span>}
+                                  </div>
+                                  {isDinnerPrepaid ? (
+                                    <span className="text-[9px] font-black bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded uppercase tracking-wider h-fit">Prepaid</span>
+                                  ) : (
+                                    <span className="text-slate-900 font-black">${(svcDinnerCount * pricing.dinner_price).toFixed(2)}</span>
+                                  )}
+                                </div>
+                              )}
                               {/* Services */}
                               {svcGuide && svcGuidePrice > 0 && <div className="flex justify-between text-xs text-slate-500"><span>Guide</span><span>${svcGuidePrice.toFixed(2)}</span></div>}
                               {(() => {
@@ -2421,13 +2515,13 @@ export function GoogleGuestAgenda({
                                           {(r.items?.meals?.lunch || 0) > 0 && (
                                             <div className="flex justify-between text-[10px] font-bold text-slate-500">
                                               <span>Lunch ×{r.items.meals.lunch}</span>
-                                              <span>${(r.items.meals.lunch * (pricing?.lunch_price || 0)).toFixed(2)}</span>
+                                              <span>{r.items.meals.lunchPrepaid ? 'Prepaid' : `$${(r.items.meals.lunch * (pricing?.lunch_price || 10)).toFixed(2)}`}</span>
                                             </div>
                                           )}
                                           {(r.items?.meals?.dinner || 0) > 0 && (
                                             <div className="flex justify-between text-[10px] font-bold text-slate-500">
                                               <span>Dinner ×{r.items.meals.dinner}</span>
-                                              <span>${(r.items.meals.dinner * (pricing?.dinner_price || 0)).toFixed(2)}</span>
+                                              <span>{r.items.meals.dinnerPrepaid ? 'Prepaid' : `$${(r.items.meals.dinner * (pricing?.dinner_price || 10)).toFixed(2)}`}</span>
                                             </div>
                                           )}
                                           {Object.entries(r.items?.services || {}).map(([k, v]: [string, any]) => (v > 0 ? (
