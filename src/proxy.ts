@@ -21,15 +21,16 @@ export async function proxy(request: NextRequest) {
     }
   );
 
+  // Use getUser() to verify the session
   const { data: { user } } = await supabase.auth.getUser();
   const { pathname } = request.nextUrl;
 
-  // Protect all routes except login and auth callbacks
+  // LOOP PROTECTION: Only redirect if truly necessary
   if (!user && pathname !== '/login' && !pathname.startsWith('/auth')) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // If logged in, don't let them stay on the login page
+  // If user is logged in, only move them if they are stuck on /login
   if (user && pathname === '/login') {
     return NextResponse.redirect(new URL('/bookings', request.url));
   }
