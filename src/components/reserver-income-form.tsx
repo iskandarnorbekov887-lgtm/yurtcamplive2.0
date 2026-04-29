@@ -48,7 +48,7 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess }:
   const [calViewYear, setCalViewYear] = useState(() => selectedDate ? new Date(selectedDate + 'T00:00:00').getFullYear() : new Date().getFullYear());
   const [calViewMonth, setCalViewMonth] = useState(() => selectedDate ? new Date(selectedDate + 'T00:00:00').getMonth() : new Date().getMonth());
   const [dayEntries, setDayEntries] = useState<DayEntry[]>([]);
-  const [yurtRequests, setYurtRequests] = useState('');
+  const [iskyCampRequests, setIskyCampRequests] = useState('');
   const [currency, setCurrency] = useState<'UZS' | 'USD' | 'EUR'>('USD');
   const [exchangeRate, setExchangeRate] = useState('1');
   const [paymentMethod, setPaymentMethod] = useState<'in_camp' | 'all_paid' | 'partially_paid'>('in_camp');
@@ -149,7 +149,7 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess }:
         created_at: new Date().toISOString(),
         last_edited_by_id: currentUserId || '',
         last_edited_at: new Date().toISOString(),
-        yurt_requests: yurtRequests || null,
+        isky_camp_requests: iskyCampRequests || null,
         // Service fields
         guest_count: guestCount,
         children_under_12: childrenUnder12,
@@ -187,7 +187,7 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess }:
   const resetForm = () => {
     setGuestNames(['']); setGuestCount(1); setChildrenUnder12(0);
     setCheckIn(selectedDate || ''); setCheckOut('');
-    setDayEntries(selectedDate ? [makeBlankDay(selectedDate)] : []); setYurtRequests('');
+    setDayEntries(selectedDate ? [makeBlankDay(selectedDate)] : []); setIskyCampRequests('');
     setCurrency('USD'); setExchangeRate('1'); setPaymentMethod('in_camp'); setAmount(''); setPaymentNote(''); setDescription('');
   };
 
@@ -304,8 +304,8 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess }:
             );
           })()}
           <div>
-            <label className="block text-sm font-black text-slate-900 mb-2">Yurt Request</label>
-            <input type="text" value={yurtRequests} onChange={e => setYurtRequests(e.target.value)} placeholder="e.g. 2 yurts, separate beds (optional)" className="w-full px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm" />
+            <label className="block text-sm font-black text-slate-900 mb-2">Isky Camp Request</label>
+            <input type="text" value={iskyCampRequests} onChange={e => setIskyCampRequests(e.target.value)} placeholder="e.g. 2 camps, separate beds (optional)" className="w-full px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm" />
           </div>
 
           {/* Day-by-Day Services */}

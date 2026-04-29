@@ -1236,8 +1236,8 @@ export function GoogleGuestAgenda({
                   <>
                   <div className="flex items-start justify-between">
                 <div>
-                  <h2 className="text-xl font-black text-slate-900">{sel.guest_name}</h2>
-                  <p className="text-sm text-slate-500 mt-0.5">{sel.check_in} → {sel.check_out}{sel.nights ? ` · ${sel.nights}n` : ''}{(sel.guest_count || sel.number_of_people) ? ` · ${sel.guest_count || sel.number_of_people} pax` : ''}</p>
+                  <h2 className="text-xl font-black text-slate-900">{String(sel?.guest_name || "Guest")}</h2>
+                  <p className="text-sm text-slate-500 mt-0.5">{String(sel?.check_in)} → {String(sel?.check_out)}{sel?.nights ? ` · ${String(sel?.nights)}n` : ''}{(sel?.guest_count || sel?.number_of_people) ? ` · ${String(sel?.guest_count || sel?.number_of_people)} pax` : ''}</p>
                 </div>
                 <div className="flex flex-col items-end gap-2">
                   {(sel.notes || sel.description) && (

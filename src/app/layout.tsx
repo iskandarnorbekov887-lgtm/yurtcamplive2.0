@@ -19,7 +19,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Isky Camp Flow",
-  description: "Yurt Camp Management System",
+  description: "Isky Camp Management System",
 };
 
 export default function RootLayout({

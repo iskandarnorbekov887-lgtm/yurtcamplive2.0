@@ -115,7 +115,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
   const [newExtraService, setNewExtraService] = useState({ name: '', price: '', currency: 'USD' as 'UZS' | 'USD' | 'EUR' });
   const [collectedAmount, setCollectedAmount] = useState('');
   const [collectedCurrency, setCollectedCurrency] = useState<'UZS' | 'USD' | 'EUR'>('USD');
-  const [activeTabIdx, setActiveTabIdx] = useState<number>(-1); // -1 = Open Tab
+  const [activeTabIdx, setActiveTabIdx] = useState<any>(-1); // -1 = Open Tab
 
   const getTabs = (booking: Booking | null) => {
     if (!booking) return [];
@@ -129,9 +129,9 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
   const month = cur.getMonth();
   const weeks = getCalendarWeeks(year, month);
   const today = dateToStr(new Date());
-  const confirmed = bookings.filter(b => b.status === 'confirmed' || b.status === 'checked_in');
-  const completed = bookings.filter(b => b.status === 'completed');
-  const cancelled = bookings.filter(b => b.status === 'cancelled');
+  const confirmed = (bookings || []).filter((b: any) => b.status === 'confirmed' || b.status === 'checked_in');
+  const completed = (bookings || []).filter((b: any) => b.status === 'completed');
+  const cancelled = (bookings || []).filter((b: any) => b.status === 'cancelled');
   const totalIskyCamps = 0;
 
   const eventsForWeek = (week: Date[]): EventInfo[] => {
@@ -567,7 +567,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                                 <div className="grid grid-cols-2 gap-3">
                                   <div className="opacity-75">
                                     <p className="text-[9px] font-bold text-slate-400 uppercase">Pax & Base Price</p>
-                                    <p className="text-sm font-black text-slate-900">{String(sel.num_people || sel.number_of_people || 0)} Guests @ ${String(sel.total_price)}</p>
+                                    <p className="text-sm font-black text-slate-900">{String(sel?.num_people || sel?.number_of_people || 0)} Guests @ ${String(sel?.total_price || 0)}</p>
                                   </div>
                                   <button 
                                     disabled={isTab1Closed}
@@ -580,20 +580,26 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                               </div>
                             ) : activeTabIdx === -1 && isTab1Closed ? (
                               /* Extension Fee for Open Tab */
-                              hasExtension && (
-                                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 animate-in fade-in slide-in-from-top-2">
-                                  <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest block mb-2">Stay Extension Fee</label>
-                                  <div className="flex gap-3">
-                                    <input 
-                                      type="number"
-                                      placeholder="Extra nights fee..."
-                                      className="flex-1 px-4 py-2 bg-white border-2 border-amber-200 rounded-xl text-sm font-black text-amber-700 outline-none focus:border-amber-400"
-                                    />
-                                    <button className="px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-black uppercase shadow-sm">Apply</button>
+                              <>
+                                {hasExtension && (
+                                  <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 animate-in fade-in slide-in-from-top-2">
+                                    <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest block mb-2">Stay Extension Fee</label>
+                                    <div className="flex gap-3">
+                                      <input 
+                                        type="number"
+                                        placeholder="Extra nights fee..."
+                                        className="flex-1 px-4 py-2 bg-white border-2 border-amber-200 rounded-xl text-sm font-black text-amber-700 outline-none focus:border-amber-400"
+                                      />
+                                      <button className="px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-black uppercase shadow-sm">Apply</button>
+                                    </div>
+                                    <p className="mt-2 text-[9px] text-amber-500 font-bold italic">* Compulsory: Guest extended stay from {String(originalCheckout)} to {String(sel?.check_out)}</p>
                                   </div>
-                                  <p className="mt-2 text-[9px] text-amber-500 font-bold italic">* Compulsory: Guest extended stay from {String(originalCheckout)} to {String(sel.check_out)}</p>
+                                )}
+                                <div className="mt-4 p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
+                                  <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Accommodation Status</p>
+                                  <p className="text-xs font-bold text-indigo-600">Primary stay settled in Tab 1. Current tab accommodation set to $0.</p>
                                 </div>
-                              )
+                              </>
                             ) : null}
                           </div>
 
@@ -607,16 +613,16 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                              </div>
                              
                              <div className="space-y-2">
-                                {(isClosed ? activeTab.items?.drinks : sel.drinks_tab)?.map((line: any, lidx: number) => (
+                                {(isClosed ? (activeTab?.items?.drinks || []) : (sel?.drinks_tab || []))?.map((line: any, lidx: number) => (
                                   <div key={lidx} className="flex justify-between text-xs font-bold text-slate-700">
-                                    <span>{String(line.drink_name)} x{String(line.quantity)}</span>
-                                    <span>${String(line.price * line.quantity)}</span>
+                                    <span>{String(line?.drink_name)} x{String(line?.quantity)}</span>
+                                    <span>${String(line?.price * line?.quantity)}</span>
                                   </div>
                                 ))}
-                                {(isClosed ? activeTab.items?.extras : sel.extra_services)?.map((line: any, lidx: number) => (
+                                {(isClosed ? (activeTab?.items?.extras || []) : (sel?.extra_services || []))?.map((line: any, lidx: number) => (
                                   <div key={lidx} className="flex justify-between text-xs font-bold text-slate-700">
-                                    <span>{String(line.name)}</span>
-                                    <span>${String(line.price)}</span>
+                                    <span>{String(line?.name)}</span>
+                                    <span>${String(line?.price)}</span>
                                   </div>
                                 ))}
                              </div>
