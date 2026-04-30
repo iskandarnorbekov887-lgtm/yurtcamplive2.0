@@ -42,6 +42,7 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
   const formRef = useRef<HTMLFormElement>(null);
 
   const [bookingType, setBookingType] = useState<'international' | 'local' | 'pool'>('international');
+  const [localStayType, setLocalStayType] = useState<'day' | 'night'>('day');
   const [guestNames, setGuestNames] = useState<string[]>(['']);
   const [guestCount, setGuestCount] = useState(1);
   const [childrenUnder12, setChildrenUnder12] = useState(0);
@@ -80,6 +81,19 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
       setCheckOut(checkIn);
     }
   }, [bookingType, checkIn]);
+
+  useEffect(() => {
+    if (bookingType === 'local' && checkIn) {
+      if (localStayType === 'day') {
+        setCheckOut(checkIn);
+      } else {
+        // night stay = next day
+        const nextDay = new Date(checkIn + 'T00:00:00');
+        nextDay.setDate(nextDay.getDate() + 1);
+        setCheckOut(nextDay.toISOString().split('T')[0]);
+      }
+    }
+  }, [bookingType, localStayType, checkIn]);
 
   useEffect(() => {
     if (bookingType === 'local' || bookingType === 'pool') {
@@ -150,10 +164,10 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
         yurt_id: null, // Reserver bookings don't require specific yurt
         guest_name: validGuestNames.join(', '),
         check_in: checkIn || new Date().toISOString().split('T')[0],
-        check_out: bookingType === 'pool' ? checkIn : (checkOut || checkIn || new Date().toISOString().split('T')[0]),
+        check_out: bookingType === 'pool' || (bookingType === 'local' && localStayType === 'day') ? checkIn : (checkOut || checkIn || new Date().toISOString().split('T')[0]),
         total_price: total_price || 0,
         number_of_people: guestCount,
-        payment_status: bookingType === 'pool' ? 'paid' : 'Unpaid',
+        payment_status: (bookingType === 'pool' || bookingType === 'local') ? 'paid' : 'Unpaid',
         source: isSystemOnly ? 'System' : 'Manual',
         status: 'confirmed',
         notes: description || null,
@@ -172,6 +186,10 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
             meta.is_pool_visitor = true;
             meta.pool_entry_count = poolEntryCount;
           }
+          if (bookingType === 'local') {
+            meta.is_local_guest = true;
+            meta.local_stay_type = localStayType;
+          }
           return Object.keys(meta).length > 0 ? JSON.stringify(meta) : null; 
         })(),
         created_by_role: 'Manager',
@@ -185,7 +203,7 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
         // Service fields
         guest_count: guestCount,
         children_under_12: childrenUnder12,
-        nights: bookingType === 'pool' ? '0' : (checkOut && checkIn) ? Math.round((new Date(checkOut + 'T00:00:00').getTime() - new Date(checkIn + 'T00:00:00').getTime()) / 86400000).toString() : null,
+        nights: (bookingType === 'pool' || (bookingType === 'local' && localStayType === 'day')) ? '0' : (checkOut && checkIn) ? Math.round((new Date(checkOut + 'T00:00:00').getTime() - new Date(checkIn + 'T00:00:00').getTime()) / 86400000).toString() : null,
         guide_service: dayEntries.some(d => d.guideService),
         guide_names: dayEntries.filter(d => d.guideService).flatMap(d => d.guideNames.filter(n => n.trim())).join(', ') || null,
         guide_amount: null,
@@ -202,7 +220,7 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
         laundry: false,
         laundry_price: null,
         laundry_currency: 'UZS',
-        payment_method: bookingType === 'pool' ? 'paid' : paymentMethod,
+        payment_method: (bookingType === 'pool' || bookingType === 'local') ? 'paid' : paymentMethod,
         payment_note: paymentNote || null,
         currency: currency,
         exchange_rate: rateValue,
@@ -213,8 +231,8 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
       }]).select();
       if (error) throw error;
 
-      // For pool bookings, record payment to booking_receipts
-      if (bookingType === 'pool' && bookingData && bookingData[0]) {
+      // For pool and local bookings, record payment to booking_receipts
+      if ((bookingType === 'pool' || bookingType === 'local') && bookingData && bookingData[0]) {
         const bookingId = bookingData[0].id;
         const paymentDate = checkIn || new Date().toISOString().split('T')[0];
         await supabase.from('booking_receipts').insert([{
@@ -224,7 +242,9 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
           settled_at: paymentDate,
           created_at: new Date().toISOString(),
           created_by_id: currentUserId || '',
-          note: `Pool entry payment for ${poolEntryCount} visitors`,
+          note: bookingType === 'pool' 
+            ? `Pool entry payment for ${poolEntryCount} visitors`
+            : `Local guest payment (${localStayType === 'day' ? 'day visit' : 'night stay'})`,
         }]);
       }
 
@@ -234,6 +254,7 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
 
   const resetForm = () => {
     setBookingType('international');
+    setLocalStayType('day');
     setGuestNames(['']); setGuestCount(1); setChildrenUnder12(0); setPoolEntryCount(1);
     setCheckIn(selectedDate || ''); setCheckOut('');
     setDayEntries(selectedDate ? [makeBlankDay(selectedDate)] : []); setIskyCampRequests('');
@@ -273,6 +294,26 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
             ))}
           </div>
 
+          {/* Local Stay Type Toggle */}
+          {bookingType === 'local' && (
+            <div className="flex gap-2 p-1 bg-amber-50 rounded-xl border border-amber-200">
+              {(['day', 'night'] as const).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setLocalStayType(type)}
+                  className={`flex-1 py-2 px-4 rounded-lg text-xs font-bold capitalize transition-all ${
+                    localStayType === type 
+                      ? 'bg-white text-amber-900 shadow-sm' 
+                      : 'text-amber-600 hover:text-amber-800'
+                  }`}
+                >
+                  {type === 'day' ? '☀️ Day Visit' : '🌙 Night Stay'}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Guest Names */}
           <div>
             <label className="block text-sm font-black text-slate-900 mb-2">Guest Names *</label>
@@ -299,8 +340,8 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
             )}
           </div>
 
-          {/* Mini Check-out Calendar - hide for pool type */}
-          {bookingType !== 'pool' && (() => {
+          {/* Mini Check-out Calendar - hide for pool and local types */}
+          {bookingType !== 'pool' && bookingType !== 'local' && (() => {
             const pad2 = (n: number) => String(n).padStart(2, '0');
             const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
             const firstDay = new Date(calViewYear, calViewMonth, 1).getDay();
@@ -518,12 +559,14 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
           })}
 
           {/* Payment Section */}
-          {bookingType === 'pool' ? (
-            <div className="border-2 border-slate-200 rounded-xl p-4 space-y-4 bg-cyan-50 border-cyan-200">
-              <label className="block text-sm font-black text-cyan-900">Pool Entry Payment *</label>
+          {bookingType === 'pool' || bookingType === 'local' ? (
+            <div className={`border-2 rounded-xl p-4 space-y-4 ${bookingType === 'pool' ? 'bg-cyan-50 border-cyan-200' : 'bg-amber-50 border-amber-200'}`}>
+              <label className={`block text-sm font-black ${bookingType === 'pool' ? 'text-cyan-900' : 'text-amber-900'}`}>
+                {bookingType === 'pool' ? 'Pool Entry Payment *' : 'Local Guest Payment *'}
+              </label>
               <div className="flex gap-2">
                 <div className="flex-1">
-                  <label className="block text-xs font-bold text-cyan-700 mb-1">Amount</label>
+                  <label className={`block text-xs font-bold ${bookingType === 'pool' ? 'text-cyan-700' : 'text-amber-700'} mb-1`}>Amount</label>
                   <input
                     type="number"
                     step="0.01"
@@ -531,15 +574,15 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="Enter amount"
-                    className="w-full px-3 py-2 border-2 border-cyan-300 rounded-lg text-sm font-bold text-black focus:border-cyan-500"
+                    className={`w-full px-3 py-2 border-2 rounded-lg text-sm font-bold text-black focus:border-500 ${bookingType === 'pool' ? 'border-cyan-300 focus:border-cyan-500' : 'border-amber-300 focus:border-amber-500'}`}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-cyan-700 mb-1">Currency</label>
+                  <label className={`block text-xs font-bold ${bookingType === 'pool' ? 'text-cyan-700' : 'text-amber-700'} mb-1`}>Currency</label>
                   <select
                     value={currency}
                     onChange={(e) => { setCurrency(e.target.value as 'UZS' | 'USD' | 'EUR'); setExchangeRate(e.target.value === 'UZS' ? '1' : exchangeRate); }}
-                    className="px-3 py-2 border-2 border-cyan-300 rounded-lg text-sm font-bold text-black focus:border-cyan-500"
+                    className={`px-3 py-2 border-2 rounded-lg text-sm font-bold text-black focus:border-500 ${bookingType === 'pool' ? 'border-cyan-300 focus:border-cyan-500' : 'border-amber-300 focus:border-amber-500'}`}
                   >
                     <option value="UZS">UZS (SUM)</option>
                     <option value="USD">USD</option>
@@ -547,8 +590,11 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
                   </select>
                 </div>
               </div>
-              <div className="text-xs text-cyan-600 font-semibold">
-                Payment will be recorded for {checkIn} and shown on all calendars
+              <div className={`text-xs font-semibold ${bookingType === 'pool' ? 'text-cyan-600' : 'text-amber-600'}`}>
+                {bookingType === 'pool' 
+                  ? `Payment will be recorded for ${checkIn} and shown on all calendars`
+                  : `Payment will be recorded for ${localStayType === 'day' ? checkIn : `${checkIn} - ${checkOut}`} and shown on all calendars`
+                }
               </div>
             </div>
           ) : (
