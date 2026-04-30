@@ -127,7 +127,8 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
     
     let currentMeta: any = {};
     try {
-      currentMeta = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
+      const parsed = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
+      currentMeta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
     } catch { currentMeta = {}; }
     
     const prevAdj = parseFloat(currentMeta.last_adjustment) || 0;
@@ -155,7 +156,8 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
 
     let currentMeta: any = {};
     try {
-      currentMeta = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
+      const parsed = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
+      currentMeta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
     } catch { currentMeta = {}; }
 
     const prevAdj = parseFloat(currentMeta.last_reduction) || 0; // Using separate field for reduction?
@@ -179,9 +181,11 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
 
   const getTabs = (booking: Booking | null) => {
     if (!booking) return [];
+    let currentMeta: any = {};
     try {
-      const meta = typeof booking.special_requests === 'string' ? JSON.parse(booking.special_requests || '{}') : (booking.special_requests || {});
-      return meta.settled_receipts || [];
+      const parsed = typeof booking.special_requests === 'string' ? JSON.parse(booking.special_requests || '{}') : (booking.special_requests || {});
+      currentMeta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
+      return currentMeta.settled_receipts || [];
     } catch { return []; }
   };
 
@@ -189,10 +193,12 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
   useEffect(() => {
     if (sel) {
       originalCheckoutRef.current = sel.check_out || '';
+      let currentMeta: any = {};
       try {
-        const meta = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
-        setExtFee(meta.last_adjustment ? String(meta.last_adjustment) : '');
-        setRedFee(meta.last_reduction ? String(meta.last_reduction) : '');
+        const parsed = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
+        currentMeta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
+        setExtFee(currentMeta.last_adjustment ? String(currentMeta.last_adjustment) : '');
+        setRedFee(currentMeta.last_reduction ? String(currentMeta.last_reduction) : '');
       } catch {
         setExtFee('');
         setRedFee('');

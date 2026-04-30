@@ -186,14 +186,16 @@ export function GoogleGuestAgenda({
 
   const getSettledReceiptsForSel = () => {
     if (dbSettledReceipts.length) return dbSettledReceipts;
+    let meta: any = {};
     try {
       if (!sel?.special_requests) return [];
       const parsed = typeof sel.special_requests === 'string'
         ? JSON.parse(sel.special_requests || '{}')
         : (sel.special_requests || {});
-      const meta = Array.isArray(parsed) ? {} : (parsed || {});
+      meta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
       return meta.settled_receipts || [];
-    } catch {
+    } catch (err) {
+      console.error('Metadata parse error:', err);
       return [];
     }
   };
@@ -281,14 +283,16 @@ export function GoogleGuestAgenda({
               if (b.status === 'confirmed') toSilentlyDelete.push(b.id);
               else warnings[b.id] = 'deleted';
             } else if (ev.start !== b.check_in || ev.end !== b.check_out) {
-              try {
-                const m = typeof b.special_requests === 'string' ? JSON.parse(b.special_requests || '{}') : (b.special_requests || {});
-                if (!m.is_manual_dates) {
+                let m: any = {};
+                try {
+                  const parsed = typeof b.special_requests === 'string' ? JSON.parse(b.special_requests || '{}') : (b.special_requests || {});
+                  m = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
+                  if (!m.is_manual_dates) {
+                    warnings[b.id] = 'dates_changed';
+                  }
+                } catch {
                   warnings[b.id] = 'dates_changed';
                 }
-              } catch {
-                warnings[b.id] = 'dates_changed';
-              }
             }
           });
           setSyncWarnings(warnings);
@@ -297,8 +301,10 @@ export function GoogleGuestAgenda({
           bookings.filter(b => b.google_event_id && b.check_in >= cutoff).forEach(b => {
             const ev = events.find(e => e.id === b.google_event_id);
             if (ev && (ev.start !== b.check_in || ev.end !== b.check_out)) {
+              let m: any = {};
               try {
-                const m = typeof b.special_requests === 'string' ? JSON.parse(b.special_requests || '{}') : (b.special_requests || {});
+                const parsed = typeof b.special_requests === 'string' ? JSON.parse(b.special_requests || '{}') : (b.special_requests || {});
+                m = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
                 if (!m.is_manual_dates) {
                   sendDateChangeNotification(
                     b.id,

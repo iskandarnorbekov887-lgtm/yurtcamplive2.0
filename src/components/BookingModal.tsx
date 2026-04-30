@@ -150,14 +150,16 @@ export function BookingModal(props: BookingModalProps) {
 
   const currentMeta = useMemo(() => {
     if (!sel) return {};
+    let meta: any = {};
     try {
       const parsed = typeof sel.special_requests === 'string'
         ? JSON.parse(sel.special_requests || '{}')
         : (sel.special_requests || {});
-      return Array.isArray(parsed) ? { days: parsed } : (parsed || {});
-    } catch {
-      return {};
+      meta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
+    } catch (err) {
+      console.error('Metadata parse error:', err);
     }
+    return meta;
   }, [sel?.special_requests]);
 
 
