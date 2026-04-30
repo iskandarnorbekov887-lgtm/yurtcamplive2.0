@@ -632,24 +632,43 @@ export function BookingModal(props: BookingModalProps) {
                                 flash('✓ Dates updated.');
                               }
 
-                                let metaToUpdate: any = {};
+                                let currentMeta: any = {};
                                 try {
                                   const parsed = typeof sel.special_requests === 'string'
                                     ? JSON.parse(sel.special_requests || '{}')
                                     : (sel.special_requests || {});
-                                  metaToUpdate = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
+                                  currentMeta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
                                 } catch {
-                                  metaToUpdate = {};
+                                  currentMeta = {};
                                 }
                                 updates.special_requests = JSON.stringify({ 
-                                  ...metaToUpdate, 
+                                  ...currentMeta, 
                                   is_manual_dates: true, 
                                   days: dayEntries,
                                   last_adjustment: adj
                                 });
                                 if (onUpdateBooking) await onUpdateBooking(sel.id, updates);
 
-                                flash('✓ Dates updated in System. Google Calendar remains unchanged.');
+                                // Sync to Google Calendar
+                                if (sel.google_event_id) {
+                                  try {
+                                    await fetch('/api/calendar/events', {
+                                      method: 'PATCH',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({
+                                        eventId: sel.google_event_id,
+                                        start: updates.check_in,
+                                        end: updates.check_out
+                                      })
+                                    });
+                                    flash('✓ Dates updated in System & Google Calendar.');
+                                  } catch (err) {
+                                    console.error('GC Sync Error:', err);
+                                    flash('✓ System updated. GC sync failed.');
+                                  }
+                                } else {
+                                  flash('✓ Dates updated.');
+                                }
                                 setEditingDates(false);
                                 setDateAdjAmount('');
                                 if (onRefresh) onRefresh();

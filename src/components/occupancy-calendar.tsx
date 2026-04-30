@@ -257,13 +257,32 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
     }
   };
 
-  const syncToGoogleCalendar = (booking: Booking) => {
+  const syncToGoogleCalendar = async (booking: Booking) => {
+    if (!booking.google_event_id) return;
     console.log('🔄 SYNCING TO GOOGLE CALENDAR:', {
-      summary: `Booking: ${booking.guest_name} (${booking.num_people || booking.number_of_people} ppl)`,
+      id: booking.google_event_id,
       start: booking.check_in,
-      end: booking.check_out,
-      description: `Sync from ${booking.created_by_role || 'System'} portal`
+      end: booking.check_out
     });
+    try {
+      const res = await fetch('/api/calendar/events', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId: booking.google_event_id,
+          start: booking.check_in,
+          end: booking.check_out
+        })
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        console.error('GC Sync Failed:', data.error);
+      } else {
+        console.log('✓ GC Sync Success');
+      }
+    } catch (err) {
+      console.error('GC Sync Error:', err);
+    }
   };
 
   const handleUpdate = async () => {
