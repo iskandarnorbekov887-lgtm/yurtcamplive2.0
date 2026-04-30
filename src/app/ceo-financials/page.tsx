@@ -29,10 +29,12 @@ function CEOFinancialCalendar() {
   const [dayReceipts, setDayReceipts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [cashBox, setCashBox] = useState<{ USD: number; UZS: number; EUR: number }>({ USD: 0, UZS: 0, EUR: 0 });
+  const [checkedInCounts, setCheckedInCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     fetchCashBox();
-  }, []);
+    fetchCheckedInCounts();
+  }, [currentDate]);
 
   const fetchCashBox = async () => {
     const { data } = await supabase.from('payments').select('*').eq('method', 'Cash');
@@ -42,6 +44,41 @@ function CEOFinancialCalendar() {
         return acc;
       }, { USD: 0, UZS: 0, EUR: 0 });
       setCashBox(summary);
+    }
+  };
+
+  const fetchCheckedInCounts = async () => {
+    const start = new Date(year, month, 1).toISOString();
+    const end = new Date(year, month + 1, 0).toISOString();
+    
+    try {
+      const { data } = await supabase
+        .from('bookings')
+        .select('check_in, check_out, status, number_of_people, guest_count')
+        .gte('check_in', start)
+        .lte('check_in', end)
+        .in('status', ['checked_in', 'completed']);
+
+      if (data) {
+        const counts: Record<string, number> = {};
+        data.forEach(booking => {
+          const checkIn = booking.check_in;
+          const checkOut = booking.check_out;
+          const people = booking.number_of_people || booking.guest_count || 1;
+          
+          // Count for each day of the stay
+          const current = new Date(checkIn);
+          const end = new Date(checkOut);
+          while (current <= end) {
+            const dateStr = current.toISOString().split('T')[0];
+            counts[dateStr] = (counts[dateStr] || 0) + people;
+            current.setDate(current.getDate() + 1);
+          }
+        });
+        setCheckedInCounts(counts);
+      }
+    } catch (error) {
+      console.error('Error fetching checked-in counts:', error);
     }
   };
 
@@ -64,26 +101,27 @@ function CEOFinancialCalendar() {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
     try {
-      // Fetch camp finances
+      // Fetch camp finances (expenses)
       const { data: finances } = await supabase
         .from('camp_finances')
         .select('*')
         .eq('date', dateStr)
         .order('created_at', { ascending: false });
 
-      // Fetch bookings that checked out on this day
+      // Fetch bookings that checked out on this day with settled tabs
       const { data: bookings } = await supabase
         .from('bookings')
         .select('*')
         .eq('check_out', dateStr)
-        .in('status', ['completed', 'checked_in'])
+        .in('status', ['completed'])
         .order('check_out', { ascending: false });
 
-      // Fetch receipts created on this day
+      // Fetch receipts created on this day (revenue from settled tabs)
       const { data: receipts } = await supabase
         .from('booking_receipts')
         .select('*')
-        .eq('created_at', `like%${dateStr}%`)
+        .gte('created_at', `${dateStr}T00:00:00`)
+        .lte('created_at', `${dateStr}T23:59:59`)
         .order('created_at', { ascending: false });
 
       setDayFinances(finances || []);
@@ -224,17 +262,24 @@ function CEOFinancialCalendar() {
             {Array.from({ length: daysInMonth }).map((_, i) => {
               const day = i + 1;
               const isToday = new Date().toDateString() === new Date(year, month, day).toDateString();
+              const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              const count = checkedInCounts[dateStr] || 0;
               return (
                 <button
                   key={day}
                   onClick={() => handleDayClick(day)}
-                  className={`min-h-[80px] p-2 rounded-xl border-2 transition-all ${
+                  className={`min-h-[80px] p-2 rounded-xl border-2 transition-all relative ${
                     isToday
                       ? 'border-indigo-600 bg-indigo-50'
                       : 'border-slate-200 hover:border-indigo-400 hover:bg-indigo-50'
                   }`}
                 >
                   <span className="text-sm font-bold text-slate-800">{day}</span>
+                  {count > 0 && (
+                    <span className="absolute top-1 right-1 w-6 h-6 bg-emerald-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm">
+                      {count}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -268,85 +313,82 @@ function CEOFinancialCalendar() {
                   <p className="text-sm font-black text-slate-900 mb-1">Net Profit</p>
                   <p className="text-3xl font-black text-slate-900">
                     {(() => {
-                      const income = dayFinances.filter(f => f.type === 'income').reduce((sum, f) => sum + f.amount_uzs, 0);
+                      const revenue = dayReceipts.reduce((sum, r) => sum + (r.total_usd || 0), 0);
                       const expenses = dayFinances.filter(f => f.type === 'expense').reduce((sum, f) => sum + f.amount_uzs, 0);
-                      const net = income - expenses;
-                      return `${net.toLocaleString('uz-UZ', { minimumFractionDigits: 2 })} UZS`;
+                      const expenseUsd = expenses / 12500; // Approximate conversion
+                      const net = revenue - expenseUsd;
+                      return `${net.toFixed(2)} USD`;
                     })()}
                   </p>
                 </div>
 
-                {/* Guest Tabs Section */}
-                {dayBookings.length > 0 && (
-                  <div className="mb-6">
-                    <h4 className="text-sm font-black text-indigo-900 uppercase tracking-widest mb-3">Guest Tabs (Checked Out)</h4>
+                <div className="grid grid-cols-2 gap-6">
+                  {/* Left: Guest Payments (Revenue) */}
+                  <div>
+                    <h4 className="text-sm font-black text-emerald-900 uppercase tracking-widest mb-3">Guest Payments</h4>
                     <div className="space-y-3">
-                      {dayBookings.map((booking) => (
-                        <button
-                          key={booking.id}
-                          onClick={() => handleBookingClick(booking)}
-                          className="w-full p-4 rounded-xl border-2 bg-indigo-50 border-indigo-200 text-left transition-all hover:shadow-lg hover:border-indigo-400"
-                        >
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-bold text-slate-800">{booking.guest_name}</p>
-                              <p className="text-sm text-slate-600">
-                                {booking.check_in} → {booking.check_out}
-                              </p>
-                              <p className="text-xs text-slate-500 mt-1">
-                                Status: {booking.status === 'completed' ? 'Completed' : 'Checked In'}
-                              </p>
+                      {dayReceipts.length > 0 ? dayReceipts.map((receipt) => (
+                        <div key={receipt.id} className="p-3 rounded-xl border-2 bg-emerald-50 border-emerald-200">
+                          <p className="font-bold text-slate-800 text-sm">Tab {receipt.receipt_id}</p>
+                          {receipt.snapshot?.payments?.map((payment: any, idx: number) => (
+                            <div key={idx} className="mt-2 text-xs">
+                              <p className="text-slate-600">{payment.method}</p>
+                              <p className="font-black text-emerald-700">{payment.amount} {payment.currency}</p>
                             </div>
-                            <div className="text-right">
-                              <p className="font-black text-indigo-700">
-                                ${(booking.total_price || 0).toFixed(2)}
-                              </p>
-                              <p className="text-xs text-slate-500">
-                                Collected: ${(booking.collected_amount || 0).toFixed(2)}
-                              </p>
-                            </div>
-                          </div>
-                        </button>
-                      ))}
+                          ))}
+                          <p className="mt-2 text-xs font-black text-slate-900">Total: ${(receipt.total_usd || 0).toFixed(2)}</p>
+                        </div>
+                      )) : (
+                        <p className="text-center text-slate-500 italic text-sm">No settled tabs for this day</p>
+                      )}
                     </div>
                   </div>
-                )}
 
-                {/* Finances Section */}
-                <div>
-                  <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-3">Camp Finances</h4>
-                  <div className="space-y-3">
-                    {dayFinances.map((finance) => (
-                      <button
-                        key={finance.id}
-                        onClick={() => handleFinanceClick(finance)}
-                        className={`w-full p-4 rounded-xl border-2 text-left transition-all hover:shadow-lg ${
-                          finance.type === 'income'
-                            ? 'bg-emerald-50 border-emerald-200 hover:border-emerald-400'
-                            : 'bg-rose-50 border-rose-200 hover:border-rose-400'
-                        }`}
-                      >
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <p className="font-bold text-slate-800">
-                              {finance.type === 'income' ? finance.guest_name : finance.category}
-                            </p>
-                            <p className="text-sm text-slate-600">{finance.description}</p>
-                          </div>
-                          <p className={`font-black ${
-                            finance.type === 'income' ? 'text-emerald-700' : 'text-rose-700'
-                          }`}>
-                            {finance.original_amount.toLocaleString()} {finance.currency}
-                          </p>
-                        </div>
-                      </button>
-                    ))}
+                  {/* Right: Expenses by Category */}
+                  <div>
+                    <h4 className="text-sm font-black text-rose-900 uppercase tracking-widest mb-3">Expenses</h4>
+                    <div className="space-y-3">
+                      {(() => {
+                        const expensesByCategory = dayFinances
+                          .filter(f => f.type === 'expense')
+                          .reduce((acc: any, f) => {
+                            const cat = f.category || 'Other';
+                            if (!acc[cat]) acc[cat] = { total: 0, count: 0, items: [] };
+                            acc[cat].total += f.amount_uzs;
+                            acc[cat].count += 1;
+                            acc[cat].items.push(f);
+                            return acc;
+                          }, {});
+
+                        return Object.keys(expensesByCategory).length > 0 ? (
+                          Object.entries(expensesByCategory).map(([category, data]: any) => (
+                            <button
+                              key={category}
+                              onClick={() => {
+                                // Show expense details
+                                const expense = data.items[0];
+                                if (expense) handleFinanceClick(expense);
+                              }}
+                              className="w-full p-3 rounded-xl border-2 bg-rose-50 border-rose-200 text-left hover:shadow-lg hover:border-rose-400 transition-all"
+                            >
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <p className="font-bold text-slate-800 text-sm">{category}</p>
+                                  <p className="text-xs text-slate-600">{data.count} item(s)</p>
+                                </div>
+                                <p className="font-black text-rose-700 text-sm">
+                                  {(data.total / 12500).toFixed(2)} USD
+                                </p>
+                              </div>
+                            </button>
+                          ))
+                        ) : (
+                          <p className="text-center text-slate-500 italic text-sm">No expenses for this day</p>
+                        );
+                      })()}
+                    </div>
                   </div>
                 </div>
-
-                {dayFinances.length === 0 && dayBookings.length === 0 && (
-                  <p className="text-center text-slate-500 italic">No transactions or guest tabs for this day</p>
-                )}
               </>
             )}
           </div>
