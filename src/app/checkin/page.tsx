@@ -153,6 +153,7 @@ function CheckinPortal() {
           onCheckIn={userRole === 'Manager' || userRole === 'CEO' ? checkIn : undefined}
           onCheckOut={userRole === 'Manager' || userRole === 'CEO' ? checkOut : undefined}
           onUpdateBooking={userRole !== 'Cook' ? handleUpdateBooking : undefined}
+          onRefresh={fetchData}
         />
       </main>
     </div>

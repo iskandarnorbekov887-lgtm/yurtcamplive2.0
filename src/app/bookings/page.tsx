@@ -104,6 +104,7 @@ function ReserverPortal() {
           onCancelBooking={cancelBooking}
           onUpdateBooking={handleUpdateBooking}
           onAddNewBooking={(date) => openIncomeForm(date)}
+          onRefresh={fetchData}
         />
         
         <div className="bg-white rounded-[2rem] border border-slate-100 shadow-xl overflow-hidden">

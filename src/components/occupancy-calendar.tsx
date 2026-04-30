@@ -336,6 +336,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
 
       // 7. Success actions
       syncToGoogleCalendar(updatedSel);
+      if (typeof onRefresh === 'function') onRefresh();
     } catch (err) {
       console.error('Update failed:', err);
     }
