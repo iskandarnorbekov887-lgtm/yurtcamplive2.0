@@ -640,7 +640,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                           <div className="pt-6 border-t border-slate-100 flex justify-between items-end">
                             <div>
                               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tab Total</p>
-                              <p className="text-2xl font-black text-slate-900">${String(isClosed ? activeTab.total : (sel.total_price || 0))}</p>
+                              <p className="text-2xl font-black text-slate-900">${String(isClosed ? (activeTab?.total || 0) : (sel.total_price || 0))}</p>
                             </div>
                             {!isClosed && (
                               <button 
