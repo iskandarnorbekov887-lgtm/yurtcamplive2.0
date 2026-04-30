@@ -1096,6 +1096,28 @@ export function BookingModal(props: BookingModalProps) {
                         )}
                       </div>
                     )}
+
+                    {(() => {
+                      let currentMeta: any = {};
+                      try {
+                        const parsed = typeof sel.special_requests === 'string'
+                          ? JSON.parse(sel.special_requests || '{}')
+                          : (sel.special_requests || {});
+                        currentMeta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
+                      } catch {
+                        currentMeta = {};
+                      }
+                      const lastAdjustment = parseFloat(currentMeta.last_adjustment) || 0;
+                      if (lastAdjustment > 0) {
+                        return (
+                          <div className="flex justify-between items-center opacity-90 border-b border-white/20 pb-2 mb-2">
+                            <span className="font-bold text-amber-200">Stay Extension</span>
+                            <span className="font-black text-amber-300">+${String(lastAdjustment.toFixed(2))}</span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                     
                     {(() => {
                       const sItems = [
