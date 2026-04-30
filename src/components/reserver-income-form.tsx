@@ -136,14 +136,14 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
       const amountUZS = currency === 'UZS' ? amountValue : amountValue * rateValue;
       const total_price = currency === 'USD' ? amountValue : amountUZS / rateValue;
 
-      const { error } = await supabase.from('bookings').insert([{
+      const { error, data: bookingData } = await supabase.from('bookings').insert([{
         yurt_id: null, // Reserver bookings don't require specific yurt
         guest_name: validGuestNames.join(', '),
         check_in: checkIn || new Date().toISOString().split('T')[0],
         check_out: bookingType === 'pool' ? checkIn : (checkOut || checkIn || new Date().toISOString().split('T')[0]),
         total_price: total_price || 0,
         number_of_people: guestCount,
-        payment_status: 'Unpaid',
+        payment_status: bookingType === 'pool' ? 'paid' : 'Unpaid',
         source: isSystemOnly ? 'System' : 'Manual',
         status: 'confirmed',
         notes: description || null,
@@ -192,7 +192,7 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
         laundry: false,
         laundry_price: null,
         laundry_currency: 'UZS',
-        payment_method: paymentMethod,
+        payment_method: bookingType === 'pool' ? 'paid' : paymentMethod,
         payment_note: paymentNote || null,
         currency: currency,
         exchange_rate: rateValue,
@@ -200,8 +200,24 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
         description: description,
         cooking_class: dayEntries.some(d => d.cookingClass),
         cooking_class_description: dayEntries.filter(d => d.cookingClass && d.cookingClassDescription).map(d => d.cookingClassDescription).join('; ') || null,
-      }]);
+      }]).select();
       if (error) throw error;
+
+      // For pool bookings, record payment to booking_receipts
+      if (bookingType === 'pool' && bookingData && bookingData[0]) {
+        const bookingId = bookingData[0].id;
+        const paymentDate = checkIn || new Date().toISOString().split('T')[0];
+        await supabase.from('booking_receipts').insert([{
+          booking_id: bookingId,
+          amount: amountValue || 0,
+          currency: currency,
+          settled_at: paymentDate,
+          created_at: new Date().toISOString(),
+          created_by_id: currentUserId || '',
+          note: `Pool entry payment for ${poolEntryCount} visitors`,
+        }]);
+      }
+
       setMessage('Booking saved successfully!'); setTimeout(() => { onSuccess(); resetForm(); setMessage(''); }, 1000);
     } catch (err: any) { setMessage(`Error: ${err.message}`); } finally { setSubmitting(false); }
   };
@@ -491,92 +507,127 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
             );
           })}
 
-          {/* Payment Method */}
-          <div className="border-2 border-slate-200 rounded-xl p-4 space-y-4">
-            <label className="block text-sm font-black text-slate-900">Payment Method *</label>
-            <div className="space-y-3">
+          {/* Payment Section */}
+          {bookingType === 'pool' ? (
+            <div className="border-2 border-slate-200 rounded-xl p-4 space-y-4 bg-cyan-50 border-cyan-200">
+              <label className="block text-sm font-black text-cyan-900">Pool Entry Payment *</label>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs font-bold text-cyan-700 mb-1">Amount</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="Enter amount"
+                    className="w-full px-3 py-2 border-2 border-cyan-300 rounded-lg text-sm font-bold text-black focus:border-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-cyan-700 mb-1">Currency</label>
+                  <select
+                    value={currency}
+                    onChange={(e) => { setCurrency(e.target.value as 'UZS' | 'USD' | 'EUR'); setExchangeRate(e.target.value === 'UZS' ? '1' : exchangeRate); }}
+                    className="px-3 py-2 border-2 border-cyan-300 rounded-lg text-sm font-bold text-black focus:border-cyan-500"
+                  >
+                    <option value="UZS">UZS (SUM)</option>
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                  </select>
+                </div>
+              </div>
+              <div className="text-xs text-cyan-600 font-semibold">
+                Payment will be recorded for {checkIn} and shown on all calendars
+              </div>
+            </div>
+          ) : (
+            <div className="border-2 border-slate-200 rounded-xl p-4 space-y-4">
+              <label className="block text-sm font-black text-slate-900">Payment Method *</label>
+              <div className="space-y-3">
 
-              {/* Option 1: To be paid in the camp */}
-              <div className={`rounded-xl border-2 p-3 transition-all ${paymentMethod === 'in_camp' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200'}`}>
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input type="radio" name="paymentMethod" checked={paymentMethod === 'in_camp'} onChange={() => setPaymentMethod('in_camp')} className="w-5 h-5 border-2 border-slate-300 text-emerald-600" />
-                  <span className="text-slate-900 font-bold">To be paid in the camp</span>
-                </label>
-                {paymentMethod === 'in_camp' && (
-                  <div className="mt-3 space-y-3">
-                    <div className="flex gap-2">
-                      <div className="flex-1">
-                        <label className="block text-xs font-bold text-slate-600 mb-1">Amount</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={amount}
-                          onChange={(e) => setAmount(e.target.value)}
-                          placeholder="Enter amount (optional)"
-                          className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black focus:border-emerald-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">Currency *</label>
-                        <select
-                          value={currency}
-                          onChange={(e) => { setCurrency(e.target.value as 'UZS' | 'USD' | 'EUR'); setExchangeRate(e.target.value === 'UZS' ? '1' : exchangeRate); }}
-                          className="px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black focus:border-emerald-500"
-                        >
-                          <option value="USD">USD</option>
-                          <option value="UZS">UZS</option>
-                          <option value="EUR">EUR</option>
-                        </select>
+                {/* Option 1: To be paid in the camp */}
+                <div className={`rounded-xl border-2 p-3 transition-all ${paymentMethod === 'in_camp' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200'}`}>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="radio" name="paymentMethod" checked={paymentMethod === 'in_camp'} onChange={() => setPaymentMethod('in_camp')} className="w-5 h-5 border-2 border-slate-300 text-emerald-600" />
+                    <span className="text-slate-900 font-bold">To be paid in the camp</span>
+                  </label>
+                  {paymentMethod === 'in_camp' && (
+                    <div className="mt-3 space-y-3">
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <label className="block text-xs font-bold text-slate-600 mb-1">Amount</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={amount}
+                            onChange={(e) => setAmount(e.target.value)}
+                            placeholder="Enter amount (optional)"
+                            className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black focus:border-emerald-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-600 mb-1">Currency *</label>
+                          <select
+                            value={currency}
+                            onChange={(e) => { setCurrency(e.target.value as 'UZS' | 'USD' | 'EUR'); setExchangeRate(e.target.value === 'UZS' ? '1' : exchangeRate); }}
+                            className="px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black focus:border-emerald-500"
+                          >
+                            <option value="USD">USD</option>
+                            <option value="UZS">UZS</option>
+                            <option value="EUR">EUR</option>
+                          </select>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
 
-              {/* Option 2: All paid */}
-              <div className={`rounded-xl border-2 p-3 transition-all ${paymentMethod === 'all_paid' ? 'border-blue-500 bg-blue-50' : 'border-slate-200'}`}>
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input type="radio" name="paymentMethod" checked={paymentMethod === 'all_paid'} onChange={() => setPaymentMethod('all_paid')} className="w-5 h-5 border-2 border-slate-300 text-blue-600" />
-                  <span className="text-slate-900 font-bold">All paid</span>
-                </label>
-                {paymentMethod === 'all_paid' && (
-                  <div className="mt-3">
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Message (optional)</label>
-                    <textarea
-                      value={paymentNote}
-                      onChange={(e) => setPaymentNote(e.target.value)}
-                      placeholder="Optional note..."
-                      rows={2}
-                      className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black focus:border-blue-500"
-                    />
-                  </div>
-                )}
-              </div>
+                {/* Option 2: All paid */}
+                <div className={`rounded-xl border-2 p-3 transition-all ${paymentMethod === 'all_paid' ? 'border-blue-500 bg-blue-50' : 'border-slate-200'}`}>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="radio" name="paymentMethod" checked={paymentMethod === 'all_paid'} onChange={() => setPaymentMethod('all_paid')} className="w-5 h-5 border-2 border-slate-300 text-blue-600" />
+                    <span className="text-slate-900 font-bold">All paid</span>
+                  </label>
+                  {paymentMethod === 'all_paid' && (
+                    <div className="mt-3">
+                      <label className="block text-xs font-bold text-slate-600 mb-1">Message (optional)</label>
+                      <textarea
+                        value={paymentNote}
+                        onChange={(e) => setPaymentNote(e.target.value)}
+                        placeholder="Optional note..."
+                        rows={2}
+                        className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black focus:border-blue-500"
+                      />
+                    </div>
+                  )}
+                </div>
 
-              {/* Option 3: Partially paid */}
-              <div className={`rounded-xl border-2 p-3 transition-all ${paymentMethod === 'partially_paid' ? 'border-amber-500 bg-amber-50' : 'border-slate-200'}`}>
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input type="radio" name="paymentMethod" checked={paymentMethod === 'partially_paid'} onChange={() => setPaymentMethod('partially_paid')} className="w-5 h-5 border-2 border-slate-300 text-amber-600" />
-                  <span className="text-slate-900 font-bold">Partially paid</span>
-                </label>
-                {paymentMethod === 'partially_paid' && (
-                  <div className="mt-3">
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Message <span className="text-red-500">*</span></label>
-                    <textarea
-                      value={paymentNote}
-                      onChange={(e) => setPaymentNote(e.target.value)}
-                      placeholder="Describe what has been paid and what is remaining..."
-                      rows={2}
-                      className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black focus:border-amber-500"
-                      required
-                    />
-                  </div>
-                )}
-              </div>
+                {/* Option 3: Partially paid */}
+                <div className={`rounded-xl border-2 p-3 transition-all ${paymentMethod === 'partially_paid' ? 'border-amber-500 bg-amber-50' : 'border-slate-200'}`}>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="radio" name="paymentMethod" checked={paymentMethod === 'partially_paid'} onChange={() => setPaymentMethod('partially_paid')} className="w-5 h-5 border-2 border-slate-300 text-amber-600" />
+                    <span className="text-slate-900 font-bold">Partially paid</span>
+                  </label>
+                  {paymentMethod === 'partially_paid' && (
+                    <div className="mt-3">
+                      <label className="block text-xs font-bold text-slate-600 mb-1">Message <span className="text-red-500">*</span></label>
+                      <textarea
+                        value={paymentNote}
+                        onChange={(e) => setPaymentNote(e.target.value)}
+                        placeholder="Describe what has been paid and what is remaining..."
+                        rows={2}
+                        className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black focus:border-amber-500"
+                        required
+                      />
+                    </div>
+                  )}
+                </div>
 
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Description */}
           <div>
