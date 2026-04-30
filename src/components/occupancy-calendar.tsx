@@ -268,20 +268,52 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
 
   const handleUpdate = async () => {
     if (!sel || !onUpdateBooking) return;
-    const updates = { ...editData };
-    if (updates.check_in || updates.check_out) {
-      updates.is_manual_dates = true;
+
+    // 1. Initialize metadata with a safe default to prevent ReferenceErrors
+    let currentMeta: any = {}; 
+    
+    try {
+      // 2. Safely parse existing metadata from special_requests
+      const parsed = typeof sel.special_requests === 'string'
+        ? JSON.parse(sel.special_requests || '{}')
+        : (sel.special_requests || {});
+
+      // 3. Ensure the result is an object, preserving previous day entries
+      currentMeta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
+    } catch (err) {
+      console.error('Metadata parse error:', err);
+      currentMeta = {}; // Fallback to empty object if JSON is broken
     }
+
+    // 4. Prepare the update payload
+    const updates: Partial<Booking> = {
+      ...editData, // Spread the new check-in/out dates
+      special_requests: JSON.stringify({ 
+        ...currentMeta, 
+        is_manual_dates: true // CRITICAL: Tells the map to ignore Google Calendar dates
+      })
+    };
+
     const updatedSel = { ...sel, ...updates } as Booking;
     setSel(updatedSel);
     setIsEditing(false);
+
     try {
+      // 5. Execute backend update
       await onUpdateBooking(sel.id, updates);
-      setPreEditCheckoutRef('');
-      originalCheckoutRef.current = updatedSel.check_out || '';
+
+      // 6. Sync local memory (Refs) so the UI doesn't revert
+      if (originalCheckoutRef) {
+        originalCheckoutRef.current = updates.check_out || '';
+      }
+      if (typeof setPreEditCheckoutRef === 'function') {
+        setPreEditCheckoutRef(''); 
+      }
+
+      // 7. Success actions
       syncToGoogleCalendar(updatedSel);
     } catch (err) {
-      console.error(err);
+      console.error('Update failed:', err);
     }
   };
 
@@ -640,7 +672,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                           <div className="pt-6 border-t border-slate-100 flex justify-between items-end">
                             <div>
                               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tab Total</p>
-                              <p className="text-2xl font-black text-slate-900">${String(isClosed ? (activeTab?.total || 0) : (sel.total_price || 0))}</p>
+                              <p className="text-2xl font-black text-slate-900">${String(isClosed ? activeTab.total : (sel.total_price || 0))}</p>
                             </div>
                             {!isClosed && (
                               <button 
