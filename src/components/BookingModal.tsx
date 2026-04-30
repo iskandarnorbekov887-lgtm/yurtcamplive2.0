@@ -1086,16 +1086,32 @@ export function BookingModal(props: BookingModalProps) {
                   </div>
                   
                   <div className="space-y-2">
-                    {(svcAmount > 0 || (isPrepaid && (sel.collected_amount || 0) === 0)) && (
-                      <div className="flex justify-between items-center opacity-90 border-b border-white/20 pb-2 mb-2">
-                        <span className="font-bold">Accommodation</span>
-                        {isPrepaid ? (
-                          <span className="text-[10px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">Prepaid</span>
-                        ) : (
-                          <span className="font-black">${String(svcAmount.toFixed(2))}</span>
-                        )}
-                      </div>
-                    )}
+                    {(svcAmount > 0 || (isPrepaid && (sel.collected_amount || 0) === 0)) && (() => {
+                      let currentMeta: any = {};
+                      try {
+                        const parsed = typeof sel.special_requests === 'string'
+                          ? JSON.parse(sel.special_requests || '{}')
+                          : (sel.special_requests || {});
+                        currentMeta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
+                      } catch {
+                        currentMeta = {};
+                      }
+                      const lastAdjustment = parseFloat(currentMeta.last_adjustment) || 0;
+                      const isExtended = lastAdjustment > 0;
+
+                      return (
+                        <div className="flex justify-between items-center opacity-90 border-b border-white/20 pb-2 mb-2">
+                          <span className="font-bold">
+                            Accommodation {isExtended && <span className="text-amber-200">(Extended)</span>}
+                          </span>
+                          {isPrepaid ? (
+                            <span className="text-[10px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">Prepaid</span>
+                          ) : (
+                            <span className="font-black">${String(svcAmount.toFixed(2))}</span>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {(() => {
                       let currentMeta: any = {};
