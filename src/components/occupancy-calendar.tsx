@@ -78,6 +78,17 @@ function getBookingStatus(b: Booking, today: string): 'checked-in' | 'checked-ou
   return 'upcoming';
 }
 
+function isPoolVisitor(b: Booking): boolean {
+  try {
+    const meta = typeof b.special_requests === 'string' 
+      ? JSON.parse(b.special_requests || '{}') 
+      : (b.special_requests || {});
+    return meta.is_pool_visitor === true;
+  } catch {
+    return false;
+  }
+}
+
 function color(b: Booking, today: string) {
   // Check if this is a system-only booking (not from Google Calendar)
   let isSystemOnly = false;
@@ -498,6 +509,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
               <div className="relative" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gridTemplateRows: `repeat(${eventRows}, 22px)`, gap: '2px 0' }}>
                 {events.map((ev, ei) => {
                   const c = color(ev.booking, today);
+                  const isPool = isPoolVisitor(ev.booking);
                   const isStart = ev.booking.check_in >= dateToStr(week[ev.colStart]);
                   const isEnd   = ev.booking.check_out <= dateToStr(week[ev.colEnd]);
                   const isCancelled = ev.booking.status === 'cancelled';
@@ -511,6 +523,47 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                   const isNeglectedCheckout = ev.booking.status === 'checked_in' &&
                     checkOutDateStr === today &&
                     now.getHours() >= 12;
+
+                  // Pool visitors render as circular icons
+                  if (isPool) {
+                    let poolCount = 1;
+                    try {
+                      const meta = typeof ev.booking.special_requests === 'string' 
+                        ? JSON.parse(ev.booking.special_requests || '{}') 
+                        : (ev.booking.special_requests || {});
+                      poolCount = meta.pool_entry_count || 1;
+                    } catch {}
+
+                    return (
+                      <button
+                        key={ei}
+                        onClick={() => {
+                          setSel(ev.booking);
+                          setEditData(ev.booking);
+                          setIsEditing(false);
+                        }}
+                        title={`Pool Visitor: ${ev.booking.guest_name} (${poolCount} people)`}
+                        style={{
+                          gridColumn: `${ev.colStart + 1} / ${ev.colStart + 2}`,
+                          gridRow: `${ev.lane + 1}`,
+                          backgroundColor: '#06B6D4', // Cyan for pool
+                          color: '#FFFFFF',
+                          borderRadius: '50%',
+                          width: '20px',
+                          height: '20px',
+                          margin: '1px auto',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '10px',
+                        }}
+                        className="hover:brightness-90 transition-all"
+                      >
+                        🏊
+                      </button>
+                    );
+                  }
 
                   return (
                     <button

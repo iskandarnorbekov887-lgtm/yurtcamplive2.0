@@ -41,9 +41,11 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
   const [bypassDuplicateCheck, setBypassDuplicateCheck] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
+  const [bookingType, setBookingType] = useState<'international' | 'local' | 'pool'>('international');
   const [guestNames, setGuestNames] = useState<string[]>(['']);
   const [guestCount, setGuestCount] = useState(1);
   const [childrenUnder12, setChildrenUnder12] = useState(0);
+  const [poolEntryCount, setPoolEntryCount] = useState(1);
   const [checkIn, setCheckIn] = useState(selectedDate || '');
   const [checkOut, setCheckOut] = useState('');
   const [calViewYear, setCalViewYear] = useState(() => selectedDate ? new Date(selectedDate + 'T00:00:00').getFullYear() : new Date().getFullYear());
@@ -72,6 +74,12 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
       setCalViewMonth(ci.getMonth());
     }
   }, [selectedDate]);
+
+  useEffect(() => {
+    if (bookingType === 'pool' && checkIn) {
+      setCheckOut(checkIn);
+    }
+  }, [bookingType, checkIn]);
 
   useEffect(() => {
     if (!checkIn) return;
@@ -132,7 +140,7 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
         yurt_id: null, // Reserver bookings don't require specific yurt
         guest_name: validGuestNames.join(', '),
         check_in: checkIn || new Date().toISOString().split('T')[0],
-        check_out: checkOut || checkIn || new Date().toISOString().split('T')[0],
+        check_out: bookingType === 'pool' ? checkIn : (checkOut || checkIn || new Date().toISOString().split('T')[0]),
         total_price: total_price || 0,
         number_of_people: guestCount,
         payment_status: 'Unpaid',
@@ -150,6 +158,10 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
             meta.is_system_only = true;
             meta.is_manual_dates = true;
           }
+          if (bookingType === 'pool') {
+            meta.is_pool_visitor = true;
+            meta.pool_entry_count = poolEntryCount;
+          }
           return Object.keys(meta).length > 0 ? JSON.stringify(meta) : null; 
         })(),
         created_by_role: 'Manager',
@@ -163,7 +175,7 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
         // Service fields
         guest_count: guestCount,
         children_under_12: childrenUnder12,
-        nights: (checkOut && checkIn) ? Math.round((new Date(checkOut + 'T00:00:00').getTime() - new Date(checkIn + 'T00:00:00').getTime()) / 86400000).toString() : null,
+        nights: bookingType === 'pool' ? '0' : (checkOut && checkIn) ? Math.round((new Date(checkOut + 'T00:00:00').getTime() - new Date(checkIn + 'T00:00:00').getTime()) / 86400000).toString() : null,
         guide_service: dayEntries.some(d => d.guideService),
         guide_names: dayEntries.filter(d => d.guideService).flatMap(d => d.guideNames.filter(n => n.trim())).join(', ') || null,
         guide_amount: null,
@@ -195,7 +207,8 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
   };
 
   const resetForm = () => {
-    setGuestNames(['']); setGuestCount(1); setChildrenUnder12(0);
+    setBookingType('international');
+    setGuestNames(['']); setGuestCount(1); setChildrenUnder12(0); setPoolEntryCount(1);
     setCheckIn(selectedDate || ''); setCheckOut('');
     setDayEntries(selectedDate ? [makeBlankDay(selectedDate)] : []); setIskyCampRequests('');
     setCurrency('USD'); setExchangeRate('1'); setPaymentMethod('in_camp'); setAmount(''); setPaymentNote(''); setDescription('');
@@ -216,6 +229,24 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
         </div>
         {message && <div className={`mb-4 p-3 rounded-lg text-sm ${message.includes('Error') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>{message}</div>}
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+          {/* Booking Type Toggle */}
+          <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
+            {(['international', 'local', 'pool'] as const).map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => setBookingType(type)}
+                className={`flex-1 py-2 px-4 rounded-lg text-xs font-bold capitalize transition-all ${
+                  bookingType === type 
+                    ? 'bg-white text-slate-900 shadow-sm' 
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {type === 'pool' ? '🏊 Pool Only' : type}
+              </button>
+            ))}
+          </div>
+
           {/* Guest Names */}
           <div>
             <label className="block text-sm font-black text-slate-900 mb-2">Guest Names *</label>
@@ -233,12 +264,17 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
           <div className="grid grid-cols-2 gap-4">
             <div><label className="block text-sm font-black text-slate-900 mb-2">Total Guests</label>
               <input type="number" min="1" value={guestCount} onChange={(e) => setGuestCount(parseInt(e.target.value) || 1)} className="w-full px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm" /></div>
-            <div><label className="block text-sm font-black text-slate-900 mb-2">Children Under 12</label>
-              <input type="number" min="0" value={childrenUnder12} onChange={(e) => setChildrenUnder12(parseInt(e.target.value) || 0)} className="w-full px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm" /></div>
+            {bookingType === 'pool' ? (
+              <div><label className="block text-sm font-black text-slate-900 mb-2">Pool Entry Count</label>
+                <input type="number" min="1" value={poolEntryCount} onChange={(e) => setPoolEntryCount(parseInt(e.target.value) || 1)} className="w-full px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm" /></div>
+            ) : (
+              <div><label className="block text-sm font-black text-slate-900 mb-2">Children Under 12</label>
+                <input type="number" min="0" value={childrenUnder12} onChange={(e) => setChildrenUnder12(parseInt(e.target.value) || 0)} className="w-full px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm" /></div>
+            )}
           </div>
 
-          {/* Mini Check-out Calendar */}
-          {(() => {
+          {/* Mini Check-out Calendar - hide for pool type */}
+          {bookingType !== 'pool' && (() => {
             const pad2 = (n: number) => String(n).padStart(2, '0');
             const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
             const firstDay = new Date(calViewYear, calViewMonth, 1).getDay();
@@ -319,10 +355,11 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
           </div>
 
           {/* Day-by-Day Services */}
-          {!checkOut && dayEntries.length <= 1 && (
+          {bookingType === 'pool' ? (
+            <p className="text-xs text-slate-400 text-center border-2 border-dashed border-slate-200 rounded-xl py-3">Pool visitors do not require meal or transport services</p>
+          ) : !checkOut && dayEntries.length <= 1 ? (
             <p className="text-xs text-slate-400 text-center border-2 border-dashed border-slate-200 rounded-xl py-3">Pick a check-out date above to expand services per day</p>
-          )}
-          {dayEntries.map((day, dayIndex) => {
+          ) : dayEntries.map((day, dayIndex) => {
             const d = new Date(day.date + 'T00:00:00');
             const dateLabel = `${d.getDate()} ${d.toLocaleString('en-US', { month: 'long' })}`;
             const isFirst = dayIndex === 0;
@@ -336,26 +373,42 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
                 </div>
                 <div className="p-4 space-y-3">
                   <div className="flex flex-wrap gap-4 items-center">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={day.lunch} onChange={e => updateDay(dayIndex, { lunch: e.target.checked })} className="w-5 h-5 border-2 border-slate-300 text-emerald-600 rounded" />
-                      <span className="text-sm font-semibold text-slate-900">Lunch</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={day.dinner} onChange={e => updateDay(dayIndex, { dinner: e.target.checked })} className="w-5 h-5 border-2 border-slate-300 text-emerald-600 rounded" />
-                      <span className="text-sm font-semibold text-slate-900">Dinner</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={day.cookingClass} onChange={e => updateDay(dayIndex, { cookingClass: e.target.checked })} className="w-5 h-5 border-2 border-slate-300 text-emerald-600 rounded" />
-                      <span className="text-sm font-semibold text-slate-900">Cooking Class</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={day.guideService} onChange={e => updateDay(dayIndex, { guideService: e.target.checked })} className="w-5 h-5 border-2 border-slate-300 text-emerald-600 rounded" />
-                      <span className="text-sm font-semibold text-slate-900">Guide</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={day.transportation} onChange={e => updateDay(dayIndex, { transportation: e.target.checked })} className="w-5 h-5 border-2 border-slate-300 text-emerald-600 rounded" />
-                      <span className="text-sm font-semibold text-slate-900">Transport</span>
-                    </label>
+                    {bookingType === 'international' && (
+                      <>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={day.lunch} onChange={e => updateDay(dayIndex, { lunch: e.target.checked })} className="w-5 h-5 border-2 border-slate-300 text-emerald-600 rounded" />
+                          <span className="text-sm font-semibold text-slate-900">Lunch</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={day.dinner} onChange={e => updateDay(dayIndex, { dinner: e.target.checked })} className="w-5 h-5 border-2 border-slate-300 text-emerald-600 rounded" />
+                          <span className="text-sm font-semibold text-slate-900">Dinner</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={day.cookingClass} onChange={e => updateDay(dayIndex, { cookingClass: e.target.checked })} className="w-5 h-5 border-2 border-slate-300 text-emerald-600 rounded" />
+                          <span className="text-sm font-semibold text-slate-900">Cooking Class</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={day.guideService} onChange={e => updateDay(dayIndex, { guideService: e.target.checked })} className="w-5 h-5 border-2 border-slate-300 text-emerald-600 rounded" />
+                          <span className="text-sm font-semibold text-slate-900">Guide</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={day.transportation} onChange={e => updateDay(dayIndex, { transportation: e.target.checked })} className="w-5 h-5 border-2 border-slate-300 text-emerald-600 rounded" />
+                          <span className="text-sm font-semibold text-slate-900">Transport</span>
+                        </label>
+                      </>
+                    )}
+                    {bookingType === 'local' && (
+                      <>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={day.lunch} onChange={e => updateDay(dayIndex, { lunch: e.target.checked })} className="w-5 h-5 border-2 border-slate-300 text-emerald-600 rounded" />
+                          <span className="text-sm font-semibold text-slate-900">Lunch</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={day.dinner} onChange={e => updateDay(dayIndex, { dinner: e.target.checked })} className="w-5 h-5 border-2 border-slate-300 text-emerald-600 rounded" />
+                          <span className="text-sm font-semibold text-slate-900">Dinner</span>
+                        </label>
+                      </>
+                    )}
                   </div>
                   {(day.lunch || day.dinner) && (
                     <input type="text" value={day.lunchDietary}
