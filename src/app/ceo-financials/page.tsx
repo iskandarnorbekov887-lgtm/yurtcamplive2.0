@@ -262,24 +262,17 @@ function CEOFinancialCalendar() {
             {Array.from({ length: daysInMonth }).map((_, i) => {
               const day = i + 1;
               const isToday = new Date().toDateString() === new Date(year, month, day).toDateString();
-              const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-              const count = checkedInCounts[dateStr] || 0;
               return (
                 <button
                   key={day}
                   onClick={() => handleDayClick(day)}
-                  className={`min-h-[80px] p-2 rounded-xl border-2 transition-all relative ${
+                  className={`min-h-[80px] p-2 rounded-xl border-2 transition-all ${
                     isToday
                       ? 'border-indigo-600 bg-indigo-50'
                       : 'border-slate-200 hover:border-indigo-400 hover:bg-indigo-50'
                   }`}
                 >
                   <span className="text-sm font-bold text-slate-800">{day}</span>
-                  {count > 0 && (
-                    <span className="absolute top-1 right-1 w-6 h-6 bg-emerald-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm">
-                      {count}
-                    </span>
-                  )}
                 </button>
               );
             })}
