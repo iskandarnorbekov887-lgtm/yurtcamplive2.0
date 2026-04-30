@@ -7,7 +7,6 @@ import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { OccupancyCalendar } from '@/components/occupancy-calendar';
-import { ReserverIncomeForm } from '@/components/reserver-income-form';
 
 // Force dynamic rendering to avoid SSR issues with auth
 export const dynamic = 'force-dynamic';
@@ -26,9 +25,6 @@ function CheckinPortal() {
   const userRole = user?.role as UserRole;
   const { t } = useLanguage();
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [selectedDayPopup, setSelectedDayPopup] = useState<string | null>(null);
-  const [showBookingForm, setShowBookingForm] = useState(false);
-  const [dayBookings, setDayBookings] = useState<Booking[]>([]);
 
   useEffect(() => {
     fetchData();
@@ -121,17 +117,6 @@ function CheckinPortal() {
     if (error) fetchData();
   };
 
-  const handleDayClick = async (dateStr: string) => {
-    setSelectedDayPopup(dateStr);
-    // Fetch bookings for that day
-    const { data } = await supabase
-      .from('bookings')
-      .select('*')
-      .lte('check_in', dateStr)
-      .gte('check_out', dateStr);
-    setDayBookings(data || []);
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
       <header className="bg-gradient-to-r from-indigo-700 to-purple-800 text-white shadow-2xl sticky top-0 z-50 backdrop-blur-md bg-opacity-95">
@@ -169,65 +154,8 @@ function CheckinPortal() {
           onCheckOut={userRole === 'Manager' || userRole === 'CEO' ? checkOut : undefined}
           onUpdateBooking={userRole !== 'Cook' ? handleUpdateBooking : undefined}
           onRefresh={fetchData}
-          onDayClick={handleDayClick}
         />
       </main>
-
-      {/* Day Popup Modal */}
-      {selectedDayPopup && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="bg-indigo-600 text-white px-6 py-4 flex justify-between items-center">
-              <h3 className="text-lg font-black">
-                {new Date(selectedDayPopup).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-              </h3>
-              <button onClick={() => setSelectedDayPopup(null)} className="p-2 hover:bg-indigo-700 rounded-lg transition-all">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-            <div className="p-6">
-              <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-3">Guest List</h4>
-              {dayBookings.length > 0 ? (
-                <div className="space-y-2 mb-6 max-h-60 overflow-y-auto">
-                  {dayBookings.map(booking => (
-                    <div key={booking.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                      <p className="font-bold text-slate-800">{booking.guest_name}</p>
-                      <p className="text-xs text-slate-600">{booking.check_in} → {booking.check_out}</p>
-                      <p className="text-xs text-slate-500 mt-1">
-                        {booking.guest_count || booking.number_of_people || 0} guests · {booking.status}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-center text-slate-500 italic mb-6">No guests on this day</p>
-              )}
-              
-              <button
-                onClick={() => {
-                  setSelectedDayPopup(null);
-                  setShowBookingForm(true);
-                }}
-                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                Add Booking
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <ReserverIncomeForm
-        isOpen={showBookingForm}
-        selectedDate={selectedDayPopup || ''}
-        onClose={() => setShowBookingForm(false)}
-        onSuccess={() => {
-          setShowBookingForm(false);
-          fetchData();
-        }}
-        isSystemOnly={true}
-      />
     </div>
   );
 }
