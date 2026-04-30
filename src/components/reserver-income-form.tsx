@@ -82,6 +82,16 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
   }, [bookingType, checkIn]);
 
   useEffect(() => {
+    if (bookingType === 'local' || bookingType === 'pool') {
+      setCurrency('UZS');
+      setExchangeRate('1');
+    } else {
+      setCurrency('USD');
+      setExchangeRate('1');
+    }
+  }, [bookingType]);
+
+  useEffect(() => {
     if (!checkIn) return;
     const ci = new Date(checkIn + 'T00:00:00');
     const co = checkOut ? new Date(checkOut + 'T00:00:00') : ci;
@@ -656,7 +666,7 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
           <div className="flex gap-4 pt-4">
             <button type="button" onClick={onClose} className="flex-1 px-6 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-all">Cancel</button>
             <button type="submit" disabled={submitting} className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all disabled:opacity-50">
-              {submitting ? 'Booking...' : 'Create Booking'}
+              {submitting ? 'Processing...' : (bookingType === 'international' ? 'Create Booking' : 'Pay')}
             </button>
           </div>
         </form>
