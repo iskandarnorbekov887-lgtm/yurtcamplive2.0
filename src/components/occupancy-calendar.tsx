@@ -15,6 +15,7 @@ interface Props {
   onUpdateBooking?: (id: number, updates: Partial<Booking>) => Promise<void>;
   onAddNewBooking?: (date: string) => void;
   onRefresh?: () => void;
+  onDayClick?: (date: string) => void;
 }
 interface EventInfo { booking: Booking; colStart: number; colEnd: number; lane: number; }
 
@@ -99,7 +100,7 @@ function color(b: Booking, today: string) {
   }
 }
 
-export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, onCancelBooking, onCheckIn, onCheckOut, onUpdateBooking, onAddNewBooking, onRefresh }: Props) {
+export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, onCancelBooking, onCheckIn, onCheckOut, onUpdateBooking, onAddNewBooking, onRefresh, onDayClick }: Props) {
   const { t } = useLanguage();
   const [cur, setCur]   = useState(new Date());
   const [sel, setSel]   = useState<Booking | null>(null);
@@ -439,6 +440,10 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                     key={di} 
                     className={`min-h-[40px] px-2 pt-2 border-r border-slate-100 last:border-r-0 cursor-pointer hover:bg-indigo-50 transition-colors ${!isCurrentMonth ? 'bg-slate-50/60' : ''}`}
                     onClick={() => {
+                      if (onDayClick) {
+                        onDayClick(ds);
+                        return;
+                      }
                       if (ds < today) {
                         alert('You cannot schedule a trip on a past date');
                         return;

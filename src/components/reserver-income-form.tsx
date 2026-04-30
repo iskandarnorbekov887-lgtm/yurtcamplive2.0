@@ -29,9 +29,10 @@ interface Props {
   selectedDate: string;
   onClose: () => void;
   onSuccess: () => void;
+  isSystemOnly?: boolean;
 }
 
-export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess }: Props) {
+export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, isSystemOnly = false }: Props) {
   const { user } = useAuth();
   const currentUserId = user?.id;
   const [submitting, setSubmitting] = useState(false);
@@ -135,21 +136,30 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess }:
         total_price: total_price || 0,
         number_of_people: guestCount,
         payment_status: 'Unpaid',
-        source: 'Manual',
+        source: isSystemOnly ? 'System' : 'Manual',
         status: 'confirmed',
         notes: description || null,
         meal_notes: null,
         transportation: null,
         meal_preference: null,
         guide_required: dayEntries.some(d => d.guideService),
-        special_requests: (() => { const f = dayEntries.filter(d => d.lunch || d.dinner || d.guideService || d.transportation || d.cookingClass || d.specialRequest.trim()); return f.length > 0 ? JSON.stringify(f) : null; })(),
-        created_by_role: 'Reserver',
-        approved_by_manager: false,
+        special_requests: (() => { 
+          const f = dayEntries.filter(d => d.lunch || d.dinner || d.guideService || d.transportation || d.cookingClass || d.specialRequest.trim()); 
+          const meta: any = f.length > 0 ? { days: f } : {};
+          if (isSystemOnly) {
+            meta.is_system_only = true;
+            meta.is_manual_dates = true;
+          }
+          return Object.keys(meta).length > 0 ? JSON.stringify(meta) : null; 
+        })(),
+        created_by_role: 'Manager',
+        approved_by_manager: true,
         created_by_id: currentUserId || '',
         created_at: new Date().toISOString(),
         last_edited_by_id: currentUserId || '',
         last_edited_at: new Date().toISOString(),
         isky_camp_requests: iskyCampRequests || null,
+        google_event_id: null, // System-only bookings don't sync to Google Calendar
         // Service fields
         guest_count: guestCount,
         children_under_12: childrenUnder12,
