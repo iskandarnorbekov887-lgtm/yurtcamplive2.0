@@ -193,7 +193,13 @@ export function GoogleGuestAgenda({
         ? JSON.parse(sel.special_requests || '{}')
         : (sel.special_requests || {});
       meta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
-      return meta.settled_receipts || [];
+      const receipts = meta.settled_receipts || [];
+      // Sort by settled_at date so oldest tab is first
+      return receipts.sort((a: any, b: any) => {
+        const dateA = new Date(a.settled_at || a.date).getTime();
+        const dateB = new Date(b.settled_at || b.date).getTime();
+        return dateA - dateB;
+      });
     } catch (err) {
       console.error('Metadata parse error:', err);
       return [];
