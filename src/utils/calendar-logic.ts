@@ -3,6 +3,8 @@
  * Focus: Stability and Speed
  */
 
+import { sendDateChangeResult } from '@/utils/notify';
+
 export function localDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
@@ -66,6 +68,15 @@ export async function handleApproveDatesLogic({
     });
     
     flash('✓ Dates approved from calendar.');
+
+    // Notify CEO about the approval
+    await sendDateChangeResult(
+      booking.id,
+      booking.guest_name,
+      'approved',
+      { checkIn: linkedEv.start, checkOut: linkedEv.end }
+    );
+
     if (onRefresh) await onRefresh();
   } catch (e: any) {
     const msg = e instanceof Error ? e.message : String(e);

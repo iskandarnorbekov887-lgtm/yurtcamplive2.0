@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '@/lib/language-context';
 import type { Booking, UserRole, Profile } from '@/lib/supabase';
 
@@ -115,7 +115,67 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
   const [newExtraService, setNewExtraService] = useState({ name: '', price: '', currency: 'USD' as 'UZS' | 'USD' | 'EUR' });
   const [collectedAmount, setCollectedAmount] = useState('');
   const [collectedCurrency, setCollectedCurrency] = useState<'UZS' | 'USD' | 'EUR'>('USD');
-  const [activeTabIdx, setActiveTabIdx] = useState<any>(-1); // -1 = Open Tab
+  const [preEditCheckoutRef, setPreEditCheckoutRef] = useState('');
+  const [extFee, setExtFee] = useState('');
+  const [redFee, setRedFee] = useState('');
+  const originalCheckoutRef = useRef<string>('');
+
+
+  const applyExtension = async () => {
+    if (!sel || !onUpdateBooking) return;
+    const amount = parseFloat(extFee) || 0;
+    
+    let currentMeta: any = {};
+    try {
+      currentMeta = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
+    } catch { currentMeta = {}; }
+    
+    const prevAdj = parseFloat(currentMeta.last_adjustment) || 0;
+    const newTotal = (sel.total_price || 0) - prevAdj + amount;
+    
+    setLoadingAction('applyExt');
+    try {
+      const newMeta = { ...currentMeta, last_adjustment: amount };
+      await onUpdateBooking(sel.id, { 
+        total_price: newTotal,
+        special_requests: JSON.stringify(newMeta)
+      });
+      setExtFee(String(amount));
+      setSel({ ...sel, total_price: newTotal, special_requests: JSON.stringify(newMeta) });
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingAction('');
+    }
+  };
+
+  const applyReduction = async () => {
+    if (!sel || !onUpdateBooking) return;
+    const amount = parseFloat(redFee) || 0;
+
+    let currentMeta: any = {};
+    try {
+      currentMeta = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
+    } catch { currentMeta = {}; }
+
+    const prevAdj = parseFloat(currentMeta.last_reduction) || 0; // Using separate field for reduction?
+    const newTotal = Math.max(0, (sel.total_price || 0) + prevAdj - amount);
+    
+    setLoadingAction('applyRed');
+    try {
+      const newMeta = { ...currentMeta, last_reduction: amount };
+      await onUpdateBooking(sel.id, { 
+        total_price: newTotal,
+        special_requests: JSON.stringify(newMeta)
+      });
+      setRedFee(String(amount));
+      setSel({ ...sel, total_price: newTotal, special_requests: JSON.stringify(newMeta) });
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingAction('');
+    }
+  };
 
   const getTabs = (booking: Booking | null) => {
     if (!booking) return [];
@@ -125,19 +185,25 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
     } catch { return []; }
   };
 
-  const year  = cur.getFullYear();
-  const month = cur.getMonth();
-  const weeks = getCalendarWeeks(year, month);
-  const today = dateToStr(new Date());
-  const confirmed = (bookings || []).filter((b: any) => b.status === 'confirmed' || b.status === 'checked_in');
-  const completed = (bookings || []).filter((b: any) => b.status === 'completed');
-  const cancelled = (bookings || []).filter((b: any) => b.status === 'cancelled');
-  const totalIskyCamps = 0;
+  // Store original checkout when a booking is selected
+  useEffect(() => {
+    if (sel) {
+      originalCheckoutRef.current = sel.check_out || '';
+      try {
+        const meta = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
+        setExtFee(meta.last_adjustment ? String(meta.last_adjustment) : '');
+        setRedFee(meta.last_reduction ? String(meta.last_reduction) : '');
+      } catch {
+        setExtFee('');
+        setRedFee('');
+      }
+    }
+  }, [sel]);
 
   const eventsForWeek = (week: Date[]): EventInfo[] => {
     const strs  = week.map(dateToStr);
     const wStart = strs[0], wEnd = strs[6];
-    const evs: Omit<EventInfo,'lane'>[] = [...confirmed, ...completed, ...cancelled]
+    const evs: Omit<EventInfo,'lane'>[] = bookings
       .filter(b => b.check_in <= wEnd && b.check_out >= wStart)
       .map(b => {
         const es = b.check_in  < wStart ? wStart : b.check_in;
@@ -151,10 +217,8 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
   const handleCancel = async () => {
     if (!sel || !onCancelBooking) return;
     if (confirm('Are you sure you want to cancel this trip?')) {
-      // Optimistic UI: Remove from view immediately
       const id = sel.id;
       setSel(null); 
-      
       try {
         await onCancelBooking(id);
       } catch (err) {
@@ -166,11 +230,8 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
   const handleCheckIn = async () => {
     if (!sel || !onCheckIn) return;
     if (!confirm('Are you sure you want to check in ' + String(sel.guest_name) + '?')) return;
-    
-    // Optimistic UI: Update local state immediately
     const id = sel.id;
     setSel({ ...sel, status: 'checked_in' });
-    
     try {
       await onCheckIn(id);
     } catch (err) {
@@ -181,11 +242,8 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
   const handleCheckOut = async () => {
     if (!sel || !onCheckOut) return;
     if (!confirm('Are you sure you want to check out ' + String(sel.guest_name) + '?')) return;
-    
-    // Optimistic UI: Update local state immediately
     const id = sel.id;
     setSel({ ...sel, status: 'completed' });
-    
     try {
       await onCheckOut(id);
     } catch (err) {
@@ -204,14 +262,17 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
 
   const handleUpdate = async () => {
     if (!sel || !onUpdateBooking) return;
-    
-    // Optimistic UI: Update modal state immediately
-    const updatedSel = { ...sel, ...editData } as Booking;
+    const updates = { ...editData };
+    if (updates.check_in || updates.check_out) {
+      updates.is_manual_dates = true;
+    }
+    const updatedSel = { ...sel, ...updates } as Booking;
     setSel(updatedSel);
     setIsEditing(false);
-    
     try {
-      await onUpdateBooking(sel.id, editData);
+      await onUpdateBooking(sel.id, updates);
+      setPreEditCheckoutRef('');
+      originalCheckoutRef.current = updatedSel.check_out || '';
       syncToGoogleCalendar(updatedSel);
     } catch (err) {
       console.error(err);
@@ -222,10 +283,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
     if (userRole === 'CEO') return true;
     if (userRole === 'Cook') return false;
     if (!currentUserId) return false;
-    // Manager can edit any booking regardless of original creator
-    if (userRole === 'Manager') {
-      return true;
-    }
+    if (userRole === 'Manager') return true;
     return false;
   };
 
@@ -233,28 +291,27 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
     if (userRole === 'CEO') return true;
     if (userRole === 'Cook') return false;
     if (!currentUserId) return false;
-    // Manager can cancel any booking regardless of original creator
-    if (userRole === 'Manager') {
-      return true;
-    }
+    if (userRole === 'Manager') return true;
     return false;
   };
 
   const isCook = userRole === 'Cook';
-
+  const today = dateToStr(new Date());
+  const month = cur.getMonth();
+  const year  = cur.getFullYear();
+  const weeks = getCalendarWeeks(year, month);
   const allEvents = weeks.map(w => eventsForWeek(w));
-  const maxLanes  = Math.max(0, ...allEvents.map(es => es.length ? Math.max(...es.map(e=>e.lane))+1 : 0));
+  const confirmed = bookings.filter(b => b.status === 'confirmed');
+  const completed = bookings.filter(b => b.status === 'completed');
+  const cancelled = bookings.filter(b => b.status === 'cancelled');
+  const totalIskyCamps = 0;
+  const [activeTabIdx, setActiveTabIdx] = useState(-1);
 
   const dayOccupancy = (dayStr: string) =>
     [...confirmed, ...cancelled].filter(b => b.check_in <= dayStr && b.check_out >= dayStr).length;
 
-  const getBookingsForDay = (dayStr: string) => {
-    return bookings.filter(b => b.check_in <= dayStr && b.check_out >= dayStr);
-  };
-
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden font-sans">
-      {/* ── Header ── */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/30">
         <div className="flex items-center gap-4">
           <h2 className="text-xl font-bold text-slate-800">
@@ -286,7 +343,6 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
         </div>
       </div>
 
-      {/* ── Day-name row ── */}
       <div className="grid grid-cols-7 border-b border-slate-100">
         {[0,1,2,3,4,5,6].map(d => (
           <div key={d} className="py-2 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
@@ -295,7 +351,6 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
         ))}
       </div>
 
-      {/* ── Weeks ── */}
       {weeks.map((week, wi) => {
         const events   = allEvents[wi];
         const maxL     = events.length ? Math.max(...events.map(e=>e.lane))+1 : 0;
@@ -303,7 +358,6 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
 
         return (
           <div key={wi} className="border-b border-slate-100 last:border-none">
-            {/* Date numbers */}
             <div className="grid grid-cols-7">
               {week.map((day, di) => {
                 const ds    = dateToStr(day);
@@ -337,7 +391,6 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
               })}
             </div>
 
-            {/* Event bars area */}
             <div className="relative px-0.5 pb-1.5" style={{ minHeight: `${eventRows * 24 + 4}px` }}>
               <div className="relative" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gridTemplateRows: `repeat(${eventRows}, 22px)`, gap: '2px 0' }}>
                 {events.map((ev, ei) => {
@@ -348,11 +401,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                   const isCheckedIn = ev.booking.status === 'checked_in';
                   const isCompleted = ev.booking.status === 'completed';
                   const bookingStatus = getBookingStatus(ev.booking, today);
-
-                  // Check for neglected check-in (after 6 PM on check-in date or overdue)
                   const isNeglectedCheckIn = bookingStatus === 'neglected-checkin' || bookingStatus === 'overdue-checkin';
-
-                  // Check for neglected checkout (after 12 PM on checkout date)
                   const checkOutDate = new Date(ev.booking.check_out);
                   const checkOutDateStr = checkOutDate.toISOString().split('T')[0];
                   const now = new Date();
@@ -384,7 +433,6 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                       <span className="flex-1 truncate">
                         {isStart ? (isCancelled ? `${ev.booking.guest_name} (CANCELLED)` : ev.booking.guest_name) : ''}
                       </span>
-                      {/* Status indicators */}
                       <span className="flex items-center gap-1 ml-1">
                         {isCheckedIn && (
                           <svg className="w-3 h-3 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -411,14 +459,11 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
         );
       })}
 
-      {/* ── Booking Detail Panel ── */}
       {sel && (
         <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4" onClick={() => setSel(null)}>
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8 animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
-            {/* Google Calendar-style header */}
             <div className="mb-6">
-              {/* Top row: close buttons */}
               <div className="flex justify-end gap-1 mb-3">
                 {sel.status === 'checked_in' && onCancelBooking && (
                   <button onClick={handleCancel} disabled={!!loadingAction} className="p-1.5 hover:bg-rose-100 rounded-lg transition-all" title="Cancel Trip">
@@ -429,8 +474,6 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                   <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
-
-              {/* Title + stats + date */}
               <div className="flex items-start gap-4 mb-5">
                 <div className="w-6 h-6 rounded-lg flex-shrink-0 mt-1 shadow-sm" style={{ backgroundColor: color(sel, today).bg }} />
                 <div>
@@ -438,83 +481,18 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                   <div className="flex items-center gap-2 mt-2">
                     <p className="text-sm font-black text-slate-600">
                       {String(sel.num_people || sel.number_of_people || sel.guest_count)} Pax
-                      {sel.children_under_12 ? ` + ${String(sel.children_under_12)} Child` : ''}
                     </p>
                     <span className="w-1 h-1 bg-slate-300 rounded-full" />
                     <p className="text-sm font-bold text-slate-500">
-                      {(() => {
-                        const ci = new Date(sel.check_in + 'T00:00:00');
-                        const co = new Date(sel.check_out + 'T00:00:00');
-                        const sameMonth = ci.getMonth() === co.getMonth() && ci.getFullYear() === co.getFullYear();
-                        if (sel.check_in === sel.check_out) return `${ci.getDate()} ${ci.toLocaleString('en-US', { month: 'short' })}`;
-                        if (sameMonth) return `${ci.getDate()}–${co.getDate()} ${ci.toLocaleString('en-US', { month: 'short' })}`;
-                        return `${ci.getDate()} ${ci.toLocaleString('en-US', { month: 'short' })} – ${co.getDate()} ${co.toLocaleString('en-US', { month: 'short' })}`;
-                      })()}
+                      {sel.check_in} – {sel.check_out}
                     </p>
                   </div>
                 </div>
               </div>
-
-              {/* Icon rows */}
-              <div className="space-y-3 ml-9">
-                {/* Notes + Day-by-day itinerary */}
-                {(() => {
-                  let days: any[] = [];
-                  try { if (sel.special_requests) days = JSON.parse(sel.special_requests); } catch {}
-                  const filledDays = days.filter((d: any) => d.lunch || d.dinner || d.guideService || d.transportation || d.cookingClass || d.specialRequest?.trim());
-                  if (!sel.notes && filledDays.length === 0) return null;
-                  return (
-                    <div className="flex-1 space-y-4">
-                        {sel.notes && <p className="text-sm text-black">{sel.notes}</p>}
-                        {filledDays.map((day: any, i: number) => {
-                          const d = new Date(day.date + 'T00:00:00');
-                          const dateLabel = `${d.getDate()} ${d.toLocaleString('en-US', { month: 'long' })}`;
-                          const serviceNames = [
-                            day.lunch && 'Lunch',
-                            day.dinner && 'Dinner',
-                            day.cookingClass && 'Cooking Class',
-                            day.guideService && 'Guide Service',
-                            day.transportation && 'Transportation',
-                          ].filter(Boolean).join(', ');
-                          return (
-                            <div key={i}>
-                              <p className="text-sm text-black">
-                                <span className="font-black">{i + 1}-kun – {dateLabel}</span>
-                                {serviceNames ? `: ${serviceNames}` : ''}:
-                              </p>
-                              <div className="mt-1 space-y-1 text-sm text-black leading-relaxed">
-                                {day.specialRequest?.trim() && <p>{day.specialRequest}</p>}
-                                {(day.lunch || day.dinner) && day.lunchDietary && <p>Food request: {day.lunchDietary}</p>}
-                                {day.guideService && (
-                                  <p>Guide: {day.guideNames?.filter((n: string) => n.trim()).join(', ') || 'To be arranged'}</p>
-                                )}
-                                {day.cookingClass && day.cookingClassDescription && <p>Cooking class: {day.cookingClassDescription}</p>}
-                                {day.transportation && day.transEntries?.map((e: any, ei: number) => {
-                                  const parts: string[] = [];
-                                  if (e.driver?.trim()) parts.push(`Driver: ${e.driver}`);
-                                  if (e.time && !e.time.startsWith(':') && !e.time.endsWith(':')) parts.push(`Pickup: ${e.time}`);
-                                  if (e.from?.trim()) parts.push(`From: ${e.from}`);
-                                  if (e.to?.trim()) parts.push(`To: ${e.to}`);
-                                  if (e.arrivalTime && !e.arrivalTime.startsWith(':') && !e.arrivalTime.endsWith(':')) parts.push(`Arrival: ${e.arrivalTime}`);
-                                  if (e.price?.trim()) parts.push(`${e.price} USD`);
-                                  return parts.length > 0 ? <p key={ei}>🚗 {parts.join(' · ')}</p> : null;
-                                })}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                  );
-                })()}
-
-              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-6 mb-8">
-              {/* Professional Hotel Folio Ledger */}
-              {(userRole === 'Manager' || userRole === 'CEO') && (
+            {(userRole === 'Manager' || userRole === 'CEO') && (
                 <div className="col-span-2 space-y-6">
-                  {/* Tab Navigation */}
                   <div className="flex flex-wrap gap-2 items-center border-b border-slate-100 pb-4">
                     {getTabs(sel).map((tab: any, idx: number) => (
                       <button 
@@ -533,7 +511,6 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                     </button>
                   </div>
 
-                  {/* Tab Content Section */}
                   <div className={`p-6 rounded-[2.5rem] border-2 transition-all ${activeTabIdx === -1 ? 'bg-white border-indigo-100 shadow-xl shadow-indigo-50' : 'bg-slate-50 border-slate-100 grayscale-[0.5]'}`}>
                     {(() => {
                       const tabs = getTabs(sel);
@@ -542,9 +519,8 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                       const isClosed = isHistory;
                       const isTab1Closed = tabs.length > 0;
                       
-                      // Extension Rule Logic
-                      const originalCheckout = isTab1Closed ? (tabs[0]?.original_checkout || tabs[0]?.check_out) : sel?.check_out;
-                      const hasExtension = (sel?.check_out || '') > (originalCheckout || '');
+                      const originalCheckout = isTab1Closed ? (tabs[0]?.original_checkout || tabs[0]?.check_out) : (preEditCheckoutRef || originalCheckoutRef.current);
+                      const hasExtension = (sel?.check_out || '') > (originalCheckout || '') && (originalCheckout !== '');
                       const hasReduction = (sel?.check_out || '') < (originalCheckout || '') && (originalCheckout !== '');
                       
                       return (
@@ -553,10 +529,8 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                             <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">
                               {isClosed ? `Receipt Archive: Tab ${String(activeTabIdx + 1)}` : 'Active Guest Folio'}
                             </h4>
-                            {isClosed && <span className="px-2 py-0.5 bg-slate-200 text-slate-600 text-[8px] font-black rounded uppercase">Read Only</span>}
                           </div>
 
-                          {/* Accommodation Logic (Master Tab Locking) */}
                           <div className="space-y-4">
                             {(!isTab1Closed || activeTabIdx === 0) ? (
                               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
@@ -568,7 +542,12 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                                   </div>
                                   <button 
                                     disabled={isTab1Closed}
-                                    onClick={() => !isTab1Closed && setIsEditing(true)}
+                                    onClick={() => {
+                                      if (!isTab1Closed) {
+                                        setPreEditCheckoutRef(sel.check_out || '');
+                                        setIsEditing(true);
+                                      }
+                                    }}
                                     className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${isTab1Closed ? 'bg-slate-100 text-slate-300 cursor-not-allowed' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'}`}
                                   >
                                     {isTab1Closed ? 'Stay Locked' : 'Edit Base Stay'}
@@ -576,34 +555,49 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                                 </div>
                               </div>
                             ) : activeTabIdx === -1 && isTab1Closed ? (
-                              /* Extension/Reduction Fee for Open Tab */
                               <>
                                 {hasExtension && (
                                   <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 animate-in fade-in slide-in-from-top-2">
                                     <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest block mb-2">Stay Extension Fee</label>
-                                    <div className="flex gap-3">
+                                    <div className="flex gap-3 items-center">
                                       <input 
                                         type="number"
-                                        placeholder="Extra nights fee..."
+                                        placeholder="Extra amount..."
+                                        value={extFee}
+                                        onChange={e => setExtFee(e.target.value)}
                                         className="flex-1 px-4 py-2 bg-white border-2 border-amber-200 rounded-xl text-sm font-black text-amber-700 outline-none focus:border-amber-400"
                                       />
-                                      <button className="px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-black uppercase shadow-sm">Apply</button>
+                                      <button 
+                                        onClick={applyExtension}
+                                        disabled={loadingAction === 'applyExt'}
+                                        className="px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-black uppercase shadow-sm"
+                                      >
+                                        Apply
+                                      </button>
                                     </div>
-                                    <p className="mt-2 text-[9px] text-amber-500 font-bold italic">* Compulsory: Guest extended stay from {String(originalCheckout)} to {String(sel?.check_out)}</p>
+                                    <p className="mt-2 text-[9px] text-amber-500 font-bold italic">* Added stay from {String(originalCheckout)} to {String(sel?.check_out)}</p>
                                   </div>
                                 )}
                                 {hasReduction && (
                                   <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 animate-in fade-in slide-in-from-top-2">
                                     <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block mb-2">Stay Reduction (Discount)</label>
-                                    <div className="flex gap-3">
+                                    <div className="flex gap-3 items-center">
                                       <input 
                                         type="number"
                                         placeholder="Discount amount..."
+                                        value={redFee}
+                                        onChange={e => setRedFee(e.target.value)}
                                         className="flex-1 px-4 py-2 bg-white border-2 border-emerald-200 rounded-xl text-sm font-black text-emerald-700 outline-none focus:border-emerald-400"
                                       />
-                                      <button className="px-4 py-2 bg-emerald-500 text-white rounded-xl text-xs font-black uppercase shadow-sm">Apply</button>
+                                      <button 
+                                        onClick={applyReduction}
+                                        disabled={loadingAction === 'applyRed'}
+                                        className="px-4 py-2 bg-emerald-500 text-white rounded-xl text-xs font-black uppercase shadow-sm"
+                                      >
+                                        Apply
+                                      </button>
                                     </div>
-                                    <p className="mt-2 text-[9px] text-emerald-500 font-bold italic">* Optional: Guest shortened stay from {String(originalCheckout)} to {String(sel?.check_out)}</p>
+                                    <p className="mt-2 text-[9px] text-emerald-500 font-bold italic">* Reduced stay from {String(originalCheckout)} to {String(sel?.check_out)}</p>
                                   </div>
                                 )}
                                 <div className="mt-4 p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
@@ -613,9 +607,6 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                               </>
                             ) : null}
                           </div>
-
-                          {/* Services, Drinks, Meals */}
-                          <div className="space-y-4 pt-4 border-t border-slate-100">
                              <div className="flex justify-between items-center">
                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Charges & Services</p>
                                {!isClosed && (

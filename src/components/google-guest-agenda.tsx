@@ -12,6 +12,7 @@ import {
   handleApproveDatesLogic,
   sanitizeNotes
 } from '@/utils/calendar-logic';
+import { sendDateChangeNotification } from '@/utils/notify';
 
 
 interface CalEvent {
@@ -181,7 +182,7 @@ export function GoogleGuestAgenda({
       }
     };
     loadReceipts();
-  }, [sel?.id]);
+  }, [sel?.id, sel?.collected_amount, sel?.special_requests]);
 
   const getSettledReceiptsForSel = () => {
     if (dbSettledReceipts.length) return dbSettledReceipts;
@@ -291,6 +292,25 @@ export function GoogleGuestAgenda({
             }
           });
           setSyncWarnings(warnings);
+
+          // Auto-notify Managers about date changes
+          bookings.filter(b => b.google_event_id && b.check_in >= cutoff).forEach(b => {
+            const ev = events.find(e => e.id === b.google_event_id);
+            if (ev && (ev.start !== b.check_in || ev.end !== b.check_out)) {
+              try {
+                const m = typeof b.special_requests === 'string' ? JSON.parse(b.special_requests || '{}') : (b.special_requests || {});
+                if (!m.is_manual_dates) {
+                  sendDateChangeNotification(
+                    b.id,
+                    b.guest_name,
+                    { checkIn: b.check_in, checkOut: b.check_out },
+                    { checkIn: ev.start, checkOut: ev.end }
+                  );
+                }
+              } catch { /* skip */ }
+            }
+          });
+
           if (toSilentlyDelete.length > 0) {
             (async () => {
               for (const id of toSilentlyDelete) {
@@ -399,9 +419,15 @@ export function GoogleGuestAgenda({
 
   const bookingItems = useMemo(() => bookings.map(b => {
     const linkedEv = gcEvents.find(e => e.id === b.google_event_id) || null;
+    
+    // THE FIX: If manual dates are on, use DB dates. Otherwise, use Google.
+    const displayStart = b.is_manual_dates ? b.check_in : (linkedEv?.start || b.check_in);
+    const displayEnd = b.is_manual_dates ? b.check_out : (linkedEv?.end || b.check_out);
+
     const effB: Booking = b.status === 'confirmed' && linkedEv && isGcCancelled(linkedEv)
-      ? { ...b, status: 'cancelled' }
-      : b;
+      ? { ...b, status: 'cancelled', check_in: displayStart, check_out: displayEnd }
+      : { ...b, check_in: displayStart, check_out: displayEnd };
+
     return {
       key: `db-${b.id}`, name: effB.guest_name, start: effB.check_in, end: effB.check_out,
       source: 'db' as const, booking: effB, event: linkedEv,
@@ -441,7 +467,7 @@ export function GoogleGuestAgenda({
   const renderCard = (item: ListItem, isCancelled: boolean) => {
     const isSelected = selectedItem?.key === item.key;
     const booking = item.booking;
-    const showApprove = !!booking && booking.status === 'checked_in' && syncWarnings[booking.id] === 'dates_changed' && (userRole === 'Manager' || userRole === 'CEO');
+    const showApprove = !!booking && booking.status === 'checked_in' && syncWarnings[booking.id] === 'dates_changed' && userRole === 'Manager';
     return (
       <div key={item.key} className={`w-full px-4 py-3 transition-all border-l-4 ${
         isCancelled
@@ -794,8 +820,16 @@ export function GoogleGuestAgenda({
 
   const handleCheckOut = async () => {
     if (!sel || !onCheckOut) return;
-    if (svcAdults <= 0 && (sel.collected_amount || 0) === 0) {
+    const receipts = getSettledReceiptsForSel();
+    const hasSettled = receipts.length > 0 || (sel.collected_amount || 0) > 0;
+
+    if (svcAdults <= 0 && !hasSettled) {
       flash('⚠ Number of adults is required for check-out.');
+      setShowServices(true);
+      return;
+    }
+    if (!isPrepaid && svcAmount <= 0 && !hasSettled) {
+      flash('⚠ Stay Price (Accommodation) is required for the first tab.');
       setShowServices(true);
       return;
     }
@@ -856,7 +890,9 @@ export function GoogleGuestAgenda({
           isPrepaid: isPrepaid,
           meals: { 
             lunch: svcLunch ? svcLunchCount : 0, 
-            dinner: svcDinner ? svcDinnerCount : 0 
+            dinner: svcDinner ? svcDinnerCount : 0,
+            isLunchPrepaid: isLunchPrepaid,
+            isDinnerPrepaid: isDinnerPrepaid
           },
           services: { 
             guide: svcGuide ? svcGuidePrice : 0, 

@@ -106,6 +106,7 @@ export interface Booking {
   is_prepaid?: boolean;
   lunch_prepaid?: boolean;
   dinner_prepaid?: boolean;
+  is_manual_dates?: boolean;
 }
 
 export interface Tab {

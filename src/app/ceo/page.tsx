@@ -307,7 +307,7 @@ function CEODashboard() {
                               {notification.status && (
                                 <div className={`inline-block mt-2 px-2 py-1 rounded text-xs font-bold ${
                                   notification.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
-                                  notification.status === 'denied' ? 'bg-rose-100 text-rose-700' :
+                                  (notification.status === 'denied' || notification.status === 'rejected') ? 'bg-rose-100 text-rose-700' :
                                   'bg-slate-100 text-slate-700'
                                 }`}>
                                   {notification.status.charAt(0).toUpperCase() + notification.status.slice(1)}
@@ -320,7 +320,7 @@ function CEODashboard() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                               </svg>
                             )}
-                            {notification.status === 'denied' && (
+                            {(notification.status === 'denied' || notification.status === 'rejected') && (
                               <svg className="w-5 h-5 text-rose-600 ml-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                               </svg>

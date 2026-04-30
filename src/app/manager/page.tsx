@@ -2,7 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { ProtectedRoute } from '@/components/protected-route';
-import { supabase, type Booking } from '@/lib/supabase';
+import { supabase, type Booking, type Notification } from '@/lib/supabase';
+import { handleApproveDatesLogic } from '@/utils/calendar-logic';
+import { sendDateChangeResult } from '@/utils/notify';
 import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
@@ -30,6 +32,9 @@ function ManagerPortal() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [activeTab, setActiveTab] = useState<'checkin' | 'bookings' | 'financials'>('checkin');
   const [pendingBookings, setPendingBookings] = useState<Booking[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showAllNotifications, setShowAllNotifications] = useState(false);
   
 
   useEffect(() => {
@@ -45,12 +50,14 @@ function ManagerPortal() {
   }, []);
 
   const fetchData = async () => {
-    const [{ data: bookingsData }, { data: pendingData }] = await Promise.all([
+    const [{ data: bookingsData }, { data: pendingData }, { data: notifData }] = await Promise.all([
       supabase.from('bookings').select('*'),
       supabase.from('bookings').select('*').eq('status', 'pending'),
+      supabase.from('notifications').select('*').eq('user_id', currentUserId || '').order('created_at', { ascending: false }),
     ]);
     setBookings(bookingsData || []);
     setPendingBookings(pendingData || []);
+    setNotifications((notifData || []).slice(0, 20));
     console.log('🔄 Manager Fetched bookings:', bookingsData?.length);
   };
 
@@ -119,6 +126,163 @@ function ManagerPortal() {
           </div>
           <div className="flex items-center gap-4">
             <LanguageSwitcher variant="light" />
+            {/* Notification Bell */}
+            <div className="relative">
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="p-2 bg-white/10 rounded-xl backdrop-blur-sm border border-white/20 hover:bg-white/20 transition-all relative"
+              >
+                <svg className="w-6 h-6 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                {notifications.filter(n => !n.read).length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center animate-pulse">
+                    {notifications.filter(n => !n.read).length}
+                  </span>
+                )}
+              </button>
+
+              {showNotifications && (
+                <div className="absolute right-0 top-12 w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 max-h-[28rem] overflow-y-auto">
+                  <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+                    <h3 className="font-black text-slate-900">Notifications</h3>
+                    <button onClick={() => setShowNotifications(false)} className="text-slate-400 hover:text-slate-600 text-lg font-bold">×</button>
+                  </div>
+                  {notifications.length === 0 ? (
+                    <p className="p-6 text-slate-500 text-sm text-center">No notifications</p>
+                  ) : (
+                    <div className="divide-y divide-slate-100">
+                      {(showAllNotifications ? notifications : notifications.slice(0, 5)).map((notification) => (
+                        <div
+                          key={notification.id}
+                          className={`p-4 transition-colors ${!notification.read ? 'bg-blue-50/70' : 'hover:bg-slate-50'}`}
+                          onClick={async () => {
+                            if (!notification.read && notification.type !== 'date_change_request') {
+                              await supabase.from('notifications').update({ read: true }).eq('id', notification.id);
+                              setNotifications(notifications.map(n => n.id === notification.id ? { ...n, read: true } : n));
+                            }
+                          }}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <p className="font-bold text-slate-900 text-sm">{notification.title}</p>
+                              <p className="text-slate-600 text-xs mt-1">{notification.message}</p>
+                              {notification.status && (
+                                <div className={`inline-block mt-2 px-2 py-1 rounded text-xs font-bold ${
+                                  notification.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
+                                  notification.status === 'rejected' ? 'bg-rose-100 text-rose-700' :
+                                  'bg-slate-100 text-slate-700'
+                                }`}>
+                                  {notification.status.charAt(0).toUpperCase() + notification.status.slice(1)}
+                                </div>
+                              )}
+                              <p className="text-slate-400 text-[10px] mt-2">{new Date(notification.created_at).toLocaleString()}</p>
+                            </div>
+                            {notification.status === 'approved' && (
+                              <svg className="w-5 h-5 text-emerald-600 ml-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                            {notification.status === 'rejected' && (
+                              <svg className="w-5 h-5 text-rose-600 ml-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            )}
+                          </div>
+
+                          {/* Date Change Request: Approve / Reject buttons */}
+                          {notification.type === 'date_change_request' && !notification.status && (
+                            <div className="flex gap-2 mt-3">
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (!notification.related_id) return;
+                                  const bookingId = notification.related_id;
+                                  const booking = bookings.find(b => b.id === bookingId);
+                                  if (!booking) { alert('Booking not found.'); return; }
+
+                                  try {
+                                    // Fetch latest calendar events to get the new dates
+                                    const res = await fetch('/api/calendar/events', { cache: 'no-store' });
+                                    const eventsData = await res.json();
+                                    if ('error' in eventsData) { alert('Failed to fetch calendar.'); return; }
+                                    const gcEvents = eventsData as any[];
+                                    const linkedEv = gcEvents.find((ev: any) => ev.id === booking.google_event_id);
+                                    if (!linkedEv) { alert('Calendar event not found.'); return; }
+
+                                    // Update dates in DB
+                                    await handleUpdateBooking(bookingId, {
+                                      check_in: linkedEv.start,
+                                      check_out: linkedEv.end,
+                                    });
+
+                                    // Mark notification as approved
+                                    await supabase.from('notifications').update({ status: 'approved', read: true }).eq('id', notification.id);
+
+                                    // Notify CEO
+                                    await sendDateChangeResult(
+                                      bookingId,
+                                      booking.guest_name,
+                                      'approved',
+                                      { checkIn: linkedEv.start, checkOut: linkedEv.end }
+                                    );
+
+                                    setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, status: 'approved', read: true } : n));
+                                    fetchData();
+                                  } catch (err) {
+                                    console.error('Approve date change failed:', err);
+                                    alert('Failed to approve date change.');
+                                  }
+                                }}
+                                className="flex-1 px-3 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-1.5"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                Approve
+                              </button>
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (!notification.related_id) return;
+                                  const bookingId = notification.related_id;
+                                  const booking = bookings.find(b => b.id === bookingId);
+
+                                  // Mark notification as rejected (dates stay unchanged)
+                                  await supabase.from('notifications').update({ status: 'rejected', read: true }).eq('id', notification.id);
+
+                                  // Notify CEO of rejection
+                                  if (booking) {
+                                    await sendDateChangeResult(
+                                      bookingId,
+                                      booking.guest_name,
+                                      'rejected',
+                                      { checkIn: booking.check_in, checkOut: booking.check_out }
+                                    );
+                                  }
+
+                                  setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, status: 'rejected', read: true } : n));
+                                }}
+                                className="flex-1 px-3 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold hover:bg-rose-700 transition-all flex items-center justify-center gap-1.5"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                                Reject
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {notifications.length > 5 && !showAllNotifications && (
+                        <button
+                          onClick={() => setShowAllNotifications(true)}
+                          className="w-full py-3 text-sm font-bold text-blue-600 hover:bg-blue-50 transition-all"
+                        >
+                          Show More ({notifications.length - 5} more)
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             <button
               onClick={signOut}
               className="px-5 py-2.5 bg-rose-600/90 hover:bg-rose-600 rounded-xl text-xs font-black transition-all shadow-lg hover:shadow-rose-500/20 active:scale-95 flex items-center gap-2"

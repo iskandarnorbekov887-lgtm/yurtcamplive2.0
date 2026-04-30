@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 
 import confetti from 'canvas-confetti';
+import * as htmlToImage from 'html-to-image';
 import { supabase } from '@/lib/supabase';
 import { isGcCancelled, formatSpace, handleApproveDatesLogic } from '@/utils/calendar-logic';
 
@@ -145,8 +146,67 @@ export function BookingModal(props: BookingModalProps) {
 
   const isStaff = userRole === 'Manager' || userRole === 'CEO';
 
-  if (!selectedItem) return null;
-  const sel = selectedItem.booking;
+  const sel = selectedItem?.booking;
+
+  const currentMeta = useMemo(() => {
+    if (!sel) return {};
+    try {
+      const parsed = typeof sel.special_requests === 'string'
+        ? JSON.parse(sel.special_requests || '{}')
+        : (sel.special_requests || {});
+      return Array.isArray(parsed) ? { days: parsed } : (parsed || {});
+    } catch {
+      return {};
+    }
+  }, [sel?.special_requests]);
+
+
+  const handleSaveProgress = async () => {
+    if (!sel || !onUpdateBooking) return;
+    setLoadingAction('save');
+    try {
+      const data: any = {
+        num_people: svcAdults,
+        children_under_12: svcChildren,
+        amount: svcAmount,
+        is_prepaid: isPrepaid,
+        lunch: svcLunch,
+        lunch_count: svcLunchCount,
+        lunch_prepaid: isLunchPrepaid,
+        dinner: svcDinner,
+        dinner_count: svcDinnerCount,
+        dinner_prepaid: isDinnerPrepaid,
+        guide_service: svcGuide,
+        guide_amount: svcGuidePrice.toString(),
+        guide_names: svcGuideNames,
+        has_transportation: svcTransport,
+        laundry: svcLaundry,
+        laundry_price: svcLaundryPrice.toString(),
+        cooking_class: svcCooking,
+        cooking_class_amount: svcCookingPrice.toString(),
+        extra_services: extraServices,
+      };
+
+      const dTab = Object.entries(selectedDrinks).map(([id, qty]) => {
+        const d = (drinks || []).find(dr => dr.id === Number(id));
+        return { 
+          drink_id: Number(id), 
+          drink_name: d?.name || '', 
+          quantity: qty, 
+          price: d?.sold_price || 0, 
+          currency: d?.currency || 'USD' 
+        };
+      });
+      data.drinks_tab = dTab;
+
+      await onUpdateBooking(sel.id, data);
+      flash('✓ Choices saved to guest file!');
+    } catch (err) {
+      flash('⚠ Failed to save progress.');
+    } finally {
+      setLoadingAction('');
+    }
+  };
 
   const statusColor = (s?: string) => ({
     checked_in: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
@@ -156,6 +216,76 @@ export function BookingModal(props: BookingModalProps) {
     pending: 'bg-slate-100 text-slate-600 border border-slate-200',
     no_arrival: 'bg-gray-200 text-gray-600 border border-gray-300',
   }[s ?? ''] ?? 'bg-slate-100 text-slate-500');
+
+  const receiptRef = useRef<HTMLDivElement>(null);
+
+  const handlePrint = () => {
+    const printContent = receiptRef.current;
+    if (!printContent) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Receipt #${selectedReceipt?.id || 'Pending'}</title>
+          <style>
+            body { font-family: system-ui, -apple-system, sans-serif; padding: 40px; color: #0f172a; }
+            .receipt-header { text-align: center; margin-bottom: 40px; border-bottom: 2px solid #6366f1; padding-bottom: 20px; }
+            .row { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px; }
+            .total { border-top: 1px solid #e2e8f0; margin-top: 20px; padding-top: 12px; font-weight: 800; font-size: 18px; color: #6366f1; }
+            .label { color: #64748b; font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.1em; }
+          </style>
+        </head>
+        <body>
+          <div class="receipt-header">
+            <h1 style="margin: 0; font-weight: 900; text-transform: uppercase;">Final Receipt</h1>
+            <p style="font-size: 12px; color: #64748b; margin-top: 8px;">ID: ${selectedReceipt?.id || 'PENDING'}</p>
+          </div>
+          <div class="row"><span class="label">Guest</span> <strong>${sel.guest_name}</strong></div>
+          <div class="row"><span class="label">Stay</span> <strong>${sel.check_in} — ${sel.check_out}</strong></div>
+          <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 20px 0;">
+          <div id="items-content">
+            ${printContent.querySelector('.space-y-4')?.innerHTML || ''}
+          </div>
+          <script>
+            window.onload = () => { window.print(); window.close(); };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const handleSaveAsImage = async () => {
+    if (!receiptRef.current) {
+      console.error('Receipt ref is null');
+      return;
+    }
+    setLoadingAction('exporting');
+    console.log('Starting receipt export with html-to-image...');
+    try {
+      const dataUrl = await htmlToImage.toPng(receiptRef.current, {
+        backgroundColor: '#ffffff',
+        quality: 1.0,
+        pixelRatio: 2,
+        skipFonts: true, // Speeds up generation
+      });
+      console.log('Image generated successfully');
+      const link = document.createElement('a');
+      link.download = `receipt-${selectedReceipt?.id || 'pending'}.png`;
+      link.href = dataUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      flash('✓ Receipt saved as image!');
+    } catch (err) {
+      console.error('Export error:', err);
+      flash('⚠ Failed to save image. Try the "Print PDF" button instead.');
+    } finally {
+      setLoadingAction('');
+    }
+  };
 
   const statusIcon = (s: string | undefined) => {
     if (s === 'checked_in') return '✓';
@@ -185,6 +315,8 @@ export function BookingModal(props: BookingModalProps) {
     const drink = drinks.find((d: any) => d.id === parseInt(id));
     return sum + (Number(qty) * (drink?.sold_price || 0));
   }, 0);
+
+  if (!selectedItem) return null;
 
   return (
     <>
@@ -270,7 +402,7 @@ export function BookingModal(props: BookingModalProps) {
                     <div className="w-6 h-6 bg-amber-100 rounded-lg flex items-center justify-center text-amber-600">
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     </div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">Google Calendar Notes</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">Booking & Stay Notes</p>
                   </div>
                   <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed font-medium">{String(sel.notes || sel.description)}</p>
                 </div>
@@ -324,7 +456,7 @@ export function BookingModal(props: BookingModalProps) {
                         <p className="text-black font-bold">{String(linkedEv.start)} → {String(linkedEv.end)}</p>
                       </div>
                     </div>
-                    {isStaff && onUpdateBooking && (
+                    {userRole === 'Manager' && onUpdateBooking && (
                       <button
                         onClick={async () => {
                           if (!confirm(`Approve new booking dates from Calendar: ${linkedEv.start} → ${linkedEv.end}?`)) return;
@@ -374,7 +506,12 @@ export function BookingModal(props: BookingModalProps) {
                           </span>
                         </div>
                         <button
-                          onClick={() => { setEditingDates(true); setEditCheckIn(sel.check_in); setEditCheckOut(sel.check_out); }}
+                          onClick={() => { 
+                            setEditingDates(true); 
+                            setEditCheckIn(sel.check_in); 
+                            setEditCheckOut(sel.check_out); 
+                            setDateAdjAmount(currentMeta.last_adjustment || '');
+                          }}
                           className="text-[10px] font-bold text-indigo-500 hover:text-indigo-700 underline underline-offset-2 decoration-indigo-200 transition-all">
                           Edit Dates
                         </button>
@@ -475,14 +612,17 @@ export function BookingModal(props: BookingModalProps) {
 
                               const updates: any = { 
                                 check_in: editCheckIn,
-                                check_out: editCheckOut
+                                check_out: editCheckOut,
+                                is_manual_dates: true
                               };
 
+                              const prevAdj = parseFloat(currentMeta.last_adjustment) || 0;
                               if (isExtension) {
-                                updates.total_price = (sel.total_price || 0) + adj;
-                                setSvcAmount((parseFloat(String(svcAmount)) || 0) + adj);
-                                flash(`✓ Extended to ${editCheckOut}. +$${adj} added to tab as Accommodation.`);
+                                updates.total_price = (sel.total_price || 0) - prevAdj + adj;
+                                setSvcAmount((parseFloat(String(svcAmount)) || 0) - prevAdj + adj);
+                                flash(`✓ Extended to ${editCheckOut}. Adjustment updated to $${adj}.`);
                               } else if (isShortening && adj > 0) {
+                                // Shortening logic (assuming it's a new reduction)
                                 updates.total_price = Math.max(0, (sel.total_price || 0) - adj);
                                 updates.collected_amount = Math.max(0, (sel.collected_amount || 0) - adj);
                                 flash(`✓ Stay shortened. $${adj} refund deducted from collected payments.`);
@@ -499,7 +639,12 @@ export function BookingModal(props: BookingModalProps) {
                                 } catch {
                                   currentMeta = {};
                                 }
-                                updates.special_requests = JSON.stringify({ ...currentMeta, is_manual_dates: true, days: dayEntries });
+                                updates.special_requests = JSON.stringify({ 
+                                  ...currentMeta, 
+                                  is_manual_dates: true, 
+                                  days: dayEntries,
+                                  last_adjustment: adj
+                                });
                                 if (onUpdateBooking) await onUpdateBooking(sel.id, updates);
 
                                 flash('✓ Dates updated in System. Google Calendar remains unchanged.');
@@ -573,6 +718,7 @@ export function BookingModal(props: BookingModalProps) {
                 </div>
               )}
 
+
               {(sel.status === 'checked_in' || sel.status === 'confirmed') && isStaff && (
                 <div className="bg-white border-2 border-slate-100 rounded-[32px] p-6 shadow-xl shadow-slate-100/50 mb-6">
                   <div className="flex justify-between items-center mb-6">
@@ -613,10 +759,12 @@ export function BookingModal(props: BookingModalProps) {
               {showServices && (sel.status === 'checked_in' || sel.status === 'confirmed') && isStaff && (
                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300 mt-4">
                   {(() => {
-                    const isStayLocked = isPrepaid || (sel.collected_amount || 0) > 0;
+                    const receipts = getSettledReceiptsForSel();
+                    const hasSettled = receipts.length > 0 || (sel.collected_amount || 0) > 0;
+                    if (hasSettled) return null; // HIDE ACCOMMODATION ENTIRELY IN SERVICES AFTER SETTLEMENT
                     
+                    const isStayLocked = hasSettled;
                     if (!isStayLocked) {
-                      // FIRST TAB — Not yet paid, show full editable form
                       return (
                         <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-white animate-in slide-in-from-top-2">
                           <div className="flex justify-between items-center">
@@ -1165,7 +1313,9 @@ export function BookingModal(props: BookingModalProps) {
                           )}
                           <button
                             onClick={() => {
-                              if (!isPrepaid && svcAmount <= 0 && (sel.collected_amount || 0) === 0) {
+                              const receipts = getSettledReceiptsForSel();
+                              const hasSettled = receipts.length > 0 || (sel.collected_amount || 0) > 0;
+                              if (!isPrepaid && svcAmount <= 0 && !hasSettled) {
                                 setValError('Stay Price is missing. Please enter the guest\'s accommodation cost before proceeding.');
                                 return;
                               }
@@ -1229,6 +1379,7 @@ export function BookingModal(props: BookingModalProps) {
                 <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
                   <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowFinalReceipt(false)} />
                   <div className="relative bg-white rounded-[32px] shadow-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+                    <div ref={receiptRef}>
                       <div className="bg-[#6366f1] px-6 py-10 text-white text-center relative overflow-hidden">
                         <div className="absolute top-4 right-4 z-10">
                           <button onClick={() => setShowFinalReceipt(false)} className="text-white/40 hover:text-white transition-all text-2xl font-bold">×</button>
@@ -1254,12 +1405,12 @@ export function BookingModal(props: BookingModalProps) {
 
                     <div className="p-6 space-y-6">
                       <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Guest</span>
-                          <span className="text-base font-black text-slate-900">{String(sel.guest_name)}</span>
+                        <div className="pb-4 border-b border-slate-100">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Guest</p>
+                          <p className="text-xl font-black text-slate-900 leading-tight">{String(sel.guest_name)}</p>
                         </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Stay</span>
+                        <div className="flex justify-between items-center pt-2">
+                          <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Stay Period</span>
                           <span className="text-base font-black text-slate-900 flex items-center gap-2">
                             {String(sel.check_in)}
                             <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1274,7 +1425,11 @@ export function BookingModal(props: BookingModalProps) {
                         <div className="space-y-6">
                           <div className="space-y-4">
                             <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-2.5 py-1 rounded-md w-fit border border-indigo-100">
-                              Tab #{String(selectedReceipt.id)}
+                              {(() => {
+                                const all = getSettledReceiptsForSel();
+                                const idx = [...all].reverse().findIndex(r => r.id === selectedReceipt.id);
+                                return `Tab #${idx !== -1 ? idx + 1 : '?'}`;
+                              })()} — {String(selectedReceipt.id)}
                             </p>
                             
                             <div className="space-y-3">
@@ -1292,12 +1447,17 @@ export function BookingModal(props: BookingModalProps) {
                               {(() => {
                                 const meals = selectedReceipt.items?.meals || {};
                                 return Object.entries(meals).map(([type, count]: [string, any]) => {
-                                  if (!count) return null;
+                                  if (type.startsWith('is') || !count) return null;
+                                  const isMealPrepaid = type === 'lunch' ? meals.isLunchPrepaid : meals.isDinnerPrepaid;
                                   const price = type === 'lunch' ? (pricing?.lunch_price || 10) : (pricing?.dinner_price || 10);
                                   return (
                                     <div key={type} className="flex justify-between items-center text-sm">
                                       <span className="text-slate-400 font-medium capitalize">{type} ×{String(count)}</span>
-                                      <span className="text-slate-500 font-bold">${String((count * price).toFixed(2))}</span>
+                                      {isMealPrepaid ? (
+                                        <span className="text-[9px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">Prepaid</span>
+                                      ) : (
+                                        <span className="text-slate-500 font-bold">${String((count * price).toFixed(2))}</span>
+                                      )}
                                     </div>
                                   );
                                 });
@@ -1345,13 +1505,24 @@ export function BookingModal(props: BookingModalProps) {
                               </div>
                             </div>
                           </div>
+
                         </div>
                       ) : (
                         <div className="space-y-6">
                           <div className="space-y-4">
-                            <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-2.5 py-1 rounded-md w-fit border border-indigo-100">
-                              Active Tab Breakdown
-                            </p>
+                            <div className="flex justify-between items-center">
+                              <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-2.5 py-1 rounded-md w-fit border border-indigo-100">
+                                Tab #{getSettledReceiptsForSel().length + 1} Breakdown
+                              </p>
+                              <button 
+                                onClick={handleSaveProgress}
+                                disabled={loadingAction === 'save'}
+                                className="text-[10px] font-black text-emerald-600 hover:text-emerald-700 flex items-center gap-1 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100 transition-all active:scale-95 disabled:opacity-50"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                                {loadingAction === 'save' ? 'SAVING...' : 'SAVE CHOICES'}
+                              </button>
+                            </div>
                             <div className="space-y-3 bg-slate-50/50 rounded-2xl p-4 border border-slate-100">
                               {(svcAmount > 0 || (isPrepaid && (sel.collected_amount || 0) === 0)) && (
                                 <div className="flex justify-between items-center text-sm">
@@ -1412,7 +1583,9 @@ export function BookingModal(props: BookingModalProps) {
                       ) : (
                         <button
                           onClick={async () => {
-                            const needsAccom = (sel.collected_amount || 0) === 0 && !isPrepaid && svcAmount <= 0;
+                            const receipts = getSettledReceiptsForSel();
+                            const hasSettled = receipts.length > 0 || (sel.collected_amount || 0) > 0;
+                            const needsAccom = !hasSettled && !isPrepaid && svcAmount <= 0;
                             if (needsAccom) {
                               setValError('Stay Price is missing. Please enter the guest\'s accommodation cost before proceeding.');
                               setShowFinalReceipt(false);
@@ -1428,6 +1601,25 @@ export function BookingModal(props: BookingModalProps) {
                         </button>
                       )}
                     </div>
+                  </div>
+                  </div>
+
+                  <div className="p-6 pt-0 flex gap-3 no-print">
+                    <button 
+                      onClick={handleSaveAsImage}
+                      disabled={loadingAction === 'exporting'}
+                      className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                      {loadingAction === 'exporting' ? 'EXPORTING...' : 'Save Image'}
+                    </button>
+                    <button 
+                      onClick={handlePrint}
+                      className="flex-1 py-4 bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-indigo-100"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                      Print PDF
+                    </button>
                   </div>
                 </div>
               )}
