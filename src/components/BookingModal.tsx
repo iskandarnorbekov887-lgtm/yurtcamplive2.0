@@ -189,6 +189,12 @@ export function BookingModal(props: BookingModalProps) {
         extra_services: extraServices,
       };
 
+      // If prepaid, add the amount to collected_amount so balance starts at zero
+      if (isPrepaid && svcAmount > 0) {
+        data.collected_amount = (sel.collected_amount || 0) + svcAmount;
+        data.collected_currency = 'USD';
+      }
+
       const dTab = Object.entries(selectedDrinks).map(([id, qty]) => {
         const d = (drinks || []).find(dr => dr.id === Number(id));
         return { 
@@ -553,7 +559,12 @@ export function BookingModal(props: BookingModalProps) {
                         </div>
                       </div>
 
-                      {editCheckOut > sel.check_out && (
+                      {editCheckOut > sel.check_out && (() => {
+                        const settledReceipts = getSettledReceiptsForSel();
+                        const firstReceipt = settledReceipts[0];
+                        const firstReceiptDate = firstReceipt?.stay?.end || firstReceipt?.checkOut;
+                        return !firstReceiptDate || editCheckOut > firstReceiptDate;
+                      })() && (
                         <div className="pt-2 border-t border-slate-200 animate-in fade-in slide-in-from-top-1">
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-tight mb-1 block">
                             Stay Extension Price (USD) <span className="text-rose-500">*</span>
@@ -612,6 +623,16 @@ export function BookingModal(props: BookingModalProps) {
                                 return;
                               }
 
+                              let currentMeta: any = {};
+                              try {
+                                const parsed = typeof sel.special_requests === 'string'
+                                  ? JSON.parse(sel.special_requests || '{}')
+                                  : (sel.special_requests || {});
+                                currentMeta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
+                              } catch {
+                                currentMeta = {};
+                              }
+
                               const updates: any = { 
                                 check_in: editCheckIn,
                                 check_out: editCheckOut,
@@ -632,46 +653,37 @@ export function BookingModal(props: BookingModalProps) {
                                 flash('✓ Dates updated.');
                               }
 
-                                let currentMeta: any = {};
-                                try {
-                                  const parsed = typeof sel.special_requests === 'string'
-                                    ? JSON.parse(sel.special_requests || '{}')
-                                    : (sel.special_requests || {});
-                                  currentMeta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
-                                } catch {
-                                  currentMeta = {};
-                                }
-                                updates.special_requests = JSON.stringify({ 
-                                  ...currentMeta, 
-                                  is_manual_dates: true, 
-                                  days: dayEntries,
-                                  last_adjustment: adj
-                                });
-                                if (onUpdateBooking) await onUpdateBooking(sel.id, updates);
+                              updates.special_requests = JSON.stringify({ 
+                                ...currentMeta, 
+                                is_manual_dates: true, 
+                                days: dayEntries,
+                                last_adjustment: adj
+                              });
+                              if (onUpdateBooking) await onUpdateBooking(sel.id, updates);
 
-                                // Sync to Google Calendar
-                                if (sel.google_event_id) {
-                                  try {
-                                    await fetch('/api/calendar/events', {
-                                      method: 'PATCH',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({
-                                        eventId: sel.google_event_id,
-                                        start: updates.check_in,
-                                        end: updates.check_out
-                                      })
-                                    });
-                                    flash('✓ Dates updated in System & Google Calendar.');
-                                  } catch (err) {
-                                    console.error('GC Sync Error:', err);
-                                    flash('✓ System updated. GC sync failed.');
-                                  }
-                                } else {
-                                  flash('✓ Dates updated.');
+                              // Sync to Google Calendar
+                              if (sel.google_event_id) {
+                                try {
+                                  await fetch('/api/calendar/events', {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      eventId: sel.google_event_id,
+                                      start: updates.check_in,
+                                      end: updates.check_out
+                                    })
+                                  });
+                                  flash('✓ Dates updated in System & Google Calendar.');
+                                } catch (err) {
+                                  console.error('GC Sync Error:', err);
+                                  flash('✓ System updated. GC sync failed.');
                                 }
-                                setEditingDates(false);
-                                setDateAdjAmount('');
-                                if (onRefresh) onRefresh();
+                              } else {
+                                flash('✓ Dates updated.');
+                              }
+                              setEditingDates(false);
+                              setDateAdjAmount('');
+                              if (onRefresh) onRefresh();
                             } catch (e: any) {
                               const msg = e instanceof Error ? e.message : String(e);
                               flash(`⚠ ${msg.slice(0, 100)}`);
@@ -711,7 +723,7 @@ export function BookingModal(props: BookingModalProps) {
                         catch { flash('⚠ Check-out failed.'); }
                         finally { setLoadingAction(''); }
                       }}
-                      disabled={loadingAction === 'checkout_manual'}
+                      disabled={loadingAction === 'checkout_manual' || gTotal > 0.01}
                       className={`px-4 py-2 text-sm font-bold rounded-xl transition-all disabled:opacity-60 flex items-center gap-2 ${
                         gTotal > 0.01
                           ? 'bg-rose-100 border-2 border-rose-300 text-rose-700 cursor-not-allowed'
@@ -809,7 +821,8 @@ export function BookingModal(props: BookingModalProps) {
                                   type="number" 
                                   value={String(svcAdults || '')} 
                                   onChange={e => setSvcAdults(parseInt(e.target.value) || 0)}
-                                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-base font-black text-black focus:border-indigo-500 outline-none transition-all"
+                                  disabled={getSettledReceiptsForSel().length > 0}
+                                  className={`w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-base font-black text-black focus:border-indigo-500 outline-none transition-all ${getSettledReceiptsForSel().length > 0 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
                                 />
                               </div>
                               <div className="space-y-1.5">
@@ -818,19 +831,21 @@ export function BookingModal(props: BookingModalProps) {
                                   type="number" 
                                   value={String(svcChildren || '')} 
                                   onChange={e => setSvcChildren(parseInt(e.target.value) || 0)}
-                                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-base font-black text-black focus:border-indigo-500 outline-none transition-all"
+                                  disabled={getSettledReceiptsForSel().length > 0}
+                                  className={`w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-base font-black text-black focus:border-indigo-500 outline-none transition-all ${getSettledReceiptsForSel().length > 0 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
                                 />
                               </div>
                             </div>
                             <div className="space-y-1.5">
-                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Stay Price (USD)</label>
+                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">{isPrepaid ? 'Advance Payment Received (USD)' : 'Stay Price (USD)'}</label>
                               <div className="relative">
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
                                 <input 
                                   type="number" 
                                   value={String(svcAmount || '')} 
                                   onChange={e => setSvcAmount(parseFloat(e.target.value) || 0)}
-                                  className="w-full pl-8 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-base font-black text-black focus:border-indigo-500 outline-none transition-all"
+                                  disabled={getSettledReceiptsForSel().length > 0}
+                                  className={`w-full pl-8 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-base font-black text-black focus:border-indigo-500 outline-none transition-all ${getSettledReceiptsForSel().length > 0 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
                                   placeholder="0.00"
                                 />
                               </div>
@@ -1223,7 +1238,7 @@ export function BookingModal(props: BookingModalProps) {
                                           const val = parseFloat(e.target.value) || 0;
                                           setPricing({ ...pricing, [pay.currency === 'UZS' ? 'usd_to_uzs' : 'usd_to_eur']: val });
                                         }}
-                                        className="w-full pl-14 pr-3 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-sm font-black text-black outline-none focus:border-indigo-500 shadow-sm"
+                                        className="w-full pl-14 pr-3 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-base font-black text-black outline-none focus:border-indigo-500 shadow-sm"
                                       />
                                     </div>
                                   </div>

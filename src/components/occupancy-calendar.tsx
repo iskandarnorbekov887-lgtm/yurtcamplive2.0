@@ -14,6 +14,7 @@ interface Props {
   onCheckOut?: (id: number) => Promise<void>;
   onUpdateBooking?: (id: number, updates: Partial<Booking>) => Promise<void>;
   onAddNewBooking?: (date: string) => void;
+  onRefresh?: () => void;
 }
 interface EventInfo { booking: Booking; colStart: number; colEnd: number; lane: number; }
 
@@ -98,7 +99,7 @@ function color(b: Booking, today: string) {
   }
 }
 
-export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, onCancelBooking, onCheckIn, onCheckOut, onUpdateBooking, onAddNewBooking }: Props) {
+export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, onCancelBooking, onCheckIn, onCheckOut, onUpdateBooking, onAddNewBooking, onRefresh }: Props) {
   const { t } = useLanguage();
   const [cur, setCur]   = useState(new Date());
   const [sel, setSel]   = useState<Booking | null>(null);
@@ -187,6 +188,10 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
       currentMeta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
       return currentMeta.settled_receipts || [];
     } catch { return []; }
+  };
+
+  const getBookingsForDay = (dayStr: string) => {
+    return bookings.filter(b => b.check_in <= dayStr && b.check_out >= dayStr);
   };
 
   // Store original checkout when a booking is selected
@@ -841,7 +846,6 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
               </div>
             )}
           </div>
-        </div>
       )}
 
       {/* Edit Request Modal */}
