@@ -632,17 +632,17 @@ export function BookingModal(props: BookingModalProps) {
                                 flash('✓ Dates updated.');
                               }
 
-                                let currentMeta: any = {};
+                                let metaToUpdate: any = {};
                                 try {
                                   const parsed = typeof sel.special_requests === 'string'
                                     ? JSON.parse(sel.special_requests || '{}')
                                     : (sel.special_requests || {});
-                                  currentMeta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
+                                  metaToUpdate = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
                                 } catch {
-                                  currentMeta = {};
+                                  metaToUpdate = {};
                                 }
                                 updates.special_requests = JSON.stringify({ 
-                                  ...currentMeta, 
+                                  ...metaToUpdate, 
                                   is_manual_dates: true, 
                                   days: dayEntries,
                                   last_adjustment: adj
