@@ -43,6 +43,7 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
 
   const [bookingType, setBookingType] = useState<'international' | 'local' | 'pool'>('international');
   const [localStayType, setLocalStayType] = useState<'day' | 'night'>('day');
+  const [accommodationType, setAccommodationType] = useState<'yurt' | 'camping'>('yurt');
   const [guestNames, setGuestNames] = useState<string[]>(['']);
   const [guestCount, setGuestCount] = useState(1);
   const [childrenUnder12, setChildrenUnder12] = useState(0);
@@ -160,6 +161,14 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
       const amountUZS = currency === 'UZS' ? amountValue : amountValue * rateValue;
       const total_price = currency === 'USD' ? amountValue : amountUZS / rateValue;
 
+      // Auto-calculate base price for camping (lower than yurt)
+      let basePrice = total_price;
+      if (bookingType === 'international' && accommodationType === 'camping' && !amount) {
+        // Camping is typically 50% of yurt price - this is a placeholder
+        // The actual pricing should come from a pricing table or config
+        basePrice = 0; // Will be set by pricing system
+      }
+
       const { error, data: bookingData } = await supabase.from('bookings').insert([{
         yurt_id: null, // Reserver bookings don't require specific yurt
         guest_name: validGuestNames.join(', '),
@@ -175,8 +184,8 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
         transportation: null,
         meal_preference: null,
         guide_required: dayEntries.some(d => d.guideService),
-        special_requests: (() => { 
-          const f = dayEntries.filter(d => d.lunch || d.dinner || d.guideService || d.transportation || d.cookingClass || d.specialRequest.trim()); 
+        special_requests: (() => {
+          const f = dayEntries.filter(d => d.lunch || d.dinner || d.guideService || d.transportation || d.cookingClass || d.specialRequest.trim());
           const meta: any = f.length > 0 ? { days: f } : {};
           if (isSystemOnly) {
             meta.is_system_only = true;
@@ -190,7 +199,10 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
             meta.is_local_guest = true;
             meta.local_stay_type = localStayType;
           }
-          return Object.keys(meta).length > 0 ? JSON.stringify(meta) : null; 
+          if (bookingType === 'international') {
+            meta.accommodation_type = accommodationType;
+          }
+          return Object.keys(meta).length > 0 ? JSON.stringify(meta) : null;
         })(),
         created_by_role: 'Manager',
         approved_by_manager: true,
@@ -255,6 +267,7 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
   const resetForm = () => {
     setBookingType('international');
     setLocalStayType('day');
+    setAccommodationType('yurt');
     setGuestNames(['']); setGuestCount(1); setChildrenUnder12(0); setPoolEntryCount(1);
     setCheckIn(selectedDate || ''); setCheckOut('');
     setDayEntries(selectedDate ? [makeBlankDay(selectedDate)] : []); setIskyCampRequests('');
@@ -293,6 +306,26 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
               </button>
             ))}
           </div>
+
+          {/* Accommodation Type Toggle for International */}
+          {bookingType === 'international' && (
+            <div className="flex gap-2 p-1 bg-indigo-50 rounded-xl border border-indigo-200">
+              {(['yurt', 'camping'] as const).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setAccommodationType(type)}
+                  className={`flex-1 py-2 px-4 rounded-lg text-xs font-bold capitalize transition-all ${
+                    accommodationType === type 
+                      ? 'bg-white text-indigo-900 shadow-sm' 
+                      : 'text-indigo-600 hover:text-indigo-800'
+                  }`}
+                >
+                  {type === 'yurt' ? '🏕️ Standard Yurt' : '⛺ Camping Spot'}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Local Stay Type Toggle */}
           {bookingType === 'local' && (
