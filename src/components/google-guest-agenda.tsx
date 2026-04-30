@@ -511,7 +511,7 @@ export function GoogleGuestAgenda({
                 ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600 border border-red-200">cancelled</span>
                 : booking && (
                     <div className="flex flex-col items-end gap-1">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${statusColor(booking.status)}`}>{String(booking.status).replace('_', ' ')}</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${statusColor(booking.status, booking)}`}>{String(booking.status).replace('_', ' ')}</span>
                     </div>
                   )
               }
@@ -550,14 +550,36 @@ export function GoogleGuestAgenda({
     );
   };
 
-  const statusColor = (s?: string) => ({
-    checked_in: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
-    confirmed: 'bg-amber-100 text-amber-700 border border-amber-200',
-    completed: 'bg-blue-100 text-blue-700 border border-blue-200',
-    cancelled: 'bg-red-100 text-red-700 border border-red-200',
-    pending: 'bg-slate-100 text-slate-600 border border-slate-200',
-    no_arrival: 'bg-gray-200 text-gray-600 border border-gray-300',
-  }[s ?? ''] ?? 'bg-slate-100 text-slate-500');
+  const statusColor = (s?: string, booking?: any) => {
+    // Check if this is a system-only booking
+    let isSystemOnly = false;
+    if (booking) {
+      if (booking.source === 'System') {
+        isSystemOnly = true;
+      } else {
+        try {
+          const meta = typeof booking.special_requests === 'string' 
+            ? JSON.parse(booking.special_requests || '{}') 
+            : (booking.special_requests || {});
+          if (meta.is_system_only) isSystemOnly = true;
+        } catch {}
+      }
+    }
+
+    // System bookings use purple styling
+    if (isSystemOnly) {
+      return 'bg-purple-100 text-purple-700 border border-purple-200';
+    }
+
+    return {
+      checked_in: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
+      confirmed: 'bg-amber-100 text-amber-700 border border-amber-200',
+      completed: 'bg-blue-100 text-blue-700 border border-blue-200',
+      cancelled: 'bg-red-100 text-red-700 border border-red-200',
+      pending: 'bg-slate-100 text-slate-600 border border-slate-200',
+      no_arrival: 'bg-gray-200 text-gray-600 border border-gray-300',
+    }[s ?? ''] ?? 'bg-slate-100 text-slate-500';
+  };
 
   const statusIcon = (s: string | undefined) => {
     if (s === 'checked_in') return '✓';

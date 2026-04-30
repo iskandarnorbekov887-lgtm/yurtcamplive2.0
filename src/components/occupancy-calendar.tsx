@@ -79,6 +79,35 @@ function getBookingStatus(b: Booking, today: string): 'checked-in' | 'checked-ou
 }
 
 function color(b: Booking, today: string) {
+  // Check if this is a system-only booking (not from Google Calendar)
+  let isSystemOnly = false;
+  if (b.source === 'System') {
+    isSystemOnly = true;
+  } else {
+    try {
+      const meta = typeof b.special_requests === 'string' 
+        ? JSON.parse(b.special_requests || '{}') 
+        : (b.special_requests || {});
+      if (meta.is_system_only) isSystemOnly = true;
+    } catch {}
+  }
+
+  // System bookings use purple styling to differentiate from Google Calendar bookings
+  if (isSystemOnly) {
+    const status = getBookingStatus(b, today);
+    switch (status) {
+      case 'checked-in':
+        return { bg: '#8B5CF6', text: '#FFFFFF' }; // Purple
+      case 'checked-out':
+        return { bg: '#A78BFA', text: '#FFFFFF' }; // Light purple
+      case 'upcoming':
+        return { bg: '#C4B5FD', text: '#4C1D95' }; // Lighter purple
+      default:
+        return { bg: '#8B5CF6', text: '#FFFFFF' }; // Purple
+    }
+  }
+
+  // Google Calendar bookings use original colors
   const status = getBookingStatus(b, today);
   switch (status) {
     case 'checked-in':
