@@ -685,7 +685,6 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                                   </div>
                                 ))}
                              </div>
-                          </div>
 
                           {/* Tab Footer (Pay & Close) */}
                           <div className="pt-6 border-t border-slate-100 flex justify-between items-end">
