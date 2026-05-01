@@ -202,6 +202,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
   const [showSettlementModal, setShowSettlementModal] = useState(false);
   const [settlementAmount, setSettlementAmount] = useState('');
   const [settlementCurrency, setSettlementCurrency] = useState<'UZS' | 'USD' | 'EUR'>('UZS');
+  const [settlementCookingClass, setSettlementCookingClass] = useState(false);
   const [drinks, setDrinks] = useState<Array<{ id: number; name: string; original_price: number; sold_price: number; currency: 'UZS' | 'USD' | 'EUR'; available: boolean }>>([]);
   const [selectedDrinks, setSelectedDrinks] = useState<Array<{ drink_id: number; drink_name: string; quantity: number; price: number; currency: 'UZS' | 'USD' | 'EUR' }>>([]);
   const [newExtraService, setNewExtraService] = useState({ name: '', price: '', currency: 'USD' as 'UZS' | 'USD' | 'EUR' });
@@ -1463,6 +1464,16 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                           <option value="EUR">EUR</option>
                         </select>
                       </div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <input
+                          type="checkbox"
+                          id="cooking-class-camper"
+                          checked={settlementCookingClass}
+                          onChange={(e) => setSettlementCookingClass(e.target.checked)}
+                          className="w-4 h-4 text-amber-600 border-amber-300 rounded focus:ring-amber-500"
+                        />
+                        <label htmlFor="cooking-class-camper" className="text-sm font-bold text-amber-900">Cooking Class</label>
+                      </div>
                       <p className="text-xs text-amber-600 font-semibold">Full services available (Lunch, Dinner, Cooking Class, Guide, Transport)</p>
                     </div>
                   );
@@ -1518,6 +1529,16 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                           <option value="EUR">EUR</option>
                         </select>
                       </div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <input
+                          type="checkbox"
+                          id="cooking-class-intl"
+                          checked={settlementCookingClass}
+                          onChange={(e) => setSettlementCookingClass(e.target.checked)}
+                          className="w-4 h-4 text-indigo-600 border-indigo-300 rounded focus:ring-indigo-500"
+                        />
+                        <label htmlFor="cooking-class-intl" className="text-sm font-bold text-indigo-900">Cooking Class</label>
+                      </div>
                       <p className="text-xs text-indigo-600 font-semibold">Full services available (Lunch, Dinner, Cooking Class, Guide, Transport)</p>
                     </div>
                   );
@@ -1531,6 +1552,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                   setShowSettlementModal(false);
                   setSettlementAmount('');
                   setSettlementCurrency('UZS');
+                  setSettlementCookingClass(false);
                 }}
                 className="flex-1 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-all"
               >
@@ -1545,13 +1567,27 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                     return;
                   }
 
-                  // Update booking with price and check-in
+                  // Get guest category
+                  const meta = (() => {
+                    try {
+                      return sel.special_requests ? JSON.parse(sel.special_requests) : {};
+                    } catch {
+                      return {};
+                    }
+                  })();
+                  const category = meta.guest_category || 'international';
+
+                  // Determine cooking_class based on category
+                  const cookingClassValue = category === 'pool' ? false : settlementCookingClass;
+
+                  // Update booking with price, cooking_class, and check-in
                   if (onUpdateBooking) {
                     await onUpdateBooking(sel.id, {
                       total_price: amountValue,
                       currency: settlementCurrency,
                       payment_status: 'paid',
-                      status: 'checked_in'
+                      status: 'checked_in',
+                      cooking_class: cookingClassValue
                     });
                   } else if (onCheckIn) {
                     await onCheckIn(sel.id);
@@ -1563,7 +1599,8 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                   setShowSettlementModal(false);
                   setSettlementAmount('');
                   setSettlementCurrency('UZS');
-                  setSel({ ...sel, status: 'checked_in' });
+                  setSettlementCookingClass(false);
+                  setSel({ ...sel, status: 'checked_in', cooking_class: cookingClassValue });
                 }}
                 className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all"
               >

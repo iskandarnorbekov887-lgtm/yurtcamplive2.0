@@ -62,7 +62,7 @@ export interface Booking {
   transportation: string;
   meal_preference: string;
   guide_required: boolean;
-  special_requests: string;
+  special_requests: string; // Contains guest_category in JSON metadata
   created_by_role: string;
   approved_by_manager: boolean;
   created_by_id: string;
@@ -70,7 +70,7 @@ export interface Booking {
   last_edited_by_role: string;
   created_at: string;
   google_event_id?: string;
-  cooking_class?: boolean;
+  cooking_class?: boolean; // Database column for cooking class
   cooking_class_amount?: string | null;
   cooking_class_description?: string | null;
   laundry_price?: string | null;
