@@ -46,12 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               .single();
             
             if (mounted && profile) {
-              const userProfile = { ...profile };
-              // THE FIX: If the DB says Reserver, force it to Manager
-              if (userProfile && (userProfile.role as any) === 'Reserver') {
-                userProfile.role = 'Manager'; 
-              }
-              setUser(userProfile);
+              setUser(profile);
             }
           }
         } else {

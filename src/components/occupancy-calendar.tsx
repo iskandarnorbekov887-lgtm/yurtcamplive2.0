@@ -115,7 +115,18 @@ function isPoolVisitor(b: Booking): boolean {
     const meta = typeof b.special_requests === 'string' 
       ? JSON.parse(b.special_requests || '{}') 
       : (b.special_requests || {});
-    return meta.is_pool_visitor === true;
+    return meta.is_pool_visitor === true || meta.guest_category === 'pool';
+  } catch {
+    return false;
+  }
+}
+
+function isLocalGuest(b: Booking): boolean {
+  try {
+    const meta = typeof b.special_requests === 'string' 
+      ? JSON.parse(b.special_requests || '{}') 
+      : (b.special_requests || {});
+    return meta.is_local_guest === true || meta.guest_category === 'local';
   } catch {
     return false;
   }
@@ -200,6 +211,11 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
   const [showDrinksPopup, setShowDrinksPopup] = useState(false);
   const [showExtraServicesPopup, setShowExtraServicesPopup] = useState(false);
   const [showSettlementModal, setShowSettlementModal] = useState(false);
+  const [categoryData, setCategoryData] = useState({
+    international: { stay_price: 0, cooking_class: false },
+    local: { amount: 0, type: 'day' },
+    pool: { amount: 0 }
+  });
   const [settlementAmount, setSettlementAmount] = useState('');
   const [settlementCurrency, setSettlementCurrency] = useState<'UZS' | 'USD' | 'EUR'>('UZS');
   const [settlementCookingClass, setSettlementCookingClass] = useState(false);
@@ -241,6 +257,42 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
     } finally {
       setLoadingAction('');
     }
+  };
+
+  const cleanPayloadByCategory = (category: string, raw: any) => {
+    if (category === 'pool') {
+      return {
+        total_price: raw.total_price,
+        currency: raw.currency,
+        payment_status: 'paid',
+        status: raw.status || 'checked_in',
+        cooking_class: false,
+        guide_service: false,
+        lunch: false,
+        dinner: false,
+        has_transportation: false,
+        amount: raw.total_price // Isolated cash amount
+      };
+    }
+    if (category === 'local') {
+      return {
+        total_price: raw.total_price,
+        currency: raw.currency,
+        payment_status: 'paid',
+        status: raw.status || 'checked_in',
+        cooking_class: false,
+        amount: raw.total_price
+      };
+    }
+    // International / Camper (Room-Based Flow)
+    return {
+      total_price: raw.total_price,
+      currency: raw.currency,
+      payment_status: raw.payment_status || 'Unpaid',
+      status: raw.status || 'checked_in',
+      cooking_class: raw.cooking_class,
+      is_room_stay: true // Ensure it stays as a room stay
+    };
   };
 
   const applyReduction = async () => {
@@ -604,43 +656,35 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                   const isManagerBooking = currentMeta.is_system_only;
                   const displayId = getDisplayId(ev.booking);
 
-                  // Pool visitors render as circular icons
-                  if (isPool) {
-                    let poolCount = 1;
-                    try {
-                      const meta = typeof ev.booking.special_requests === 'string' 
-                        ? JSON.parse(ev.booking.special_requests || '{}') 
-                        : (ev.booking.special_requests || {});
-                      poolCount = meta.pool_entry_count || 1;
-                    } catch {}
-
+                  const isLocal = isLocalGuest(ev.booking);
+                  const isRoomStay = currentMeta.is_room_stay ?? (!isPool && !isLocal);
+                  
+                  // Financial Note Display for non-room stays (Local/Pool)
+                  if (!isRoomStay && isManagerBooking) {
+                    const pricePaid = ev.booking.collected_amount || ev.booking.total_price || 0;
                     return (
                       <button
                         key={ei}
-                        onClick={() => {
-                          setSel(ev.booking);
-                          setEditData(ev.booking);
-                          setIsEditing(false);
-                        }}
-                        title={`Pool Visitor: ${ev.booking.guest_name} (${poolCount} people)`}
+                        onClick={() => { setSel(ev.booking); setIsEditing(false); }}
                         style={{
                           gridColumn: `${ev.colStart + 1} / ${ev.colStart + 2}`,
                           gridRow: `${ev.lane + 1}`,
-                          backgroundColor: '#06B6D4', // Cyan for pool
+                          backgroundColor: isPool ? '#06B6D4' : '#F59E0B',
                           color: '#FFFFFF',
-                          borderRadius: '50%',
-                          width: '20px',
-                          height: '20px',
-                          margin: '1px auto',
+                          borderRadius: '4px',
+                          margin: '1px',
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '10px',
+                          padding: '0 4px',
+                          fontSize: '9px',
+                          fontWeight: 'bold',
+                          height: '20px',
+                          border: (isManagerBooking && userRole === 'CEO') ? '2px solid #3B82F6' : 'none',
                         }}
-                        className="hover:brightness-90 transition-all"
+                        className="truncate shadow-sm"
                       >
-                        🏊
+                        <span className="truncate">{ev.booking.guest_name} | {ev.booking.number_of_people}p | {pricePaid} UZS</span>
                       </button>
                     );
                   }
@@ -663,7 +707,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                         marginLeft: isStart ? '2px' : '0',
                         marginRight: isEnd  ? '2px' : '0',
                         cursor: 'pointer',
-                        border: isManagerBooking ? '2px solid #3B82F6' : 'none', // Blue border for manager bookings
+                        border: (isManagerBooking && userRole === 'CEO') ? '2px solid #3B82F6' : 'none', // Blue border for CEO view only
                       }}
                       className="text-[11px] font-semibold px-2 truncate text-left flex items-center h-[20px] hover:brightness-90 transition-all"
                     >
@@ -1409,120 +1453,60 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                 if (category === 'pool') {
                   return (
                     <div className="bg-cyan-50 border-2 border-cyan-200 rounded-xl p-4 space-y-3">
-                      <label className="block text-sm font-black text-cyan-900">Pool Entry Fee</label>
+                      <label className="block text-sm font-black text-cyan-900 uppercase tracking-widest text-[10px]">Pool Entry Fee</label>
                       <div className="flex gap-2">
                         <input
                           type="number"
                           step="0.01"
                           min="0"
-                          value={settlementAmount}
-                          onChange={(e) => setSettlementAmount(e.target.value)}
+                          value={categoryData.pool.amount || ''}
+                          onChange={(e) => setCategoryData({ ...categoryData, pool: { ...categoryData.pool, amount: parseFloat(e.target.value) || 0 } })}
                           placeholder="Enter amount"
                           className="flex-1 px-3 py-2 border-2 border-cyan-300 rounded-lg text-sm font-bold text-black focus:border-cyan-500"
                         />
-                        <select
-                          value={settlementCurrency}
-                          onChange={(e) => setSettlementCurrency(e.target.value as 'UZS' | 'USD' | 'EUR')}
-                          className="px-3 py-2 border-2 border-cyan-300 rounded-lg text-sm font-bold text-black focus:border-cyan-500"
-                        >
-                          <option value="UZS">UZS</option>
-                          <option value="USD">USD</option>
-                          <option value="EUR">EUR</option>
-                        </select>
+                        <div className="px-3 py-2 bg-cyan-100 text-cyan-900 rounded-lg text-sm font-black">UZS</div>
                       </div>
-                      <label className="block text-sm font-black text-cyan-900">Drinks (Optional)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="Drinks amount"
-                        className="w-full px-3 py-2 border-2 border-cyan-300 rounded-lg text-sm font-bold text-black focus:border-cyan-500"
-                      />
-                    </div>
-                  );
-                } else if (category === 'camper') {
-                  return (
-                    <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-4 space-y-3">
-                      <label className="block text-sm font-black text-amber-900">Tent Fee</label>
-                      <div className="flex gap-2">
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={settlementAmount}
-                          onChange={(e) => setSettlementAmount(e.target.value)}
-                          placeholder="Enter amount"
-                          className="flex-1 px-3 py-2 border-2 border-amber-300 rounded-lg text-sm font-bold text-black focus:border-amber-500"
-                        />
-                        <select
-                          value={settlementCurrency}
-                          onChange={(e) => setSettlementCurrency(e.target.value as 'UZS' | 'USD' | 'EUR')}
-                          className="px-3 py-2 border-2 border-amber-300 rounded-lg text-sm font-bold text-black focus:border-amber-500"
-                        >
-                          <option value="UZS">UZS</option>
-                          <option value="USD">USD</option>
-                          <option value="EUR">EUR</option>
-                        </select>
-                      </div>
-                      <div className="flex items-center gap-2 mt-2">
-                        <input
-                          type="checkbox"
-                          id="cooking-class-camper"
-                          checked={settlementCookingClass}
-                          onChange={(e) => setSettlementCookingClass(e.target.checked)}
-                          className="w-4 h-4 text-amber-600 border-amber-300 rounded focus:ring-amber-500"
-                        />
-                        <label htmlFor="cooking-class-camper" className="text-sm font-bold text-amber-900">Cooking Class</label>
-                      </div>
-                      <p className="text-xs text-amber-600 font-semibold">Full services available (Lunch, Dinner, Cooking Class, Guide, Transport)</p>
+                      <p className="text-[10px] font-bold text-cyan-600">Isolated Service Bucket: Room data will be purged on save.</p>
                     </div>
                   );
                 } else if (category === 'local') {
                   return (
                     <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-4 space-y-3">
-                      <label className="block text-sm font-black text-emerald-900">Local Guest Fee</label>
+                      <label className="block text-sm font-black text-emerald-900 uppercase tracking-widest text-[10px]">Local Guest Fee</label>
                       <div className="flex gap-2">
                         <input
                           type="number"
                           step="0.01"
                           min="0"
-                          value={settlementAmount}
-                          onChange={(e) => setSettlementAmount(e.target.value)}
+                          value={categoryData.local.amount || ''}
+                          onChange={(e) => setCategoryData({ ...categoryData, local: { ...categoryData.local, amount: parseFloat(e.target.value) || 0 } })}
                           placeholder="Enter amount"
                           className="flex-1 px-3 py-2 border-2 border-emerald-300 rounded-lg text-sm font-bold text-black focus:border-emerald-500"
                         />
-                        <select
-                          value={settlementCurrency}
-                          onChange={(e) => setSettlementCurrency(e.target.value as 'UZS' | 'USD' | 'EUR')}
-                          className="px-3 py-2 border-2 border-emerald-300 rounded-lg text-sm font-bold text-black focus:border-emerald-500"
-                        >
-                          <option value="UZS">UZS</option>
-                          <option value="USD">USD</option>
-                          <option value="EUR">EUR</option>
-                        </select>
+                        <div className="px-3 py-2 bg-emerald-100 text-emerald-900 rounded-lg text-sm font-black">UZS</div>
                       </div>
-                      <p className="text-xs text-emerald-600 font-semibold">Lunch/Dinner services available</p>
                     </div>
                   );
                 } else {
-                  // International (Yurt)
+                  // International / Camper (Room-Based)
+                  const isCamper = category === 'camper';
                   return (
-                    <div className="bg-indigo-50 border-2 border-indigo-200 rounded-xl p-4 space-y-3">
-                      <label className="block text-sm font-black text-indigo-900">Stay Price</label>
+                    <div className={`${isCamper ? 'bg-amber-50 border-amber-200' : 'bg-indigo-50 border-indigo-200'} border-2 rounded-xl p-4 space-y-3`}>
+                      <label className={`block text-sm font-black ${isCamper ? 'text-amber-900' : 'text-indigo-900'} uppercase tracking-widest text-[10px]`}>Stay Price</label>
                       <div className="flex gap-2">
                         <input
                           type="number"
                           step="0.01"
                           min="0"
-                          value={settlementAmount}
-                          onChange={(e) => setSettlementAmount(e.target.value)}
+                          value={categoryData.international.stay_price || ''}
+                          onChange={(e) => setCategoryData({ ...categoryData, international: { ...categoryData.international, stay_price: parseFloat(e.target.value) || 0 } })}
                           placeholder="Enter amount"
-                          className="flex-1 px-3 py-2 border-2 border-indigo-300 rounded-lg text-sm font-bold text-black focus:border-indigo-500"
+                          className={`flex-1 px-3 py-2 border-2 ${isCamper ? 'border-amber-300 focus:border-amber-500' : 'border-indigo-300 focus:border-indigo-500'} rounded-lg text-sm font-bold text-black`}
                         />
                         <select
                           value={settlementCurrency}
                           onChange={(e) => setSettlementCurrency(e.target.value as 'UZS' | 'USD' | 'EUR')}
-                          className="px-3 py-2 border-2 border-indigo-300 rounded-lg text-sm font-bold text-black focus:border-indigo-500"
+                          className={`px-3 py-2 border-2 ${isCamper ? 'border-amber-300 focus:border-amber-500' : 'border-indigo-300 focus:border-indigo-500'} rounded-lg text-sm font-bold text-black`}
                         >
                           <option value="UZS">UZS</option>
                           <option value="USD">USD</option>
@@ -1532,14 +1516,13 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                       <div className="flex items-center gap-2 mt-2">
                         <input
                           type="checkbox"
-                          id="cooking-class-intl"
-                          checked={settlementCookingClass}
-                          onChange={(e) => setSettlementCookingClass(e.target.checked)}
-                          className="w-4 h-4 text-indigo-600 border-indigo-300 rounded focus:ring-indigo-500"
+                          id="cooking-class-settle"
+                          checked={categoryData.international.cooking_class}
+                          onChange={(e) => setCategoryData({ ...categoryData, international: { ...categoryData.international, cooking_class: e.target.checked } })}
+                          className={`w-4 h-4 ${isCamper ? 'text-amber-600 border-amber-300' : 'text-indigo-600 border-indigo-300'} rounded`}
                         />
-                        <label htmlFor="cooking-class-intl" className="text-sm font-bold text-indigo-900">Cooking Class</label>
+                        <label htmlFor="cooking-class-settle" className={`text-sm font-bold ${isCamper ? 'text-amber-900' : 'text-indigo-900'}`}>Cooking Class</label>
                       </div>
-                      <p className="text-xs text-indigo-600 font-semibold">Full services available (Lunch, Dinner, Cooking Class, Guide, Transport)</p>
                     </div>
                   );
                 }
@@ -1548,12 +1531,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
 
             <div className="flex gap-3 mt-6">
               <button
-                onClick={() => {
-                  setShowSettlementModal(false);
-                  setSettlementAmount('');
-                  setSettlementCurrency('UZS');
-                  setSettlementCookingClass(false);
-                }}
+                onClick={() => setShowSettlementModal(false)}
                 className="flex-1 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-all"
               >
                 Cancel
@@ -1561,12 +1539,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
               <button
                 onClick={async () => {
                   if (!sel || !onCheckIn) return;
-                  const amountValue = parseFloat(settlementAmount || '0');
-                  if (amountValue <= 0) {
-                    alert('Please enter a valid amount');
-                    return;
-                  }
-
+                  
                   // Get guest category
                   const meta = (() => {
                     try {
@@ -1577,34 +1550,48 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                   })();
                   const category = meta.guest_category || 'international';
 
-                  // Determine cooking_class based on category
-                  const cookingClassValue = category === 'pool' ? false : settlementCookingClass;
+                  let amountValue = 0;
+                  let cookingClassValue = false;
 
-                  // Update booking with price, cooking_class, and check-in
+                  if (category === 'pool') {
+                    amountValue = categoryData.pool.amount;
+                  } else if (category === 'local') {
+                    amountValue = categoryData.local.amount;
+                  } else {
+                    amountValue = categoryData.international.stay_price;
+                    cookingClassValue = categoryData.international.cooking_class;
+                  }
+
+                  if (amountValue <= 0 && category !== 'international') {
+                    alert('Please enter a valid amount');
+                    return;
+                  }
+
+                  // Cleaning Logic
+                  const rawPayload = {
+                    total_price: amountValue,
+                    currency: (category === 'pool' || category === 'local') ? 'UZS' : settlementCurrency,
+                    status: 'checked_in',
+                    cooking_class: cookingClassValue
+                  };
+                  
+                  const cleanedPayload = cleanPayloadByCategory(category, rawPayload);
+                  
                   if (onUpdateBooking) {
-                    await onUpdateBooking(sel.id, {
-                      total_price: amountValue,
-                      currency: settlementCurrency,
-                      payment_status: 'paid',
-                      status: 'checked_in',
-                      cooking_class: cookingClassValue
-                    });
-                  } else if (onCheckIn) {
+                    await onUpdateBooking(sel.id, cleanedPayload);
+                  } else {
                     await onCheckIn(sel.id);
                   }
 
-                  // Record payment to booking_receipts
-                  // This would need to be implemented with a proper API call
-
                   setShowSettlementModal(false);
-                  setSettlementAmount('');
-                  setSettlementCurrency('UZS');
-                  setSettlementCookingClass(false);
-                  setSel({ ...sel, status: 'checked_in', cooking_class: cookingClassValue });
+                  setSel({ ...sel, ...cleanedPayload });
+                  
+                  // Refresh cache
+                  try { await supabase.rpc('reload_schema'); } catch {}
                 }}
-                className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all"
+                className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg transition-all"
               >
-                Check-In & Settle
+                PAY & SETTLE
               </button>
             </div>
           </div>

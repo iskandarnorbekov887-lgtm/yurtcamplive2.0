@@ -41,7 +41,7 @@ export async function GET() {
     const items = (response.data.items || []).map(event => {
       const start = event.start?.date || event.start?.dateTime?.split('T')[0] || '';
       const rawEnd = event.end?.date || event.end?.dateTime?.split('T')[0] || '';
-      const end = rawEnd && rawEnd > start ? rawEnd : (() => {
+      const end = rawEnd && rawEnd >= start ? rawEnd : (() => {
         if (!start) return '';
         const d = new Date(start + 'T12:00:00'); d.setDate(d.getDate() + 1);
         return d.toISOString().split('T')[0];

@@ -1,4 +1,3 @@
-import { createBrowserClient } from '@supabase/ssr';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
@@ -14,28 +13,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  * On the server (SSR/build), we return a no-op proxy so that imports
  * from 'use client' modules don't crash during the server render pass.
  */
-function createSafeBrowserClient(): SupabaseClient {
-  if (typeof window === 'undefined') {
-    // Server-side: return a no-op proxy (never used for real calls)
-    const handler: ProxyHandler<object> = {
-      get() {
-        return () => new Proxy({}, handler);
-      },
-    };
-    return new Proxy({}, handler) as unknown as SupabaseClient;
-  }
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Missing Supabase Environment Variables: NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY');
-  }
-
-  return createBrowserClient(supabaseUrl, supabaseAnonKey);
-}
-
-export const supabase: SupabaseClient = createSafeBrowserClient();
+import { createClient } from '@/utils/supabase/client';
+export const supabase = createClient();
 
 export type UserRole = 'CEO' | 'Manager' | 'Cook';
 
@@ -72,7 +51,6 @@ export interface Booking {
   google_event_id?: string;
   cooking_class?: boolean; // Database column for cooking class
   cooking_class_amount?: string | null;
-  cooking_class_description?: string | null;
   laundry_price?: string | null;
   laundry_currency?: 'UZS' | 'USD' | null;
   guest_count?: number;
@@ -140,6 +118,28 @@ export interface Finance {
   receipt_url: string | null;
   created_by: string;
   created_at: string;
+}
+
+export interface KitchenOrder {
+  type: 'lunch' | 'dinner';
+  quantity: number;
+  status: 'pending' | 'accepted';
+  requested_at: string;
+  accepted_at?: string;
+}
+
+export interface GroceryRequest {
+  id: number;
+  items: Array<{
+    name: string;
+    qty: string;
+    unit: string;
+    purchased: boolean;
+    received: boolean;
+  }>;
+  status: 'requested' | 'purchased' | 'received';
+  created_at: string;
+  created_by_id: string;
 }
 
 export interface Notification {

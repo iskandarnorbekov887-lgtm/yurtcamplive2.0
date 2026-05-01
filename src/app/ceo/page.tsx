@@ -504,6 +504,7 @@ function CEODashboard() {
               onCheckIn={handleCheckIn}
               onCheckOut={handleCheckOut}
               onUpdateBooking={handleUpdateBooking}
+              onRefresh={fetchData}
             />
           </div>
         )}

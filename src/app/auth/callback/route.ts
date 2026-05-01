@@ -39,7 +39,6 @@ export async function GET(request: Request) {
           'CEO': '/ceo',
           'Manager': '/manager',
           'Cook': '/cook',
-          'Reserver': '/bookings',
         };
 
         const redirectPath = profile?.role

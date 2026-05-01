@@ -108,6 +108,7 @@ interface BookingModalProps {
   handleCheckIn: () => Promise<void>;
   handleCheckOut: () => Promise<void>;
   handleCancel: () => Promise<void>;
+  finalizeTab?: () => Promise<void>;
   handleCreateFromEvent: (doCheckIn: boolean) => Promise<void>;
   fetchCbuRate: (curr: any) => Promise<void>;
   
@@ -141,7 +142,7 @@ export function BookingModal(props: BookingModalProps) {
     editCheckIn, setEditCheckIn, editCheckOut, setEditCheckOut, dateAdjAmount, setDateAdjAmount,
     valError, setValError, getSettledReceiptsForSel, handleCheckIn, handleCheckOut, handleCancel,
     handleCreateFromEvent, fetchCbuRate, gTotal, debtRemaining, tPaidUsd, isBalanceMatched, today,
-    gcEvents, dayEntries
+    gcEvents, dayEntries, finalizeTab
   } = props;
 
   const isStaff = userRole === 'Manager' || userRole === 'CEO';
@@ -161,6 +162,17 @@ export function BookingModal(props: BookingModalProps) {
     }
     return meta;
   }, [sel?.special_requests]);
+
+  const [kitchenOrders, setKitchenOrders] = useState<any[]>(currentMeta.kitchen_orders || []);
+  const [showMealRequestModal, setShowMealRequestModal] = useState(false);
+  const [currentMealType, setCurrentMealType] = useState<'lunch' | 'dinner' | null>(null);
+  const [mealRequestAmount, setMealRequestAmount] = useState(0);
+
+  useEffect(() => {
+    if (currentMeta.kitchen_orders) {
+      setKitchenOrders(currentMeta.kitchen_orders);
+    }
+  }, [currentMeta.kitchen_orders]);
 
 
   const handleSaveProgress = async () => {
@@ -207,7 +219,16 @@ export function BookingModal(props: BookingModalProps) {
       });
       data.drinks_tab = dTab;
 
+      // Manual Protection Rule: Flag office bookings as manually updated
+      if (sel.google_event_id || sel.source === 'System' || sel.source === 'office') {
+        data.is_manually_updated = true;
+      }
+
       await onUpdateBooking(sel.id, data);
+      
+      // Force Supabase schema reload
+      try { await supabase.rpc('reload_schema'); } catch { /* ignore if not exist */ }
+
       flash('✓ Choices saved to guest file!');
     } catch (err) {
       flash('⚠ Failed to save progress.');
@@ -311,11 +332,15 @@ export function BookingModal(props: BookingModalProps) {
     ? Math.ceil((new Date(sel.check_in + 'T00:00:00').getTime() - new Date(today + 'T00:00:00').getTime()) / 86400000)
     : 999;
   const isGracePeriodActive = false;
-  const canCheckIn = sel?.status === 'confirmed' && daysUntilCheckIn <= 2 && !!onCheckIn;
-  const isComingSoon = sel?.status === 'confirmed' && daysUntilCheckIn > 2;
-  const isCheckOutDay = sel ? today >= sel.check_out : false;
-  const canCheckOut = (sel?.status === 'checked_in' || isGracePeriodActive) && isCheckOutDay && !!onCheckOut;
-  const canCancel = sel && ['confirmed', 'pending'].includes(sel.status) && !!onCancelBooking;
+  const guestCategory = currentMeta.guest_category || 'international';
+  const isDayGuest = guestCategory === 'pool' || (guestCategory === 'local' && currentMeta.local_stay_type === 'day');
+  const isRoomStay = guestCategory === 'international' || guestCategory === 'camper';
+
+  const canCheckIn = sel?.status === 'confirmed' && daysUntilCheckIn <= 2 && !!onCheckIn && !isDayGuest;
+  const isComingSoon = sel?.status === 'confirmed' && daysUntilCheckIn > 2 && !isDayGuest;
+
+  const canCheckOut = (sel?.status === 'checked_in' || isGracePeriodActive) && !!onCheckOut && !isDayGuest;
+  const canCancel = sel && ['confirmed', 'pending'].includes(sel.status) && !!onCancelBooking && !isDayGuest;
   const isAfterNoon = new Date().getHours() >= 12;
   const isAfterTwo = new Date().getHours() >= 14;
 
@@ -330,7 +355,7 @@ export function BookingModal(props: BookingModalProps) {
     <>
       <div className="fixed inset-0 z-[100] flex items-center sm:items-start justify-center p-0 sm:p-4 sm:pt-16 pb-safe" onClick={() => setSelectedItem(null)}>
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-        <div className="relative bg-white sm:rounded-2xl shadow-2xl w-full sm:max-w-md h-full sm:h-auto sm:max-h-[85vh] overflow-y-auto pb-20 sm:pb-0" onClick={e => e.stopPropagation()}>
+        <div className={"relative bg-white sm:rounded-2xl shadow-2xl w-full sm:max-w-md h-full sm:h-auto sm:max-h-[85vh] overflow-y-auto pb-20 sm:pb-0 " + (userRole === 'CEO' && sel?.source === 'System' ? 'border-4 border-blue-500' : '')} onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 sticky top-0 bg-white rounded-t-2xl z-10">
             <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500">
               {sel ? 'Booking Details' : 'Google Calendar Event'}
@@ -369,7 +394,7 @@ export function BookingModal(props: BookingModalProps) {
                   <button onClick={() => handleCreateFromEvent(true)} disabled={loadingAction === 'creating'}
                     className="w-full py-2.5 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 transition-all disabled:opacity-60 flex items-center justify-center gap-2">
                     {loadingAction === 'creating' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '→'}
-                    Check In
+                    Check In & Settle
                   </button>
                 ) : (
                   <div className="w-full py-2.5 bg-sky-50 border border-sky-200 rounded-xl text-sm font-bold text-sky-700 text-center">
@@ -713,25 +738,51 @@ export function BookingModal(props: BookingModalProps) {
                   )}
                   {canCheckOut && (
                     <button onClick={async () => {
-                        if (gTotal > 0.01) {
-                          flash(`⚠ Guest has an open tab of $${gTotal.toFixed(2)}. Please settle Tab before checking out.`);
+                        const receipts = getSettledReceiptsForSel();
+                        const hasSettled = receipts.length > 0 || (sel.collected_amount || 0) > 0;
+                        const guestNum = sel.number_of_people || sel.guest_count || 0;
+                        const price = sel.total_price || 0;
+                        const isPrepaidVal = isPrepaid || sel.is_prepaid || false;
+
+                        if (guestNum <= 0) {
+                          flash(`⚠ Please enter the Number of Guests before checking out.`);
                           return;
+                        }
+                        if (price <= 0 && !isPrepaidVal && !hasSettled) {
+                          flash(`⚠ Please enter a Total Price or mark as Prepaid before checking out.`);
+                          return;
+                        }
+                        if (gTotal > 0.01) {
+                          if (isPrepaidVal) {
+                             // If it's prepaid, we allow checkout but still trigger tab closure
+                          } else {
+                            flash(`⚠ Guest has an open tab of $${gTotal.toFixed(2)}. Please settle Tab before checking out.`);
+                            return;
+                          }
                         }
                         if (!confirm(`Complete stay for ${sel.guest_name}?`)) return;
                         setLoadingAction('checkout_manual');
-                        try { if (onCheckOut) await onCheckOut(sel.id); flash('✓ Guest checked out.'); setSelectedItem(null); }
+                        try { 
+                          // If there's any active tab (even if $0 due to prepaid), close it first
+                          if (finalizeTab && gTotal >= 0) {
+                             await finalizeTab();
+                          }
+                          if (onCheckOut) await onCheckOut(sel.id); 
+                          flash('✓ Guest checked out successfully!'); 
+                          setSelectedItem(null); 
+                        }
                         catch { flash('⚠ Check-out failed.'); }
                         finally { setLoadingAction(''); }
                       }}
-                      disabled={loadingAction === 'checkout_manual' || gTotal > 0.01}
+                      disabled={loadingAction === 'checkout_manual'}
                       className={`px-4 py-2 text-sm font-bold rounded-xl transition-all disabled:opacity-60 flex items-center gap-2 ${
-                        gTotal > 0.01
-                          ? 'bg-rose-100 border-2 border-rose-300 text-rose-700 cursor-not-allowed'
-                          : 'bg-blue-600 hover:bg-blue-700 text-white'
+                        (gTotal > 0.01 || (sel.number_of_people || sel.guest_count || 0) <= 0 || ((sel.total_price || 0) <= 0 && !sel.is_prepaid))
+                          ? 'bg-rose-100 border-2 border-rose-300 text-rose-700'
+                          : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-100'
                       }`}
                     >
                       {loadingAction === 'checkout_manual' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '✈'}
-                      {gTotal > 0.01 ? `Open Tab $${gTotal.toFixed(2)}` : 'Check Out'}
+                      {gTotal > 0.01 ? `Open Tab $${gTotal.toFixed(2)}` : 'Check Out Guest'}
                     </button>
                   )}
                   {isComingSoon && (
@@ -797,7 +848,8 @@ export function BookingModal(props: BookingModalProps) {
                     if (hasSettled) return null; // HIDE ACCOMMODATION ENTIRELY IN SERVICES AFTER SETTLEMENT
                     
                     const isStayLocked = hasSettled;
-                    if (!isStayLocked) {
+                    const isPool = sel?.guest_category === 'pool';
+                    if (!isStayLocked && !isPool) {
                       return (
                         <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-white animate-in slide-in-from-top-2">
                           <div className="flex justify-between items-center">
@@ -884,155 +936,273 @@ export function BookingModal(props: BookingModalProps) {
                     );
                   })()}
 
-                  <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-white">
-                    <div className="flex justify-between items-center">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Food</p>
-                      <button onClick={() => {
-                        const next = !(isLunchPrepaid || isDinnerPrepaid);
-                        setIsLunchPrepaid(next);
-                        setIsDinnerPrepaid(next);
-                      }}
-                        className={`px-2 py-0.5 text-[8px] font-black uppercase tracking-wider rounded-md border transition-all ${(isLunchPrepaid || isDinnerPrepaid) ? 'bg-emerald-100 text-emerald-700 border-emerald-300' : 'bg-slate-50 text-slate-400 border-slate-200 hover:border-slate-300'}`}>
-                        {(isLunchPrepaid || isDinnerPrepaid) ? '✓ Pre-paid' : 'Pre-paid'}
-                      </button>
-                    </div>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-3">
-                          <label className="flex items-center gap-2 cursor-pointer min-w-[80px]">
-                            <input type="checkbox" checked={svcLunch} onChange={e => { setSvcLunch(e.target.checked); if (e.target.checked && svcLunchCount <= 0) setSvcLunchCount(1); }} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
-                            <span className="text-sm font-bold text-slate-900">Lunch</span>
-                          </label>
-                          {svcLunch && <input type="number" value={String(svcLunchCount)} onChange={e => setSvcLunchCount(parseInt(e.target.value) || 0)} placeholder="Qty"
-                            className={`w-16 px-2 py-2 border-2 ${svcLunchCount <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} />}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {svcLunch && pricing?.lunch_price && pricing.lunch_price > 0 && (
-                            <span className={`text-xs font-bold text-slate-500 ${isLunchPrepaid ? 'line-through opacity-50' : ''}`}>${String((svcLunchCount * pricing.lunch_price).toFixed(2))}</span>
-                          )}
-                        </div>
+                  {isRoomStay && (
+                    <div className="border border-slate-200 rounded-xl p-4 space-y-4 bg-white shadow-sm">
+                      <div className="flex justify-between items-center mb-1">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Kitchen Orders</p>
+                        <span className="px-2 py-0.5 text-[8px] font-black uppercase tracking-wider rounded-md bg-indigo-50 text-indigo-600 border border-indigo-100">Shiny Workflow</span>
                       </div>
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-3">
-                          <label className="flex items-center gap-2 cursor-pointer min-w-[80px]">
-                            <input type="checkbox" checked={svcDinner} onChange={e => { setSvcDinner(e.target.checked); if (e.target.checked && svcDinnerCount <= 0) setSvcDinnerCount(1); }} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
-                            <span className="text-sm font-bold text-slate-900">Dinner</span>
-                          </label>
-                          {svcDinner && <input type="number" value={String(svcDinnerCount)} onChange={e => setSvcDinnerCount(parseInt(e.target.value) || 0)} placeholder="Qty"
-                            className={`w-16 px-2 py-2 border-2 ${svcDinnerCount <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} />}
+                      
+                      <div className="grid grid-cols-2 gap-3">
+                        {/* Lunch Request Button */}
+                        <div className="space-y-2">
+                          {(() => {
+                            const order = kitchenOrders.find(o => o.type === 'lunch');
+                            const isPending = order?.status === 'pending';
+                            const isAccepted = order?.status === 'confirmed';
+                            return (
+                              <button type="button" 
+                                onClick={() => { 
+                                  setCurrentMealType('lunch'); 
+                                  setMealRequestAmount(order?.quantity || 0);
+                                  setShowMealRequestModal(true); 
+                                }}
+                                className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all shadow-md active:scale-95 flex flex-col items-center justify-center gap-1 border-2 ${
+                                  isAccepted ? 'bg-emerald-500 border-emerald-400 text-white' : 
+                                  isPending ? 'bg-orange-500 border-orange-400 text-white' : 
+                                  'bg-white border-slate-100 text-slate-400 hover:border-indigo-200 hover:text-indigo-600'
+                                }`}>
+                                <span className="opacity-80">Request Lunch</span>
+                                {order && <span className="text-sm font-black">x {order.quantity}</span>}
+                              </button>
+                            );
+                          })()}
                         </div>
-                        <div className="flex items-center gap-2">
-                          {svcDinner && pricing?.dinner_price && pricing.dinner_price > 0 && (
-                            <span className={`text-xs font-bold text-slate-500 ${isDinnerPrepaid ? 'line-through opacity-50' : ''}`}>${String((svcDinnerCount * pricing.dinner_price).toFixed(2))}</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
 
-                  <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-white">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Other Services</p>
-                    <div className="grid grid-cols-1 gap-4">
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" checked={svcGuide} onChange={e => { 
-                              setSvcGuide(e.target.checked); 
-                              if (e.target.checked) { 
-                                setSvcGuidePrice(pricing?.guide_price || 0); 
-                                setSvcGuideNames(['']); 
-                              } 
-                            }} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
-                            <div className="flex flex-col">
-                              <span className="text-sm font-bold text-slate-900">Guide Service</span>
-                              {pricing?.guide_price && pricing.guide_price > 0 && (
-                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">System Price: ${String(pricing.guide_price)} / guide</span>
-                              )}
-                            </div>
-                          </label>
-                          {svcGuide && (
-                            <div className="flex items-center gap-2">
-                              <button type="button" onClick={() => setSvcGuidePrice(Math.max(0, svcGuidePrice - 5))} className="w-8 h-8 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-black text-sm transition-all shadow-sm">－</button>
-                              <div className="relative">
-                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px]">$</span>
-                                <input type="number" value={String(svcGuidePrice)} onChange={e => setSvcGuidePrice(parseFloat(e.target.value) || 0)}
-                                  className="w-20 pl-5 pr-2 py-2 bg-white border-2 border-slate-200 rounded-xl text-base font-black text-black focus:border-indigo-500 outline-none text-center" />
+                        {/* Dinner Request Button */}
+                        <div className="space-y-2">
+                          {(() => {
+                            const order = kitchenOrders.find(o => o.type === 'dinner');
+                            const isPending = order?.status === 'pending';
+                            const isAccepted = order?.status === 'confirmed';
+                            return (
+                              <button type="button" 
+                                onClick={() => { 
+                                  setCurrentMealType('dinner'); 
+                                  setMealRequestAmount(order?.quantity || 0);
+                                  setShowMealRequestModal(true); 
+                                }}
+                                className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all shadow-md active:scale-95 flex flex-col items-center justify-center gap-1 border-2 ${
+                                  isAccepted ? 'bg-emerald-500 border-emerald-400 text-white' : 
+                                  isPending ? 'bg-orange-500 border-orange-400 text-white' : 
+                                  'bg-white border-slate-100 text-slate-400 hover:border-indigo-200 hover:text-indigo-600'
+                                }`}>
+                                <span className="opacity-80">Request Dinner</span>
+                                {order && <span className="text-sm font-black">x {order.quantity}</span>}
+                              </button>
+                            );
+                          })()}
+                        </div>
+                      </div>
+
+                      {/* Info Text */}
+                      <p className="text-[9px] font-bold text-slate-400 text-center italic">
+                        * Items appear in the Tab only after Kitchen Acceptance.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Meal Request Modal */}
+                  {showMealRequestModal && (
+                    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowMealRequestModal(false)}>
+                      <div className="bg-white rounded-[32px] w-full max-w-sm p-8 shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-6">
+                          <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Request {currentMealType}</h3>
+                          <button onClick={() => setShowMealRequestModal(false)} className="text-2xl font-bold text-slate-400">×</button>
+                        </div>
+                        
+                        <div className="space-y-6">
+                          <div className="flex items-center justify-center gap-6">
+                            <button type="button" onClick={() => setMealRequestAmount(Math.max(0, mealRequestAmount - 1))} className="w-16 h-16 rounded-3xl bg-slate-100 text-slate-600 text-2xl font-black hover:bg-slate-200 transition-all shadow-sm">－</button>
+                            <div className="text-5xl font-black text-slate-900 min-w-[60px] text-center">{mealRequestAmount}</div>
+                            <button type="button" onClick={() => setMealRequestAmount(mealRequestAmount + 1)} className="w-16 h-16 rounded-3xl bg-indigo-50 text-indigo-600 text-2xl font-black hover:bg-indigo-100 transition-all shadow-sm">＋</button>
+                          </div>
+
+                          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Include in Booking (Prepaid)</span>
+                            <button 
+                              type="button"
+                              onClick={() => currentMealType === 'lunch' ? setIsLunchPrepaid(!isLunchPrepaid) : setIsDinnerPrepaid(!isDinnerPrepaid)}
+                              className={`w-12 h-6 rounded-full transition-all relative ${ (currentMealType === 'lunch' ? isLunchPrepaid : isDinnerPrepaid) ? 'bg-emerald-500' : 'bg-slate-300' }`}
+                            >
+                              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${ (currentMealType === 'lunch' ? isLunchPrepaid : isDinnerPrepaid) ? 'left-7' : 'left-1' }`} />
+                            </button>
+                          </div>
+
+                          {(currentMealType === 'lunch' ? isLunchPrepaid : isDinnerPrepaid) && (
+                            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-center gap-3 animate-in fade-in slide-in-from-top-1">
+                              <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 shrink-0">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                               </div>
-                              <button type="button" onClick={() => setSvcGuidePrice(svcGuidePrice + 5)} className="w-8 h-8 flex items-center justify-center bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl font-black text-sm transition-all shadow-sm">＋</button>
+                              <p className="text-[11px] font-bold text-emerald-700 leading-tight">
+                                This is a <span className="font-black uppercase">Prepaid</span> request. It will not increase the guest's debt on the tab.
+                              </p>
+                            </div>
+                          )}
+
+                          <button type="button" 
+                            disabled={mealRequestAmount <= 0}
+                            onClick={async () => {
+                              // 1. Fetch latest metadata first to prevent overwriting other fields (like settled_receipts)
+                              const { data: latest } = await supabase
+                                .from('bookings')
+                                .select('special_requests')
+                                .eq('id', sel.id)
+                                .single();
+
+                              const latestMeta = latest?.special_requests 
+                                ? (typeof latest.special_requests === 'string' ? JSON.parse(latest.special_requests) : latest.special_requests)
+                                : {};
+
+                              const order = { 
+                                type: currentMealType, 
+                                quantity: mealRequestAmount, 
+                                status: 'pending', 
+                                prepaid: currentMealType === 'lunch' ? isLunchPrepaid : isDinnerPrepaid,
+                                guest_name: sel.guest_name, 
+                                id: sel.id,
+                                requested_at: new Date().toISOString() 
+                              };
+                              
+                              const nextOrders = [...(latestMeta.kitchen_orders || []).filter((o: any) => o.type !== currentMealType), order];
+                              const updatedMeta = { ...latestMeta, kitchen_orders: nextOrders };
+
+                              console.log('Database Payload (Kitchen):', updatedMeta);
+
+                              // 2. Direct Write to Database (Bypass Props)
+                              const { error } = await supabase
+                                .from('bookings')
+                                .update({ special_requests: JSON.stringify(updatedMeta) })
+                                .eq('id', sel.id);
+
+                              if (error) {
+                                console.error('Handshake Failed:', error.message);
+                                flash('⚠ Database Error: ' + error.message);
+                              } else {
+                                console.log('Handshake Success: Data is now in Supabase');
+                                setKitchenOrders(nextOrders);
+                                if (onRefresh) onRefresh(); // Force dashboard to sync
+                                flash('✓ Sent to Kitchen!');
+                              }
+                              setShowMealRequestModal(false);
+                            }}
+                            className="w-full py-5 bg-indigo-600 text-white rounded-[24px] text-sm font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50"
+                          >
+                            Send to Kitchen
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {isRoomStay && (
+                    <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-white">
+
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Other Services</p>
+                      <div className="grid grid-cols-1 gap-4">
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={svcGuide} onChange={e => { 
+                                setSvcGuide(e.target.checked); 
+                                if (e.target.checked) { 
+                                  setSvcGuidePrice(pricing?.guide_price || 0); 
+                                  setSvcGuideNames(['']); 
+                                } 
+                              }} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
+                              <div className="flex flex-col">
+                                <span className="text-sm font-bold text-slate-900">Guide Service</span>
+                                {pricing?.guide_price && pricing.guide_price > 0 && (
+                                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">System Price: ${String(pricing.guide_price)} / guide</span>
+                                )}
+                              </div>
+                            </label>
+                            {svcGuide && (
+                              <div className="flex items-center gap-2">
+                                <button type="button" onClick={() => setSvcGuidePrice(Math.max(0, svcGuidePrice - 5))} className="w-8 h-8 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-black text-sm transition-all shadow-sm">－</button>
+                                <div className="relative">
+                                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px]">$</span>
+                                  <input type="number" value={String(svcGuidePrice)} onChange={e => setSvcGuidePrice(parseFloat(e.target.value) || 0)}
+                                    className="w-20 pl-5 pr-2 py-2 bg-white border-2 border-slate-200 rounded-xl text-base font-black text-black focus:border-indigo-500 outline-none text-center" />
+                                </div>
+                                <button type="button" onClick={() => setSvcGuidePrice(svcGuidePrice + 5)} className="w-8 h-8 flex items-center justify-center bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl font-black text-sm transition-all shadow-sm">＋</button>
+                              </div>
+                            )}
+                          </div>
+                          {svcGuide && (
+                            <div className="space-y-2">
+                              {svcGuideNames.map((name: any, ni: number) => (
+                                <div key={ni} className="flex gap-2">
+                                  <input type="text" value={String(name || '')} onChange={e => { const next = [...svcGuideNames]; next[ni] = e.target.value; setSvcGuideNames(next); }}
+                                    placeholder={`Guide ${ni + 1} name...`}
+                                    className={`flex-1 px-3 py-2 border-2 ${!String(name).trim() ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} />
+                                  {svcGuideNames.length > 1 && <button type="button" onClick={() => { setSvcGuideNames(svcGuideNames.filter((_: any, i: number) => i !== ni)); setSvcGuidePrice(Math.max(0, svcGuidePrice - 40)); }}
+                                    className="text-rose-500 hover:text-rose-600 font-black text-xl px-1">×</button>}
+                                </div>
+                              ))}
+                              <button type="button" onClick={() => { setSvcGuideNames([...svcGuideNames, '']); setSvcGuidePrice(svcGuidePrice + 40); }}
+                                className="w-full py-1.5 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:border-indigo-300 hover:text-indigo-500 transition-all">+ Add Another Guide ($40)</button>
                             </div>
                           )}
                         </div>
-                        {svcGuide && (
-                          <div className="space-y-2">
-                            {svcGuideNames.map((name: any, ni: number) => (
-                              <div key={ni} className="flex gap-2">
-                                <input type="text" value={String(name || '')} onChange={e => { const next = [...svcGuideNames]; next[ni] = e.target.value; setSvcGuideNames(next); }}
-                                  placeholder={`Guide ${ni + 1} name...`}
-                                  className={`flex-1 px-3 py-2 border-2 ${!String(name).trim() ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} />
-                                {svcGuideNames.length > 1 && <button type="button" onClick={() => { setSvcGuideNames(svcGuideNames.filter((_: any, i: number) => i !== ni)); setSvcGuidePrice(Math.max(0, svcGuidePrice - 40)); }}
-                                  className="text-rose-500 hover:text-rose-600 font-black text-xl px-1">×</button>}
-                              </div>
-                            ))}
-                            <button type="button" onClick={() => { setSvcGuideNames([...svcGuideNames, '']); setSvcGuidePrice(svcGuidePrice + 40); }}
-                              className="w-full py-1.5 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:border-indigo-300 hover:text-indigo-500 transition-all">+ Add Another Guide ($40)</button>
-                          </div>
-                        )}
-                      </div>
-                      <div className="space-y-2 pt-2 border-t border-slate-100">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" checked={svcTransport} onChange={e => setSvcTransport(e.target.checked)} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
-                          <span className="text-sm font-bold text-slate-900">Transport</span>
-                        </label>
-                        {svcTransport && (
-                          <div className="space-y-3">
-                            {svcTransList.map((trans: any, ti: number) => (
-                              <div key={ti} className="p-3 border border-slate-100 rounded-xl bg-slate-50/50 space-y-2">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Transfer {String(ti + 1)}</span>
-                                  {svcTransList.length > 1 && <button type="button" onClick={() => setSvcTransList(svcTransList.filter((_: any, i: number) => i !== ti))} className="text-rose-600 hover:text-rose-700 font-bold text-xs">✕ Remove</button>}
-                                </div>
-                                <input type="text" value={String(trans.name)} onChange={e => setSvcTransList(svcTransList.map((t: any, i: number) => i === ti ? { ...t, name: e.target.value } : t))} placeholder="Driver Name..."
-                                  className={`w-full px-3 py-2 border-2 ${!String(trans.name).trim() ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} />
-                                <div className="flex gap-2">
-                                  <input type="text" value={String(trans.details)} onChange={e => setSvcTransList(svcTransList.map((t: any, i: number) => i === ti ? { ...t, details: e.target.value } : t))} placeholder="From/To..."
-                                    className={`flex-1 px-3 py-2 border-2 ${!String(trans.details).trim() ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} />
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-[10px] font-bold text-slate-400">$</span>
-                                    <input type="number" value={String(trans.price)} onChange={e => setSvcTransList(svcTransList.map((t: any, i: number) => i === ti ? { ...t, price: parseFloat(e.target.value) || 0 } : t))} placeholder="Price"
-                                      className={`w-20 px-2 py-2 border-2 ${trans.price <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} />
+                        <div className="space-y-2 pt-2 border-t border-slate-100">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={svcTransport} onChange={e => setSvcTransport(e.target.checked)} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
+                            <span className="text-sm font-bold text-slate-900">Transport</span>
+                          </label>
+                          {svcTransport && (
+                            <div className="space-y-3">
+                              {svcTransList.map((trans: any, ti: number) => (
+                                <div key={ti} className="p-3 border border-slate-100 rounded-xl bg-slate-50/50 space-y-2">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Transfer {String(ti + 1)}</span>
+                                    {svcTransList.length > 1 && <button type="button" onClick={() => setSvcTransList(svcTransList.filter((_: any, i: number) => i !== ti))} className="text-rose-600 hover:text-rose-700 font-bold text-xs">✕ Remove</button>}
+                                  </div>
+                                  <input type="text" value={String(trans.name)} onChange={e => setSvcTransList(svcTransList.map((t: any, i: number) => i === ti ? { ...t, name: e.target.value } : t))} placeholder="Driver Name..."
+                                    className={`w-full px-3 py-2 border-2 ${!String(trans.name).trim() ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} />
+                                  <div className="flex gap-2">
+                                    <input type="text" value={String(trans.details)} onChange={e => setSvcTransList(svcTransList.map((t: any, i: number) => i === ti ? { ...t, details: e.target.value } : t))} placeholder="From/To..."
+                                      className={`flex-1 px-3 py-2 border-2 ${!String(trans.details).trim() ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} />
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[10px] font-bold text-slate-400">$</span>
+                                      <input type="number" value={String(trans.price)} onChange={e => setSvcTransList(svcTransList.map((t: any, i: number) => i === ti ? { ...t, price: parseFloat(e.target.value) || 0 } : t))} placeholder="Price"
+                                        className={`w-20 px-2 py-2 border-2 ${trans.price <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} />
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            ))}
-                            <button type="button" onClick={() => setSvcTransList([...svcTransList, { name: '', details: '', price: 0 }])}
-                              className="w-full py-1.5 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:border-indigo-300 hover:text-indigo-500 transition-all">+ Add Transfer</button>
+                              ))}
+                              <button type="button" onClick={() => setSvcTransList([...svcTransList, { name: '', details: '', price: 0 }])}
+                                className="w-full py-1.5 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:border-indigo-300 hover:text-indigo-500 transition-all">+ Add Transfer</button>
+                            </div>
+                          )}
+                        </div>
+                        {sel?.guest_category !== 'pool' && (
+                          <div className="space-y-2 pt-2 border-t border-slate-100">
+                            <div className="flex justify-between items-center">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" checked={svcCooking} onChange={e => setSvcCooking(e.target.checked)} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
+                                <span className="text-sm font-bold text-slate-900">Cooking Class</span>
+                              </label>
+                              {svcCooking && <div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-400">$</span>
+                                <input type="number" value={String(svcCookingPrice)} onChange={e => setSvcCookingPrice(parseFloat(e.target.value) || 0)} placeholder="Price"
+                                  className={`w-24 px-3 py-2 border-2 ${svcCookingPrice <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} /></div>}
+                            </div>
                           </div>
                         )}
-                      </div>
-                      <div className="space-y-2 pt-2 border-t border-slate-100">
-                        <div className="flex justify-between items-center">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" checked={svcCooking} onChange={e => setSvcCooking(e.target.checked)} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
-                            <span className="text-sm font-bold text-slate-900">Cooking Class</span>
-                          </label>
-                          {svcCooking && <div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-400">$</span>
-                            <input type="number" value={String(svcCookingPrice)} onChange={e => setSvcCookingPrice(parseFloat(e.target.value) || 0)} placeholder="Price"
-                              className={`w-24 px-3 py-2 border-2 ${svcCookingPrice <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} /></div>}
-                        </div>
-                      </div>
-                      <div className="space-y-2 pt-2 border-t border-slate-100">
-                        <div className="flex justify-between items-center">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" checked={svcLaundry} onChange={e => setSvcLaundry(e.target.checked)} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
-                            <span className="text-sm font-bold text-slate-900">Laundry</span>
-                          </label>
-                          {svcLaundry && <div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-400">$</span>
-                            <input type="number" value={String(svcLaundryPrice)} onChange={e => setSvcLaundryPrice(parseFloat(e.target.value) || 0)} placeholder="Price"
-                              className={`w-24 px-3 py-2 border-2 ${svcLaundryPrice <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} /></div>}
+                        <div className="space-y-2 pt-2 border-t border-slate-100">
+                          <div className="flex justify-between items-center">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={svcLaundry} onChange={e => setSvcLaundry(e.target.checked)} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
+                              <span className="text-sm font-bold text-slate-900">Laundry</span>
+                            </label>
+                            {svcLaundry && <div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-400">$</span>
+                              <input type="number" value={String(svcLaundryPrice)} onChange={e => setSvcLaundryPrice(parseFloat(e.target.value) || 0)} placeholder="Price"
+                                className={`w-24 px-3 py-2 border-2 ${svcLaundryPrice <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} /></div>}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
 
@@ -1105,7 +1275,7 @@ export function BookingModal(props: BookingModalProps) {
                             Accommodation {isExtended && <span className="text-amber-200">(Extended)</span>}
                           </span>
                           {isPrepaid ? (
-                            <span className="text-[10px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">Prepaid</span>
+                            <span className="text-[10px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">PREPAID</span>
                           ) : (
                             <span className="font-black">${String(svcAmount.toFixed(2))}</span>
                           )}
@@ -1136,9 +1306,14 @@ export function BookingModal(props: BookingModalProps) {
                     })()}
                     
                     {(() => {
+                      const acceptedOrders = kitchenOrders.filter((o: any) => o.status === 'confirmed');
                       const sItems = [
-                        svcLunch && { name: 'Lunch', count: svcLunchCount, price: pricing.lunch_price, prepaid: isLunchPrepaid },
-                        svcDinner && { name: 'Dinner', count: svcDinnerCount, price: pricing.dinner_price, prepaid: isDinnerPrepaid },
+                        ...acceptedOrders.map((o: any) => ({
+                          name: o.type.charAt(0).toUpperCase() + o.type.slice(1),
+                          count: o.quantity,
+                          price: o.type === 'lunch' ? pricing.lunch_price : pricing.dinner_price,
+                          prepaid: o.prepaid || false
+                        })),
                         svcGuide && { name: 'Guide', price: svcGuidePrice, prepaid: false },
                         svcTransport && { name: 'Transport', price: svcTransList.reduce((s: number, t: any) => s + (t.price || 0), 0), prepaid: false },
                         svcLaundry && { name: 'Laundry', price: svcLaundryPrice, prepaid: false },
@@ -1511,7 +1686,7 @@ export function BookingModal(props: BookingModalProps) {
                                 <div className="flex justify-between items-center text-sm">
                                   <span className="text-slate-600 font-bold">Stay Price</span>
                                   {selectedReceipt.items?.isPrepaid ? (
-                                    <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">Prepaid</span>
+                                    <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">PREPAID</span>
                                   ) : (
                                     <span className="text-slate-900 font-black">${String((selectedReceipt.items.accommodation || 0).toFixed(2))}</span>
                                   )}
@@ -1528,7 +1703,7 @@ export function BookingModal(props: BookingModalProps) {
                                     <div key={type} className="flex justify-between items-center text-sm">
                                       <span className="text-slate-400 font-medium capitalize">{type} ×{String(count)}</span>
                                       {isMealPrepaid ? (
-                                        <span className="text-[9px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">Prepaid</span>
+                                        <span className="text-[9px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">PREPAID</span>
                                       ) : (
                                         <span className="text-slate-500 font-bold">${String((count * price).toFixed(2))}</span>
                                       )}
@@ -1602,7 +1777,7 @@ export function BookingModal(props: BookingModalProps) {
                                 <div className="flex justify-between items-center text-sm">
                                   <span className="text-slate-600 font-bold">Stay Price</span>
                                   {isPrepaid && (sel.collected_amount || 0) === 0 ? (
-                                    <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">Prepaid</span>
+                                    <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">PREPAID</span>
                                   ) : (
                                     <span className="text-slate-900 font-black">${String(svcAmount.toFixed(2))}</span>
                                   )}
@@ -1623,7 +1798,7 @@ export function BookingModal(props: BookingModalProps) {
                                   <div key={i} className="flex justify-between items-center text-sm">
                                     <span className="text-slate-400 font-medium">{item.name} {item.count ? `×${item.count}` : ''}</span>
                                     {item.prepaid ? (
-                                      <span className="text-[9px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">Prepaid</span>
+                                      <span className="text-[9px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">PREPAID</span>
                                     ) : (
                                       <span className="text-slate-500 font-bold">${String((item.count ? item.count * item.price : item.price).toFixed(2))}</span>
                                     )}
@@ -1654,26 +1829,40 @@ export function BookingModal(props: BookingModalProps) {
                           </svg>
                           Paid & Settled
                         </div>
-                      ) : (
-                        <button
-                          onClick={async () => {
-                            const receipts = getSettledReceiptsForSel();
-                            const hasSettled = receipts.length > 0 || (sel.collected_amount || 0) > 0;
-                            const needsAccom = !hasSettled && !isPrepaid && svcAmount <= 0;
-                            if (needsAccom) {
-                              setValError('Stay Price is missing. Please enter the guest\'s accommodation cost before proceeding.');
-                              setShowFinalReceipt(false);
-                              setShowServices(true);
-                              return;
-                            }
-                            if (handleCheckOut) await handleCheckOut();
-                          }}
-                          disabled={loadingAction === 'checkout' || !isBalanceMatched || gTotal <= 0}
-                          className={`w-full py-5 rounded-[20px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 shadow-lg ${(!isBalanceMatched || gTotal <= 0) ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' : 'bg-[#6366f1] text-white hover:bg-[#4f46e5] active:scale-95 shadow-indigo-200'}`}
-                        >
-                          Confirm & Settle Tab
-                        </button>
-                      )}
+                      ) : (() => {
+                        const isPrepaidSomewhere = isPrepaid || isLunchPrepaid || isDinnerPrepaid;
+                        const kitchenOrders = currentMeta.kitchen_orders || [];
+                        const hasConfirmedOrders = kitchenOrders.some((o: any) => o.status === 'confirmed');
+                        
+                        // Case A: Fully Prepaid ($0 balance but guest had meals/stay)
+                        const isFullyPrepaid = gTotal <= 0.01 && (isPrepaidSomewhere || hasConfirmedOrders);
+                        
+                        // Case B: Billable (Total > 0)
+                        const isBillable = gTotal > 0.01;
+
+                        const isSettleDisabled = loadingAction === 'checkout' || (!isFullyPrepaid && (!isBalanceMatched || gTotal <= 0));
+
+                        return (
+                          <button
+                            onClick={async () => {
+                              const receipts = getSettledReceiptsForSel();
+                              const hasSettled = receipts.length > 0 || (sel.collected_amount || 0) > 0;
+                              const needsAccom = !hasSettled && !isPrepaid && svcAmount <= 0;
+                              if (needsAccom) {
+                                setValError('Stay Price is missing. Please enter the guest\'s accommodation cost before proceeding.');
+                                setShowFinalReceipt(false);
+                                setShowServices(true);
+                                return;
+                              }
+                              if (handleCheckOut) await handleCheckOut();
+                            }}
+                            disabled={isSettleDisabled}
+                            className={`w-full py-5 rounded-[20px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 shadow-lg ${isSettleDisabled ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' : 'bg-[#6366f1] text-white hover:bg-[#4f46e5] active:scale-95 shadow-indigo-200'}`}
+                          >
+                            {isFullyPrepaid ? 'Complete & Archive Orders' : (isBalanceMatched ? 'Review & Pay Tab' : 'Match Balance Below to Pay')}
+                          </button>
+                        );
+                      })()}
                     </div>
                   </div>
                   </div>

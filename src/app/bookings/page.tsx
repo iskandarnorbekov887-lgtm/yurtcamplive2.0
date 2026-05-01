@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { OccupancyCalendar } from '@/components/occupancy-calendar';
-import { ReserverIncomeForm } from '@/components/reserver-income-form';
+import { ManagerIncomeForm } from '@/components/manager-income-form';
 
 import type { UserRole } from '@/lib/supabase';
 
@@ -17,12 +17,12 @@ export const dynamic = 'force-dynamic';
 export default function BookingsPage() {
   return (
     <ProtectedRoute allowedRoles={['CEO', 'Manager']}>
-      <ReserverPortal />
+      <BookingPortal />
     </ProtectedRoute>
   );
 }
 
-function ReserverPortal() {
+function BookingPortal() {
   const { user, signOut } = useAuth();
   const currentUserId = user?.id;
   const userRole = user?.role as UserRole;
@@ -51,7 +51,7 @@ function ReserverPortal() {
     try {
       const { data: bookingsData } = await supabase.from('bookings').select('*');
       setBookings(bookingsData || []);
-      console.log('🔄 Reserver Fetched bookings:', bookingsData?.length);
+      console.log('🔄 Booking Portal Fetched bookings:', bookingsData?.length);
     } catch (err) {
       console.error(err);
     } finally {
@@ -142,7 +142,7 @@ function ReserverPortal() {
         </div>
       </main>
 
-      <ReserverIncomeForm
+      <ManagerIncomeForm
         isOpen={showIncomeForm}
         selectedDate={selectedBookingDate}
         onClose={() => setShowIncomeForm(false)}

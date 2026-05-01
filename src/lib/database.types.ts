@@ -13,7 +13,7 @@ export interface Database {
         Row: {
           id: string
           email: string
-          role: 'CEO' | 'Manager' | 'Reserver' | 'Cook'
+          role: 'CEO' | 'Manager' | 'Cook'
           full_name: string | null
           created_at: string
           updated_at: string
@@ -21,7 +21,7 @@ export interface Database {
         Insert: {
           id: string
           email: string
-          role?: 'CEO' | 'Manager' | 'Reserver' | 'Cook'
+          role?: 'CEO' | 'Manager' | 'Cook'
           full_name?: string | null
           created_at?: string
           updated_at?: string
@@ -29,36 +29,17 @@ export interface Database {
         Update: {
           id?: string
           email?: string
-          role?: 'CEO' | 'Manager' | 'Reserver' | 'Cook'
+          role?: 'CEO' | 'Manager' | 'Cook'
           full_name?: string | null
           created_at?: string
           updated_at?: string
         }
       }
-      yurts: {
-        Row: {
-          id: number
-          name: string
-          status: string
-          type: string
-        }
-        Insert: {
-          id?: number
-          name: string
-          status?: string
-          type?: string
-        }
-        Update: {
-          id?: number
-          name?: string
-          status?: string
-          type?: string
-        }
-      }
+      // The yurts table is deprecated and removed from code references.
+      // Use is_room_stay metadata for accommodation logic.
       bookings: {
         Row: {
           id: number
-          yurt_id: number
           guest_name: string
           check_in: string
           check_out: string
@@ -73,7 +54,6 @@ export interface Database {
         }
         Insert: {
           id?: number
-          yurt_id: number
           guest_name: string
           check_in: string
           check_out: string
@@ -88,7 +68,6 @@ export interface Database {
         }
         Update: {
           id?: number
-          yurt_id?: number
           guest_name?: string
           check_in?: string
           check_out?: string

@@ -38,10 +38,9 @@ export async function proxy(request: NextRequest) {
       'CEO': '/ceo',
       'Manager': '/manager',
       'Cook': '/cook',
-      'Reserver': '/bookings',
     };
 
-    const targetPath = rolePaths[profile?.role as string] || '/bookings';
+    const targetPath = rolePaths[profile?.role as string] || '/manager';
     return NextResponse.redirect(new URL(targetPath, request.url));
   }
 

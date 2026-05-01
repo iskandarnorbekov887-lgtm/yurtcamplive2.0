@@ -176,11 +176,22 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelect
   };
 
   const barIcon = (bar: EventBar) => {
-    if (bar.status === 'checked_in') return '✓ ';
-    if (bar.status === 'completed') return '✈ ';
-    if (bar.status === 'cancelled') return '✕ ';
-    if (bar.status === 'no_arrival') return '⊘ ';
-    return '';
+    let prefix = '';
+    if (bar.status === 'checked_in') prefix += '✓ ';
+    if (bar.status === 'completed') prefix += '✈ ';
+    if (bar.status === 'cancelled') prefix += '✕ ';
+    if (bar.status === 'no_arrival') prefix += '⊘ ';
+
+    if (bar.type === 'bk') {
+      const b = bar.raw as Booking;
+      try {
+        const meta = typeof b.special_requests === 'string' ? JSON.parse(b.special_requests || '{}') : (b.special_requests || {});
+        const orders = meta.kitchen_orders || [];
+        if (orders.some((o: any) => o.type === 'lunch' && o.status === 'confirmed')) prefix += '🍱 ';
+        if (orders.some((o: any) => o.type === 'dinner' && o.status === 'confirmed')) prefix += '🌙 ';
+      } catch {}
+    }
+    return prefix;
   };
 
   return (

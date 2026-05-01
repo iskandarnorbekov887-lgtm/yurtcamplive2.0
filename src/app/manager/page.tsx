@@ -10,7 +10,7 @@ import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { GoogleGuestAgenda } from '@/components/google-guest-agenda';
 import { PrivateCalendarView } from '@/components/private-calendar-view';
-import { ReserverIncomeForm } from '@/components/reserver-income-form';
+import { ManagerIncomeForm } from '@/components/manager-income-form';
 
 import type { UserRole } from '@/lib/supabase';
 
@@ -31,12 +31,13 @@ function ManagerPortal() {
   const userRole = user?.role as UserRole;
   const { t } = useLanguage();
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [activeTab, setActiveTab] = useState<'checkin' | 'bookings' | 'financials'>('checkin');
+  const [activeTab, setActiveTab] = useState<'checkin' | 'bookings' | 'financials' | 'grocery'>('checkin');
   const [pendingBookings, setPendingBookings] = useState<Booking[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAllNotifications, setShowAllNotifications] = useState(false);
-  const [showBookingForm, setShowBookingForm] = useState(false);
+  const [isFlashing, setIsFlashing] = useState(false);
+  const [groceryRequest, setGroceryRequest] = useState<any>(null);
   
 
   useEffect(() => {
@@ -52,14 +53,16 @@ function ManagerPortal() {
   }, []);
 
   const fetchData = async () => {
-    const [{ data: bookingsData }, { data: pendingData }, { data: notifData }] = await Promise.all([
+    const [{ data: bookingsData }, { data: pendingData }, { data: notifData }, { data: groceryData }] = await Promise.all([
       supabase.from('bookings').select('*'),
       supabase.from('bookings').select('*').eq('status', 'pending'),
       supabase.from('notifications').select('*').eq('user_id', currentUserId || '').order('created_at', { ascending: false }),
+      supabase.from('grocery_requests').select('*').order('created_at', { ascending: false }).limit(1).single()
     ]);
     setBookings(bookingsData || []);
     setPendingBookings(pendingData || []);
     setNotifications((notifData || []).slice(0, 20));
+    setGroceryRequest(groceryData);
     console.log('🔄 Manager Fetched bookings:', bookingsData?.length);
   };
 
@@ -89,7 +92,20 @@ function ManagerPortal() {
   };
 
   const handleUpdateBooking = async (id: number, updates: Partial<Booking>) => {
-    await supabase.from('bookings').update({ ...updates, last_edited_by_id: currentUserId || '', last_edited_at: new Date().toISOString() }).eq('id', id);
+    await supabase.from('bookings').update({ 
+      ...updates, 
+      is_manually_updated: true, // Manual Protection Rule: Prevent office sync overwrite
+      last_edited_by_id: currentUserId || '', 
+      last_edited_at: new Date().toISOString() 
+    }).eq('id', id);
+    fetchData();
+  };
+
+  const handleMarkPurchased = async () => {
+    if (!groceryRequest) return;
+    await supabase.from('grocery_requests')
+      .update({ status: 'purchased', items: groceryRequest.items })
+      .eq('id', groceryRequest.id);
     fetchData();
   };
 
@@ -127,14 +143,27 @@ function ManagerPortal() {
             </div>
           </div>
           <div className="flex items-center gap-4">
+             <LanguageSwitcher variant="light" />
+            {/* ⚡ Temporary Flash / Force Refresh Button */}
             <button
-              onClick={() => setShowBookingForm(true)}
-              className="px-5 py-2.5 bg-emerald-600/90 hover:bg-emerald-600 rounded-xl text-xs font-black transition-all shadow-lg hover:shadow-emerald-500/20 active:scale-95 flex items-center gap-2"
+              onClick={async () => {
+                setIsFlashing(true);
+                await fetchData();
+                setTimeout(() => setIsFlashing(false), 800);
+              }}
+              disabled={isFlashing}
+              title="Force refresh all data from server"
+              className={`p-2.5 rounded-xl border text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all active:scale-95 ${
+                isFlashing
+                  ? 'bg-yellow-400 border-yellow-300 text-yellow-900 shadow-lg shadow-yellow-400/40 animate-pulse'
+                  : 'bg-white/10 border-white/20 text-white hover:bg-white/20'
+              }`}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-              Add Booking
+              <svg className={`w-4 h-4 ${isFlashing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {isFlashing ? 'Syncing...' : '⚡ Flash'}
             </button>
-            <LanguageSwitcher variant="light" />
             {/* Notification Bell */}
             <div className="relative">
               <button
@@ -305,7 +334,7 @@ function ManagerPortal() {
 
       <div className="max-w-7xl mx-auto p-6">
         <div className="flex gap-4 mb-6">
-          {(['checkin', 'bookings', 'financials'] as const).map((tab) => (
+          {(['checkin', 'bookings', 'financials', 'grocery'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -313,7 +342,10 @@ function ManagerPortal() {
                 activeTab === tab ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'
               }`}
             >
-              {t(`manager.${tab}`)}
+              {tab === 'grocery' ? 'Grocery' : t(`manager.${tab === 'financials' ? 'expenses' : tab}`)}
+              {tab === 'grocery' && groceryRequest?.status === 'requested' && (
+                <span className="ml-2 w-2 h-2 bg-rose-500 rounded-full inline-block animate-pulse" />
+              )}
             </button>
           ))}
         </div>
@@ -351,6 +383,53 @@ function ManagerPortal() {
           </div>
         )}
 
+        {activeTab === 'grocery' && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="bg-white rounded-[32px] p-8 shadow-xl border border-slate-100">
+              <div className="flex justify-between items-center mb-8">
+                <div>
+                  <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tight">Grocery Purchase Mode</h2>
+                  <p className="text-slate-500 font-bold">Review and update the list from the Kitchen</p>
+                </div>
+                {groceryRequest?.status === 'requested' && <span className="bg-amber-100 text-amber-700 px-4 py-1.5 rounded-full text-xs font-black uppercase border border-amber-200">New Request</span>}
+              </div>
+
+              {!groceryRequest || groceryRequest.status === 'received' ? (
+                <div className="py-20 text-center text-slate-400">
+                  <div className="text-5xl mb-4">🛒</div>
+                  <p className="text-lg font-bold">No active grocery requests</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid gap-3">
+                    {groceryRequest.items.map((item: any, idx: number) => (
+                      <div key={idx} className="flex gap-3 items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                        <input type="text" value={item.name} onChange={e => {
+                          const next = {...groceryRequest}; next.items[idx].name = e.target.value; setGroceryRequest(next);
+                        }} className="flex-1 px-4 py-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-900" />
+                        <input type="text" value={item.qty} onChange={e => {
+                          const next = {...groceryRequest}; next.items[idx].qty = e.target.value; setGroceryRequest(next);
+                        }} className="w-24 px-4 py-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-900 text-center" />
+                        <span className="text-xs font-black text-slate-400 w-10 uppercase">{item.unit}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {groceryRequest.status === 'requested' ? (
+                    <button onClick={handleMarkPurchased}
+                      className="w-full py-5 bg-indigo-600 text-white rounded-[24px] text-sm font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all mt-6 active:scale-95">
+                      Mark as Purchased
+                    </button>
+                  ) : (
+                    <div className="p-6 bg-emerald-50 border border-emerald-100 rounded-2xl text-center">
+                      <p className="text-emerald-700 font-black uppercase tracking-widest text-xs">Waiting for Kitchen Verification...</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {activeTab === 'bookings' && (
           <div className="grid md:grid-cols-2 gap-6">
             <div className="bg-white rounded-xl shadow p-6">
@@ -453,17 +532,6 @@ function ManagerPortal() {
           </div>
         )}
       </div>
-
-      <ReserverIncomeForm
-        isOpen={showBookingForm}
-        selectedDate={new Date().toISOString().split('T')[0]}
-        onClose={() => setShowBookingForm(false)}
-        onSuccess={() => {
-          setShowBookingForm(false);
-          fetchData();
-        }}
-        isSystemOnly={true}
-      />
     </div>
   );
 }
