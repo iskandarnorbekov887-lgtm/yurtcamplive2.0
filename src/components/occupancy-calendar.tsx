@@ -23,6 +23,38 @@ function dateToStr(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
+// Helper to get display ID with prefix based on guest category
+function getDisplayId(booking: Booking): string {
+  const currentMeta = (() => {
+    try {
+      return booking.special_requests ? JSON.parse(booking.special_requests) : {};
+    } catch {
+      return {};
+    }
+  })();
+
+  // Google Calendar sync
+  if (booking.google_event_id && !currentMeta.is_system_only) {
+    return `G-${booking.id}`;
+  }
+
+  // Manager-created bookings
+  if (currentMeta.is_system_only) {
+    const category = currentMeta.guest_category || 'international';
+    const prefixMap: Record<string, string> = {
+      'international': 'M',
+      'local': 'L',
+      'camper': 'C',
+      'pool': 'P'
+    };
+    const prefix = prefixMap[category] || 'M';
+    return `${prefix}-${booking.id}`;
+  }
+
+  // Default
+  return `${booking.id}`;
+}
+
 function getCalendarWeeks(year: number, month: number): Date[][] {
   const first = new Date(year, month, 1);
   const last  = new Date(year, month + 1, 0);
@@ -89,22 +121,37 @@ function isPoolVisitor(b: Booking): boolean {
   }
 }
 
-function color(b: Booking, today: string) {
+function color(b: Booking, today: string, userRole: UserRole) {
   // Check if this is a system-only booking (not from Google Calendar)
   let isSystemOnly = false;
   if (b.source === 'System') {
     isSystemOnly = true;
   } else {
     try {
-      const meta = typeof b.special_requests === 'string' 
-        ? JSON.parse(b.special_requests || '{}') 
+      const meta = typeof b.special_requests === 'string'
+        ? JSON.parse(b.special_requests || '{}')
         : (b.special_requests || {});
       if (meta.is_system_only) isSystemOnly = true;
     } catch {}
   }
 
-  // System bookings use purple styling to differentiate from Google Calendar bookings
-  if (isSystemOnly) {
+  // Manager view: System bookings show in emerald green when active
+  if (isSystemOnly && userRole === 'Manager') {
+    const status = getBookingStatus(b, today);
+    switch (status) {
+      case 'checked-in':
+        return { bg: '#10B981', text: '#FFFFFF' }; // Emerald green for active
+      case 'checked-out':
+        return { bg: '#059669', text: '#FFFFFF' }; // Darker green
+      case 'upcoming':
+        return { bg: '#6EE7B7', text: '#064E3B' }; // Light green
+      default:
+        return { bg: '#10B981', text: '#FFFFFF' }; // Emerald green
+    }
+  }
+
+  // CEO view: System bookings use purple styling to differentiate from Google Calendar bookings
+  if (isSystemOnly && userRole === 'CEO') {
     const status = getBookingStatus(b, today);
     switch (status) {
       case 'checked-in':
@@ -152,6 +199,9 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
   const [editRequestData, setEditRequestData] = useState<Partial<Booking>>({});
   const [showDrinksPopup, setShowDrinksPopup] = useState(false);
   const [showExtraServicesPopup, setShowExtraServicesPopup] = useState(false);
+  const [showSettlementModal, setShowSettlementModal] = useState(false);
+  const [settlementAmount, setSettlementAmount] = useState('');
+  const [settlementCurrency, setSettlementCurrency] = useState<'UZS' | 'USD' | 'EUR'>('UZS');
   const [drinks, setDrinks] = useState<Array<{ id: number; name: string; original_price: number; sold_price: number; currency: 'UZS' | 'USD' | 'EUR'; available: boolean }>>([]);
   const [selectedDrinks, setSelectedDrinks] = useState<Array<{ drink_id: number; drink_name: string; quantity: number; price: number; currency: 'UZS' | 'USD' | 'EUR' }>>([]);
   const [newExtraService, setNewExtraService] = useState({ name: '', price: '', currency: 'USD' as 'UZS' | 'USD' | 'EUR' });
@@ -286,7 +336,25 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
   };
 
   const handleCheckIn = async () => {
-    if (!sel || !onCheckIn) return;
+    if (!sel) return;
+
+    // Check if this is a manager-created booking
+    const currentMeta = (() => {
+      try {
+        return sel.special_requests ? JSON.parse(sel.special_requests) : {};
+      } catch {
+        return {};
+      }
+    })();
+
+    // For manager bookings, open settlement modal
+    if (currentMeta.is_system_only) {
+      setShowSettlementModal(true);
+      return;
+    }
+
+    // For regular bookings, proceed with normal check-in
+    if (!onCheckIn) return;
     if (!confirm('Are you sure you want to check in ' + String(sel.guest_name) + '?')) return;
     const id = sel.id;
     setSel({ ...sel, status: 'checked_in' });
@@ -508,7 +576,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
             <div className="relative px-0.5 pb-1.5" style={{ minHeight: `${eventRows * 24 + 4}px` }}>
               <div className="relative" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gridTemplateRows: `repeat(${eventRows}, 22px)`, gap: '2px 0' }}>
                 {events.map((ev, ei) => {
-                  const c = color(ev.booking, today);
+                  const c = color(ev.booking, today, userRole);
                   const isPool = isPoolVisitor(ev.booking);
                   const isStart = ev.booking.check_in >= dateToStr(week[ev.colStart]);
                   const isEnd   = ev.booking.check_out <= dateToStr(week[ev.colEnd]);
@@ -523,6 +591,17 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                   const isNeglectedCheckout = ev.booking.status === 'checked_in' &&
                     checkOutDateStr === today &&
                     now.getHours() >= 12;
+
+                  // Check if this is a manager-created booking
+                  const currentMeta = (() => {
+                    try {
+                      return ev.booking.special_requests ? JSON.parse(ev.booking.special_requests) : {};
+                    } catch {
+                      return {};
+                    }
+                  })();
+                  const isManagerBooking = currentMeta.is_system_only;
+                  const displayId = getDisplayId(ev.booking);
 
                   // Pool visitors render as circular icons
                   if (isPool) {
@@ -573,7 +652,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                         setEditData(ev.booking);
                         setIsEditing(false);
                       }}
-                      title={ev.booking.guest_name}
+                      title={`${ev.booking.guest_name} (${displayId})`}
                       style={{
                         gridColumn: `${ev.colStart + 1} / ${ev.colEnd + 2}`,
                         gridRow: `${ev.lane + 1}`,
@@ -583,11 +662,12 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                         marginLeft: isStart ? '2px' : '0',
                         marginRight: isEnd  ? '2px' : '0',
                         cursor: 'pointer',
+                        border: isManagerBooking ? '2px solid #3B82F6' : 'none', // Blue border for manager bookings
                       }}
                       className="text-[11px] font-semibold px-2 truncate text-left flex items-center h-[20px] hover:brightness-90 transition-all"
                     >
                       <span className="flex-1 truncate">
-                        {isStart ? (isCancelled ? `${ev.booking.guest_name} (CANCELLED)` : ev.booking.guest_name) : ''}
+                        {isStart ? (isCancelled ? `${ev.booking.guest_name} (CANCELLED)` : `${ev.booking.guest_name} ${userRole === 'CEO' ? `(${displayId})` : ''}`) : ''}
                       </span>
                       <span className="flex items-center gap-1 ml-1">
                         {isCheckedIn && (
@@ -631,7 +711,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                 </button>
               </div>
               <div className="flex items-start gap-4 mb-5">
-                <div className="w-6 h-6 rounded-lg flex-shrink-0 mt-1 shadow-sm" style={{ backgroundColor: color(sel, today).bg }} />
+                <div className="w-6 h-6 rounded-lg flex-shrink-0 mt-1 shadow-sm" style={{ backgroundColor: color(sel, today, userRole).bg }} />
                 <div>
                   <h3 className="text-2xl font-black text-slate-900 leading-none">{String(sel.guest_name)}</h3>
                   <div className="flex items-center gap-2 mt-2">
@@ -1252,9 +1332,9 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                         setIsEditing(false);
                       }}
                       className="p-4 rounded-xl border-2 cursor-pointer transition-all hover:shadow-lg"
-                      style={{ 
-                        borderColor: color(booking, today).bg,
-                        backgroundColor: color(booking, today).bg + '10'
+                      style={{
+                        borderColor: color(booking, today, userRole).bg,
+                        backgroundColor: color(booking, today, userRole).bg + '10'
                       }}
                     >
                       <div className="flex items-center justify-between">
@@ -1262,7 +1342,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                           <p className="font-bold text-slate-800">{booking.guest_name}</p>
                           <p className="text-sm text-slate-500">{booking.check_in} → {booking.check_out}</p>
                         </div>
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color(booking, today).bg }} />
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color(booking, today, userRole).bg }} />
                       </div>
                     </div>
                   ))}
@@ -1284,6 +1364,212 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Settlement Modal for Manager Bookings */}
+      {showSettlementModal && sel && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4" onClick={() => setShowSettlementModal(false)}>
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-black text-slate-800">Settlement - Check-In</h2>
+              <button onClick={() => setShowSettlementModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-all">
+                <svg className="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <p className="text-sm font-bold text-slate-600">Guest: <span className="text-slate-900">{sel.guest_name}</span></p>
+              <p className="text-sm font-bold text-slate-600">Category: <span className="text-slate-900 capitalize">{(() => {
+                const meta = (() => {
+                  try {
+                    return sel.special_requests ? JSON.parse(sel.special_requests) : {};
+                  } catch {
+                    return {};
+                  }
+                })();
+                return meta.guest_category || 'international';
+              })()}</span></p>
+            </div>
+
+            <div className="space-y-4">
+              {(() => {
+                const meta = (() => {
+                  try {
+                    return sel.special_requests ? JSON.parse(sel.special_requests) : {};
+                  } catch {
+                    return {};
+                  }
+                })();
+                const category = meta.guest_category || 'international';
+
+                if (category === 'pool') {
+                  return (
+                    <div className="bg-cyan-50 border-2 border-cyan-200 rounded-xl p-4 space-y-3">
+                      <label className="block text-sm font-black text-cyan-900">Pool Entry Fee</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={settlementAmount}
+                          onChange={(e) => setSettlementAmount(e.target.value)}
+                          placeholder="Enter amount"
+                          className="flex-1 px-3 py-2 border-2 border-cyan-300 rounded-lg text-sm font-bold text-black focus:border-cyan-500"
+                        />
+                        <select
+                          value={settlementCurrency}
+                          onChange={(e) => setSettlementCurrency(e.target.value as 'UZS' | 'USD' | 'EUR')}
+                          className="px-3 py-2 border-2 border-cyan-300 rounded-lg text-sm font-bold text-black focus:border-cyan-500"
+                        >
+                          <option value="UZS">UZS</option>
+                          <option value="USD">USD</option>
+                          <option value="EUR">EUR</option>
+                        </select>
+                      </div>
+                      <label className="block text-sm font-black text-cyan-900">Drinks (Optional)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="Drinks amount"
+                        className="w-full px-3 py-2 border-2 border-cyan-300 rounded-lg text-sm font-bold text-black focus:border-cyan-500"
+                      />
+                    </div>
+                  );
+                } else if (category === 'camper') {
+                  return (
+                    <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-4 space-y-3">
+                      <label className="block text-sm font-black text-amber-900">Tent Fee</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={settlementAmount}
+                          onChange={(e) => setSettlementAmount(e.target.value)}
+                          placeholder="Enter amount"
+                          className="flex-1 px-3 py-2 border-2 border-amber-300 rounded-lg text-sm font-bold text-black focus:border-amber-500"
+                        />
+                        <select
+                          value={settlementCurrency}
+                          onChange={(e) => setSettlementCurrency(e.target.value as 'UZS' | 'USD' | 'EUR')}
+                          className="px-3 py-2 border-2 border-amber-300 rounded-lg text-sm font-bold text-black focus:border-amber-500"
+                        >
+                          <option value="UZS">UZS</option>
+                          <option value="USD">USD</option>
+                          <option value="EUR">EUR</option>
+                        </select>
+                      </div>
+                      <p className="text-xs text-amber-600 font-semibold">Full services available (Lunch, Dinner, Cooking Class, Guide, Transport)</p>
+                    </div>
+                  );
+                } else if (category === 'local') {
+                  return (
+                    <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-4 space-y-3">
+                      <label className="block text-sm font-black text-emerald-900">Local Guest Fee</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={settlementAmount}
+                          onChange={(e) => setSettlementAmount(e.target.value)}
+                          placeholder="Enter amount"
+                          className="flex-1 px-3 py-2 border-2 border-emerald-300 rounded-lg text-sm font-bold text-black focus:border-emerald-500"
+                        />
+                        <select
+                          value={settlementCurrency}
+                          onChange={(e) => setSettlementCurrency(e.target.value as 'UZS' | 'USD' | 'EUR')}
+                          className="px-3 py-2 border-2 border-emerald-300 rounded-lg text-sm font-bold text-black focus:border-emerald-500"
+                        >
+                          <option value="UZS">UZS</option>
+                          <option value="USD">USD</option>
+                          <option value="EUR">EUR</option>
+                        </select>
+                      </div>
+                      <p className="text-xs text-emerald-600 font-semibold">Lunch/Dinner services available</p>
+                    </div>
+                  );
+                } else {
+                  // International (Yurt)
+                  return (
+                    <div className="bg-indigo-50 border-2 border-indigo-200 rounded-xl p-4 space-y-3">
+                      <label className="block text-sm font-black text-indigo-900">Stay Price</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={settlementAmount}
+                          onChange={(e) => setSettlementAmount(e.target.value)}
+                          placeholder="Enter amount"
+                          className="flex-1 px-3 py-2 border-2 border-indigo-300 rounded-lg text-sm font-bold text-black focus:border-indigo-500"
+                        />
+                        <select
+                          value={settlementCurrency}
+                          onChange={(e) => setSettlementCurrency(e.target.value as 'UZS' | 'USD' | 'EUR')}
+                          className="px-3 py-2 border-2 border-indigo-300 rounded-lg text-sm font-bold text-black focus:border-indigo-500"
+                        >
+                          <option value="UZS">UZS</option>
+                          <option value="USD">USD</option>
+                          <option value="EUR">EUR</option>
+                        </select>
+                      </div>
+                      <p className="text-xs text-indigo-600 font-semibold">Full services available (Lunch, Dinner, Cooking Class, Guide, Transport)</p>
+                    </div>
+                  );
+                }
+              })()}
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowSettlementModal(false);
+                  setSettlementAmount('');
+                  setSettlementCurrency('UZS');
+                }}
+                className="flex-1 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!sel || !onCheckIn) return;
+                  const amountValue = parseFloat(settlementAmount || '0');
+                  if (amountValue <= 0) {
+                    alert('Please enter a valid amount');
+                    return;
+                  }
+
+                  // Update booking with price and check-in
+                  if (onUpdateBooking) {
+                    await onUpdateBooking(sel.id, {
+                      total_price: amountValue,
+                      currency: settlementCurrency,
+                      payment_status: 'paid',
+                      status: 'checked_in'
+                    });
+                  } else if (onCheckIn) {
+                    await onCheckIn(sel.id);
+                  }
+
+                  // Record payment to booking_receipts
+                  // This would need to be implemented with a proper API call
+
+                  setShowSettlementModal(false);
+                  setSettlementAmount('');
+                  setSettlementCurrency('UZS');
+                  setSel({ ...sel, status: 'checked_in' });
+                }}
+                className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all"
+              >
+                Check-In & Settle
+              </button>
+            </div>
           </div>
         </div>
       )}

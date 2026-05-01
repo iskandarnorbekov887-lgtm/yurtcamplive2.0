@@ -44,6 +44,14 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
   const [bookingType, setBookingType] = useState<'international' | 'local' | 'pool'>('international');
   const [localStayType, setLocalStayType] = useState<'day' | 'night'>('day');
   const [accommodationType, setAccommodationType] = useState<'yurt' | 'camping'>('yurt');
+
+  // Helper to determine guest category
+  const getGuestCategory = (): 'international' | 'local' | 'camper' | 'pool' => {
+    if (bookingType === 'pool') return 'pool';
+    if (bookingType === 'local') return 'local';
+    if (bookingType === 'international' && accommodationType === 'camping') return 'camper';
+    return 'international';
+  };
   const [guestNames, setGuestNames] = useState<string[]>(['']);
   const [guestCount, setGuestCount] = useState(1);
   const [childrenUnder12, setChildrenUnder12] = useState(0);
@@ -190,6 +198,7 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
           if (isSystemOnly) {
             meta.is_system_only = true;
             meta.is_manual_dates = true;
+            meta.guest_category = getGuestCategory();
           }
           if (bookingType === 'pool') {
             meta.is_pool_visitor = true;
@@ -243,8 +252,9 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
       }]).select();
       if (error) throw error;
 
-      // For pool and local bookings, record payment to booking_receipts
-      if ((bookingType === 'pool' || bookingType === 'local') && bookingData && bookingData[0]) {
+      // For pool and local bookings (non-manager), record payment to booking_receipts
+      // Manager bookings (isSystemOnly) will have payment set at check-in
+      if (!isSystemOnly && (bookingType === 'pool' || bookingType === 'local') && bookingData && bookingData[0]) {
         const bookingId = bookingData[0].id;
         const paymentDate = checkIn || new Date().toISOString().split('T')[0];
         await supabase.from('booking_receipts').insert([{
@@ -254,7 +264,7 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
           settled_at: paymentDate,
           created_at: new Date().toISOString(),
           created_by_id: currentUserId || '',
-          note: bookingType === 'pool' 
+          note: bookingType === 'pool'
             ? `Pool entry payment for ${poolEntryCount} visitors`
             : `Local guest payment (${localStayType === 'day' ? 'day visit' : 'night stay'})`,
         }]);
@@ -593,8 +603,13 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
             );
           })}
 
-          {/* Payment Section */}
-          {bookingType === 'pool' || bookingType === 'local' ? (
+          {/* Payment Section - hidden for manager bookings, set at check-in */}
+          {isSystemOnly ? (
+            <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 space-y-4 bg-slate-50">
+              <label className="block text-sm font-black text-slate-900">Pricing</label>
+              <p className="text-xs text-slate-500 text-center">Price will be set during check-in through the Settlement Tab</p>
+            </div>
+          ) : bookingType === 'pool' || bookingType === 'local' ? (
             <div className={`border-2 rounded-xl p-4 space-y-4 ${bookingType === 'pool' ? 'bg-cyan-50 border-cyan-200' : 'bg-amber-50 border-amber-200'}`}>
               <label className={`block text-sm font-black ${bookingType === 'pool' ? 'text-cyan-900' : 'text-amber-900'}`}>
                 {bookingType === 'pool' ? 'Pool Entry Payment *' : 'Local Guest Payment *'}
@@ -626,7 +641,7 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
                 </div>
               </div>
               <div className={`text-xs font-semibold ${bookingType === 'pool' ? 'text-cyan-600' : 'text-amber-600'}`}>
-                {bookingType === 'pool' 
+                {bookingType === 'pool'
                   ? `Payment will be recorded for ${checkIn} and shown on all calendars`
                   : `Payment will be recorded for ${localStayType === 'day' ? checkIn : `${checkIn} - ${checkOut}`} and shown on all calendars`
                 }
