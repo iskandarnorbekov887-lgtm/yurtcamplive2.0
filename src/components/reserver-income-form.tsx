@@ -454,8 +454,10 @@ export function ReserverIncomeForm({ isOpen, selectedDate, onClose, onSuccess, i
             <input type="text" value={iskyCampRequests} onChange={e => setIskyCampRequests(e.target.value)} placeholder="e.g. 2 camps, separate beds (optional)" className="w-full px-4 py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-500 text-slate-900 font-semibold text-sm" />
           </div>
 
-          {/* Day-by-Day Services */}
-          {bookingType === 'pool' ? (
+          {/* Day-by-Day Services - hidden for manager bookings */}
+          {isSystemOnly ? (
+            <p className="text-xs text-slate-400 text-center border-2 border-dashed border-slate-200 rounded-xl py-3">Services can be added after check-in through the calendar</p>
+          ) : bookingType === 'pool' ? (
             <p className="text-xs text-slate-400 text-center border-2 border-dashed border-slate-200 rounded-xl py-3">Pool visitors do not require meal or transport services</p>
           ) : !checkOut && dayEntries.length <= 1 ? (
             <p className="text-xs text-slate-400 text-center border-2 border-dashed border-slate-200 rounded-xl py-3">Pick a check-out date above to expand services per day</p>
