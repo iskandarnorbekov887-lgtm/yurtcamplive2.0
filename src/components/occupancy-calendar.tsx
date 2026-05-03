@@ -1586,8 +1586,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                   setShowSettlementModal(false);
                   setSel({ ...sel, ...cleanedPayload });
                   
-                  // Refresh cache
-                  try { await supabase.rpc('reload_schema'); } catch {}
+
                 }}
                 className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg transition-all"
               >
