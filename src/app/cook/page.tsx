@@ -44,7 +44,7 @@ function CookPortal() {
       // Cook visibility: See all guests with pending kitchen orders or active status
       const { data: bookingsData } = await supabase.from('bookings').select('*, special_requests').neq('status', 'cancelled');
       
-      const sanitized = (bookingsData || []).map(b => ({
+      const sanitized = (bookingsData || []).map((b: Booking) => ({
         ...b,
         special_requests: b.special_requests 
           ? (typeof b.special_requests === 'string' ? JSON.parse(b.special_requests) : b.special_requests) 
