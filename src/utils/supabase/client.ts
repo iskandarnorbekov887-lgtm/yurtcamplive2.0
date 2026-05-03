@@ -25,7 +25,6 @@ export function createClient() {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
-      lockType: 'custom', 
     }
   });
   return client;
