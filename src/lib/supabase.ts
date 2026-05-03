@@ -85,6 +85,7 @@ export interface Booking {
   lunch_prepaid?: boolean;
   dinner_prepaid?: boolean;
   is_manual_dates?: boolean;
+  is_manually_updated?: boolean;
 }
 
 export interface Tab {
