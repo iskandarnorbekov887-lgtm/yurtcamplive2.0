@@ -38,6 +38,8 @@ function ManagerPortal() {
   const [showAllNotifications, setShowAllNotifications] = useState(false);
   const [isFlashing, setIsFlashing] = useState(false);
   const [groceryRequest, setGroceryRequest] = useState<any>(null);
+  const [showIncomeForm, setShowIncomeForm] = useState(false);
+  const [selectedBookingDate, setSelectedBookingDate] = useState('');
   
 
   useEffect(() => {
@@ -363,6 +365,10 @@ function ManagerPortal() {
                 await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', id);
                 fetchData();
               }}
+              onAddNewBooking={(data: Partial<Booking>) => {
+                setSelectedBookingDate((data as any).check_in || '');
+                setShowIncomeForm(true);
+              }}
               onRefresh={fetchData}
             />
 
@@ -532,6 +538,16 @@ function ManagerPortal() {
           </div>
         )}
       </div>
+
+      <ManagerIncomeForm
+        isOpen={showIncomeForm}
+        selectedDate={selectedBookingDate}
+        onClose={() => setShowIncomeForm(false)}
+        onSuccess={() => {
+          setShowIncomeForm(false);
+          fetchData();
+        }}
+      />
     </div>
   );
 }
