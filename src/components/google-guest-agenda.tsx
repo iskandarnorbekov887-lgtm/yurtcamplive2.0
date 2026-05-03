@@ -1058,7 +1058,7 @@ export function GoogleGuestAgenda({
       }
 
       const updates: Partial<Booking> = {
-        is_manually_updated: true, // Manual Protection Rule
+        is_manual_dates: true, // Manual Protection Rule
         total_price: (sel.total_price || 0) + gTotal,
         collected_amount: (sel.collected_amount || 0) + totalPaidUsd,
         collected_currency: 'USD',
