@@ -827,10 +827,23 @@ export function GoogleGuestAgenda({
       // Note: we don't include transport here as it's more complex to pre-calculate, but usually it's guide/lunch/stay
       const initialGTotal = Math.max(0, (initialIsPrepaid ? 0 : initialSvcAmount) + initialSTotal - (draft?.svcDiscount ?? 0));
 
+      // Smart currency default: Local/Pool = UZS (POS rule), International/Google = USD
+      let defaultCurrency: 'UZS' | 'USD' | 'EUR' = 'USD';
+      try {
+        const meta = typeof b.special_requests === 'string'
+          ? JSON.parse(b.special_requests || '{}')
+          : (b.special_requests || {});
+        const cat = meta.guest_category || '';
+        if (cat === 'local' || cat === 'pool') defaultCurrency = 'UZS';
+      } catch {}
+      // If the booking already has a recorded currency, honour it; otherwise use the smart default
+      const resolvedCurrency = (b.collected_currency as 'UZS' | 'USD' | 'EUR') || defaultCurrency;
+      setCollectedCurrency(resolvedCurrency);
+
       // Always start with a fresh payment input list for the current tab, auto-filled with gTotal
       setSvcPayList([{ 
         amount: initialGTotal > 0 ? initialGTotal.toString() : '', 
-        currency: b.collected_currency || 'USD', 
+        currency: resolvedCurrency, 
         method: 'Cash' 
       }]);
       setPayModified(false);
