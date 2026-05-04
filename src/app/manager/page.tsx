@@ -40,24 +40,57 @@ function ManagerPortal() {
   const [groceryRequest, setGroceryRequest] = useState<any>(null);
   const [showIncomeForm, setShowIncomeForm] = useState(false);
   const [selectedBookingDate, setSelectedBookingDate] = useState('');
-  
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [timeoutError, setTimeoutError] = useState(false);
+  const [configMissing, setConfigMissing] = useState(false);
 
   const pollInterval = useRef<NodeJS.Timeout | null>(null);
   const isStopping = useRef(false);
 
   useEffect(() => {
-    fetchData();
+    // Clear any stale intervals (safety net for mount)
+    if (pollInterval.current) clearInterval(pollInterval.current);
+    isStopping.current = false;
+
+    // Check for missing Supabase config
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      console.error('Configuration Missing: NEXT_PUBLIC_SUPABASE_URL is undefined');
+      setConfigMissing(true);
+      setLoading(false);
+      return;
+    }
+
+    // 5-second timeout for initial load
+    const timeoutTimer = setTimeout(() => {
+      if (loading) {
+        console.error('Error: Connection Timeout after 5 seconds');
+        setTimeoutError(true);
+        setLoading(false);
+        if (pollInterval.current) clearInterval(pollInterval.current);
+      }
+    }, 5000);
+
+    fetchData().then(() => {
+      clearTimeout(timeoutTimer);
+      setLoading(false);
+    }).catch(() => {
+      clearTimeout(timeoutTimer);
+      setLoading(false);
+    });
+
     // Poll for updates every 15 seconds for real-time sync (safety increase from 5s)
     pollInterval.current = setInterval(() => {
-      fetchData();
+      if (!isStopping.current) fetchData();
     }, 15000);
 
     return () => {
+      clearTimeout(timeoutTimer);
       if (pollInterval.current) clearInterval(pollInterval.current);
     };
   }, []);
 
-  const fetchData = async () => {
+  const fetchData = async (): Promise<void> => {
     if (isStopping.current) return;
     try {
       const [
@@ -73,12 +106,21 @@ function ManagerPortal() {
       ]);
 
       // Check for 403 Forbidden errors (Insufficient permissions or session expired)
-      const err403 = [bErr, pErr, nErr, gErr].find(e => e?.code === '42501' || e?.status === 403);
+      const err403 = [bErr, pErr, nErr, gErr].find(e => 
+        e?.code === '42501' || 
+        e?.status === 403 || 
+        e?.message?.includes('JWT') ||
+        e?.message?.includes('permission')
+      );
       if (err403) {
-        console.error('🚫 403 Forbidden detected. Stopping polling and redirecting to login.');
+        console.error('🚫 403 Forbidden detected. Stopping polling.');
         isStopping.current = true;
         if (pollInterval.current) clearInterval(pollInterval.current);
-        window.location.href = '/login';
+        setSessionExpired(true);
+        // Redirect after showing error UI
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 3000);
         return;
       }
 
@@ -89,10 +131,20 @@ function ManagerPortal() {
       console.log('🔄 Manager Fetched bookings:', bookingsData?.length);
     } catch (err: any) {
       console.error('Fetch error:', err);
-      if (err?.status === 403 || err?.code === '42501') {
+      if (
+        err?.status === 403 || 
+        err?.code === '42501' ||
+        err?.message?.includes('JWT') ||
+        err?.message?.includes('permission')
+      ) {
+        isStopping.current = true;
         if (pollInterval.current) clearInterval(pollInterval.current);
-        window.location.href = '/login';
+        setSessionExpired(true);
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 3000);
       }
+      throw err;
     }
   };
 
@@ -161,6 +213,75 @@ function ManagerPortal() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
+      {/* Session Expired Error UI */}
+      {sessionExpired && (
+        <div className="fixed inset-0 z-[100] bg-red-50 flex items-center justify-center">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md text-center animate-in fade-in zoom-in duration-300">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-black text-slate-900 mb-2">Session Expired</h2>
+            <p className="text-slate-600 mb-6">Your session has expired. Redirecting to login...</p>
+            <div className="flex items-center justify-center gap-2 text-sm text-slate-500">
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span>Redirecting in 3 seconds...</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Loading / Timeout / Config Missing overlays */}
+      {(loading || timeoutError || configMissing) && (
+        <div className="fixed inset-0 z-[99] bg-white/80 backdrop-blur-sm flex items-center justify-center">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm text-center border border-slate-200">
+            {configMissing ? (
+              <>
+                <div className="w-14 h-14 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-7 h-7 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-black text-slate-900 mb-2">Configuration Missing</h2>
+                <p className="text-sm text-slate-600 mb-4">NEXT_PUBLIC_SUPABASE_URL is not set. Check your .env.local file.</p>
+              </>
+            ) : timeoutError ? (
+              <>
+                <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-black text-slate-900 mb-2">Connection Timeout</h2>
+                <p className="text-sm text-slate-600 mb-4">Could not reach the server within 5 seconds.</p>
+                <button
+                  onClick={() => { setTimeoutError(false); setLoading(true); window.location.reload(); }}
+                  className="px-5 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-all"
+                >
+                  Retry
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-7 h-7 text-blue-600 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                </div>
+                <h2 className="text-xl font-black text-slate-900 mb-2">Loading Dashboard</h2>
+                <p className="text-sm text-slate-500">Fetching data from server...</p>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <header className="bg-gradient-to-r from-blue-800 to-indigo-900 text-white shadow-2xl sticky top-0 z-50 backdrop-blur-md bg-opacity-95">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
