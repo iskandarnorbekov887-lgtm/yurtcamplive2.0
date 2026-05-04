@@ -598,9 +598,16 @@ export function BookingModal(props: BookingModalProps) {
                 }
 
                 return (
-                  <div className={`px-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 select-none cursor-not-allowed ${statusColor(sel.status)}`}>
-                    <span className={statusIconColor(sel.status)}>{statusIcon(sel.status)}</span>
-                    <span className="capitalize">{String(sel.status).replace('_', ' ')}</span>
+                  <div className="bg-white border-2 border-slate-100 rounded-[32px] p-6 shadow-xl shadow-slate-100/50 space-y-4">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 shadow-md shadow-emerald-100">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight leading-tight">Successfully Checked Out</h3>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Guest Tab Closed & Settled</p>
+                      </div>
+                    </div>
                   </div>
                 );
               })()}
@@ -1325,7 +1332,7 @@ export function BookingModal(props: BookingModalProps) {
                 </div>
               )}
 
-              {isStaff && !isPOS && (
+              {isStaff && !isPOS && sel.status !== 'completed' && (
                 <div className="bg-indigo-600 rounded-2xl p-5 text-white shadow-xl shadow-indigo-200 animate-in fade-in zoom-in duration-500">
                   <div className="flex justify-between items-center mb-4">
                     <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Tab Summary</p>
@@ -1664,7 +1671,7 @@ export function BookingModal(props: BookingModalProps) {
               )}
 
               {/* FOLIO HISTORY — settled tabs (green) + active tab (indigo) */}
-              {isStaff && !isPOS && (() => {
+              {isStaff && !isPOS && sel.status !== 'completed' && (() => {
                 const receipts = getSettledReceiptsForSel();
                 const tabCount = receipts.length;
                 if (tabCount === 0 && gTotal <= 0.01 && (sel.collected_amount || 0) === 0) return null;
