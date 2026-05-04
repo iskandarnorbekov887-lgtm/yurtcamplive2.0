@@ -78,7 +78,7 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
         check_out: checkOut || checkIn,
         number_of_people: guestCount,
         guest_count: guestCount,
-        status: isDayVisit ? 'completed' : 'checked_in',
+        status: isFinancial ? 'completed' : 'checked_in', // Local (Day/Night) and Pool are instant-completed
         source: 'manual',
         total_price: price, // Unified Financial Fix
         payment_status: isFinancial ? 'paid' : 'Unpaid',
