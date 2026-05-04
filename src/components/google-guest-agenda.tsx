@@ -13,6 +13,7 @@ import {
   sanitizeNotes
 } from '@/utils/calendar-logic';
 import { sendDateChangeNotification } from '@/utils/notify';
+import { ManagerIncomeForm } from '@/components/manager-income-form';
 
 
 interface CalEvent {
@@ -114,6 +115,7 @@ export function GoogleGuestAgenda({
   const [isDinnerPrepaid, setIsDinnerPrepaid] = useState(false);
   const [selectedCalendarDay, setSelectedCalendarDay] = useState<string>(localDateStr(new Date()));
   const [nowTime, setNowTime] = useState(new Date());
+  const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setNowTime(new Date()), 60000); // Update every minute
@@ -1228,6 +1230,15 @@ export function GoogleGuestAgenda({
           {loadingEvents && <span className="text-xs text-slate-400 flex items-center gap-1"><span className="w-3 h-3 border-2 border-slate-300 border-t-indigo-500 rounded-full animate-spin inline-block" />Syncing...</span>}
           {eventsError && <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded-lg border border-red-200">⚠ Calendar: {eventsError.slice(0, 60)}</span>}
           {!loadingEvents && !eventsError && <span className="text-xs text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200">● {gcEvents.length} calendar events</span>}
+          {onAddNewBooking && (
+            <button 
+              onClick={() => setShowAddModal(true)}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center gap-2"
+            >
+              <span>+</span>
+              Add Booking
+            </button>
+          )}
         </div>
       </div>
 
@@ -1410,6 +1421,16 @@ export function GoogleGuestAgenda({
         today={today}
         gcEvents={gcEvents}
         dayEntries={dayEntries}
+      />
+
+      <ManagerIncomeForm 
+        isOpen={showAddModal} 
+        onClose={() => setShowAddModal(false)} 
+        selectedDate={selectedCalendarDay}
+        onSuccess={() => {
+          setShowAddModal(false);
+          onRefresh?.();
+        }}
       />
     </div>
   );

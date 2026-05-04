@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { ProtectedRoute } from '@/components/protected-route';
 import { supabase, type Booking } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -33,17 +33,30 @@ function CookPortal() {
   const [groceryStatus, setGroceryStatus] = useState<'none' | 'requested' | 'purchased' | 'received'>('none');
   const [loading, setLoading] = useState(false);
 
+  const pollInterval = useRef<NodeJS.Timeout | null>(null);
+  const isStopping = useRef(false);
+
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 3000); // 3s Polling for "Real-time" feel
-    return () => clearInterval(interval);
+    pollInterval.current = setInterval(fetchData, 15000); // 15s Polling (safety increase from 3s)
+    return () => {
+      if (pollInterval.current) clearInterval(pollInterval.current);
+    };
   }, []);
 
   const fetchData = async () => {
+    if (isStopping.current) return;
     try {
       // Cook visibility: See all guests with pending kitchen orders or active status
-      const { data: bookingsData } = await supabase.from('bookings').select('*, special_requests').neq('status', 'cancelled');
+      const { data: bookingsData, error } = await supabase.from('bookings').select('*, special_requests').neq('status', 'cancelled');
       
+      if (error?.status === 403 || error?.code === '42501') {
+        console.error('🚫 Cook 403 Forbidden detected. Stopping polling.');
+        isStopping.current = true;
+        if (pollInterval.current) clearInterval(pollInterval.current);
+        signOut();
+        return;
+      }
       const sanitized = ((bookingsData || []) as Booking[]).map((b: Booking) => ({
         ...b,
         special_requests: b.special_requests 
