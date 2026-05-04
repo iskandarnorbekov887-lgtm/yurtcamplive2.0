@@ -559,12 +559,49 @@ export function BookingModal(props: BookingModalProps) {
                 </div>
               )}
 
-              {sel.status === 'completed' && !isGracePeriodActive && (
-                <div className={`px-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 select-none cursor-not-allowed ${statusColor(sel.status)}`}>
-                  <span className={statusIconColor(sel.status)}>{statusIcon(sel.status)}</span>
-                  <span className="capitalize">{String(sel.status).replace('_', ' ')}</span>
-                </div>
-              )}
+              {sel.status === 'completed' && !isGracePeriodActive && (() => {
+                const isPOS = currentMeta.guest_category === 'local' || currentMeta.guest_category === 'pool';
+                
+                if (isPOS) {
+                  return (
+                    <div className="bg-white border-2 border-slate-100 rounded-[32px] p-6 shadow-xl shadow-slate-100/50 space-y-4">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600 shadow-md shadow-blue-100">
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight leading-tight">Transaction Receipt</h3>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Instant Point of Sale Settlement</p>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex flex-col items-center justify-center gap-1 shadow-inner">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount Taken</p>
+                        <p className="text-3xl font-black text-slate-900 flex items-baseline gap-1">
+                          {(sel.collected_amount || sel.total_price || 0).toLocaleString()} 
+                          <span className="text-lg text-slate-500 font-bold">{sel.collected_currency || 'UZS'}</span>
+                        </p>
+                      </div>
+                      
+                      <div className="flex items-center justify-between px-2 text-sm font-bold text-slate-600 border-b border-slate-100 pb-2">
+                        <span className="uppercase tracking-widest text-[10px] text-slate-400">Guest Count:</span>
+                        <span className="text-slate-900 text-base">{sel.number_of_people || sel.guest_count || 0} pax</span>
+                      </div>
+                      
+                      <button className="w-full py-4 bg-slate-100 text-slate-400 font-black uppercase tracking-[0.2em] text-[11px] rounded-2xl cursor-not-allowed border border-slate-200">
+                        Closed Tab - Receipt Logged
+                      </button>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className={`px-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 select-none cursor-not-allowed ${statusColor(sel.status)}`}>
+                    <span className={statusIconColor(sel.status)}>{statusIcon(sel.status)}</span>
+                    <span className="capitalize">{String(sel.status).replace('_', ' ')}</span>
+                  </div>
+                );
+              })()}
 
               {isStaff && sel.status !== 'no_arrival' && sel.status !== 'cancelled' && (sel.status !== 'completed' || isGracePeriodActive) && (
                 <div className="flex flex-wrap gap-2">
