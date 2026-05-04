@@ -52,7 +52,7 @@ function CookPortal() {
       }));
 
       setBookings(sanitized);
-      console.log('Sanitized Bookings for Cook:', sanitized.map(b => b.special_requests));
+      console.log('Sanitized Bookings for Cook:', sanitized.map((b: Booking) => b.special_requests));
       
       // Fetch Drinks for the selector
       const { data: drinkData } = await supabase.from('drinks').select('*').eq('available', true);
