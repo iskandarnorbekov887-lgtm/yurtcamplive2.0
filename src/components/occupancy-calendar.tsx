@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '@/lib/language-context';
-import type { Booking, UserRole, Profile } from '@/lib/supabase';
+import { supabase, type Booking, type UserRole, type Profile } from '@/lib/supabase';
 
 interface Props { 
   bookings: Booking[]; 
