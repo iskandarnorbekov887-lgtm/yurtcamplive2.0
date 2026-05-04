@@ -836,8 +836,8 @@ export function GoogleGuestAgenda({
         const cat = meta.guest_category || '';
         if (cat === 'local' || cat === 'pool') defaultCurrency = 'UZS';
       } catch {}
-      // If the booking already has a recorded currency, honour it; otherwise use the smart default
-      const resolvedCurrency = (b.collected_currency as 'UZS' | 'USD' | 'EUR') || defaultCurrency;
+      // Always use the smart default for new tabs to ensure consistency
+      const resolvedCurrency = defaultCurrency;
       setCollectedCurrency(resolvedCurrency);
 
       // Always start with a fresh payment input list for the current tab, auto-filled with gTotal
