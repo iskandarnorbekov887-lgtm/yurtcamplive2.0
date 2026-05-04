@@ -98,6 +98,28 @@ export function GoogleGuestAgenda({
   const [newExtraPrice, setNewExtraPrice] = useState('');
   const [actionMsg, setActionMsg] = useState('');
   const [svcChildren, setSvcChildren] = useState(0);
+
+  const getPrefix = (item: ListItem) => {
+    const booking = item.booking;
+    if (!booking) return '🌐 [G] ';
+    
+    let category = '';
+    try {
+      const meta = typeof booking.special_requests === 'string' 
+        ? JSON.parse(booking.special_requests || '{}') 
+        : (booking.special_requests || {});
+      category = meta.guest_category || '';
+    } catch {}
+
+    if (category === 'pool') return '🏊 [POL] ';
+    if (category === 'local') return '🏠 [LOC] ';
+    if (category === 'international' || category === 'camper') return '🏢 [OFF] ';
+    
+    if (booking.source === 'System' || booking.source === 'manual') return '🏢 [OFF] ';
+    if (item.source === 'calendar' || item.source === 'both') return '🌐 [G] ';
+    
+    return '';
+  };
   const [svcAmount, setSvcAmount] = useState(0);
   const [svcDiscount, setSvcDiscount] = useState(0);
   const [svcPayList, setSvcPayList] = useState<Array<{ 
@@ -503,6 +525,7 @@ export function GoogleGuestAgenda({
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <p className={`font-bold text-sm truncate ${isCancelled ? 'text-red-600 line-through' : 'text-slate-900'}`}>
+                <span className="text-slate-400 font-medium mr-1">{getPrefix(item)}</span>
                 {item.name}
               </p>
               <p className="text-xs text-slate-400 mt-0.5">{item.start} → {item.end}</p>

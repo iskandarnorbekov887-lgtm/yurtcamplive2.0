@@ -149,6 +149,35 @@ export function BookingModal(props: BookingModalProps) {
 
   const sel = selectedItem?.booking;
 
+  const getBookingTypeInfo = () => {
+    if (!sel) {
+      if (selectedItem?.source === 'calendar') {
+        return { prefix: '🌐 [G]', message: 'Google Calendar synced booking' };
+      }
+      return null;
+    }
+    
+    let category = '';
+    try {
+      const meta = typeof sel.special_requests === 'string' 
+        ? JSON.parse(sel.special_requests || '{}') 
+        : (sel.special_requests || {});
+      category = meta.guest_category || '';
+    } catch {}
+
+    if (category === 'pool') return { prefix: '🏊 [POL]', message: 'Instant POS: Settled in UZS' };
+    if (category === 'local') return { prefix: '🏠 [LOC]', message: 'Instant POS: Settled in UZS' };
+    if (category === 'international' || category === 'camper' || sel.source === 'System' || sel.source === 'manual') {
+      return { prefix: '🏢 [OFF]', message: 'Manual Office Booking: International Stay' };
+    }
+    if (selectedItem?.source === 'calendar' || selectedItem?.source === 'both') {
+      return { prefix: '🌐 [G]', message: 'Google Calendar synced booking' };
+    }
+    return null;
+  };
+
+  const typeInfo = getBookingTypeInfo();
+
   const currentMeta = useMemo(() => {
     if (!sel) return {};
     let meta: any = {};
@@ -407,6 +436,15 @@ export function BookingModal(props: BookingModalProps) {
             <div className="p-5 space-y-4">
               <div className="flex items-start justify-between">
                 <div>
+                  {typeInfo && (
+                    <button 
+                      onClick={() => flash(typeInfo.message)}
+                      className="mb-2 px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-lg text-[10px] font-black text-slate-500 uppercase tracking-widest hover:bg-slate-200 transition-all flex items-center gap-1.5"
+                    >
+                      <span>{typeInfo.prefix}</span>
+                      <span>Click to Identify</span>
+                    </button>
+                  )}
                   <h2 className="text-xl font-black text-slate-900">{String(sel?.guest_name || "Guest")}</h2>
                   <p className="text-sm text-slate-500 mt-0.5">{String(sel?.check_in)} → {String(sel?.check_out)}{sel?.nights ? ` · ${String(sel?.nights)}n` : ''}{(sel?.guest_count || sel?.number_of_people) ? ` · ${String(sel?.guest_count || sel?.number_of_people)} pax` : ''}</p>
                 </div>

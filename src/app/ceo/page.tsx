@@ -130,8 +130,13 @@ function CEODashboard() {
       setBookings(deDuplicate(bookingsData.data || []));
       setStaff(staffData.data || []);
       setNotifications((notificationsData.data || []).slice(0, 10) || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Dashboard Fetch error:', error);
+      if (error?.status === 403 || error?.code === '42501') {
+        if (pollInterval.current) clearInterval(pollInterval.current);
+        if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
+        window.location.href = '/login';
+      }
     } finally {
       setLoading(false);
       clearTimeout(timer);

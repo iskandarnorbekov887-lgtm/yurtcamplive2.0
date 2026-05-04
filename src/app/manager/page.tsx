@@ -87,8 +87,12 @@ function ManagerPortal() {
       setNotifications((notifData || []).slice(0, 20));
       setGroceryRequest(groceryData);
       console.log('🔄 Manager Fetched bookings:', bookingsData?.length);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Fetch error:', err);
+      if (err?.status === 403 || err?.code === '42501') {
+        if (pollInterval.current) clearInterval(pollInterval.current);
+        window.location.href = '/login';
+      }
     }
   };
 
