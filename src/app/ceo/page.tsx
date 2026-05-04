@@ -103,11 +103,11 @@ function CEODashboard() {
       // Check for 403 Forbidden errors
       const err403 = [bookingsData, staffData, notificationsData].find(res => res.error?.status === 403 || res.error?.code === '42501');
       if (err403) {
-        console.error('🚫 Dashboard 403 Forbidden detected. Stopping polling.');
+        console.error('🚫 Dashboard 403 Forbidden detected. Stopping polling and redirecting to login.');
         isStopping.current = true;
         if (pollInterval.current) clearInterval(pollInterval.current);
         if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
-        signOut();
+        window.location.href = '/login';
         return;
       }
 

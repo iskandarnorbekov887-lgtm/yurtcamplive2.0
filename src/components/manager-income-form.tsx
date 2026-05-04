@@ -78,10 +78,9 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
         check_out: checkOut || checkIn,
         number_of_people: guestCount,
         guest_count: guestCount,
-        status: isDayVisit ? 'completed' : 'checked_in', // Instant completion for day guests
-        source: 'manual', // Use 'manual' as per directive
-        sync_to_gcal: false, // Ensure no sync to Google Calendar
-        total_price: 0, // All manager-created entries start at 0; revenue is tracked in 'amount' or 'tabs'
+        status: isDayVisit ? 'completed' : 'checked_in',
+        source: 'manual',
+        total_price: price, // Unified Financial Fix
         payment_status: isFinancial ? 'paid' : 'Unpaid',
         currency: 'UZS',
         amount: price,
@@ -98,7 +97,7 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
         })
       };
 
-      // Absolute Data Isolation Cleaning
+      // Absolute Data Isolation: Purge room-related fields for Local/Pool/Financials
       if (!isRoomStay) {
         payload.cooking_class = false;
         payload.guide_service = false;
@@ -106,6 +105,7 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
         payload.dinner = false;
         payload.has_transportation = false;
         payload.laundry = false;
+        payload.total_accommodation_price = 0;
       }
 
       if (isFinancial) {

@@ -73,12 +73,12 @@ function ManagerPortal() {
       ]);
 
       // Check for 403 Forbidden errors (Insufficient permissions or session expired)
-      const err403 = [bErr, pErr, nErr].find(e => e?.code === '42501' || e?.status === 403);
+      const err403 = [bErr, pErr, nErr, gErr].find(e => e?.code === '42501' || e?.status === 403);
       if (err403) {
-        console.error('🚫 403 Forbidden detected. Stopping polling and signing out.');
+        console.error('🚫 403 Forbidden detected. Stopping polling and redirecting to login.');
         isStopping.current = true;
         if (pollInterval.current) clearInterval(pollInterval.current);
-        signOut();
+        window.location.href = '/login';
         return;
       }
 
