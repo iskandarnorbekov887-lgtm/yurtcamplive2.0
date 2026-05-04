@@ -192,6 +192,8 @@ export function BookingModal(props: BookingModalProps) {
     return meta;
   }, [sel?.special_requests]);
 
+  const isPOS = currentMeta.guest_category === 'local' || currentMeta.guest_category === 'pool';
+
   const [kitchenOrders, setKitchenOrders] = useState<any[]>(currentMeta.kitchen_orders || []);
   const [showMealRequestModal, setShowMealRequestModal] = useState(false);
   const [currentMealType, setCurrentMealType] = useState<'lunch' | 'dinner' | null>(null);
@@ -1323,7 +1325,7 @@ export function BookingModal(props: BookingModalProps) {
                 </div>
               )}
 
-              {isStaff && (
+              {isStaff && !isPOS && (
                 <div className="bg-indigo-600 rounded-2xl p-5 text-white shadow-xl shadow-indigo-200 animate-in fade-in zoom-in duration-500">
                   <div className="flex justify-between items-center mb-4">
                     <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Tab Summary</p>
@@ -1662,7 +1664,7 @@ export function BookingModal(props: BookingModalProps) {
               )}
 
               {/* FOLIO HISTORY — settled tabs (green) + active tab (indigo) */}
-              {isStaff && (() => {
+              {isStaff && !isPOS && (() => {
                 const receipts = getSettledReceiptsForSel();
                 const tabCount = receipts.length;
                 if (tabCount === 0 && gTotal <= 0.01 && (sel.collected_amount || 0) === 0) return null;
