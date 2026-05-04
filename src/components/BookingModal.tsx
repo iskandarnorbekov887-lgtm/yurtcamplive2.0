@@ -152,7 +152,7 @@ export function BookingModal(props: BookingModalProps) {
   const getBookingTypeInfo = () => {
     if (!sel) {
       if (selectedItem?.source === 'calendar') {
-        return { prefix: '🌐 [G]', message: 'Google Calendar synced booking' };
+        return { prefix: '🌐', message: 'Google Calendar synced booking' };
       }
       return null;
     }
@@ -165,13 +165,13 @@ export function BookingModal(props: BookingModalProps) {
       category = meta.guest_category || '';
     } catch {}
 
-    if (category === 'pool') return { prefix: '🏊 [POL]', message: 'Instant POS: Settled in UZS' };
-    if (category === 'local') return { prefix: '🏠 [LOC]', message: 'Instant POS: Settled in UZS' };
+    if (category === 'pool') return { prefix: '🏊', message: 'Instant POS: Settled in UZS' };
+    if (category === 'local') return { prefix: '🏠', message: 'Instant POS: Settled in UZS' };
     if (category === 'international' || category === 'camper' || sel.source === 'System' || sel.source === 'manual') {
-      return { prefix: '🏢 [OFF]', message: 'Manual Office Booking: International Stay' };
+      return { prefix: '', message: 'Manual Office Booking: International Stay' };
     }
     if (selectedItem?.source === 'calendar' || selectedItem?.source === 'both') {
-      return { prefix: '🌐 [G]', message: 'Google Calendar synced booking' };
+      return { prefix: '🌐', message: 'Google Calendar synced booking' };
     }
     return null;
   };

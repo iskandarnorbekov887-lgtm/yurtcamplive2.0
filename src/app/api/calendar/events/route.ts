@@ -1,4 +1,4 @@
-import { google } from 'googleapis';
+import { calendar_v3, auth as googleAuth } from '@googleapis/calendar';
 import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
@@ -17,13 +17,13 @@ export async function GET() {
   }
 
   try {
-    const auth = new google.auth.JWT({
+    const auth = new googleAuth.JWT({
       email,
       key: rawKey.replace(/\\n/g, '\n'),
       scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
     });
 
-    const calendar = google.calendar({ version: 'v3', auth });
+    const calendar = new calendar_v3.Calendar({ auth });
 
     const now = new Date();
     const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -84,13 +84,13 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
     }
 
-    const auth = new google.auth.JWT({
+    const auth = new googleAuth.JWT({
       email,
       key: rawKey.replace(/\\n/g, '\n'),
       scopes: ['https://www.googleapis.com/auth/calendar'],
     });
 
-    const calendar = google.calendar({ version: 'v3', auth });
+    const calendar = new calendar_v3.Calendar({ auth });
     
     // Google Calendar API expects 'end' to be exclusive for all-day events.
     // If 'start' and 'end' are date strings like 'YYYY-MM-DD', we use 'date' field.

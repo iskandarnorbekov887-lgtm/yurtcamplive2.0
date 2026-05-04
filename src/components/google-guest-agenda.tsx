@@ -101,7 +101,7 @@ export function GoogleGuestAgenda({
 
   const getPrefix = (item: ListItem) => {
     const booking = item.booking;
-    if (!booking) return '🌐 [G] ';
+    if (!booking) return '🌐 ';
     
     let category = '';
     try {
@@ -111,12 +111,12 @@ export function GoogleGuestAgenda({
       category = meta.guest_category || '';
     } catch {}
 
-    if (category === 'pool') return '🏊 [POL] ';
-    if (category === 'local') return '🏠 [LOC] ';
-    if (category === 'international' || category === 'camper') return '🏢 [OFF] ';
+    if (category === 'pool') return '🏊 ';
+    if (category === 'local') return '🏠 ';
+    if (category === 'international' || category === 'camper') return '';
     
-    if (booking.source === 'System' || booking.source === 'manual') return '🏢 [OFF] ';
-    if (item.source === 'calendar' || item.source === 'both') return '🌐 [G] ';
+    if (booking.source === 'System' || booking.source === 'manual') return '';
+    if (item.source === 'calendar' || item.source === 'both') return '🌐 ';
     
     return '';
   };
@@ -412,40 +412,6 @@ export function GoogleGuestAgenda({
     setTimeout(() => setSelectedReceipt(null), 0);
   }, [sel?.id]);
 
-  // --- AUTO-CHECKOUT WORKER ---
-  useEffect(() => {
-    if (!onCheckOut) return;
-    const checkAutoCO = async () => {
-      const now = new Date();
-      const todayStr = localDateStr(now);
-      const isPostNoon = now.getHours() >= 12;
-      
-      // Auto-checkout if:
-      // 1. Status is 'checked_in'
-      // 2. Checkout day is BEFORE today (past days)
-      // 3. Debt is basically 0
-      const toAutoCO = bookings.filter(b => {
-        if (b.status !== 'checked_in') return false;
-        if (b.check_out >= todayStr) return false; // Stay active if checkout is today or future
-        const debt = (b.total_price || 0) - (b.collected_amount || 0);
-        return debt < 1.00;
-      });
-      
-      for (const b of toAutoCO) {
-        try {
-          await onCheckOut(b.id);
-          console.log(`Auto-checked out settled guest: ${b.guest_name}`);
-        } catch (e) {
-          console.error('Auto-checkout failed for', b.id, e);
-        }
-      }
-    };
-    
-    const interval = setInterval(checkAutoCO, 300000); // Run every 5 minutes
-    checkAutoCO();
-    return () => clearInterval(interval);
-  }, [bookings, onCheckOut]);
-
 
 
 
@@ -552,9 +518,7 @@ export function GoogleGuestAgenda({
                     <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-rose-600 text-white animate-pulse">⚠ OVERDUE (2PM+)</span>
                   ) : isAfterNoon ? (
                     <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-amber-500 text-white">⚠ LATE (12PM+)</span>
-                  ) : (
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-600 border border-indigo-200 italic">Auto-CO @ 11:59</span>
-                  )}
+                  ) : null}
                 </>
               )}
             </div>

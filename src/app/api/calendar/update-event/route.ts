@@ -1,4 +1,4 @@
-import { google } from 'googleapis';
+import { calendar_v3, auth as googleAuth } from '@googleapis/calendar';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
@@ -16,13 +16,13 @@ export async function PATCH(req: NextRequest) {
   }
 
   try {
-    const auth = new google.auth.JWT({
+    const auth = new googleAuth.JWT({
       email,
       key: rawKey.replace(/\\n/g, '\n'),
       scopes: ['https://www.googleapis.com/auth/calendar.events'],
     });
 
-    const calendar = google.calendar({ version: 'v3', auth });
+    const calendar = new calendar_v3.Calendar({ auth });
 
     await calendar.events.patch({
       calendarId,

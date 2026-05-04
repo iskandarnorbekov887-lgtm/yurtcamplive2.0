@@ -25,6 +25,7 @@ interface EventBar {
   endsThisWeek: boolean;
   raw: Booking | CalEvent;
   gcCancelled?: boolean;
+  category?: 'international' | 'local' | 'pool' | 'camper' | '';
 }
 
 const isGcCancelled = (ev: CalEvent | null | undefined) =>
@@ -123,9 +124,15 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelect
         for (let i = 0; i <= 6; i++) { if (days[i] !== null && days[i]! >= b.check_in) { startCol = i; break; } }
         for (let i = 6; i >= 0; i--) { if (days[i] !== null && days[i]! <= b.check_out) { endCol = i; break; } }
         if (endCol < startCol) endCol = startCol;
+        let category: 'international' | 'local' | 'pool' | 'camper' | '' = '';
+        try {
+          const meta = typeof b.special_requests === 'string' ? JSON.parse(b.special_requests || '{}') : (b.special_requests || {});
+          category = meta.guest_category || '';
+        } catch {}
+        if (!category && (b.source === 'System' || b.source === 'manual')) category = 'international';
         bars.push({
           startCol, endCol, label: b.guest_name, type: 'bk', id: b.id,
-          status: b.status, raw: b,
+          status: b.status, raw: b, category,
           startsThisWeek: b.check_in >= weekStart,
           endsThisWeek: b.check_out <= weekEnd,
         });
@@ -164,9 +171,17 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelect
 
   const handleDayClick = (d: string) => setSelectedDay(d);
 
-  // Hard color rule (system-only): GC events default to yellow (confirmed-like),
-  // red GC events read as cancelled. Status colors NEVER pushed back to GC.
+  // Hard color rule: POS local/pool have fixed colors (never change with status).
+  // International/office bookings change color by status. GC events stay yellow.
   const barColor = (bar: EventBar) => {
+    if (bar.type === 'gc') {
+      if (bar.gcCancelled) return 'bg-red-400 text-white';
+      return 'bg-amber-300 text-slate-900';
+    }
+    // POS categories: fixed color regardless of status
+    if (bar.category === 'pool') return 'bg-teal-500 text-white';
+    if (bar.category === 'local') return 'bg-violet-500 text-white';
+    // International / office / default: status-based colors
     if (bar.status === 'cancelled') return 'bg-red-500 text-white';
     if (bar.status === 'no_arrival') return 'bg-gray-400 text-white';
     if (bar.status === 'checked_in') return 'bg-emerald-500 text-white';
@@ -176,21 +191,27 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelect
   };
 
   const barIcon = (bar: EventBar) => {
-    let prefix = '';
+    // GC events: no icons at all
+    if (bar.type === 'gc') return '';
+    // POS local/pool: just emoji, no status icons
+    if (bar.category === 'local') return '🏠 ';
+    if (bar.category === 'pool') return '🏊 ';
+    // Google Calendar synced bookings (empty category): show 🌐
+    if (bar.category === '') return '🌐 ';
+    // Manager-created international bookings: � + status
+    let prefix = '� ';
     if (bar.status === 'checked_in') prefix += '✓ ';
     if (bar.status === 'completed') prefix += '✈ ';
     if (bar.status === 'cancelled') prefix += '✕ ';
     if (bar.status === 'no_arrival') prefix += '⊘ ';
 
-    if (bar.type === 'bk') {
-      const b = bar.raw as Booking;
-      try {
-        const meta = typeof b.special_requests === 'string' ? JSON.parse(b.special_requests || '{}') : (b.special_requests || {});
-        const orders = meta.kitchen_orders || [];
-        if (orders.some((o: any) => o.type === 'lunch' && o.status === 'confirmed')) prefix += '🍱 ';
-        if (orders.some((o: any) => o.type === 'dinner' && o.status === 'confirmed')) prefix += '🌙 ';
-      } catch {}
-    }
+    const b = bar.raw as Booking;
+    try {
+      const meta = typeof b.special_requests === 'string' ? JSON.parse(b.special_requests || '{}') : (b.special_requests || {});
+      const orders = meta.kitchen_orders || [];
+      if (orders.some((o: any) => o.type === 'lunch' && o.status === 'confirmed')) prefix += '🍱 ';
+      if (orders.some((o: any) => o.type === 'dinner' && o.status === 'confirmed')) prefix += '🌙 ';
+    } catch {}
     return prefix;
   };
 
@@ -348,11 +369,13 @@ export function PrivateCalendarView({ bookings, gcEvents: gcEventsProp, onSelect
 
         {/* Legend */}
         <div className="mt-3 flex gap-4 flex-wrap pt-2 border-t border-slate-100">
+          <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-amber-300 inline-block" />🌐 Google</span>
           <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-amber-400 inline-block" />Confirmed</span>
           <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-emerald-500 inline-block" />✓ Checked In</span>
-          <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-blue-500 inline-block" /><span className="text-amber-500">✈</span> Checked Out</span>
+          <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-blue-500 inline-block" />✈ Checked Out</span>
           <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-red-500 inline-block" />✕ Cancelled</span>
-          <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-gray-400 inline-block" />⊘ No Arrival</span>
+          <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-violet-500 inline-block" />🏠 Local</span>
+          <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-teal-500 inline-block" />🏊 Pool</span>
         </div>
       </div>
     </div>

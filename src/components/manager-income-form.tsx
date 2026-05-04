@@ -173,19 +173,19 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
             {(['international', 'local', 'pool'] as const).map(c => (
               <button key={c} type="button" onClick={() => handleCategoryChange(c)}
                 className={`py-3 px-2 rounded-[14px] text-[10px] font-black uppercase tracking-wider transition-all ${mainCategory === c ? 'bg-white text-slate-900 shadow-md' : 'text-slate-500 hover:text-slate-700'}`}>
-                {c === 'international' ? 'International' : c === 'local' ? '🏠 Local' : '🏊 Pool'}
+                {c === 'international' ? '�' : c === 'local' ? '🏠' : '🏊'}
               </button>
             ))}
           </div>
 
           {mainCategory === 'international' && (
-            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200 animate-in slide-in-from-top-2">
+            <div className={`flex items-center justify-between p-4 rounded-2xl border-2 animate-in slide-in-from-top-2 transition-all ${isCamper ? 'bg-amber-50 border-amber-300 shadow-sm' : 'bg-white border-slate-200'}`}>
               <div className="flex flex-col">
-                <span className="text-sm font-bold text-slate-900">Guest is a Camper</span>
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Registers as 'camper' category</span>
+                <span className={`text-sm font-bold ${isCamper ? 'text-amber-800' : 'text-slate-900'}`}>Guest is a Camper</span>
+                <span className={`text-[10px] font-bold uppercase tracking-widest ${isCamper ? 'text-amber-500' : 'text-slate-400'}`}>Registers as 'camper' category</span>
               </div>
               <button type="button" onClick={() => setIsCamper(!isCamper)}
-                className={`w-12 h-6 rounded-full transition-all relative ${isCamper ? 'bg-indigo-600' : 'bg-slate-300'}`}>
+                className={`w-12 h-6 rounded-full transition-all relative ${isCamper ? 'bg-amber-500' : 'bg-slate-300'}`}>
                 <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isCamper ? 'right-1' : 'left-1'}`} />
               </button>
             </div>
