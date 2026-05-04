@@ -41,9 +41,10 @@ export async function GET(request: Request) {
           'Cook': '/cook',
         };
 
-        const redirectPath = profile?.role
-          ? (rolePaths[profile.role] || next)
-          : next;
+        let userRole = profile?.role || 'Manager';
+        if (userRole === 'Reserver') userRole = 'Manager';
+
+        const redirectPath = rolePaths[userRole] || next;
 
         return NextResponse.redirect(`${origin}${redirectPath}`);
       }

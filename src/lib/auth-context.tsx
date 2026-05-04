@@ -46,7 +46,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               .single();
             
             if (mounted && profile) {
-              setUser(profile);
+              // Fallback: If legacy role 'Reserver' is found, treat as 'Manager'
+              const userProfile = { ...profile };
+              if (userProfile.role === 'Reserver' || !userProfile.role) {
+                userProfile.role = 'Manager';
+              }
+              setUser(userProfile);
             }
           }
         } else {
