@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { GoogleGuestAgenda } from '@/components/google-guest-agenda';
+import { ManagerIncomeForm } from '@/components/manager-income-form';
 import type { UserRole } from '@/lib/supabase';
 
 // Force dynamic rendering to avoid SSR issues with auth
@@ -37,6 +38,8 @@ function CEODashboard() {
   const [editingUser, setEditingUser] = useState<Profile | null>(null);
   const [newUser, setNewUser] = useState({ email: '', password: '', fullName: '', role: 'Manager' as UserRole });
   const [loadingUser, setLoadingUser] = useState(false);
+  const [showAddBookingModal, setShowAddBookingModal] = useState(false);
+  const [selectedBookingDate, setSelectedBookingDate] = useState('');
 
 
   const pollInterval = useRef<NodeJS.Timeout | null>(null);
@@ -530,6 +533,10 @@ function CEODashboard() {
               onCheckIn={handleCheckIn}
               onCheckOut={handleCheckOut}
               onUpdateBooking={handleUpdateBooking}
+              onAddNewBooking={(data: Partial<Booking>) => {
+                setSelectedBookingDate((data as any).check_in || '');
+                setShowAddBookingModal(true);
+              }}
               onRefresh={fetchData}
             />
           </div>
@@ -636,63 +643,54 @@ function CEODashboard() {
 
       {/* Add User Modal */}
       {showAddUserModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
-            <h3 className="text-xl font-black text-slate-800 mb-6">Add New Staff Member</h3>
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2rem] w-full max-w-md p-8 shadow-2xl animate-in zoom-in duration-200">
+            <h3 className="text-xl font-black text-slate-800 mb-6">Add Team Member</h3>
             <div className="space-y-4">
-              <div>
-                <label className="text-xs font-black uppercase tracking-widest text-slate-400">Full Name</label>
-                <input
-                  type="text"
-                  value={newUser.fullName}
-                  onChange={(e) => setNewUser({ ...newUser, fullName: e.target.value })}
-                  className="w-full mt-1 px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-indigo-500 outline-none transition-all"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-black uppercase tracking-widest text-slate-400">Email</label>
-                <input
-                  type="email"
-                  value={newUser.email}
-                  onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                  className="w-full mt-1 px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-indigo-500 outline-none transition-all"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-black uppercase tracking-widest text-slate-400">Password</label>
-                <input
-                  type="password"
-                  value={newUser.password}
-                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                  className="w-full mt-1 px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-indigo-500 outline-none transition-all"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-black uppercase tracking-widest text-slate-400">Role</label>
-                <select
-                  value={newUser.role}
-                  onChange={(e) => setNewUser({ ...newUser, role: e.target.value as UserRole })}
-                  className="w-full mt-1 px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-indigo-500 outline-none transition-all"
-                >
-                  <option value="Manager">Manager</option>
-                  <option value="Cook">Cook</option>
-                  <option value="CEO">CEO</option>
-                </select>
-              </div>
+              <input 
+                type="text" 
+                placeholder="Full Name" 
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                value={newUser.fullName}
+                onChange={(e) => setNewUser({ ...newUser, fullName: e.target.value })}
+              />
+              <input 
+                type="email" 
+                placeholder="Email Address" 
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                value={newUser.email}
+                onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+              />
+              <input 
+                type="password" 
+                placeholder="Password" 
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                value={newUser.password}
+                onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+              />
+              <select 
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                value={newUser.role}
+                onChange={(e) => setNewUser({ ...newUser, role: e.target.value as UserRole })}
+              >
+                <option value="Manager">Manager</option>
+                <option value="Cook">Cook</option>
+                <option value="CEO">CEO</option>
+              </select>
             </div>
             <div className="flex gap-3 mt-8">
-              <button
+              <button 
                 onClick={() => setShowAddUserModal(false)}
-                className="flex-1 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-all"
+                className="flex-1 py-3 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-all"
               >
                 Cancel
               </button>
-              <button
+              <button 
                 onClick={handleAddUser}
-                disabled={loadingUser || !newUser.email || !newUser.password || !newUser.fullName}
-                className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all disabled:opacity-50"
+                disabled={loadingUser}
+                className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all disabled:opacity-50"
               >
-                {loadingUser ? 'Creating...' : 'Create User'}
+                {loadingUser ? 'Adding...' : 'Add Member'}
               </button>
             </div>
           </div>
@@ -701,55 +699,38 @@ function CEODashboard() {
 
       {/* Edit User Modal */}
       {showEditUserModal && editingUser && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
-            <h3 className="text-xl font-black text-slate-800 mb-6">Edit Staff Member</h3>
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2rem] w-full max-w-md p-8 shadow-2xl animate-in zoom-in duration-200">
+            <h3 className="text-xl font-black text-slate-800 mb-6">Edit Team Member</h3>
             <div className="space-y-4">
-              <div>
-                <label className="text-xs font-black uppercase tracking-widest text-slate-400">Full Name</label>
-                <input
-                  type="text"
-                  value={editingUser.full_name || ''}
-                  onChange={(e) => setEditingUser({ ...editingUser, full_name: e.target.value })}
-                  className="w-full mt-1 px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-indigo-500 outline-none transition-all"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-black uppercase tracking-widest text-slate-400">Email (Read-only)</label>
-                <input
-                  type="email"
-                  value={editingUser.email || ''}
-                  disabled
-                  className="w-full mt-1 px-4 py-3 bg-slate-100 border-2 border-slate-100 rounded-xl font-black text-slate-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-black uppercase tracking-widest text-slate-400">Role</label>
-                <select
-                  value={editingUser.role}
-                  onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as UserRole })}
-                  className="w-full mt-1 px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-indigo-500 outline-none transition-all"
-                >
-                  <option value="Manager">Manager</option>
-                  <option value="Cook">Cook</option>
-                  <option value="CEO">CEO</option>
-                </select>
-              </div>
+              <input 
+                type="text" 
+                placeholder="Full Name" 
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                value={editingUser.full_name || ''}
+                onChange={(e) => setEditingUser({ ...editingUser, full_name: e.target.value })}
+              />
+              <select 
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                value={editingUser.role}
+                onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as UserRole })}
+              >
+                <option value="Manager">Manager</option>
+                <option value="Cook">Cook</option>
+                <option value="CEO">CEO</option>
+              </select>
             </div>
             <div className="flex gap-3 mt-8">
-              <button
-                onClick={() => {
-                  setShowEditUserModal(false);
-                  setEditingUser(null);
-                }}
-                className="flex-1 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-all"
+              <button 
+                onClick={() => setShowEditUserModal(false)}
+                className="flex-1 py-3 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-all"
               >
                 Cancel
               </button>
-              <button
+              <button 
                 onClick={handleUpdateUser}
                 disabled={loadingUser}
-                className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all disabled:opacity-50"
+                className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all disabled:opacity-50"
               >
                 {loadingUser ? 'Saving...' : 'Save Changes'}
               </button>
@@ -758,7 +739,15 @@ function CEODashboard() {
         </div>
       )}
 
-
+      <ManagerIncomeForm 
+        isOpen={showAddBookingModal} 
+        onClose={() => setShowAddBookingModal(false)} 
+        selectedDate={selectedBookingDate}
+        onSuccess={() => {
+          setShowAddBookingModal(false);
+          fetchData();
+        }}
+      />
     </div>
   );
 }
