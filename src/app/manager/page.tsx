@@ -36,7 +36,7 @@ function ManagerPortal() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAllNotifications, setShowAllNotifications] = useState(false);
-  const [isFlashing, setIsFlashing] = useState(false);
+
   const [groceryRequest, setGroceryRequest] = useState<any>(null);
   const [showIncomeForm, setShowIncomeForm] = useState(false);
   const [selectedBookingDate, setSelectedBookingDate] = useState('');
@@ -174,26 +174,7 @@ function ManagerPortal() {
           </div>
           <div className="flex items-center gap-4">
              <LanguageSwitcher variant="light" />
-            {/* ⚡ Temporary Flash / Force Refresh Button */}
-            <button
-              onClick={async () => {
-                setIsFlashing(true);
-                await fetchData();
-                setTimeout(() => setIsFlashing(false), 800);
-              }}
-              disabled={isFlashing}
-              title="Force refresh all data from server"
-              className={`p-2.5 rounded-xl border text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all active:scale-95 ${
-                isFlashing
-                  ? 'bg-yellow-400 border-yellow-300 text-yellow-900 shadow-lg shadow-yellow-400/40 animate-pulse'
-                  : 'bg-white/10 border-white/20 text-white hover:bg-white/20'
-              }`}
-            >
-              <svg className={`w-4 h-4 ${isFlashing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              {isFlashing ? 'Syncing...' : '⚡ Flash'}
-            </button>
+
             {/* Notification Bell */}
             <div className="relative">
               <button
