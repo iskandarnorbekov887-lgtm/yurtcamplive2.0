@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { ProtectedRoute } from '@/components/protected-route';
 import { supabase, type Booking, type Profile, type Finance, type Notification } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -39,19 +39,33 @@ function CEODashboard() {
   const [loadingUser, setLoadingUser] = useState(false);
 
 
+  const pollInterval = useRef<NodeJS.Timeout | null>(null);
+  const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isStopping = useRef(false);
+
   useEffect(() => {
     fetchData();
-    // Poll for updates every 5 seconds for real-time sync
-    console.log('⏰ CEO Starting 5-second polling');
-    const interval = setInterval(() => {
+    // Poll for updates every 15 seconds for real-time sync (safety increase from 5s)
+    console.log('⏰ CEO Starting 15-second polling');
+    pollInterval.current = setInterval(() => {
       console.log('⏰ CEO Polling...');
       fetchData();
-    }, 5000);
+    }, 15000);
     
     // Alert for guests not checked in within 24 hours of check-in date
-    const checkInterval = setInterval(async () => {
+    checkIntervalRef.current = setInterval(async () => {
+      if (isStopping.current) return;
       const now = new Date();
-      const { data: confirmedBookings } = await supabase.from('bookings').select('*').eq('status', 'confirmed');
+      const { data: confirmedBookings, error } = await supabase.from('bookings').select('*').eq('status', 'confirmed');
+      
+      if (error?.status === 403 || error?.code === '42501') {
+         isStopping.current = true;
+         if (pollInterval.current) clearInterval(pollInterval.current);
+         if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
+         signOut();
+         return;
+      }
+
       if (confirmedBookings) {
         for (const booking of confirmedBookings) {
           const checkInDate = new Date(booking.check_in);
@@ -63,15 +77,16 @@ function CEODashboard() {
           }
         }
       }
-    }, 60000); // Check every minute
+    }, 300000); // Check every 5 minutes (safety increase from 1m)
 
     return () => {
-      clearInterval(interval);
-      clearInterval(checkInterval);
+      if (pollInterval.current) clearInterval(pollInterval.current);
+      if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
     };
   }, []);
 
   const fetchData = async () => {
+    if (isStopping.current) return;
     // Safety timeout to prevent dashboard hang
     const timer = setTimeout(() => {
       setLoading(false);
@@ -84,6 +99,17 @@ function CEODashboard() {
         supabase.from('profiles').select('*'),
         supabase.from('notifications').select('*').eq('user_id', currentUserId || '').order('created_at', { ascending: false })
       ]);
+
+      // Check for 403 Forbidden errors
+      const err403 = [bookingsData, staffData, notificationsData].find(res => res.error?.status === 403 || res.error?.code === '42501');
+      if (err403) {
+        console.error('🚫 Dashboard 403 Forbidden detected. Stopping polling.');
+        isStopping.current = true;
+        if (pollInterval.current) clearInterval(pollInterval.current);
+        if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
+        signOut();
+        return;
+      }
 
       console.log('✅ Dashboard: Data received!');
       

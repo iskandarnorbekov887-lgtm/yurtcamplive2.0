@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { ProtectedRoute } from '@/components/protected-route';
 import { supabase, type Booking, type Notification } from '@/lib/supabase';
 import { handleApproveDatesLogic } from '@/utils/calendar-logic';
@@ -42,30 +42,54 @@ function ManagerPortal() {
   const [selectedBookingDate, setSelectedBookingDate] = useState('');
   
 
+  const pollInterval = useRef<NodeJS.Timeout | null>(null);
+  const isStopping = useRef(false);
+
   useEffect(() => {
     fetchData();
-    // Poll for updates every 5 seconds for real-time sync
-    const interval = setInterval(() => {
+    // Poll for updates every 15 seconds for real-time sync (safety increase from 5s)
+    pollInterval.current = setInterval(() => {
       fetchData();
-    }, 5000);
+    }, 15000);
 
     return () => {
-      clearInterval(interval);
+      if (pollInterval.current) clearInterval(pollInterval.current);
     };
   }, []);
 
   const fetchData = async () => {
-    const [{ data: bookingsData }, { data: pendingData }, { data: notifData }, { data: groceryData }] = await Promise.all([
-      supabase.from('bookings').select('*'),
-      supabase.from('bookings').select('*').eq('status', 'pending'),
-      supabase.from('notifications').select('*').eq('user_id', currentUserId || '').order('created_at', { ascending: false }),
-      supabase.from('grocery_requests').select('*').order('created_at', { ascending: false }).limit(1).single()
-    ]);
-    setBookings(bookingsData || []);
-    setPendingBookings(pendingData || []);
-    setNotifications((notifData || []).slice(0, 20));
-    setGroceryRequest(groceryData);
-    console.log('🔄 Manager Fetched bookings:', bookingsData?.length);
+    if (isStopping.current) return;
+    try {
+      const [
+        { data: bookingsData, error: bErr }, 
+        { data: pendingData, error: pErr }, 
+        { data: notifData, error: nErr }, 
+        { data: groceryData, error: gErr }
+      ] = await Promise.all([
+        supabase.from('bookings').select('*'),
+        supabase.from('bookings').select('*').eq('status', 'pending'),
+        supabase.from('notifications').select('*').eq('user_id', currentUserId || '').order('created_at', { ascending: false }),
+        supabase.from('grocery_requests').select('*').order('created_at', { ascending: false }).limit(1).single()
+      ]);
+
+      // Check for 403 Forbidden errors (Insufficient permissions or session expired)
+      const err403 = [bErr, pErr, nErr].find(e => e?.code === '42501' || e?.status === 403);
+      if (err403) {
+        console.error('🚫 403 Forbidden detected. Stopping polling and signing out.');
+        isStopping.current = true;
+        if (pollInterval.current) clearInterval(pollInterval.current);
+        signOut();
+        return;
+      }
+
+      setBookings(bookingsData || []);
+      setPendingBookings(pendingData || []);
+      setNotifications((notifData || []).slice(0, 20));
+      setGroceryRequest(groceryData);
+      console.log('🔄 Manager Fetched bookings:', bookingsData?.length);
+    } catch (err) {
+      console.error('Fetch error:', err);
+    }
   };
 
   const approveBooking = async (id: number) => {
