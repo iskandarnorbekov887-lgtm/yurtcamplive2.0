@@ -1,20 +1,19 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { ProtectedRoute } from '@/components/protected-route';
 import { supabase, type Booking, type Notification } from '@/lib/supabase';
-import { handleApproveDatesLogic } from '@/utils/calendar-logic';
-import { sendDateChangeResult } from '@/utils/notify';
 import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { GoogleGuestAgenda } from '@/components/google-guest-agenda';
-import { PrivateCalendarView } from '@/components/private-calendar-view';
 import { ManagerIncomeForm } from '@/components/manager-income-form';
+import { ManagerNotifications } from '@/components/manager/manager-notifications';
+import { ManagerGrocery } from '@/components/manager/manager-grocery';
+import { ManagerMealRequests } from '@/components/manager/manager-meal-requests';
 
 import type { UserRole } from '@/lib/supabase';
 
-// Force dynamic rendering to avoid SSR issues with auth
 export const dynamic = 'force-dynamic';
 
 export default function ManagerPage() {
@@ -30,44 +29,53 @@ function ManagerPortal() {
   const currentUserId = user?.id;
   const userRole = user?.role as UserRole;
   const { t } = useLanguage();
+
+  // Core data state
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [activeTab, setActiveTab] = useState<'checkin' | 'bookings' | 'financials' | 'grocery'>('checkin');
   const [pendingBookings, setPendingBookings] = useState<Booking[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [showAllNotifications, setShowAllNotifications] = useState(false);
-
   const [groceryRequest, setGroceryRequest] = useState<any>(null);
+
+  // UI state
+  const [activeTab, setActiveTab] = useState<'checkin' | 'bookings' | 'financials' | 'grocery'>('checkin');
+  const [showNotifications, setShowNotifications] = useState(false);
   const [showIncomeForm, setShowIncomeForm] = useState(false);
   const [selectedBookingDate, setSelectedBookingDate] = useState('');
-  const [sessionExpired, setSessionExpired] = useState(false);
+  const [selectedMealBooking, setSelectedMealBooking] = useState<Booking | null>(null);
+
+  // Loading / error state
   const [loading, setLoading] = useState(true);
   const [timeoutError, setTimeoutError] = useState(false);
   const [configMissing, setConfigMissing] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
-  const pollInterval = useRef<NodeJS.Timeout | null>(null);
+  const channelsRef = useRef<any[]>([]);
   const isStopping = useRef(false);
 
+  const cleanupChannels = () => {
+    channelsRef.current.forEach((ch) => {
+      try { ch.unsubscribe(); } catch { /* ignore */ }
+    });
+    channelsRef.current = [];
+  };
+
+  // ─── Data Fetching ───────────────────────────────────────────────
+
   useEffect(() => {
-    // Clear any stale intervals (safety net for mount)
-    if (pollInterval.current) clearInterval(pollInterval.current);
+    cleanupChannels();
     isStopping.current = false;
 
-    // Check for missing Supabase config
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
-      console.error('Configuration Missing: NEXT_PUBLIC_SUPABASE_URL is undefined');
       setConfigMissing(true);
       setLoading(false);
       return;
     }
 
-    // 5-second timeout for initial load
     const timeoutTimer = setTimeout(() => {
       if (loading) {
-        console.error('Error: Connection Timeout after 5 seconds');
         setTimeoutError(true);
         setLoading(false);
-        if (pollInterval.current) clearInterval(pollInterval.current);
+        cleanupChannels();
       }
     }, 5000);
 
@@ -79,48 +87,51 @@ function ManagerPortal() {
       setLoading(false);
     });
 
-    // Poll for updates every 15 seconds for real-time sync (safety increase from 5s)
-    pollInterval.current = setInterval(() => {
-      if (!isStopping.current) fetchData();
-    }, 15000);
+    // Subscribe to real-time changes on relevant tables
+    const tables = ['bookings', 'notifications', 'grocery_requests', 'meal_requests'];
+    tables.forEach((table) => {
+      const channel = supabase
+        .channel(`manager-${table}-changes`)
+        .on('postgres_changes', { event: '*', schema: 'public', table }, () => {
+          if (!isStopping.current) fetchData();
+        })
+        .subscribe((status: string, err?: any) => {
+          if (err) console.warn(`Realtime ${table} error:`, err);
+        });
+      channelsRef.current.push(channel);
+    });
 
     return () => {
       clearTimeout(timeoutTimer);
-      if (pollInterval.current) clearInterval(pollInterval.current);
+      cleanupChannels();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchData = async (): Promise<void> => {
     if (isStopping.current) return;
     try {
       const [
-        { data: bookingsData, error: bErr }, 
-        { data: pendingData, error: pErr }, 
-        { data: notifData, error: nErr }, 
+        { data: bookingsData, error: bErr },
+        { data: pendingData, error: pErr },
+        { data: notifData, error: nErr },
         { data: groceryData, error: gErr }
       ] = await Promise.all([
-        supabase.from('bookings').select('*'),
-        supabase.from('bookings').select('*').eq('status', 'pending'),
+        supabase.from('bookings').select('*, meal_requests(*)'),
+        supabase.from('bookings').select('*, meal_requests(*)').eq('status', 'pending'),
         supabase.from('notifications').select('*').eq('user_id', currentUserId || '').order('created_at', { ascending: false }),
         supabase.from('grocery_requests').select('*').order('created_at', { ascending: false }).limit(1).single()
       ]);
 
-      // Check for 403 Forbidden errors (Insufficient permissions or session expired)
-      const err403 = [bErr, pErr, nErr, gErr].find(e => 
-        e?.code === '42501' || 
-        e?.status === 403 || 
-        e?.message?.includes('JWT') ||
-        e?.message?.includes('permission')
+      const err403 = [bErr, pErr, nErr, gErr].find(e =>
+        e?.code === '42501' || e?.status === 403 ||
+        e?.message?.includes('JWT') || e?.message?.includes('permission')
       );
       if (err403) {
-        console.error('🚫 403 Forbidden detected. Stopping polling.');
         isStopping.current = true;
-        if (pollInterval.current) clearInterval(pollInterval.current);
+        cleanupChannels();
         setSessionExpired(true);
-        // Redirect after showing error UI
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 3000);
+        setTimeout(() => { window.location.href = '/login'; }, 3000);
         return;
       }
 
@@ -128,38 +139,27 @@ function ManagerPortal() {
       setPendingBookings(pendingData || []);
       setNotifications((notifData || []).slice(0, 20));
       setGroceryRequest(groceryData);
-      console.log('🔄 Manager Fetched bookings:', bookingsData?.length);
     } catch (err: any) {
-      console.error('Fetch error:', err);
-      if (
-        err?.status === 403 || 
-        err?.code === '42501' ||
-        err?.message?.includes('JWT') ||
-        err?.message?.includes('permission')
-      ) {
+      if (err?.status === 403 || err?.code === '42501' ||
+          err?.message?.includes('JWT') || err?.message?.includes('permission')) {
         isStopping.current = true;
-        if (pollInterval.current) clearInterval(pollInterval.current);
+        cleanupChannels();
         setSessionExpired(true);
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 3000);
+        setTimeout(() => { window.location.href = '/login'; }, 3000);
       }
       throw err;
     }
   };
 
+  // ─── Booking Actions ─────────────────────────────────────────────
+
   const approveBooking = async (id: number) => {
-    await supabase.from('bookings').update({ 
-      status: 'confirmed', 
-      approved_by_manager: true 
-    }).eq('id', id);
+    await supabase.from('bookings').update({ status: 'confirmed', approved_by_manager: true }).eq('id', id);
     fetchData();
   };
 
   const rejectBooking = async (id: number) => {
-    await supabase.from('bookings').update({
-      status: 'cancelled'
-    }).eq('id', id);
+    await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', id);
     fetchData();
   };
 
@@ -174,11 +174,11 @@ function ManagerPortal() {
   };
 
   const handleUpdateBooking = async (id: number, updates: Partial<Booking>) => {
-    await supabase.from('bookings').update({ 
-      ...updates, 
-      is_manually_updated: true, // Manual Protection Rule: Prevent office sync overwrite
-      last_edited_by_id: currentUserId || '', 
-      last_edited_at: new Date().toISOString() 
+    await supabase.from('bookings').update({
+      ...updates,
+      is_manually_updated: true,
+      last_edited_by_id: currentUserId || '',
+      last_edited_at: new Date().toISOString()
     }).eq('id', id);
     fetchData();
   };
@@ -191,29 +191,24 @@ function ManagerPortal() {
     fetchData();
   };
 
-
+  // ─── Derived State ─────────────────────────────────────────────
 
   const today = new Date().toISOString().split('T')[0];
-  const now = new Date();
-  const currentHour = now.getHours();
+  const currentHour = new Date().getHours();
 
-  // Filter neglected bookings (confirmed, check-in day is today or past, and after 6PM or overdue)
   const neglectedBookings = bookings.filter(b => {
     if (b.status !== 'confirmed') return false;
-    const checkInDate = new Date(b.check_in);
-    const checkInDateStr = checkInDate.toISOString().split('T')[0];
-    // Neglected if check-in day is today and after 6PM, or check-in day is in the past
+    const checkInDateStr = new Date(b.check_in).toISOString().split('T')[0];
     if (checkInDateStr === today && currentHour >= 18) return true;
     if (checkInDateStr < today) return true;
     return false;
   });
 
-  const todaysCheckins = bookings.filter(b => b.check_in === today);
-  const todaysCheckouts = bookings.filter(b => b.check_out === today);
+  // ─── Layout ──────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
-      {/* Session Expired Error UI */}
+      {/* Error Overlays */}
       {sessionExpired && (
         <div className="fixed inset-0 z-[100] bg-red-50 flex items-center justify-center">
           <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md text-center animate-in fade-in zoom-in duration-300">
@@ -223,11 +218,11 @@ function ManagerPortal() {
               </svg>
             </div>
             <h2 className="text-2xl font-black text-slate-900 mb-2">Session Expired</h2>
-            <p className="text-slate-600 mb-6">Your session has expired. Redirecting to login...</p>
+            <p className="text-slate-600 mb-6">Redirecting to login...</p>
             <div className="flex items-center justify-center gap-2 text-sm text-slate-500">
               <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
               <span>Redirecting in 3 seconds...</span>
             </div>
@@ -235,7 +230,6 @@ function ManagerPortal() {
         </div>
       )}
 
-      {/* Loading / Timeout / Config Missing overlays */}
       {(loading || timeoutError || configMissing) && (
         <div className="fixed inset-0 z-[99] bg-white/80 backdrop-blur-sm flex items-center justify-center">
           <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm text-center border border-slate-200">
@@ -270,8 +264,8 @@ function ManagerPortal() {
               <>
                 <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg className="w-7 h-7 text-blue-600 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
                 </div>
                 <h2 className="text-xl font-black text-slate-900 mb-2">Loading Dashboard</h2>
@@ -282,11 +276,14 @@ function ManagerPortal() {
         </div>
       )}
 
+      {/* Header */}
       <header className="bg-gradient-to-r from-blue-800 to-indigo-900 text-white shadow-2xl sticky top-0 z-50 backdrop-blur-md bg-opacity-95">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/10 rounded-xl backdrop-blur-sm border border-white/20">
-              <svg className="w-8 h-8 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2-2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+              <svg className="w-8 h-8 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2-2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
             </div>
             <div>
               <h1 className="text-2xl font-black tracking-tight">{t('portal.manager')}</h1>
@@ -294,176 +291,50 @@ function ManagerPortal() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-             <LanguageSwitcher variant="light" />
+            <LanguageSwitcher variant="light" />
 
             {/* Notification Bell */}
             <div className="relative">
               <button
-                onClick={() => setShowNotifications(!showNotifications)}
+                onClick={() => setShowNotifications((s) => !s)}
                 className="p-2 bg-white/10 rounded-xl backdrop-blur-sm border border-white/20 hover:bg-white/20 transition-all relative"
               >
                 <svg className="w-6 h-6 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
-                {notifications.filter(n => !n.read).length > 0 && (
+                {notifications.filter((n) => !n.read).length > 0 && (
                   <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center animate-pulse">
-                    {notifications.filter(n => !n.read).length}
+                    {notifications.filter((n) => !n.read).length}
                   </span>
                 )}
               </button>
 
               {showNotifications && (
-                <div className="absolute right-0 top-12 w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 max-h-[28rem] overflow-y-auto">
-                  <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-                    <h3 className="font-black text-slate-900">Notifications</h3>
-                    <button onClick={() => setShowNotifications(false)} className="text-slate-400 hover:text-slate-600 text-lg font-bold">×</button>
-                  </div>
-                  {notifications.length === 0 ? (
-                    <p className="p-6 text-slate-500 text-sm text-center">No notifications</p>
-                  ) : (
-                    <div className="divide-y divide-slate-100">
-                      {(showAllNotifications ? notifications : notifications.slice(0, 5)).map((notification) => (
-                        <div
-                          key={notification.id}
-                          className={`p-4 transition-colors ${!notification.read ? 'bg-blue-50/70' : 'hover:bg-slate-50'}`}
-                          onClick={async () => {
-                            if (!notification.read && notification.type !== 'date_change_request') {
-                              await supabase.from('notifications').update({ read: true }).eq('id', notification.id);
-                              setNotifications(notifications.map(n => n.id === notification.id ? { ...n, read: true } : n));
-                            }
-                          }}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <p className="font-bold text-slate-900 text-sm">{notification.title}</p>
-                              <p className="text-slate-600 text-xs mt-1">{notification.message}</p>
-                              {notification.status && (
-                                <div className={`inline-block mt-2 px-2 py-1 rounded text-xs font-bold ${
-                                  notification.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
-                                  notification.status === 'rejected' ? 'bg-rose-100 text-rose-700' :
-                                  'bg-slate-100 text-slate-700'
-                                }`}>
-                                  {notification.status.charAt(0).toUpperCase() + notification.status.slice(1)}
-                                </div>
-                              )}
-                              <p className="text-slate-400 text-[10px] mt-2">{new Date(notification.created_at).toLocaleString()}</p>
-                            </div>
-                            {notification.status === 'approved' && (
-                              <svg className="w-5 h-5 text-emerald-600 ml-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                              </svg>
-                            )}
-                            {notification.status === 'rejected' && (
-                              <svg className="w-5 h-5 text-rose-600 ml-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                            )}
-                          </div>
-
-                          {/* Date Change Request: Approve / Reject buttons */}
-                          {notification.type === 'date_change_request' && !notification.status && (
-                            <div className="flex gap-2 mt-3">
-                              <button
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  if (!notification.related_id) return;
-                                  const bookingId = notification.related_id;
-                                  const booking = bookings.find(b => b.id === bookingId);
-                                  if (!booking) { alert('Booking not found.'); return; }
-
-                                  try {
-                                    // Fetch latest calendar events to get the new dates
-                                    const res = await fetch('/api/calendar/events', { cache: 'no-store' });
-                                    const eventsData = await res.json();
-                                    if ('error' in eventsData) { alert('Failed to fetch calendar.'); return; }
-                                    const gcEvents = eventsData as any[];
-                                    const linkedEv = gcEvents.find((ev: any) => ev.id === booking.google_event_id);
-                                    if (!linkedEv) { alert('Calendar event not found.'); return; }
-
-                                    // Update dates in DB
-                                    await handleUpdateBooking(bookingId, {
-                                      check_in: linkedEv.start,
-                                      check_out: linkedEv.end,
-                                    });
-
-                                    // Mark notification as approved
-                                    await supabase.from('notifications').update({ status: 'approved', read: true }).eq('id', notification.id);
-
-                                    // Notify CEO
-                                    await sendDateChangeResult(
-                                      bookingId,
-                                      booking.guest_name,
-                                      'approved',
-                                      { checkIn: linkedEv.start, checkOut: linkedEv.end }
-                                    );
-
-                                    setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, status: 'approved', read: true } : n));
-                                    fetchData();
-                                  } catch (err) {
-                                    console.error('Approve date change failed:', err);
-                                    alert('Failed to approve date change.');
-                                  }
-                                }}
-                                className="flex-1 px-3 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-1.5"
-                              >
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                                Approve
-                              </button>
-                              <button
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  if (!notification.related_id) return;
-                                  const bookingId = notification.related_id;
-                                  const booking = bookings.find(b => b.id === bookingId);
-
-                                  // Mark notification as rejected (dates stay unchanged)
-                                  await supabase.from('notifications').update({ status: 'rejected', read: true }).eq('id', notification.id);
-
-                                  // Notify CEO of rejection
-                                  if (booking) {
-                                    await sendDateChangeResult(
-                                      bookingId,
-                                      booking.guest_name,
-                                      'rejected',
-                                      { checkIn: booking.check_in, checkOut: booking.check_out }
-                                    );
-                                  }
-
-                                  setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, status: 'rejected', read: true } : n));
-                                }}
-                                className="flex-1 px-3 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold hover:bg-rose-700 transition-all flex items-center justify-center gap-1.5"
-                              >
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
-                                Reject
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                      {notifications.length > 5 && !showAllNotifications && (
-                        <button
-                          onClick={() => setShowAllNotifications(true)}
-                          className="w-full py-3 text-sm font-bold text-blue-600 hover:bg-blue-50 transition-all"
-                        >
-                          Show More ({notifications.length - 5} more)
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <ManagerNotifications
+                  notifications={notifications}
+                  setNotifications={setNotifications}
+                  bookings={bookings}
+                  onUpdateBooking={handleUpdateBooking}
+                  onRefresh={fetchData}
+                  onClose={() => setShowNotifications(false)}
+                />
               )}
             </div>
+
             <button
               onClick={signOut}
               className="px-5 py-2.5 bg-rose-600/90 hover:bg-rose-600 rounded-xl text-xs font-black transition-all shadow-lg hover:shadow-rose-500/20 active:scale-95 flex items-center gap-2"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
               {t('btn.logout')}
             </button>
           </div>
         </div>
       </header>
 
+      {/* Tabs */}
       <div className="max-w-7xl mx-auto p-6">
         <div className="flex gap-4 mb-6">
           {(['checkin', 'bookings', 'financials', 'grocery'] as const).map((tab) => (
@@ -482,6 +353,7 @@ function ManagerPortal() {
           ))}
         </div>
 
+        {/* Tab Content */}
         {activeTab === 'checkin' && (
           <div className="animate-in fade-in duration-500">
             <GoogleGuestAgenda
@@ -501,10 +373,8 @@ function ManagerPortal() {
               }}
               onRefresh={fetchData}
             />
-
           </div>
         )}
-
 
         {activeTab === 'financials' && (
           <div className="bg-white rounded-xl shadow p-6">
@@ -520,58 +390,20 @@ function ManagerPortal() {
         )}
 
         {activeTab === 'grocery' && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="bg-white rounded-[32px] p-8 shadow-xl border border-slate-100">
-              <div className="flex justify-between items-center mb-8">
-                <div>
-                  <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tight">Grocery Purchase Mode</h2>
-                  <p className="text-slate-500 font-bold">Review and update the list from the Kitchen</p>
-                </div>
-                {groceryRequest?.status === 'requested' && <span className="bg-amber-100 text-amber-700 px-4 py-1.5 rounded-full text-xs font-black uppercase border border-amber-200">New Request</span>}
-              </div>
-
-              {!groceryRequest || groceryRequest.status === 'received' ? (
-                <div className="py-20 text-center text-slate-400">
-                  <div className="text-5xl mb-4">🛒</div>
-                  <p className="text-lg font-bold">No active grocery requests</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="grid gap-3">
-                    {groceryRequest.items.map((item: any, idx: number) => (
-                      <div key={idx} className="flex gap-3 items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                        <input type="text" value={item.name} onChange={e => {
-                          const next = {...groceryRequest}; next.items[idx].name = e.target.value; setGroceryRequest(next);
-                        }} className="flex-1 px-4 py-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-900" />
-                        <input type="text" value={item.qty} onChange={e => {
-                          const next = {...groceryRequest}; next.items[idx].qty = e.target.value; setGroceryRequest(next);
-                        }} className="w-24 px-4 py-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-900 text-center" />
-                        <span className="text-xs font-black text-slate-400 w-10 uppercase">{item.unit}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {groceryRequest.status === 'requested' ? (
-                    <button onClick={handleMarkPurchased}
-                      className="w-full py-5 bg-indigo-600 text-white rounded-[24px] text-sm font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all mt-6 active:scale-95">
-                      Mark as Purchased
-                    </button>
-                  ) : (
-                    <div className="p-6 bg-emerald-50 border border-emerald-100 rounded-2xl text-center">
-                      <p className="text-emerald-700 font-black uppercase tracking-widest text-xs">Waiting for Kitchen Verification...</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+          <ManagerGrocery
+            groceryRequest={groceryRequest}
+            setGroceryRequest={setGroceryRequest}
+            onMarkPurchased={handleMarkPurchased}
+          />
         )}
+
         {activeTab === 'bookings' && (
           <div className="grid md:grid-cols-2 gap-6">
+            {/* Neglected Bookings */}
             <div className="bg-white rounded-xl shadow p-6">
               <h2 className="text-xl font-bold mb-4 text-red-800 flex items-center gap-2">
                 <svg className="w-6 h-6 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/>
+                  <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z" />
                 </svg>
                 Attention Needed ({neglectedBookings.length})
               </h2>
@@ -580,36 +412,43 @@ function ManagerPortal() {
               ) : (
                 <div className="space-y-3">
                   {neglectedBookings.map((booking, idx) => (
-                    <button
+                    <div
                       key={`neglected-${booking.id}-${idx}`}
-                      onClick={() => {
-                        // Scroll to calendar and highlight booking (simplified - just switch to checkin tab)
-                        setActiveTab('checkin');
-                      }}
                       className="w-full text-left border-2 border-red-200 rounded-lg p-4 bg-red-50 hover:bg-red-100 transition-all"
                     >
                       <div className="flex justify-between items-start">
                         <div>
                           <p className="font-bold text-gray-900">{booking.guest_name}</p>
                           <p className="text-sm text-gray-700">Booking #{booking.id}</p>
-                          <p className="text-sm text-red-600 font-medium">
-                            Check-in: {booking.check_in}
-                          </p>
+                          <p className="text-sm text-red-600 font-medium">Check-in: {booking.check_in}</p>
                         </div>
                         <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded font-medium animate-pulse">
                           NOT CHECKED IN
                         </span>
                       </div>
-                    </button>
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={() => setActiveTab('checkin')}
+                          className="flex-1 bg-indigo-600 text-white py-1.5 rounded-lg hover:bg-indigo-700 text-xs font-bold transition-all"
+                        >
+                          View in Calendar
+                        </button>
+                        <button
+                          onClick={() => setSelectedMealBooking(booking)}
+                          className="flex-1 bg-orange-500 text-white py-1.5 rounded-lg hover:bg-orange-600 text-xs font-bold transition-all"
+                        >
+                          🍽️ Request Food
+                        </button>
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
             </div>
 
+            {/* Pending Bookings */}
             <div className="bg-white rounded-xl shadow p-6">
-              <h2 className="text-xl font-bold mb-4 text-yellow-800">
-                Pending Bookings ({pendingBookings.length})
-              </h2>
+              <h2 className="text-xl font-bold mb-4 text-yellow-800">Pending Bookings ({pendingBookings.length})</h2>
               {pendingBookings.length === 0 ? (
                 <p className="text-gray-600">No pending bookings to review</p>
               ) : (
@@ -620,32 +459,23 @@ function ManagerPortal() {
                         <div>
                           <p className="font-bold text-gray-900">{booking.guest_name}</p>
                           <p className="text-sm text-gray-700">Booking #{booking.id}</p>
-                          <p className="text-sm text-gray-600">
-                            {booking.check_in} → {booking.check_out}
-                          </p>
-                          <p className="text-sm font-medium text-green-700">
-                            ${booking.total_price}
-                          </p>
+                          <p className="text-sm text-gray-600">{booking.check_in} → {booking.check_out}</p>
+                          <p className="text-sm font-medium text-green-700">${booking.total_price}</p>
                         </div>
-                        <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded font-medium">
-                          PENDING
-                        </span>
+                        <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded font-medium">PENDING</span>
                       </div>
-
                       {booking.notes && (
                         <div className="mt-3 p-2 bg-white rounded border">
                           <p className="text-xs font-medium text-gray-600">Internal Notes:</p>
                           <p className="text-sm text-gray-800">{booking.notes}</p>
                         </div>
                       )}
-
                       {booking.meal_notes && (
                         <div className="mt-2 p-2 bg-orange-50 rounded border border-orange-200">
                           <p className="text-xs font-medium text-orange-600">Meal Notes for Cook:</p>
                           <p className="text-sm text-gray-800">{booking.meal_notes}</p>
                         </div>
                       )}
-
                       <div className="flex gap-2 mt-4">
                         <button
                           onClick={() => approveBooking(booking.id)}
@@ -668,6 +498,13 @@ function ManagerPortal() {
           </div>
         )}
       </div>
+
+      {/* Modals */}
+      <ManagerMealRequests
+        booking={selectedMealBooking}
+        onClose={() => setSelectedMealBooking(null)}
+        onSent={fetchData}
+      />
 
       <ManagerIncomeForm
         isOpen={showIncomeForm}

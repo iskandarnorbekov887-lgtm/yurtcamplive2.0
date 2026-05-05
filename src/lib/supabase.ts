@@ -86,6 +86,8 @@ export interface Booking {
   dinner_prepaid?: boolean;
   is_manual_dates?: boolean;
   is_manually_updated?: boolean;
+  /** Joined meal_requests from the normalized table (not a DB column) */
+  meal_requests?: MealRequest[];
 }
 
 export interface Tab {
@@ -164,4 +166,31 @@ export interface Payment {
   exchange_rate_used: number;
   method: string;
   created_at?: string;
+}
+
+export interface MealRequest {
+  id: number;
+  booking_id: number;
+  meal_date: string;
+  meal_type: 'Lunch' | 'Dinner';
+  adult_qty: number;
+  child_qty: number;
+  dietary_type: 'Normal' | 'Vegetarian';
+  status: 'Pending' | 'Accepted' | 'Served';
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExtraService {
+  id: number;
+  booking_id: number;
+  service_type: 'drink' | 'other';
+  source_id?: number | null;
+  name: string;
+  quantity: number;
+  price: number;
+  currency: 'UZS' | 'USD' | 'EUR';
+  created_at: string;
+  updated_at: string;
 }

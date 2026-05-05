@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '@/lib/language-context';
 import { supabase, type Booking, type UserRole, type Profile } from '@/lib/supabase';
+import { SignaturePad } from '@/components/signature-pad';
 
 interface Props { 
   bookings: Booking[]; 
@@ -227,6 +228,8 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
   const [preEditCheckoutRef, setPreEditCheckoutRef] = useState('');
   const [extFee, setExtFee] = useState('');
   const [redFee, setRedFee] = useState('');
+  const [signatureData, setSignatureData] = useState<string | null>(null);
+  const [showSignatureStep, setShowSignatureStep] = useState(false);
   const originalCheckoutRef = useRef<string>('');
 
 
@@ -347,6 +350,8 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
   // Store original checkout when a booking is selected
   useEffect(() => {
     if (sel) {
+      setSignatureData(null);
+      setShowSignatureStep(false);
       originalCheckoutRef.current = sel.check_out || '';
       let currentMeta: any = {};
       try {
@@ -406,13 +411,25 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
       return;
     }
 
-    // For regular bookings, proceed with normal check-in
+    // For regular bookings: show signature step first
+    if (!showSignatureStep) {
+      setShowSignatureStep(true);
+      return;
+    }
+
     if (!onCheckIn) return;
-    if (!confirm('Are you sure you want to check in ' + String(sel.guest_name) + '?')) return;
     const id = sel.id;
     setSel({ ...sel, status: 'checked_in' });
     try {
+      // Save signature to booking metadata if present
+      if (signatureData && onUpdateBooking) {
+        await onUpdateBooking(id, {
+          special_requests: JSON.stringify({ ...currentMeta, checkin_signature: signatureData, checkin_signed_at: new Date().toISOString() })
+        });
+      }
       await onCheckIn(id);
+      setShowSignatureStep(false);
+      setSignatureData(null);
     } catch (err) {
       console.error(err);
     }
@@ -576,7 +593,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
 
       <div className="grid grid-cols-7 border-b border-slate-100">
         {[0,1,2,3,4,5,6].map(d => (
-          <div key={d} className="py-2 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+          <div key={d} className="py-3 text-center text-xs sm:text-sm font-semibold text-slate-400 uppercase tracking-wider">
             {t(`day.${d}`)}
           </div>
         ))}
@@ -599,7 +616,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                 return (
                   <div 
                     key={di} 
-                    className={`min-h-[40px] px-2 pt-2 border-r border-slate-100 last:border-r-0 cursor-pointer hover:bg-indigo-50 transition-colors ${!isCurrentMonth ? 'bg-slate-50/60' : ''}`}
+                    className={`min-h-[56px] sm:min-h-[64px] px-2 sm:px-3 pt-2 sm:pt-3 border-r border-slate-100 last:border-r-0 cursor-pointer hover:bg-indigo-50 transition-colors ${!isCurrentMonth ? 'bg-slate-50/60' : ''}`}
                     onClick={() => {
                       if (onDayClick) {
                         onDayClick(ds);
@@ -613,12 +630,12 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                     }}
                   >
                     <div className="flex items-center justify-between">
-                      <span className={`text-sm font-semibold w-7 h-7 flex items-center justify-center rounded-full
+                      <span className={`text-base sm:text-lg font-semibold w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full
                         ${isToday ? 'bg-indigo-600 text-white' : isCurrentMonth ? 'text-slate-700' : 'text-slate-300'}`}>
                         {day.getDate()}
                       </span>
                       {full && (
-                        <span className="text-[9px] font-black text-red-600 bg-red-50 px-1 rounded">FULL</span>
+                        <span className="text-[10px] sm:text-xs font-black text-red-600 bg-red-50 px-1.5 py-0.5 rounded">FULL</span>
                       )}
                     </div>
                   </div>
@@ -626,8 +643,8 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
               })}
             </div>
 
-            <div className="relative px-0.5 pb-1.5" style={{ minHeight: `${eventRows * 24 + 4}px` }}>
-              <div className="relative" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gridTemplateRows: `repeat(${eventRows}, 22px)`, gap: '2px 0' }}>
+            <div className="relative px-0.5 pb-2" style={{ minHeight: `${eventRows * 28 + 6}px` }}>
+              <div className="relative" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gridTemplateRows: `repeat(${eventRows}, 26px)`, gap: '2px 0' }}>
                 {events.map((ev, ei) => {
                   const c = color(ev.booking, today, userRole);
                   const isPool = isPoolVisitor(ev.booking);
@@ -741,9 +758,9 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
       })}
 
       {sel && (
-        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4" onClick={() => setSel(null)}>
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-3 sm:p-4" onClick={() => setSel(null)}>
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8 animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-xl sm:max-w-2xl p-5 sm:p-8 animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
             <div className="mb-6">
               <div className="flex justify-end gap-1 mb-3">
                 {sel.status === 'checked_in' && onCancelBooking && (
@@ -751,8 +768,8 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                     <svg className="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                   </button>
                 )}
-                <button onClick={() => setSel(null)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-all">
-                  <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                <button onClick={() => setSel(null)} className="p-2 hover:bg-slate-100 rounded-lg transition-all">
+                  <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
               <div className="flex items-start gap-4 mb-5">
@@ -937,40 +954,72 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
               <div className="flex flex-col gap-3">
                 {isEditing ? (
                   <div className="flex gap-3">
-                    <button onClick={() => setIsEditing(false)} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all">Cancel</button>
-                    <button onClick={handleUpdate} className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all">Save Changes</button>
+                    <button onClick={() => setIsEditing(false)} className="flex-1 min-h-[48px] py-3 text-sm bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all">Cancel</button>
+                    <button onClick={handleUpdate} className="flex-1 min-h-[48px] py-3 text-sm bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all">Save Changes</button>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-3">
+                    {/* Signature Pad Step for Check-in */}
+                    {showSignatureStep && sel.status === 'confirmed' && sel.check_in === today && (
+                      <div className="p-4 sm:p-5 bg-slate-50 rounded-2xl border-2 border-slate-200 animate-in fade-in slide-in-from-bottom-2">
+                        <label className="text-xs sm:text-sm font-black text-slate-500 uppercase tracking-widest block mb-3">
+                          Guest Signature (Required)
+                        </label>
+                        <SignaturePad
+                          onChange={(data) => setSignatureData(data)}
+                          width={600}
+                          height={140}
+                          className="max-w-full"
+                        />
+                        <div className="flex gap-3 mt-4">
+                          <button
+                            onClick={() => { setShowSignatureStep(false); setSignatureData(null); }}
+                            className="flex-1 min-h-[48px] py-3 text-sm bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all"
+                          >
+                            Back
+                          </button>
+                          <button
+                            onClick={handleCheckIn}
+                            disabled={!signatureData || !!loadingAction}
+                            className={`flex-1 min-h-[48px] py-3 text-sm rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
+                              signatureData ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                            }`}
+                          >
+                            {loadingAction === 'checkin' ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'Confirm Check In'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex gap-3">
-                      {onCheckIn && sel.status === 'confirmed' && sel.check_in === today && (
+                      {onCheckIn && sel.status === 'confirmed' && sel.check_in === today && !showSignatureStep && (
                         <button
                           onClick={handleCheckIn}
                           disabled={!!loadingAction}
-                          className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2"
+                          className="flex-1 min-h-[48px] py-3 text-sm bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2"
                         >
-                          {loadingAction === 'checkin' ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : t('btn.check_in')}
+                          {loadingAction === 'checkin' ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : t('btn.check_in')}
                         </button>
                       )}
                       {onCheckIn && sel.status === 'confirmed' && sel.check_in !== today && (
-                        <div className="flex-1 py-3 bg-amber-100 text-amber-700 rounded-xl font-bold text-center flex items-center justify-center">
+                        <div className="flex-1 min-h-[48px] py-3 text-sm bg-amber-100 text-amber-700 rounded-xl font-bold text-center flex items-center justify-center">
                           Upcoming Guest
                         </div>
                       )}
                       {onCheckOut && sel?.status === 'checked_in' && (
                         today === sel?.check_out ? (
-                          <button onClick={handleCheckOut} className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
+                          <button onClick={handleCheckOut} className="flex-1 min-h-[48px] py-3 text-sm bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
                             Check Out Now
                           </button>
                         ) : (
-                          <div className="flex-1 py-3 bg-indigo-50 text-indigo-600 rounded-xl font-bold text-center flex items-center justify-center gap-2 border-2 border-indigo-100">
+                          <div className="flex-1 min-h-[48px] py-3 text-sm bg-indigo-50 text-indigo-600 rounded-xl font-bold text-center flex items-center justify-center gap-2 border-2 border-indigo-100">
                              <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse" />
                              Active Stay
                           </div>
                         )
                       )}
                       {sel.status === 'completed' && (
-                        <div className="flex-1 py-3 bg-blue-500 text-white rounded-xl font-bold text-center flex items-center justify-center cursor-not-allowed">
+                        <div className="flex-1 min-h-[48px] py-3 text-sm bg-blue-500 text-white rounded-xl font-bold text-center flex items-center justify-center cursor-not-allowed">
                           Successful Check Out
                         </div>
                       )}
@@ -981,7 +1030,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                         <div className="flex-1 group relative">
                           <button
                             onClick={() => setIsEditing(true)}
-                            className="w-full py-3 bg-indigo-50 text-indigo-600 rounded-xl font-bold hover:bg-indigo-100 transition-all"
+                            className="w-full min-h-[48px] py-3 text-sm bg-indigo-50 text-indigo-600 rounded-xl font-bold hover:bg-indigo-100 transition-all"
                           >
                             Add Details
                           </button>
@@ -994,7 +1043,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                             setEditRequestData(sel);
                             setShowEditRequestModal(true);
                           }}
-                          className="px-3 py-3 bg-amber-50 text-amber-600 rounded-xl font-bold hover:bg-amber-100 transition-all text-xs"
+                          className="px-4 min-h-[48px] py-3 text-xs sm:text-sm bg-amber-50 text-amber-600 rounded-xl font-bold hover:bg-amber-100 transition-all"
                         >
                           Request Change
                         </button>
@@ -1010,9 +1059,9 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                             setSel(null);
                           }}
                           disabled={!!loadingAction}
-                          className="flex-1 py-3 bg-emerald-50 text-emerald-600 rounded-xl font-bold hover:bg-emerald-100 transition-all"
+                          className="flex-1 min-h-[48px] py-3 text-sm bg-emerald-50 text-emerald-600 rounded-xl font-bold hover:bg-emerald-100 transition-all"
                         >
-                          {loadingAction === 'restore' ? <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto" /> : 'Restore Booking'}
+                          {loadingAction === 'restore' ? <div className="w-5 h-5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto" /> : 'Restore Booking'}
                         </button>
                       )}
 
@@ -1021,12 +1070,12 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                           <button
                             onClick={handleCancel}
                             disabled={!!loadingAction || !canCancel(sel)}
-                            className={`w-full py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${canCancel(sel) ? 'bg-rose-50 text-rose-600 hover:bg-rose-100' : 'bg-slate-50 text-slate-300 cursor-not-allowed'}`}
+                            className={`w-full min-h-[48px] py-3 text-sm rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${canCancel(sel) ? 'bg-rose-50 text-rose-600 hover:bg-rose-100' : 'bg-slate-50 text-slate-300 cursor-not-allowed'}`}
                           >
-                            {loadingAction === 'cancel' ? <div className="w-4 h-4 border-2 border-rose-600 border-t-transparent rounded-full animate-spin" /> : 'Cancel Trip'}
+                            {loadingAction === 'cancel' ? <div className="w-5 h-5 border-2 border-rose-600 border-t-transparent rounded-full animate-spin" /> : 'Cancel Trip'}
                           </button>
                           {!canCancel(sel) && userRole !== 'CEO' && (
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
                               You do not have permission to modify this booking
                             </div>
                           )}
@@ -1052,7 +1101,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                               setSel(null);
                             }}
                             disabled={!!loadingAction}
-                            className="w-full py-2 bg-gray-200 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-300 transition-all"
+                            className="w-full min-h-[44px] py-2 text-sm bg-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-300 transition-all"
                           >
                             Mark as No Arrival
                           </button>
@@ -1092,18 +1141,18 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                   type="text"
                   value={editRequestData.guest_name || ''}
                   onChange={e => setEditRequestData({ ...editRequestData, guest_name: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-3 text-base rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">Check-in Date</label>
                   <input
                     type="date"
                     value={editRequestData.check_in || ''}
                     onChange={e => setEditRequestData({ ...editRequestData, check_in: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-4 py-3 text-base rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />
                 </div>
                 <div>
@@ -1112,7 +1161,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                     type="date"
                     value={editRequestData.check_out || ''}
                     onChange={e => setEditRequestData({ ...editRequestData, check_out: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-4 py-3 text-base rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -1123,7 +1172,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                   type="number"
                   value={editRequestData.num_people || editRequestData.number_of_people || ''}
                   onChange={e => setEditRequestData({ ...editRequestData, num_people: parseInt(e.target.value) })}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-3 text-base rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
               </div>
 
@@ -1132,7 +1181,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                 <textarea
                   value={editRequestData.special_requests || ''}
                   onChange={e => setEditRequestData({ ...editRequestData, special_requests: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-3 text-base rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   rows={3}
                 />
               </div>
@@ -1140,7 +1189,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
               <div className="flex gap-4 pt-4">
                 <button
                   onClick={() => setShowEditRequestModal(false)}
-                  className="flex-1 px-6 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-all"
+                  className="flex-1 min-h-[48px] px-6 py-3 text-sm bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-all"
                 >
                   Cancel
                 </button>

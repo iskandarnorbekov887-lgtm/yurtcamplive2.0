@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { ProtectedRoute } from '@/components/protected-route';
-import { supabase, type Booking } from '@/lib/supabase';
+import { supabase, type Booking, type MealRequest } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
@@ -23,50 +23,98 @@ function CookPortal() {
   const { user, signOut } = useAuth();
   const { t } = useLanguage();
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [mealRequests, setMealRequests] = useState<MealRequest[]>([]);
   const [activeTab, setActiveTab] = useState<'orders' | 'grocery' | 'schedule'>('orders');
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [drinks, setDrinks] = useState<any[]>([]);
   const [showDrinkSelector, setShowDrinkSelector] = useState(false);
-  
+
   // Grocery State
   const [groceryItems, setGroceryItems] = useState<Array<{ name: string; qty: string; unit: string; purchased: boolean; received: boolean }>>([]);
   const [groceryStatus, setGroceryStatus] = useState<'none' | 'requested' | 'purchased' | 'received'>('none');
   const [loading, setLoading] = useState(false);
 
-  const pollInterval = useRef<NodeJS.Timeout | null>(null);
+  const channelsRef = useRef<any[]>([]);
   const isStopping = useRef(false);
 
+  const cleanupChannels = () => {
+    channelsRef.current.forEach((ch) => {
+      try { ch.unsubscribe(); } catch { /* ignore */ }
+    });
+    channelsRef.current = [];
+  };
+
   useEffect(() => {
+    cleanupChannels();
+    isStopping.current = false;
+
     fetchData();
-    pollInterval.current = setInterval(fetchData, 15000); // 15s Polling (safety increase from 3s)
+
+    // Subscribe to real-time changes on relevant tables
+    const tables = ['meal_requests', 'bookings', 'grocery_requests', 'drinks'];
+    tables.forEach((table) => {
+      const channel = supabase
+        .channel(`cook-${table}-changes`)
+        .on('postgres_changes', { event: '*', schema: 'public', table }, () => {
+          if (!isStopping.current) fetchData();
+        })
+        .subscribe((status: string, err?: any) => {
+          if (err) console.warn(`Realtime ${table} error:`, err);
+        });
+      channelsRef.current.push(channel);
+    });
+
     return () => {
-      if (pollInterval.current) clearInterval(pollInterval.current);
+      cleanupChannels();
     };
   }, []);
+
+  // Helper: get local YYYY-MM-DD
+  const getLocalDateStr = (date = new Date()) =>
+    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+  // Helper: normalize any date value from Supabase to YYYY-MM-DD
+  const normalizeDate = (d: string | Date | null) => {
+    if (!d) return '';
+    const s = typeof d === 'string' ? d : d.toISOString ? d.toISOString() : String(d);
+    return s.split('T')[0];
+  };
 
   const fetchData = async () => {
     if (isStopping.current) return;
     try {
-      // Cook visibility: See all guests with pending kitchen orders or active status
-      const { data: bookingsData, error } = await supabase.from('bookings').select('*, special_requests').neq('status', 'cancelled');
-      
-      if (error?.status === 403 || error?.code === '42501') {
-        console.error('🚫 Cook 403 Forbidden detected. Stopping polling.');
+      const today = getLocalDateStr();
+
+      // Fetch bookings with joined meal_requests for schedule + orders
+      const { data: bookingsData, error: bErr } = await supabase
+        .from('bookings')
+        .select('*, meal_requests(*)')
+        .neq('status', 'cancelled');
+
+      if (bErr?.status === 403 || bErr?.code === '42501') {
+        console.error('🚫 Cook 403 Forbidden detected. Stopping realtime.');
         isStopping.current = true;
-        if (pollInterval.current) clearInterval(pollInterval.current);
+        cleanupChannels();
         signOut();
         return;
       }
-      const sanitized = ((bookingsData || []) as Booking[]).map((b: Booking) => ({
-        ...b,
-        special_requests: b.special_requests 
-          ? (typeof b.special_requests === 'string' ? JSON.parse(b.special_requests) : b.special_requests) 
-          : { kitchen_orders: [] }
-      }));
 
-      setBookings(sanitized);
-      console.log('Sanitized Bookings for Cook:', sanitized.map((b: Booking) => b.special_requests));
-      
+      const bookingsWithMeals = (bookingsData || []) as Booking[];
+      setBookings(bookingsWithMeals);
+
+      // Derive flat mealRequests from joined data (today+ and Pending/Accepted)
+      const allMeals = bookingsWithMeals.flatMap((b) =>
+        (b.meal_requests || []).map((m) => ({
+          ...m,
+          meal_date: normalizeDate(m.meal_date),
+        }))
+      ).filter((m) => {
+        const mealDate = normalizeDate(m.meal_date);
+        return mealDate >= today && (m.status === 'Pending' || m.status === 'Accepted');
+      });
+      console.log('� Cook fetched meals:', allMeals);
+      setMealRequests(allMeals);
+
       // Fetch Drinks for the selector
       const { data: drinkData } = await supabase.from('drinks').select('*').eq('available', true);
       setDrinks(drinkData || []);
@@ -80,35 +128,28 @@ function CookPortal() {
       .order('created_at', { ascending: false })
       .limit(1)
       .single();
-    
+
     if (groceryData) {
       setGroceryItems(groceryData.items || []);
       setGroceryStatus(groceryData.status);
     }
   };
 
-  const handleAcceptOrder = async (booking: Booking, mealType: 'lunch' | 'dinner') => {
+  const handleAcceptMeal = async (mealId: number) => {
     try {
-      // Fetch latest to prevent overwriting other fields (like draft or days)
-      const { data: latest } = await supabase
-        .from('bookings')
-        .select('special_requests')
-        .eq('id', booking.id)
-        .single();
-
-      const meta = latest?.special_requests 
-        ? (typeof latest.special_requests === 'string' ? JSON.parse(latest.special_requests) : latest.special_requests)
-        : {};
-      
-      const orders = (meta.kitchen_orders || []).map((o: any) => 
-        o.type === mealType ? { ...o, status: 'confirmed', accepted_at: new Date().toISOString() } : o
-      );
-      await supabase.from('bookings').update({
-        special_requests: JSON.stringify({ ...meta, kitchen_orders: orders })
-      }).eq('id', booking.id);
+      await supabase.from('meal_requests').update({ status: 'Accepted' }).eq('id', mealId);
       fetchData();
     } catch (err) {
-      console.error('Accept order failed:', err);
+      console.error('Accept meal failed:', err);
+    }
+  };
+
+  const handleMarkServed = async (mealId: number) => {
+    try {
+      await supabase.from('meal_requests').update({ status: 'Served' }).eq('id', mealId);
+      fetchData();
+    } catch (err) {
+      console.error('Mark served failed:', err);
     }
   };
 
@@ -180,26 +221,10 @@ function CookPortal() {
     }
   };
 
-  const kitchenOrders = bookings.flatMap(b => {
-    try {
-      const meta = typeof b.special_requests === 'string' 
-        ? JSON.parse(b.special_requests || '{}') 
-        : (b.special_requests || {});
-      
-      const orders = (meta.kitchen_orders || []).map((o: any) => ({ 
-        ...o, 
-        bookingId: b.id, 
-        guestName: b.guest_name, 
-        booking: b 
-      }));
-      return orders;
-    } catch (e) { 
-      console.error('Failed to parse kitchen orders for booking:', b.id, e);
-      return []; 
-    }
-  });
-
-  const pendingOrders = kitchenOrders.filter(o => o.status === 'pending');
+  const today = getLocalDateStr();
+  const todaysMeals = mealRequests.filter(m => m.meal_date === today);
+  const pendingCount = todaysMeals.filter(m => m.status === 'Pending').length;
+  console.log('📅 Cook today:', today, '| todaysMeals:', todaysMeals.length, '| allMeals:', mealRequests.length);
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
@@ -230,20 +255,21 @@ function CookPortal() {
             <button key={tab} onClick={() => setActiveTab(tab)}
               className={`flex-1 py-3 rounded-[18px] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-orange-600 text-white shadow-lg shadow-orange-200' : 'text-slate-400 hover:text-slate-600'}`}>
               {tab === 'orders' ? 'Order Queue' : tab === 'schedule' ? 'Guest Schedule' : 'Grocery Flow'}
-              {tab === 'orders' && pendingOrders.length > 0 && <span className="ml-2 bg-white text-orange-600 px-1.5 py-0.5 rounded-full text-[10px]">{pendingOrders.length}</span>}
+              {tab === 'orders' && pendingCount > 0 && <span className="ml-2 bg-white text-orange-600 px-1.5 py-0.5 rounded-full text-[10px]">{pendingCount}</span>}
             </button>
           ))}
         </div>
 
         {activeTab === 'orders' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {pendingOrders.length > 0 && (
+            {/* Pending alert banner */}
+            {pendingCount > 0 && (
               <div className="bg-rose-500 text-white p-5 rounded-[32px] flex items-center justify-between animate-pulse shadow-xl shadow-rose-200 border-4 border-rose-400">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center font-black text-2xl">🔔</div>
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Kitchen Priority Alert</p>
-                    <p className="text-xl font-black">{pendingOrders.length} New Orders Received!</p>
+                    <p className="text-xl font-black">{pendingCount} New Meal Orders!</p>
                   </div>
                 </div>
                 <div className="text-[10px] font-black bg-white text-rose-600 px-4 py-1.5 rounded-full uppercase tracking-tighter">Action Required</div>
@@ -252,44 +278,112 @@ function CookPortal() {
 
             <h2 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
               <span className="p-2 bg-orange-100 text-orange-600 rounded-xl">🍽️</span>
-              Active Kitchen Queue
+              Today's Meals — {today}
             </h2>
 
-            {pendingOrders.length === 0 ? (
+            {todaysMeals.length === 0 ? (
               <div className="bg-white rounded-[32px] p-16 text-center shadow-xl border border-slate-100">
                 <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl">👨‍🍳</div>
-                <h3 className="text-xl font-bold text-slate-900">Queue is Clear</h3>
-                <p className="text-slate-500 mt-2">No new requests from the Manager right now.</p>
+                <h3 className="text-xl font-bold text-slate-900">No Meals Today</h3>
+                <p className="text-slate-500 mt-2">No meal requests for today from the Manager.</p>
               </div>
             ) : (
-              <div className="grid gap-4">
-                {pendingOrders.map((order, idx) => (
-                  <div key={idx} className="bg-white rounded-[32px] p-8 shadow-md border border-slate-100 flex items-center justify-between group hover:shadow-xl hover:border-orange-200 transition-all duration-300">
-                    <div className="flex items-center gap-8">
-                      <div className="relative">
-                        <div className="w-20 h-20 bg-orange-50 rounded-3xl flex items-center justify-center text-4xl shadow-inner border border-orange-100 group-hover:scale-110 transition-transform">
-                          {order.type === 'lunch' ? '🍱' : '🌙'}
-                        </div>
-                        <div className="absolute -top-2 -right-2 bg-rose-500 text-white w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border-4 border-white">!</div>
-                      </div>
-                      <div>
+              <div className="grid gap-6">
+                {(['Lunch', 'Dinner'] as const).map((mealType) => {
+                  const typeMeals = todaysMeals.filter(m => m.meal_type === mealType);
+                  if (typeMeals.length === 0) return null;
+
+                  const totalAdults = typeMeals.reduce((sum, m) => sum + m.adult_qty, 0);
+                  const totalKids = typeMeals.reduce((sum, m) => sum + m.child_qty, 0);
+                  const normalCount = typeMeals.filter(m => m.dietary_type === 'Normal').length;
+                  const vegCount = typeMeals.filter(m => m.dietary_type === 'Vegetarian').length;
+
+                  return (
+                    <div key={mealType} className="bg-white rounded-[32px] p-6 shadow-xl border border-slate-100">
+                      {/* Section header with totals */}
+                      <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-3">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-orange-600 bg-orange-50 px-3 py-1 rounded-full border border-orange-100">{order.type} request</span>
-                          <span className="text-[10px] font-bold text-slate-400">⏱️ {new Date(order.requested_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                          <div className="w-14 h-14 bg-orange-50 rounded-2xl flex items-center justify-center text-3xl shadow-inner border border-orange-100">
+                            {mealType === 'Lunch' ? '🍱' : '🌙'}
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-black text-slate-900">{mealType}</h3>
+                            <p className="text-sm text-slate-500 font-bold">
+                              {totalAdults} Adults · {totalKids} Kids
+                              {normalCount > 0 && <span className="ml-2">🍖 {normalCount}</span>}
+                              {vegCount > 0 && <span className="ml-2">🥗 {vegCount}</span>}
+                            </p>
+                          </div>
                         </div>
-                        <h3 className="text-2xl font-black text-slate-900 mt-2">{order.guestName}</h3>
-                        <p className="text-slate-500 font-bold mt-1">Requested Portions: <span className="text-orange-600 text-2xl ml-1">{order.quantity}</span></p>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600 bg-orange-50 px-3 py-1 rounded-full border border-orange-100">
+                          {typeMeals.length} order{typeMeals.length > 1 ? 's' : ''}
+                        </span>
+                      </div>
+
+                      {/* Meal cards */}
+                      <div className="space-y-3">
+                        {typeMeals.map((meal) => {
+                          const guest = bookings.find(b => b.id === meal.booking_id);
+                          return (
+                            <div key={meal.id} className={`rounded-2xl p-4 border-2 flex items-center justify-between transition-all ${
+                              meal.status === 'Pending'
+                                ? 'bg-rose-50 border-rose-100'
+                                : 'bg-emerald-50 border-emerald-100'
+                            }`}>
+                              <div className="flex items-center gap-4">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg font-black ${
+                                  meal.dietary_type === 'Vegetarian' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                                }`}>
+                                  {meal.dietary_type === 'Vegetarian' ? '🥗' : '🍖'}
+                                </div>
+                                <div>
+                                  <p className="font-bold text-slate-900">
+                                    {guest?.guest_name || `Booking #${meal.booking_id}`}
+                                  </p>
+                                  <p className="text-sm text-slate-500">
+                                    {meal.adult_qty} Adults
+                                    {meal.child_qty > 0 && <span className="ml-2">👶 {meal.child_qty} Kids</span>}
+                                    <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                      meal.status === 'Pending'
+                                        ? 'bg-rose-100 text-rose-600'
+                                        : 'bg-emerald-100 text-emerald-600'
+                                    }`}>
+                                      {meal.status}
+                                    </span>
+                                  </p>
+                                  {meal.notes && (
+                                    <p className="text-xs text-slate-400 italic mt-1">{meal.notes}</p>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex gap-2">
+                                {meal.status === 'Pending' && (
+                                  <button
+                                    onClick={() => handleAcceptMeal(meal.id)}
+                                    className="px-5 py-2.5 bg-emerald-500 text-white rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-100 active:scale-95 flex items-center gap-2"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                    Accept
+                                  </button>
+                                )}
+                                {meal.status === 'Accepted' && (
+                                  <button
+                                    onClick={() => handleMarkServed(meal.id)}
+                                    className="px-5 py-2.5 bg-blue-500 text-white rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-blue-600 transition-all shadow-lg shadow-blue-100 active:scale-95 flex items-center gap-2"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                    Mark Served
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
-                    <button 
-                      onClick={() => handleAcceptOrder(order.booking, order.type)}
-                      className="px-10 py-5 bg-emerald-500 text-white rounded-3xl font-black uppercase tracking-widest text-xs hover:bg-emerald-600 transition-all shadow-xl shadow-emerald-100 active:scale-95 flex items-center gap-3 group/btn"
-                    >
-                      <svg className="w-5 h-5 group-hover/btn:scale-125 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                      Accept & Confirm
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
