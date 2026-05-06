@@ -124,7 +124,7 @@ function ManagerPortal() {
       ]);
 
       const err403 = [bErr, pErr, nErr, gErr].find(e =>
-        e?.code === '42501' || e?.status === 403 ||
+        e?.code === '42501' ||
         e?.message?.includes('JWT') || e?.message?.includes('permission')
       );
       if (err403) {

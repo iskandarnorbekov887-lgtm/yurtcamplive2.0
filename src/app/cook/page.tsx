@@ -91,7 +91,7 @@ function CookPortal() {
         .select('*, meal_requests(*)')
         .neq('status', 'cancelled');
 
-      if (bErr?.status === 403 || bErr?.code === '42501') {
+      if (bErr?.code === '42501') {
         console.error('🚫 Cook 403 Forbidden detected. Stopping realtime.');
         isStopping.current = true;
         cleanupChannels();

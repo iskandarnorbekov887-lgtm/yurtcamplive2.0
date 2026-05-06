@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/utils/supabase/client'; 
+import { supabase } from '@/utils/supabase/client'; 
 import type { Profile } from './supabase';
 
 interface AuthContextType {
@@ -18,7 +18,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const [supabase] = useState(() => createClient()); // Initialize ONCE and hold in state
+  // supabase is imported directly and handles session persistence automatically
   const [user, setUser] = useState<Profile | null>(null);
   const [session, setSession] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);

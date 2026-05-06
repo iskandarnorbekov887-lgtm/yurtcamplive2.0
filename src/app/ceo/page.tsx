@@ -61,7 +61,7 @@ function CEODashboard() {
       const now = new Date();
       const { data: confirmedBookings, error } = await supabase.from('bookings').select('*').eq('status', 'confirmed');
       
-      if (error?.status === 403 || error?.code === '42501') {
+      if (error?.code === '42501') {
          isStopping.current = true;
          if (pollInterval.current) clearInterval(pollInterval.current);
          if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
@@ -104,7 +104,7 @@ function CEODashboard() {
       ]);
 
       // Check for 403 Forbidden errors
-      const err403 = [bookingsData, staffData, notificationsData].find(res => res.error?.status === 403 || res.error?.code === '42501');
+      const err403 = [bookingsData, staffData, notificationsData].find(res => res.error?.code === '42501');
       if (err403) {
         console.error('🚫 Dashboard 403 Forbidden detected. Stopping polling and redirecting to login.');
         isStopping.current = true;
@@ -132,7 +132,7 @@ function CEODashboard() {
       setNotifications((notificationsData.data || []).slice(0, 10) || []);
     } catch (error: any) {
       console.error('Dashboard Fetch error:', error);
-      if (error?.status === 403 || error?.code === '42501') {
+      if (error?.code === '42501') {
         if (pollInterval.current) clearInterval(pollInterval.current);
         if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
         window.location.href = '/login';

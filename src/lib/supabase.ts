@@ -7,14 +7,11 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  * the auth session to **browser cookies** (not just localStorage).
  * This ensures the Vercel server can read the session on every request.
  *
- * `createBrowserClient` is a singleton by default — safe to call from
- * multiple components without navigator.locks contention.
- *
- * On the server (SSR/build), we return a no-op proxy so that imports
- * from 'use client' modules don't crash during the server render pass.
+ * `createBrowserClient` is a singleton by default — safe to import
+ * from multiple components without navigator.locks contention.
  */
-import { createClient } from '@/utils/supabase/client';
-export const supabase = createClient();
+import { supabase } from '@/utils/supabase/client';
+export { supabase };
 
 export type UserRole = 'CEO' | 'Manager' | 'Cook';
 
