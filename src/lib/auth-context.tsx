@@ -59,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             if (mounted && profile) {
               const userProfile = { ...profile };
+              // Normalize case for known roles so ProtectedRoute checks work
               const rawRole = (userProfile.role || '').toString().trim().toLowerCase();
               if (rawRole === 'cook') {
                 userProfile.role = 'Cook';
@@ -66,8 +67,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 userProfile.role = 'CEO';
               } else if (rawRole === 'manager') {
                 userProfile.role = 'Manager';
-              } else {
-                // Fallback: Reserver, empty, or unknown → Manager
+              }
+              // Only default to Manager when role is completely missing
+              if (!userProfile.role) {
                 userProfile.role = 'Manager';
               }
               setUser(userProfile);
