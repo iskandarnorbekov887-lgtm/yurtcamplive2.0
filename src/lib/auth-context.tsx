@@ -9,6 +9,7 @@ interface AuthContextType {
   user: Profile | null;
   session: any | null;
   loading: boolean;
+  authError: string | null;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -22,53 +23,87 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<Profile | null>(null);
   const [session, setSession] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
   const lastUserId = useRef<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
 
-    // Listen for Auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event: any, newSession: any) => {
-        if (!mounted) return;
+    // Safety timeout: never stay loading longer than 5 seconds
+    const timeoutId = setTimeout(() => {
+      if (mounted) {
+        console.error('⏰ Auth timeout after 5s — forcing loading to false');
+        setAuthError('Authentication took too long. Please refresh if the page is blank.');
+        setLoading(false);
+      }
+    }, 5000);
 
-        if (newSession?.user) {
-          setSession(newSession);
-          if (newSession.user.id !== lastUserId.current) {
-            lastUserId.current = newSession.user.id;
-            
-            // Fetch Profile
-            // Fetch Profile
-            const { data: profile } = await supabase
+    const handleSession = async (newSession: any) => {
+      if (!mounted) return;
+
+      if (newSession?.user) {
+        setSession(newSession);
+        if (newSession.user.id !== lastUserId.current) {
+          lastUserId.current = newSession.user.id;
+
+          try {
+            const { data: profile, error: profileErr } = await supabase
               .from('profiles')
               .select('*')
               .eq('id', newSession.user.id)
               .single();
-            
+
+            if (profileErr) {
+              console.error('Profile fetch failed:', profileErr.message);
+            }
+
             if (mounted && profile) {
-              // Fallback: If legacy role 'Reserver' is found, treat as 'Manager'
               const userProfile = { ...profile };
               if (userProfile.role === 'Reserver' || !userProfile.role) {
                 userProfile.role = 'Manager';
               }
               setUser(userProfile);
             }
+          } catch (err: any) {
+            console.error('Profile fetch exception:', err?.message || err);
           }
-        } else {
-          setUser(null);
-          setSession(null);
-          lastUserId.current = null;
         }
-        
-        setLoading(false); // Only set loading false once we have a definitive answer
+      } else {
+        setUser(null);
+        setSession(null);
+        lastUserId.current = null;
+      }
+
+      if (mounted) {
+        setLoading(false);
+        clearTimeout(timeoutId);
+      }
+    };
+
+    // 1. Get existing session on mount (handles browser refresh)
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      if (initialSession) {
+        handleSession(initialSession);
+      }
+    });
+
+    // 2. Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event: any, newSession: any) => {
+        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+          handleSession(newSession);
+        } else if (event === 'SIGNED_OUT') {
+          handleSession(null);
+        }
       }
     );
 
     return () => {
       mounted = false;
+      clearTimeout(timeoutId);
       subscription?.unsubscribe();
     };
-  }, [supabase]); // ONLY depend on the static supabase client
+  }, [supabase]);
 
   const signIn = async (email: string, password: string) => {
     setLoading(true);
@@ -98,7 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, authError, signIn, signUp, signOut }}>
       {/* Safety: If loading takes too long, we still need to render to avoid permanent black screen */}
       {children}
     </AuthContext.Provider>
