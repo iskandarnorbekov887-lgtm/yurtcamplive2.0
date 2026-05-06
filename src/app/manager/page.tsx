@@ -119,7 +119,11 @@ function ManagerPortal() {
       ] = await Promise.all([
         supabase.from('bookings').select('*, meal_requests(*)'),
         supabase.from('bookings').select('*, meal_requests(*)').eq('status', 'pending'),
-        supabase.from('notifications').select('*').eq('user_id', currentUserId || '').order('created_at', { ascending: false }),
+        supabase
+          .from('notifications')
+          .select('*')
+          .or(`user_id.eq.${currentUserId || ''},and(target_role.eq.${userRole || ''},user_id.is.null)`)
+          .order('created_at', { ascending: false }),
         supabase.from('grocery_requests').select('*').order('created_at', { ascending: false }).limit(1).single()
       ]);
 

@@ -59,7 +59,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             if (mounted && profile) {
               const userProfile = { ...profile };
-              if (userProfile.role === 'Reserver' || !userProfile.role) {
+              const rawRole = (userProfile.role || '').toString().trim().toLowerCase();
+              if (rawRole === 'cook') {
+                userProfile.role = 'Cook';
+              } else if (rawRole === 'ceo') {
+                userProfile.role = 'CEO';
+              } else if (rawRole === 'manager') {
+                userProfile.role = 'Manager';
+              } else {
+                // Fallback: Reserver, empty, or unknown → Manager
                 userProfile.role = 'Manager';
               }
               setUser(userProfile);

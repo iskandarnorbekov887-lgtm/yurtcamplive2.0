@@ -100,7 +100,11 @@ function CEODashboard() {
       const [bookingsData, staffData, notificationsData] = await Promise.all([
         supabase.from('bookings').select('*').order('check_in', { ascending: false }),
         supabase.from('profiles').select('*'),
-        supabase.from('notifications').select('*').eq('user_id', currentUserId || '').order('created_at', { ascending: false })
+        supabase
+          .from('notifications')
+          .select('*')
+          .or(`user_id.eq.${currentUserId || ''},and(target_role.eq.${userRole || ''},user_id.is.null)`)
+          .order('created_at', { ascending: false })
       ]);
 
       // Check for 403 Forbidden errors
