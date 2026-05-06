@@ -1,0 +1,146 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+export const dynamic = 'force-dynamic';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: { autoRefreshToken: false, persistSession: false }
+});
+
+/**
+ * POST /api/bookings/finalize
+ * Finalizes (settles) an open tab for a booking:
+ *  1. Archives the current tab as a booking_receipt
+ *  2. Updates booking total_price and collected_amount
+ *  3. Persists payments to the payments table
+ * Body: {
+ *   booking_id: number,
+ *   tab_data: {
+ *     date: string,
+ *     items: { accommodation, meals, services, extras, drinks },
+ *     total: number,
+ *     payments: Array<{ amount, currency, method }>
+ *   },
+ *   last_edited_by_id?: string
+ * }
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { booking_id, tab_data, last_edited_by_id } = body;
+
+    if (!booking_id || !tab_data) {
+      return NextResponse.json({ error: 'booking_id and tab_data are required' }, { status: 400 });
+    }
+
+    const { data: booking, error: fetchErr } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('id', booking_id)
+      .single();
+
+    if (fetchErr || !booking) {
+      return NextResponse.json({ error: fetchErr?.message || 'Booking not found' }, { status: 404 });
+    }
+
+    // 1. Archive receipt
+    const { data: receipt, error: receiptErr } = await supabase
+      .from('booking_receipts')
+      .insert([{
+        booking_id,
+        amount: tab_data.total || 0,
+        currency: tab_data.payments?.[0]?.currency || 'USD',
+        settled_at: tab_data.date || new Date().toISOString(),
+        created_by_id: last_edited_by_id || booking.created_by_id,
+        note: JSON.stringify(tab_data),
+      }])
+      .select()
+      .single();
+
+    if (receiptErr) {
+      return NextResponse.json({ error: receiptErr.message }, { status: 500 });
+    }
+
+    // 2. Record individual payments
+    const payments = (tab_data.payments || []).map((p: any) => ({
+      booking_id,
+      amount_original: parseFloat(p.amount) || 0,
+      currency_original: p.currency || 'USD',
+      amount_usd_equivalent: p.currency === 'USD'
+        ? parseFloat(p.amount) || 0
+        : (parseFloat(p.amount) || 0) / (p.rate || (p.currency === 'UZS' ? 12500 : 0.92)),
+      exchange_rate_used: p.rate || (p.currency === 'UZS' ? 12500 : 0.92),
+      method: p.method || 'Cash',
+      created_at: new Date().toISOString(),
+    }));
+
+    if (payments.length > 0) {
+      const { error: payErr } = await supabase.from('payments').insert(payments);
+      if (payErr) {
+        console.error('Payments insert error:', payErr);
+      }
+    }
+
+    // 3. Update booking totals
+    const totalPaid = tab_data.payments?.reduce((sum: number, p: any) => {
+      const amt = parseFloat(p.amount) || 0;
+      if (p.currency === 'USD') return sum + amt;
+      const rate = p.rate || (p.currency === 'UZS' ? 12500 : 0.92);
+      return sum + (amt / rate);
+    }, 0) || 0;
+
+    const updates: Record<string, any> = {
+      is_manually_updated: true,
+      total_price: (booking.total_price || 0) + (tab_data.total || 0),
+      collected_amount: (booking.collected_amount || 0) + totalPaid,
+      last_edited_at: new Date().toISOString(),
+    };
+
+    if (last_edited_by_id) {
+      updates.last_edited_by_id = last_edited_by_id;
+    }
+
+    // Merge settled_receipts into special_requests metadata
+    let meta: Record<string, any> = {};
+    try {
+      meta = typeof booking.special_requests === 'string'
+        ? JSON.parse(booking.special_requests || '{}')
+        : (booking.special_requests || {});
+    } catch { /* ignore */ }
+
+    const settledReceipts = meta.settled_receipts || [];
+    settledReceipts.push({
+      id: receipt.id,
+      date: tab_data.date,
+      total: tab_data.total,
+      items: tab_data.items,
+      payments: tab_data.payments,
+      settled_at: new Date().toISOString(),
+    });
+
+    meta.settled_receipts = settledReceipts;
+    updates.special_requests = JSON.stringify(meta);
+
+    const { data: updated, error: updErr } = await supabase
+      .from('bookings')
+      .update(updates)
+      .eq('id', booking_id)
+      .select()
+      .single();
+
+    if (updErr) {
+      return NextResponse.json({ error: updErr.message }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      receipt,
+      booking: updated,
+      payments_inserted: payments.length,
+    });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || 'Internal error' }, { status: 500 });
+  }
+}
