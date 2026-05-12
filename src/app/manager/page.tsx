@@ -105,7 +105,9 @@ function ManagerPortal() {
                      notifications={notifications}
                      setNotifications={setNotifications}
                      bookings={bookings}
-                     onUpdateBooking={() => {}}
+                     onUpdateBooking={async (id, data) => { 
+                       console.log("Update triggered for:", id, data);
+                     }}
                      onRefresh={fetchData}
                      onClose={() => setShowNotifications(false)}
                    />
@@ -171,7 +173,9 @@ function ManagerPortal() {
                     currentUserId={currentUserId}
                     onCheckIn={() => {}}
                     onCheckOut={() => {}}
-                    onUpdateBooking={() => {}}
+                    onUpdateBooking={async (id, data) => { 
+                      console.log("Update triggered for:", id, data);
+                    }}
                     onCancelBooking={() => {}}
                     onAddNewBooking={(data: any) => {
                       setSelectedBookingDate(data.check_in || '');
