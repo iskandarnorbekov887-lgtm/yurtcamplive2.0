@@ -27,12 +27,16 @@ function normalizeDate(d: string | Date | null) {
 export function ManagerMealRequests({ booking, onClose, onSent }: ManagerMealRequestsProps) {
   const [mealDrafts, setMealDrafts] = useState<MealDraft[]>([]);
   const [loading, setLoading] = useState(false);
+  const [sentVersion, setSentVersion] = useState(0);
 
   useEffect(() => {
     if (!booking) {
       setMealDrafts([]);
       return;
     }
+
+    // Immediately clear stale drafts from previous guest
+    setMealDrafts([]);
 
     const b = booking; // capture for TypeScript narrowing
 
@@ -45,11 +49,12 @@ export function ManagerMealRequests({ booking, onClose, onSent }: ManagerMealReq
       const checkOut = new Date(coy, com - 1, cod);
       const drafts: MealDraft[] = [];
 
-      // Fetch existing meal requests for this booking to prevent double-ordering
+      // Fetch existing meal requests strictly filtered by booking_id to prevent cross-guest leakage
       const { data: existing } = await supabase
         .from('meal_requests')
         .select('meal_date, meal_type')
         .eq('booking_id', b.id);
+      console.log(`📋 generateDrafts: booking_id=${b.id}, found ${(existing || []).length} existing meal_requests`);
       const existingKeys = new Set(
         (existing || []).map((e: any) => `${normalizeDate(e.meal_date)}|${e.meal_type}`)
       );
@@ -82,9 +87,42 @@ export function ManagerMealRequests({ booking, onClose, onSent }: ManagerMealReq
     }
 
     generateDrafts();
-  }, [booking]);
+  }, [booking, sentVersion]);
 
-  const handleSend = async () => {
+  const handleSendOne = async (idx: number) => {
+    if (!booking) return;
+    const draft = mealDrafts[idx];
+    if (draft.sent) return;
+
+    const row = {
+      booking_id: booking.id,
+      meal_date: draft.meal_date,
+      meal_type: draft.meal_type,
+      adult_qty: draft.adult_qty,
+      child_qty: draft.child_qty,
+      dietary_type: draft.dietary_type,
+      status: 'Pending',
+    };
+    console.log('Manager sending meal (single):', row);
+
+    const { error } = await supabase.from('meal_requests').insert(row);
+
+    if (error) {
+      console.error('Failed to send meal request:', error);
+      alert('Failed to send meal request: ' + error.message);
+      return;
+    }
+
+    setMealDrafts((prev) => prev.map((d, i) => (i === idx ? { ...d, sent: true } : d)));
+    setSentVersion((v) => v + 1);
+    onSent();
+  };
+
+  const handleRemoveDraft = (idx: number) => {
+    setMealDrafts((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleSendAll = async () => {
     if (!booking) return;
     const toSend = mealDrafts.filter((d) => !d.sent);
     if (toSend.length === 0) return;
@@ -98,6 +136,7 @@ export function ManagerMealRequests({ booking, onClose, onSent }: ManagerMealReq
       dietary_type: d.dietary_type,
       status: 'Pending',
     }));
+    console.log('Manager sending meal (batch):', rows);
 
     const { error } = await supabase.from('meal_requests').insert(rows);
     if (error) {
@@ -107,6 +146,7 @@ export function ManagerMealRequests({ booking, onClose, onSent }: ManagerMealReq
     }
 
     setMealDrafts((prev) => prev.map((d) => ({ ...d, sent: true })));
+    setSentVersion((v) => v + 1);
     onSent();
   };
 
@@ -145,7 +185,7 @@ export function ManagerMealRequests({ booking, onClose, onSent }: ManagerMealReq
               <div className="space-y-2">
                 {mealDrafts.map((draft, idx) => (
                   <div
-                    key={idx}
+                    key={`${booking.id}-${draft.meal_date}-${draft.meal_type}`}
                     className={`rounded-xl p-3 border-2 flex items-center gap-3 transition-all ${
                       draft.sent ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-white border-slate-200'
                     }`}
@@ -163,53 +203,74 @@ export function ManagerMealRequests({ booking, onClose, onSent }: ManagerMealReq
                           </svg>
                           Request Sent
                         </span>
+                        <span className="text-xs text-slate-400 font-bold">
+                          {draft.adult_qty} Adults {draft.child_qty > 0 && `· ${draft.child_qty} Kids`}
+                          {draft.dietary_type === 'Vegetarian' ? ' · 🥗 Veg' : ' · 🍖 Normal'}
+                        </span>
                       </div>
                     ) : (
-                      <div className="flex gap-2 flex-1">
-                        <div className="flex-1">
-                          <label className="text-[10px] font-bold uppercase text-slate-400">Adults</label>
-                          <input
-                            type="number"
-                            min={0}
-                            value={draft.adult_qty}
-                            onChange={(e) => {
-                              const next = [...mealDrafts];
-                              next[idx].adult_qty = parseInt(e.target.value) || 0;
-                              setMealDrafts(next);
-                            }}
-                            className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-900 focus:border-orange-500 outline-none"
-                          />
+                      <>
+                        <div className="flex gap-2 flex-1">
+                          <div className="flex-1">
+                            <label className="text-[10px] font-bold uppercase text-slate-400">Adults</label>
+                            <input
+                              type="number"
+                              min={0}
+                              value={draft.adult_qty}
+                              onChange={(e) => {
+                                const next = [...mealDrafts];
+                                next[idx].adult_qty = parseInt(e.target.value) || 0;
+                                setMealDrafts(next);
+                              }}
+                              className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-900 focus:border-orange-500 outline-none"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <label className="text-[10px] font-bold uppercase text-slate-400">Kids</label>
+                            <input
+                              type="number"
+                              min={0}
+                              value={draft.child_qty}
+                              onChange={(e) => {
+                                const next = [...mealDrafts];
+                                next[idx].child_qty = parseInt(e.target.value) || 0;
+                                setMealDrafts(next);
+                              }}
+                              className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-900 focus:border-orange-500 outline-none"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <label className="text-[10px] font-bold uppercase text-slate-400">Diet</label>
+                            <select
+                              value={draft.dietary_type}
+                              onChange={(e) => {
+                                const next = [...mealDrafts];
+                                next[idx].dietary_type = e.target.value as 'Normal' | 'Vegetarian';
+                                setMealDrafts(next);
+                              }}
+                              className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-900 focus:border-orange-500 outline-none"
+                            >
+                              <option value="Normal">🍖 Normal</option>
+                              <option value="Vegetarian">🥗 Vegetarian</option>
+                            </select>
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <label className="text-[10px] font-bold uppercase text-slate-400">Kids</label>
-                          <input
-                            type="number"
-                            min={0}
-                            value={draft.child_qty}
-                            onChange={(e) => {
-                              const next = [...mealDrafts];
-                              next[idx].child_qty = parseInt(e.target.value) || 0;
-                              setMealDrafts(next);
-                            }}
-                            className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-900 focus:border-orange-500 outline-none"
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <label className="text-[10px] font-bold uppercase text-slate-400">Diet</label>
-                          <select
-                            value={draft.dietary_type}
-                            onChange={(e) => {
-                              const next = [...mealDrafts];
-                              next[idx].dietary_type = e.target.value as 'Normal' | 'Vegetarian';
-                              setMealDrafts(next);
-                            }}
-                            className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-900 focus:border-orange-500 outline-none"
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleSendOne(idx)}
+                            className="px-3 py-1.5 bg-emerald-500 text-white rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-emerald-600 transition-all shadow-sm active:scale-95"
                           >
-                            <option value="Normal">🍖 Normal</option>
-                            <option value="Vegetarian">🥗 Vegetarian</option>
-                          </select>
+                            Send
+                          </button>
+                          <button
+                            onClick={() => handleRemoveDraft(idx)}
+                            className="px-3 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-rose-100 transition-all active:scale-95"
+                            title="Remove this date"
+                          >
+                            ✕
+                          </button>
                         </div>
-                      </div>
+                      </>
                     )}
                   </div>
                 ))}
@@ -217,7 +278,7 @@ export function ManagerMealRequests({ booking, onClose, onSent }: ManagerMealReq
 
               <div className="flex gap-3 pt-2">
                 <button
-                  onClick={handleSend}
+                  onClick={handleSendAll}
                   disabled={mealDrafts.every((d) => d.sent)}
                   className={`flex-1 py-3 rounded-xl font-black uppercase tracking-widest text-xs transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2 ${
                     mealDrafts.every((d) => d.sent)
@@ -228,7 +289,7 @@ export function ManagerMealRequests({ booking, onClose, onSent }: ManagerMealReq
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                   </svg>
-                  Send Meal Requests
+                  Send All
                 </button>
                 <button
                   onClick={onClose}

@@ -8,6 +8,7 @@ import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { GoogleGuestAgenda } from '@/components/google-guest-agenda';
 import { ManagerIncomeForm } from '@/components/manager-income-form';
+import { ManagerMealRequests } from '@/components/manager/manager-meal-requests';
 import type { UserRole } from '@/lib/supabase';
 
 // Force dynamic rendering to avoid SSR issues with auth
@@ -23,12 +24,13 @@ export default function CEOPage() {
 
 function CEODashboard() {
   const { user, session, signOut } = useAuth();
+  console.log('Current User Role:', user?.role);
   const currentUserId = user?.id;
   const userRole = user?.role as UserRole;
   const { t } = useLanguage();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [staff, setStaff] = useState<Profile[]>([]);
-  const [activeTab, setActiveTab] = useState<'checkin' | 'team' | 'financials' | 'pricing'>('checkin');
+  const [activeTab, setActiveTab] = useState<'checkin' | 'team' | 'financials' | 'pricing' | 'meals'>('checkin');
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -40,6 +42,7 @@ function CEODashboard() {
   const [loadingUser, setLoadingUser] = useState(false);
   const [showAddBookingModal, setShowAddBookingModal] = useState(false);
   const [selectedBookingDate, setSelectedBookingDate] = useState('');
+  const [selectedMealBooking, setSelectedMealBooking] = useState<Booking | null>(null);
 
 
   const pollInterval = useRef<NodeJS.Timeout | null>(null);
@@ -98,7 +101,7 @@ function CEODashboard() {
     try {
       console.log('🔄 Dashboard: Fetching data...');
       const [bookingsData, staffData, notificationsData] = await Promise.all([
-        supabase.from('bookings').select('*').order('check_in', { ascending: false }),
+        supabase.from('bookings').select('*, meal_requests(*)').order('check_in', { ascending: false }),
         supabase.from('profiles').select('*'),
         supabase
           .from('notifications')
@@ -509,7 +512,7 @@ function CEODashboard() {
 
       <main className="max-w-7xl mx-auto p-6 md:p-8">
         <div className="flex bg-white/50 p-1.5 rounded-2xl mb-8 border border-slate-200 shadow-sm w-fit">
-          {(['checkin', 'team', 'financials'] as const).map((tab) => (
+          {(['checkin', 'team', 'financials', 'meals'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -517,7 +520,7 @@ function CEODashboard() {
                 activeTab === tab ? 'bg-white text-indigo-700 shadow-lg border border-slate-100 scale-105' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
               }`}
             >
-              {t(`tab.${tab}`)}
+              {tab === 'meals' ? '🍽️ Meals' : t(`tab.${tab}`)}
             </button>
           ))}
           <button
@@ -748,9 +751,71 @@ function CEODashboard() {
         </div>
       )}
 
-      <ManagerIncomeForm 
-        isOpen={showAddBookingModal} 
-        onClose={() => setShowAddBookingModal(false)} 
+        {activeTab === 'meals' && (
+          <div className="animate-in fade-in duration-500 space-y-6">
+            <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/60 border border-slate-100 p-8">
+              <h2 className="text-2xl font-black text-slate-800 mb-6 flex items-center gap-3">
+                <span className="p-2 bg-orange-100 text-orange-600 rounded-xl">🍽️</span>
+                Active Stays — Meal Requests
+              </h2>
+              {(() => {
+                const activeBookings = bookings.filter(b => b.status === 'checked_in' || b.status === 'confirmed');
+                if (activeBookings.length === 0) {
+                  return <p className="text-slate-600">No active stays</p>;
+                }
+                return (
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {activeBookings.map((booking) => {
+                      const meals = booking.meal_requests || [];
+                      const pendingMeals = meals.filter(m => m.status === 'Pending').length;
+                      const acceptedMeals = meals.filter(m => m.status === 'Accepted').length;
+                      const servedMeals = meals.filter(m => m.status === 'Served').length;
+                      return (
+                        <div key={booking.id} className="border-2 border-slate-200 rounded-2xl p-5 bg-white hover:border-orange-200 transition-all">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-bold text-slate-900">{booking.guest_name}</p>
+                              <p className="text-sm text-slate-600">{booking.check_in} → {booking.check_out}</p>
+                              <p className="text-sm text-slate-500">{booking.number_of_people || booking.guest_count || 1} guests</p>
+                            </div>
+                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                              booking.status === 'checked_in' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {booking.status === 'checked_in' ? 'Checked In' : 'Upcoming'}
+                            </span>
+                          </div>
+                          {meals.length > 0 && (
+                            <div className="flex gap-4 mt-4 text-xs font-black uppercase tracking-wider">
+                              <span className="text-rose-600 bg-rose-50 px-2 py-1 rounded-lg">{pendingMeals} Pending</span>
+                              <span className="text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">{acceptedMeals} Accepted</span>
+                              <span className="text-slate-500 bg-slate-50 px-2 py-1 rounded-lg">{servedMeals} Served</span>
+                            </div>
+                          )}
+                          <button
+                            onClick={() => setSelectedMealBooking(booking)}
+                            className="w-full mt-4 bg-orange-500 text-white py-2.5 rounded-xl hover:bg-orange-600 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-orange-100 active:scale-95"
+                          >
+                            {meals.length > 0 ? 'Edit Meal Requests' : 'Request Food'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+
+      <ManagerMealRequests
+        booking={selectedMealBooking}
+        onClose={() => setSelectedMealBooking(null)}
+        onSent={fetchData}
+      />
+
+      <ManagerIncomeForm
+        isOpen={showAddBookingModal}
+        onClose={() => setShowAddBookingModal(false)}
         selectedDate={selectedBookingDate}
         onSuccess={() => {
           setShowAddBookingModal(false);

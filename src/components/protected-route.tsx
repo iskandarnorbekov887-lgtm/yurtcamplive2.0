@@ -22,12 +22,14 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
   useEffect(() => {
     if (mounted && !loading) {
       if (!user) {
+        console.warn('🛡️ ProtectedRoute: No user found, redirecting to /login');
         router.push('/login');
       } else if (!allowedRoles.includes(user.role)) {
+        console.warn(`🛡️ ProtectedRoute: Role ${user.role} not in ${allowedRoles.join(', ')}, redirecting to /unauthorized`);
         router.push('/unauthorized');
       }
     }
-  }, [user, loading, mounted, router, allowedRoles]);
+  }, [user, loading, mounted, router, JSON.stringify(allowedRoles)]);
 
   // During SSR/hydration, show a loading state to prevent hydration mismatch
   if (!mounted || loading) {

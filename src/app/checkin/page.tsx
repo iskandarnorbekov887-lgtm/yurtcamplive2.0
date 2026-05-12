@@ -65,7 +65,7 @@ function CheckinPortal() {
 
   const checkOut = async (id: number) => {
     // Optimistic UI: Mark as completed instantly
-    setBookings(prev => prev.map(b => b.id === id ? { ...b, status: 'completed' } : b));
+    setBookings(prev => prev.map(b => b.id === id ? { ...b, status: 'completed', payment_status: 'paid' } : b));
 
     // Get booking data for finance entry
     const { data: booking } = await supabase.from('bookings').select('*').eq('id', id).single();
@@ -105,7 +105,7 @@ function CheckinPortal() {
       created_by: booking.created_by_role || 'System',
     }]);
 
-    const { error } = await supabase.from('bookings').update({ status: 'completed' }).eq('id', id);
+    const { error } = await supabase.from('bookings').update({ status: 'completed', payment_status: 'paid' }).eq('id', id);
     if (error) fetchData();
   };
 

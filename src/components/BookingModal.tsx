@@ -106,9 +106,9 @@ interface BookingModalProps {
   // Helpers
   getSettledReceiptsForSel: () => any[];
   handleCheckIn: () => Promise<void>;
-  handleCheckOut: () => Promise<void>;
+  handleCheckOut: () => Promise<void | boolean>;
   handleCancel: () => Promise<void>;
-  finalizeTab?: () => Promise<void>;
+  finalizeTab?: () => Promise<boolean>;
   handleCreateFromEvent: (doCheckIn: boolean) => Promise<void>;
   fetchCbuRate: (curr: any) => Promise<void>;
   
@@ -199,11 +199,46 @@ export function BookingModal(props: BookingModalProps) {
   const [currentMealType, setCurrentMealType] = useState<'lunch' | 'dinner' | null>(null);
   const [mealRequestAmount, setMealRequestAmount] = useState(0);
 
+  // Sync kitchen_orders from the meal_requests table (source of truth for status)
   useEffect(() => {
-    if (currentMeta.kitchen_orders) {
-      setKitchenOrders(currentMeta.kitchen_orders);
+    if (!sel) return;
+    async function syncKitchenOrdersFromDB() {
+      const { data: meals } = await supabase
+        .from('meal_requests')
+        .select('id, meal_type, status, adult_qty, child_qty')
+        .eq('booking_id', sel.id);
+      if (!meals || meals.length === 0) return;
+
+      // Build updated kitchen_orders from meal_requests
+      // Skip 'Served' meals — they were already billed and paid in a previous tab
+      const updatedOrders = [...(currentMeta.kitchen_orders || [])];
+      for (const m of meals) {
+        if (m.status === 'Served') continue; // already billed, skip
+        const type = m.meal_type.toLowerCase(); // 'lunch' or 'dinner'
+        const statusMap: Record<string, string> = { 'Pending': 'pending', 'Accepted': 'confirmed' };
+        const newStatus = statusMap[m.status] || m.status.toLowerCase();
+        const existingIndex = updatedOrders.findIndex((o: any) => o.meal_id === m.id || (!o.meal_id && o.type === type));
+        if (existingIndex !== -1) {
+          updatedOrders[existingIndex].status = newStatus;
+          updatedOrders[existingIndex].quantity = m.adult_qty;
+          updatedOrders[existingIndex].meal_id = m.id;
+        } else {
+          updatedOrders.push({
+            type,
+            quantity: m.adult_qty,
+            status: newStatus,
+            prepaid: false,
+            guest_name: sel.guest_name,
+            id: sel.id,
+            meal_id: m.id,
+            requested_at: new Date().toISOString()
+          });
+        }
+      }
+      setKitchenOrders(updatedOrders);
     }
-  }, [currentMeta.kitchen_orders]);
+    syncKitchenOrdersFromDB();
+  }, [sel?.id, currentMeta.kitchen_orders]);
 
 
   const handleSaveProgress = async () => {
@@ -847,9 +882,12 @@ export function BookingModal(props: BookingModalProps) {
                         if (!confirm(`Complete stay for ${sel.guest_name}?`)) return;
                         setLoadingAction('checkout_manual');
                         try { 
-                          // If there's any active tab (even if $0 due to prepaid), close it first
                           if (finalizeTab && gTotal >= 0) {
-                             await finalizeTab();
+                             const success = await finalizeTab();
+                             if (success === false) {
+                               setLoadingAction('');
+                               return; // Stop checkout if validation failed
+                             }
                           }
                           if (onCheckOut) await onCheckOut(sel.id); 
                           flash('✓ Guest checked out successfully!'); 
@@ -1031,23 +1069,26 @@ export function BookingModal(props: BookingModalProps) {
                         {/* Lunch Request Button */}
                         <div className="space-y-2">
                           {(() => {
-                            const order = kitchenOrders.find(o => o.type === 'lunch');
-                            const isPending = order?.status === 'pending';
-                            const isAccepted = order?.status === 'confirmed';
+                            const lunchOrders = kitchenOrders.filter(o => o.type === 'lunch');
+                            const totalLunchQty = lunchOrders.reduce((sum, o) => sum + (o.quantity || 0), 0);
+                            const isPending = lunchOrders.some(o => o.status === 'pending');
+                            const hasAcceptedLunch = lunchOrders.some(o => o.status === 'confirmed');
                             return (
                               <button type="button" 
                                 onClick={() => { 
                                   setCurrentMealType('lunch'); 
-                                  setMealRequestAmount(order?.quantity || 0);
+                                  setMealRequestAmount(0); // Default to 0 for adding extra portions
                                   setShowMealRequestModal(true); 
                                 }}
-                                className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all shadow-md active:scale-95 flex flex-col items-center justify-center gap-1 border-2 ${
-                                  isAccepted ? 'bg-emerald-500 border-emerald-400 text-white' : 
-                                  isPending ? 'bg-orange-500 border-orange-400 text-white' : 
-                                  'bg-white border-slate-100 text-slate-400 hover:border-indigo-200 hover:text-indigo-600'
+                                className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all flex flex-col items-center justify-center gap-1 border-2 ${
+                                  hasAcceptedLunch ? 'bg-emerald-500 border-emerald-400 text-white shadow-md active:scale-95' : 
+                                  isPending ? 'bg-orange-500 border-orange-400 text-white shadow-md active:scale-95' : 
+                                  'bg-white border-slate-100 text-slate-400 hover:border-indigo-200 hover:text-indigo-600 shadow-md active:scale-95'
                                 }`}>
-                                <span className="opacity-80">Request Lunch</span>
-                                {order && <span className="text-sm font-black">x {order.quantity}</span>}
+                                {isPending ? <span className="opacity-80">⏳ Sent — + Add More</span> :
+                                 hasAcceptedLunch ? <span className="opacity-80">✓ Accepted — + Add More</span> :
+                                 <span className="opacity-80">Request Lunch</span>}
+                                {totalLunchQty > 0 && <span className="text-sm font-black">x {totalLunchQty} Total</span>}
                               </button>
                             );
                           })()}
@@ -1056,23 +1097,26 @@ export function BookingModal(props: BookingModalProps) {
                         {/* Dinner Request Button */}
                         <div className="space-y-2">
                           {(() => {
-                            const order = kitchenOrders.find(o => o.type === 'dinner');
-                            const isPending = order?.status === 'pending';
-                            const isAccepted = order?.status === 'confirmed';
+                            const dinnerOrders = kitchenOrders.filter(o => o.type === 'dinner');
+                            const totalDinnerQty = dinnerOrders.reduce((sum, o) => sum + (o.quantity || 0), 0);
+                            const isPending = dinnerOrders.some(o => o.status === 'pending');
+                            const hasAcceptedDinner = dinnerOrders.some(o => o.status === 'confirmed');
                             return (
                               <button type="button" 
                                 onClick={() => { 
                                   setCurrentMealType('dinner'); 
-                                  setMealRequestAmount(order?.quantity || 0);
+                                  setMealRequestAmount(0); // Default to 0 for adding extra portions
                                   setShowMealRequestModal(true); 
                                 }}
-                                className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all shadow-md active:scale-95 flex flex-col items-center justify-center gap-1 border-2 ${
-                                  isAccepted ? 'bg-emerald-500 border-emerald-400 text-white' : 
-                                  isPending ? 'bg-orange-500 border-orange-400 text-white' : 
-                                  'bg-white border-slate-100 text-slate-400 hover:border-indigo-200 hover:text-indigo-600'
+                                className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all flex flex-col items-center justify-center gap-1 border-2 ${
+                                  hasAcceptedDinner ? 'bg-emerald-500 border-emerald-400 text-white shadow-md active:scale-95' : 
+                                  isPending ? 'bg-orange-500 border-orange-400 text-white shadow-md active:scale-95' : 
+                                  'bg-white border-slate-100 text-slate-400 hover:border-indigo-200 hover:text-indigo-600 shadow-md active:scale-95'
                                 }`}>
-                                <span className="opacity-80">Request Dinner</span>
-                                {order && <span className="text-sm font-black">x {order.quantity}</span>}
+                                {isPending ? <span className="opacity-80">⏳ Sent — + Add More</span> :
+                                 hasAcceptedDinner ? <span className="opacity-80">✓ Accepted — + Add More</span> :
+                                 <span className="opacity-80">Request Dinner</span>}
+                                {totalDinnerQty > 0 && <span className="text-sm font-black">x {totalDinnerQty} Total</span>}
                               </button>
                             );
                           })()}
@@ -1124,7 +1168,7 @@ export function BookingModal(props: BookingModalProps) {
                             </div>
                           )}
 
-                          <button type="button" 
+                          <button type="button"
                             disabled={mealRequestAmount <= 0}
                             onClick={async () => {
                               // 1. Fetch latest metadata first to prevent overwriting other fields (like settled_receipts)
@@ -1134,40 +1178,66 @@ export function BookingModal(props: BookingModalProps) {
                                 .eq('id', sel.id)
                                 .single();
 
-                              const latestMeta = latest?.special_requests 
+                              const latestMeta = latest?.special_requests
                                 ? (typeof latest.special_requests === 'string' ? JSON.parse(latest.special_requests) : latest.special_requests)
                                 : {};
 
-                              const order = { 
-                                type: currentMealType, 
-                                quantity: mealRequestAmount, 
-                                status: 'pending', 
-                                prepaid: currentMealType === 'lunch' ? isLunchPrepaid : isDinnerPrepaid,
-                                guest_name: sel.guest_name, 
-                                id: sel.id,
-                                requested_at: new Date().toISOString() 
-                              };
+                              // 3. Insert into normalized meal_requests table so Cook dashboard sees it
+                              const todayStr = new Date().toISOString().split('T')[0];
+                              const dbMealType = currentMealType === 'lunch' ? 'Lunch' : 'Dinner';
                               
-                              const nextOrders = [...(latestMeta.kitchen_orders || []).filter((o: any) => o.type !== currentMealType), order];
+                              const mealRow = {
+                                booking_id: sel.id,
+                                meal_date: todayStr,
+                                meal_type: dbMealType,
+                                adult_qty: mealRequestAmount,
+                                child_qty: 0,
+                                dietary_type: 'Normal',
+                                status: 'Pending',
+                              };
+                              console.log('Inserting into meal_requests:', mealRow);
+                              const { data: insertedMeal, error: mealErr } = await supabase.from('meal_requests').insert(mealRow).select().single();
+
+                              if (mealErr) {
+                                console.error('meal_requests insert failed:', mealErr);
+                                flash('⚠ Saved locally but failed to sync to kitchen: ' + mealErr.message);
+                                setShowMealRequestModal(false);
+                                return;
+                              }
+
+                              const order = {
+                                type: currentMealType,
+                                quantity: mealRequestAmount,
+                                status: 'pending',
+                                prepaid: currentMealType === 'lunch' ? isLunchPrepaid : isDinnerPrepaid,
+                                guest_name: sel.guest_name,
+                                id: sel.id,
+                                meal_id: insertedMeal.id,
+                                requested_at: new Date().toISOString()
+                              };
+
+                              const nextOrders = [...(latestMeta.kitchen_orders || []), order];
                               const updatedMeta = { ...latestMeta, kitchen_orders: nextOrders };
 
                               console.log('Database Payload (Kitchen):', updatedMeta);
 
-                              // 2. Direct Write to Database (Bypass Props)
-                              const { error } = await supabase
+                              // 2. Write kitchen_orders JSON for backward-compat (BookingModal display)
+                              const { error: metaErr } = await supabase
                                 .from('bookings')
                                 .update({ special_requests: JSON.stringify(updatedMeta) })
                                 .eq('id', sel.id);
 
-                              if (error) {
-                                console.error('Handshake Failed:', error.message);
-                                flash('⚠ Database Error: ' + error.message);
-                              } else {
-                                console.log('Handshake Success: Data is now in Supabase');
-                                setKitchenOrders(nextOrders);
-                                if (onRefresh) onRefresh(); // Force dashboard to sync
-                                flash('✓ Sent to Kitchen!');
+                              if (metaErr) {
+                                console.error('Handshake Failed:', metaErr.message);
+                                flash('⚠ Database Error: ' + metaErr.message);
+                                setShowMealRequestModal(false);
+                                return;
                               }
+
+                              console.log('Handshake Success: Data is now in Supabase + meal_requests');
+                              setKitchenOrders(nextOrders);
+                              if (onRefresh) onRefresh(); // Force dashboard to sync
+                              flash('✓ Sent to Kitchen!');
                               setShowMealRequestModal(false);
                             }}
                             className="w-full py-5 bg-indigo-600 text-white rounded-[24px] text-sm font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50"

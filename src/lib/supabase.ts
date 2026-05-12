@@ -191,3 +191,68 @@ export interface ExtraService {
   created_at: string;
   updated_at: string;
 }
+
+// ─── Procurement & Inventory (Updated Schema) ────────────────
+
+export type UnitType = string; // Dynamic units supported
+export type ProcurementStatus = 'draft' | 'sent' | 'reviewed' | 'finalized';
+export type ItemStatus = 'pending' | 'discrepancy' | 'ok';
+
+export interface InventoryItem {
+  id: string; // UUID
+  item_name: string;
+  current_stock: number;
+  use_unit: string;      // RENAME from unit_type
+  buy_unit?: string;     // NEW
+  conversion_factor: number; // NEW
+  min_threshold: number;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface ProcurementRequest {
+  id: string; // UUID
+  status: ProcurementStatus;
+  total_cost: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  /** Joined items */
+  procurement_items?: ProcurementItem[];
+}
+
+export interface ProcurementItem {
+  id: string; // UUID
+  request_id: string;
+  item_id: string;
+  requested_qty: number;
+  actual_received_qty: number; // In BUY_UNIT
+  unit_price: number;
+  item_status: ItemStatus;
+  reason_code?: string; // NEW
+  cook_comment?: string; // NEW
+  created_at: string;
+  /** Joined inventory */
+  inventory?: InventoryItem;
+}
+
+export interface UsageLog {
+  id: string; // UUID
+  item_id: string;
+  amount_used: number;
+  source: string | null;
+  created_at: string;
+  /** Joined inventory */
+  inventory?: InventoryItem;
+}
+
+export interface InventoryLedger {
+  id: string;
+  item_id: string;
+  type: 'IN' | 'OUT' | 'WASTE' | 'ADJUSTMENT';
+  qty: number;
+  unit: string;
+  reason?: string;
+  created_at: string;
+  created_by?: string;
+}

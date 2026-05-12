@@ -439,7 +439,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
     if (!sel || !onCheckOut) return;
     if (!confirm('Are you sure you want to check out ' + String(sel.guest_name) + '?')) return;
     const id = sel.id;
-    setSel({ ...sel, status: 'completed' });
+    setSel({ ...sel, status: 'completed', payment_status: 'paid' });
     try {
       await onCheckOut(id);
     } catch (err) {

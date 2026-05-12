@@ -727,6 +727,29 @@ export function GoogleGuestAgenda({
         const meta = typeof b.special_requests === 'string' ? JSON.parse(b.special_requests || '{}') : (b.special_requests || {});
         kitchenOrders = meta.kitchen_orders || [];
       } catch {}
+
+      // Sync kitchen_orders from meal_requests table (source of truth for status)
+      // Skip 'Served' meals — they were already billed and paid in a previous tab
+      const { data: dbMeals } = await supabase
+        .from('meal_requests')
+        .select('meal_type, status, adult_qty, child_qty')
+        .eq('booking_id', b.id);
+      if (dbMeals && dbMeals.length > 0) {
+        const statusMap: Record<string, string> = { 'Pending': 'pending', 'Accepted': 'confirmed' };
+        for (const m of dbMeals) {
+          if (m.status === 'Served') continue; // already billed, skip
+          const type = m.meal_type.toLowerCase();
+          const newStatus = statusMap[m.status] || m.status.toLowerCase();
+          const existing = kitchenOrders.find((o: any) => o.type === type);
+          if (existing) {
+            existing.status = newStatus;
+            existing.quantity = m.adult_qty;
+          } else {
+            kitchenOrders.push({ type, quantity: m.adult_qty, status: newStatus, prepaid: false, guest_name: b.guest_name, id: b.id, requested_at: new Date().toISOString() });
+          }
+        }
+      }
+
       const accLunch = kitchenOrders.find((o: any) => o.type === 'lunch' && o.status === 'confirmed');
       const accDinner = kitchenOrders.find((o: any) => o.type === 'dinner' && o.status === 'confirmed');
 
@@ -913,45 +936,45 @@ export function GoogleGuestAgenda({
     finally { setLoadingAction(''); }
   };
 
-  const finalizeTab = async () => {
-    if (!sel || !onCheckOut) return;
+  const finalizeTab = async (): Promise<boolean> => {
+    if (!sel || !onCheckOut) return false;
     const receipts = getSettledReceiptsForSel();
     const hasSettled = receipts.length > 0 || (sel.collected_amount || 0) > 0;
 
     if (svcAdults <= 0 && !hasSettled) {
       flash('⚠ Number of adults is required for check-out.');
       setShowServices(true);
-      return;
+      return false;
     }
     if (!isPrepaid && svcAmount <= 0 && !hasSettled) {
       flash('⚠ Stay Price (Accommodation) is required for the first tab.');
       setShowServices(true);
-      return;
+      return false;
     }
     if ((svcLunch && svcLunchCount <= 0) || (svcDinner && svcDinnerCount <= 0)) {
       flash('⚠ Quantity is required for selected meals.');
       setShowServices(true);
-      return;
+      return false;
     }
     if (svcGuide && (svcGuideNames.some(n => !n.trim()) || svcGuidePrice <= 0)) {
       flash('⚠ Please enter guide name and amount.');
       setShowServices(true);
-      return;
+      return false;
     }
     if (svcTransport && svcTransList.some(t => !t.name.trim() || !t.details.trim() || t.price <= 0)) {
       flash('⚠ Please fill all transport fields (name, destination, amount).');
       setShowServices(true);
-      return;
+      return false;
     }
     if (svcLaundry && svcLaundryPrice <= 0) {
       flash('⚠ Please enter laundry amount.');
       setShowServices(true);
-      return;
+      return false;
     }
     if (svcCooking && svcCookingPrice <= 0) {
       flash('⚠ Please enter cooking class amount.');
       setShowServices(true);
-      return;
+      return false;
     }
     setLoadingAction('checkout');
     try {
@@ -1064,7 +1087,7 @@ export function GoogleGuestAgenda({
         total_price: (sel.total_price || 0) + gTotal,
         collected_amount: (sel.collected_amount || 0) + totalPaidUsd,
         collected_currency: 'USD',
-        payment_status: 'Paid',
+        payment_status: 'paid',
         is_prepaid: isPrepaid,
         lunch: false, lunch_count: 0,
         dinner: false, dinner_count: 0,
@@ -1074,7 +1097,7 @@ export function GoogleGuestAgenda({
         laundry: false, laundry_price: null,
         drinks_tab: undefined,
         extra_services: undefined,
-        special_requests: JSON.stringify({ ...currentMeta, settled_receipts: settledReceipts, days: dayEntries, draft: null }), 
+        special_requests: JSON.stringify({ ...currentMeta, settled_receipts: settledReceipts, days: dayEntries, draft: null, kitchen_orders: [] }), 
         amount: 0
       };
       
@@ -1103,9 +1126,11 @@ export function GoogleGuestAgenda({
       setSvcPayList([{ amount: '', currency: 'USD', method: 'Cash' }]);
       setPayModified(false);
 
+      return true;
     } catch (err) { 
       console.error('Finalize Tab failed:', err);
-      flash('⚠ Failed to settle tab.'); 
+      flash('⚠ Failed to settle tab.');
+      return false;
     }
     finally { setLoadingAction(''); }
   };

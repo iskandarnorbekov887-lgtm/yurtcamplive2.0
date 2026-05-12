@@ -29,14 +29,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    // Safety timeout: never stay loading longer than 5 seconds
+    // Safety timeout: never stay loading longer than 15 seconds
+    // This prevents accidental redirects to login on slow connections or heavy pages
     const timeoutId = setTimeout(() => {
       if (mounted) {
-        console.error('⏰ Auth timeout after 5s — forcing loading to false');
-        setAuthError('Authentication took too long. Please refresh if the page is blank.');
+        console.warn('⏰ Auth took > 15s — checking if session still pending...');
+        // If we still have no session but are not yet 'logged out', give it more time
+        // but set loading to false to at least render the attempt
         setLoading(false);
       }
-    }, 5000);
+    }, 15000);
 
     const handleSession = async (newSession: any) => {
       if (!mounted) return;
@@ -59,19 +61,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             if (mounted && profile) {
               const userProfile = { ...profile };
-              // Normalize case for known roles so ProtectedRoute checks work
-              const rawRole = (userProfile.role || '').toString().trim().toLowerCase();
-              if (rawRole === 'cook') {
+              // Strictly preserve the role from the profiles table — no silent fallback to Manager
+              const rawRole = (userProfile.role || '').toString().trim();
+              const normalizedRole = rawRole.toLowerCase();
+              if (normalizedRole === 'cook') {
                 userProfile.role = 'Cook';
-              } else if (rawRole === 'ceo') {
+              } else if (normalizedRole === 'ceo') {
                 userProfile.role = 'CEO';
-              } else if (rawRole === 'manager') {
+              } else if (normalizedRole === 'manager') {
                 userProfile.role = 'Manager';
+              } else {
+                // If DB has an empty / unknown role, keep it as-is (ProtectedRoute will reject)
+                // Do NOT silently default to Manager
+                userProfile.role = rawRole || 'UNKNOWN';
               }
-              // Only default to Manager when role is completely missing
-              if (!userProfile.role) {
-                userProfile.role = 'Manager';
-              }
+              console.log('AuthContext loaded role:', userProfile.role, '| raw from DB:', profile.role);
               setUser(userProfile);
             }
           } catch (err: any) {

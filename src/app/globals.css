@@ -1,26 +1,70 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+@theme {
+  --color-noir-950: #0a0a0c;
+  --color-noir-900: #121215;
+  --color-noir-800: #1a1a20;
+  --color-noir-700: #25252e;
+  
+  --color-electric-blue: #3b82f6;
+  --color-emerald-success: #10b981;
+  --color-safety-orange: #f59e0b;
+  
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root {
+  --background: var(--color-noir-950);
+  --foreground: #ffffff;
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+/* Glassmorphism Utility */
+.glass {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glass-card {
+  background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 100%);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+/* Pulse Animation for Status Glow */
+@keyframes status-glow-pending {
+  0%, 100% { box-shadow: 0 0 10px rgba(245, 158, 11, 0.2); }
+  50% { box-shadow: 0 0 25px rgba(245, 158, 11, 0.5); }
+}
+
+.glow-pending {
+  animation: status-glow-pending 2s infinite ease-in-out;
+}
+
+@keyframes status-glow-sent {
+  0%, 100% { box-shadow: 0 0 10px rgba(59, 130, 246, 0.2); }
+  50% { box-shadow: 0 0 25px rgba(59, 130, 246, 0.5); }
+}
+
+.glow-sent {
+  animation: status-glow-sent 2s infinite ease-in-out;
+}
+
+/* Red Flashing Border for Discrepancy */
+@keyframes discrepancy-pulse {
+  0%, 100% { border-color: rgba(245, 158, 11, 0.3); }
+  50% { border-color: rgba(245, 158, 11, 1); }
+}
+
+.border-discrepancy {
+  animation: discrepancy-pulse 1s infinite ease-in-out;
+  border-width: 3px;
 }
