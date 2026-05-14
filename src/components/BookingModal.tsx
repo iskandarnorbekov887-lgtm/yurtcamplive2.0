@@ -1,10 +1,9 @@
 'use client';
 import { useState, useEffect, useRef, useMemo } from 'react';
-
-import confetti from 'canvas-confetti';
-import * as htmlToImage from 'html-to-image';
 import { supabase } from '@/lib/supabase';
-import { isGcCancelled, formatSpace, handleApproveDatesLogic } from '@/utils/calendar-logic';
+import { formatSpace } from '@/utils/calendar-logic';
+import { UnifiedFolio } from '@/components/manager/UnifiedFolio';
+import * as htmlToImage from 'html-to-image';
 
 interface BookingModalProps {
   selectedItem: any;
@@ -17,8 +16,6 @@ interface BookingModalProps {
   setLoadingAction: (a: string) => void;
   actionMsg: string;
   flash: (m: string) => void;
-  syncWarnings: any;
-  setSyncWarnings: (w: any) => void;
   onRefresh?: () => void;
   onUpdateBooking?: (id: number, data: any) => Promise<void>;
   onCheckIn?: (id: number) => Promise<void>;
@@ -56,19 +53,10 @@ interface BookingModalProps {
   setSvcTransport: (v: boolean) => void;
   svcTransList: any[];
   setSvcTransList: (v: any[]) => void;
-  svcCooking: boolean;
-  setSvcCooking: (v: boolean) => void;
-  svcCookingPrice: number;
-  setSvcCookingPrice: (v: number) => void;
-  svcLaundry: boolean;
-  setSvcLaundry: (v: boolean) => void;
-  svcLaundryPrice: number;
-  setSvcLaundryPrice: (v: number) => void;
   svcDiscount: number;
   setSvcDiscount: (v: number) => void;
   svcPayList: any[];
   setSvcPayList: (v: any[]) => void;
-  setPayModified: (v: boolean) => void;
   
   // Drink/Extra service states
   showDrinks: boolean;
@@ -120,43 +108,36 @@ interface BookingModalProps {
   today: string;
   gcEvents: any[];
   dayEntries: any[];
+  syncWarnings?: any;
+  setSyncWarnings?: (v: any) => void;
 }
 
 export function BookingModal(props: BookingModalProps) {
   const {
     selectedItem, setSelectedItem, userRole, currentUserId, pricing, setPricing,
-    loadingAction, setLoadingAction, actionMsg, flash, syncWarnings, setSyncWarnings,
+    loadingAction, setLoadingAction, actionMsg, flash,
     onRefresh, onUpdateBooking, onCheckIn, onCheckOut, onCancelBooking,
     svcAdults, setSvcAdults, svcChildren, setSvcChildren, svcAmount, setSvcAmount,
     isPrepaid, setIsPrepaid, isLunchPrepaid, setIsLunchPrepaid, isDinnerPrepaid, setIsDinnerPrepaid,
     svcLunch, setSvcLunch, svcLunchCount, setSvcLunchCount, svcDinner, setSvcDinner, svcDinnerCount, setSvcDinnerCount,
     svcGuide, setSvcGuide, svcGuidePrice, setSvcGuidePrice, svcGuideNames, setSvcGuideNames,
     svcTransport, setSvcTransport, svcTransList, setSvcTransList,
-    svcCooking, setSvcCooking, svcCookingPrice, setSvcCookingPrice,
-    svcLaundry, setSvcLaundry, svcLaundryPrice, setSvcLaundryPrice,
-    svcDiscount, setSvcDiscount, svcPayList, setSvcPayList, setPayModified,
+    svcDiscount, setSvcDiscount, svcPayList, setSvcPayList,
     showDrinks, setShowDrinks, drinks, selectedDrinks, setSelectedDrinks,
     extraServices, setExtraServices, newExtraName, setNewExtraName, newExtraPrice, setNewExtraPrice,
     showServices, setShowServices, showNotes, setShowNotes, showFinalReceipt, setShowFinalReceipt,
     selectedReceipt, setSelectedReceipt, editingDates, setEditingDates,
     editCheckIn, setEditCheckIn, editCheckOut, setEditCheckOut, dateAdjAmount, setDateAdjAmount,
     valError, setValError, getSettledReceiptsForSel, handleCheckIn, handleCheckOut, handleCancel,
-    handleCreateFromEvent, fetchCbuRate, gTotal, debtRemaining, tPaidUsd, isBalanceMatched, today,
-    gcEvents, dayEntries, finalizeTab
+    fetchCbuRate, gTotal, debtRemaining, tPaidUsd, isBalanceMatched, today,
+    dayEntries, finalizeTab
   } = props;
 
   const isStaff = userRole === 'Manager' || userRole === 'CEO';
-
   const sel = selectedItem?.booking;
 
   const getBookingTypeInfo = () => {
-    if (!sel) {
-      if (selectedItem?.source === 'calendar') {
-        return { prefix: '🌐', message: 'Google Calendar synced booking' };
-      }
-      return null;
-    }
-    
+    if (!sel) return null;
     let category = '';
     try {
       const meta = typeof sel.special_requests === 'string' 
@@ -167,13 +148,7 @@ export function BookingModal(props: BookingModalProps) {
 
     if (category === 'pool') return { prefix: '🏊', message: 'Instant POS: Settled in UZS' };
     if (category === 'local') return { prefix: '🏠', message: 'Instant POS: Settled in UZS' };
-    if (category === 'international' || category === 'camper' || sel.source === 'System' || sel.source === 'manual') {
-      return { prefix: '', message: 'Manual Office Booking: International Stay' };
-    }
-    if (selectedItem?.source === 'calendar' || selectedItem?.source === 'both') {
-      return { prefix: '🌐', message: 'Google Calendar synced booking' };
-    }
-    return null;
+    return { prefix: '', message: 'Standard Stay Booking' };
   };
 
   const typeInfo = getBookingTypeInfo();
@@ -192,9 +167,54 @@ export function BookingModal(props: BookingModalProps) {
     return meta;
   }, [sel?.special_requests]);
 
+  const guestStatement = useMemo(() => {
+    if (!sel) return null;
+    
+    const accommodation = sel.total_price || 0;
+    const mealRequests = sel.meal_requests || [];
+    const payments = (sel as any).payments || [];
+    const collected = sel.collected_amount || 0;
+    
+    const mealItems = mealRequests.map((m: any) => {
+       const qty = (m.adult_qty || 0) + (m.child_qty || 0);
+       const isLunch = m.meal_type.toLowerCase().includes('lunch');
+       const pricePer = isLunch ? (pricing?.lunch_price || 10) : (pricing?.dinner_price || 12);
+       return {
+         name: m.meal_type,
+         date: m.meal_date,
+         qty,
+         price: pricePer,
+         total: qty * pricePer,
+         status: m.status
+       };
+    });
+    
+    const mealsTotal = mealItems.reduce((s: number, i: any) => s + i.total, 0);
+    const grandTotal = accommodation + mealsTotal;
+    
+    const paymentsTotal = payments.reduce((s: number, p: any) => s + (p.amount_usd_equivalent || 0), 0);
+    const totalReconciled = collected + paymentsTotal;
+    const remaining = Math.max(0, grandTotal - totalReconciled);
+    
+    let status = 'OPEN TAB';
+    if (remaining < 0.01) status = 'PAID';
+    if (isPrepaid) status = 'PREPAID';
+    
+    return {
+      accommodation,
+      mealItems,
+      mealsTotal,
+      grandTotal,
+      totalReconciled,
+      remaining,
+      status
+    };
+  }, [sel, pricing, isPrepaid]);
+
   const isPOS = currentMeta.guest_category === 'local' || currentMeta.guest_category === 'pool';
 
   const [kitchenOrders, setKitchenOrders] = useState<any[]>(currentMeta.kitchen_orders || []);
+  const [mealAssurance, setMealAssurance] = useState({ accepted: 0, served: 0 });
   const [showMealRequestModal, setShowMealRequestModal] = useState(false);
   const [currentMealType, setCurrentMealType] = useState<'lunch' | 'dinner' | null>(null);
   const [mealRequestAmount, setMealRequestAmount] = useState(0);
@@ -205,37 +225,61 @@ export function BookingModal(props: BookingModalProps) {
     async function syncKitchenOrdersFromDB() {
       const { data: meals } = await supabase
         .from('meal_requests')
-        .select('id, meal_type, status, adult_qty, child_qty')
+        .select('*')
         .eq('booking_id', sel.id);
-      if (!meals || meals.length === 0) return;
 
-      // Build updated kitchen_orders from meal_requests
-      // Skip 'Served' meals — they were already billed and paid in a previous tab
-      const updatedOrders = [...(currentMeta.kitchen_orders || [])];
-      for (const m of meals) {
-        if (m.status === 'Served') continue; // already billed, skip
-        const type = m.meal_type.toLowerCase(); // 'lunch' or 'dinner'
-        const statusMap: Record<string, string> = { 'Pending': 'pending', 'Accepted': 'confirmed' };
-        const newStatus = statusMap[m.status] || m.status.toLowerCase();
-        const existingIndex = updatedOrders.findIndex((o: any) => o.meal_id === m.id || (!o.meal_id && o.type === type));
-        if (existingIndex !== -1) {
-          updatedOrders[existingIndex].status = newStatus;
-          updatedOrders[existingIndex].quantity = m.adult_qty;
-          updatedOrders[existingIndex].meal_id = m.id;
-        } else {
-          updatedOrders.push({
+      if (meals) {
+        const acceptedCount = meals.filter(m => m.status === 'Accepted').length;
+        const servedCount = meals.filter(m => m.status === 'Served').length;
+        setMealAssurance({ accepted: acceptedCount, served: servedCount });
+      }
+
+      // Source of Truth: DB meals
+      const finalOrders: any[] = [];
+      const jsonOrders = currentMeta.kitchen_orders || [];
+
+      if (meals) {
+        for (const m of meals) {
+          const type = m.meal_type.toLowerCase();
+          const statusMap: Record<string, string> = { 
+            'Pending': 'pending', 
+            'Accepted': 'confirmed',
+            'Served': 'served'
+          };
+          const newStatus = statusMap[m.status] || m.status.toLowerCase();
+          
+          // Try to find matching info in JSON (for metadata like prepaid status)
+          const jsonMatch = jsonOrders.find((o: any) => o.meal_id === m.id || (!o.meal_id && o.type === type));
+          
+          finalOrders.push({
             type,
             quantity: m.adult_qty,
             status: newStatus,
-            prepaid: false,
+            prepaid: jsonMatch ? jsonMatch.prepaid : (type === 'lunch' ? isLunchPrepaid : isDinnerPrepaid),
             guest_name: sel.guest_name,
             id: sel.id,
             meal_id: m.id,
-            requested_at: new Date().toISOString()
+            requested_at: jsonMatch ? jsonMatch.requested_at : (m.created_at || new Date().toISOString())
           });
         }
       }
-      setKitchenOrders(updatedOrders);
+      
+      // Also include any JSON orders that aren't in the DB yet (for local-first feeling)
+      for (const jo of jsonOrders) {
+        if (jo.meal_id && !finalOrders.some(fo => fo.meal_id === jo.meal_id)) {
+          finalOrders.push(jo);
+        } else if (!jo.meal_id && !finalOrders.some(fo => fo.type === jo.type)) {
+          finalOrders.push(jo);
+        }
+      }
+
+      // Sort: Pending first, then Accepted, then Served
+      finalOrders.sort((a, b) => {
+        const p: any = { 'pending': 0, 'confirmed': 1, 'served': 2 };
+        return (p[a.status] ?? 3) - (p[b.status] ?? 3);
+      });
+
+      setKitchenOrders(finalOrders);
     }
     syncKitchenOrdersFromDB();
   }, [sel?.id, currentMeta.kitchen_orders]);
@@ -260,10 +304,6 @@ export function BookingModal(props: BookingModalProps) {
         guide_amount: svcGuidePrice.toString(),
         guide_names: svcGuideNames,
         has_transportation: svcTransport,
-        laundry: svcLaundry,
-        laundry_price: svcLaundryPrice.toString(),
-        cooking_class: svcCooking,
-        cooking_class_amount: svcCookingPrice.toString(),
         extra_services: extraServices,
       };
 
@@ -397,6 +437,10 @@ export function BookingModal(props: BookingModalProps) {
   const daysUntilCheckIn = sel
     ? Math.ceil((new Date(sel.check_in + 'T00:00:00').getTime() - new Date(today + 'T00:00:00').getTime()) / 86400000)
     : 999;
+  const daysUntilCheckOut = sel
+    ? Math.ceil((new Date(sel.check_out + 'T00:00:00').getTime() - new Date(today + 'T00:00:00').getTime()) / 86400000)
+    : 999;
+
   const isGracePeriodActive = false;
   const guestCategory = currentMeta.guest_category || 'international';
   const isDayGuest = guestCategory === 'pool' || (guestCategory === 'local' && currentMeta.local_stay_type === 'day');
@@ -405,7 +449,7 @@ export function BookingModal(props: BookingModalProps) {
   const canCheckIn = sel?.status === 'confirmed' && daysUntilCheckIn <= 2 && !!onCheckIn && !isDayGuest;
   const isComingSoon = sel?.status === 'confirmed' && daysUntilCheckIn > 2 && !isDayGuest;
 
-  const canCheckOut = (sel?.status === 'checked_in' || isGracePeriodActive) && !!onCheckOut && !isDayGuest;
+  const canCheckOut = (sel?.status === 'checked_in' || isGracePeriodActive) && daysUntilCheckOut <= 1 && !!onCheckOut && !isDayGuest;
   const canCancel = sel && ['confirmed', 'pending'].includes(sel.status) && !!onCancelBooking && !isDayGuest;
   const isAfterNoon = new Date().getHours() >= 12;
   const isAfterTwo = new Date().getHours() >= 14;
@@ -417,176 +461,118 @@ export function BookingModal(props: BookingModalProps) {
 
   if (!selectedItem) return null;
 
+  // Calendar-only event (no booking) — show simplified card
+  if (!sel && selectedItem?.event) {
+    const ev = selectedItem.event;
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center sm:items-start justify-center p-0 sm:p-4 sm:pt-16 pb-safe" onClick={() => setSelectedItem(null)}>
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+        <div className="relative bento-card sm:rounded-2xl shadow-2xl w-full sm:max-w-md h-full sm:h-auto sm:max-h-[85vh] overflow-y-auto pb-20 sm:pb-0" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-between px-5 py-4 border-b border-black sticky top-0 bg-white rounded-t-2xl z-10">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+              📅 Google Calendar Event
+            </p>
+            <button onClick={() => setSelectedItem(null)} className="w-8 h-8 flex items-center justify-center edge-control rounded-xl transition-all text-black font-bold text-xl">×</button>
+          </div>
+          <div className="p-5 space-y-4">
+            <div>
+              <h2 className="text-xl font-black text-slate-900">{ev.summary || '(No title)'}</h2>
+              <p className="text-sm text-slate-500 mt-0.5 font-data">{ev.start} → {ev.end}</p>
+              {ev.description && (
+                <p className="text-xs text-slate-500 mt-2 whitespace-pre-wrap bg-slate-50 rounded-xl p-3 border border-slate-100">{ev.description}</p>
+              )}
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+              <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 mb-2">Calendar Only — No Booking Yet</p>
+              <p className="text-xs text-amber-600">Create a booking from this event to manage check-in, services, and payments.</p>
+            </div>
+            {props.handleCreateFromEvent && (
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => props.handleCreateFromEvent(true)}
+                  disabled={loadingAction === 'creating'}
+                  className="w-full py-3 bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2 transition-all disabled:opacity-60 border border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]"
+                >
+                  {loadingAction === 'creating' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '→'}
+                  Create Booking & Check In
+                </button>
+                <button
+                  onClick={() => props.handleCreateFromEvent(false)}
+                  disabled={loadingAction === 'creating'}
+                  className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2 transition-all disabled:opacity-60 border border-slate-300"
+                >
+                  Create Booking Only
+                </button>
+              </div>
+            )}
+            {actionMsg && (
+              <div className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold text-center animate-in fade-in">{actionMsg}</div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // No booking and no event — nothing to show
+  if (!sel) return null;
+
   return (
     <>
       <div className="fixed inset-0 z-[100] flex items-center sm:items-start justify-center p-0 sm:p-4 sm:pt-16 pb-safe" onClick={() => setSelectedItem(null)}>
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-        <div className={"relative bg-white sm:rounded-2xl shadow-2xl w-full sm:max-w-md h-full sm:h-auto sm:max-h-[85vh] overflow-y-auto pb-20 sm:pb-0 " + (userRole === 'CEO' && sel?.source === 'System' ? 'border-4 border-blue-500' : '')} onClick={e => e.stopPropagation()}>
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 sticky top-0 bg-white rounded-t-2xl z-10">
-            <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500">
-              {sel ? 'Booking Details' : 'Google Calendar Event'}
+        <div className={"relative bento-card sm:rounded-2xl shadow-2xl w-full sm:max-w-md h-full sm:h-auto sm:max-h-[85vh] overflow-y-auto pb-20 sm:pb-0 " + (userRole === 'CEO' && sel?.source === 'System' ? 'border-4 border-blue-500' : '')} onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-between px-5 py-4 border-b border-black sticky top-0 bg-white rounded-t-2xl z-10">
+            <p className="text-[10px] font-black uppercase tracking-widest hc-accent-sky">
+              Booking Details
             </p>
-            <button onClick={() => setSelectedItem(null)} className="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-xl transition-all text-slate-500 font-bold text-xl">×</button>
+            <button onClick={() => setSelectedItem(null)} className="w-8 h-8 flex items-center justify-center edge-control rounded-xl transition-all text-black font-bold text-xl">×</button>
           </div>
 
-          {!sel ? (
-            <div className="p-5 space-y-3">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-xl font-black text-slate-900">{String(selectedItem.event?.summary)}</h2>
-                  <p className="text-sm text-slate-500">{String(selectedItem.start)} → {String(selectedItem.end)}</p>
-                </div>
-                {selectedItem.event && isGcCancelled(selectedItem.event) && (
-                  <span className="text-xs font-bold px-3 py-1 rounded-full bg-red-100 text-red-700 border border-red-200 flex items-center gap-1">
-                    ✕ cancelled
-                  </span>
-                )}
-              </div>
-              {selectedItem.event?.description && !selectedItem.event.description.includes('tasks.google.com') && <p className="text-sm text-black bg-slate-50 rounded-xl p-3">{String(selectedItem.event.description)}</p>}
-              {selectedItem.event?.location && <p className="text-sm text-slate-500">📍 {String(selectedItem.event.location)}</p>}
-              {actionMsg && (
-                <div className={`text-sm font-medium px-3 py-2 rounded-lg ${actionMsg.startsWith('⚠') ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>{String(actionMsg)}</div>
-              )}
-              {(() => {
-                const days = Math.ceil((new Date(selectedItem.start + 'T00:00:00').getTime() - new Date(today + 'T00:00:00').getTime()) / 86400000);
-                if (selectedItem.event && isGcCancelled(selectedItem.event)) {
-                  return (
-                    <div className="w-full py-3 px-4 bg-red-50 border border-red-200 rounded-xl text-sm font-bold text-red-700 text-center flex items-center justify-center gap-2">
-                      <span>✕</span> Cancelled
-                    </div>
-                  );
-                }
-                return days <= 2 ? (
-                  <button onClick={() => handleCreateFromEvent(true)} disabled={loadingAction === 'creating'}
-                    className="w-full py-2.5 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 transition-all disabled:opacity-60 flex items-center justify-center gap-2">
-                    {loadingAction === 'creating' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '→'}
-                    Check In & Settle
-                  </button>
-                ) : (
-                  <div className="w-full py-2.5 bg-sky-50 border border-sky-200 rounded-xl text-sm font-bold text-sky-700 text-center">
-                    ⏰ Coming in {String(days)} day{days !== 1 ? 's' : ''}
+          <div className="p-5 space-y-4">
+            <div className="flex items-start justify-between">
+              <div>
+                {typeInfo && (
+                  <div className="mb-2 px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-lg text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                    <span>{typeInfo.prefix}</span>
+                    <span>{typeInfo.message}</span>
                   </div>
-                );
-              })()}
-            </div>
-          ) : (
-            <div className="p-5 space-y-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  {typeInfo && (
-                    <button 
-                      onClick={() => flash(typeInfo.message)}
-                      className="mb-2 px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-lg text-[10px] font-black text-slate-500 uppercase tracking-widest hover:bg-slate-200 transition-all flex items-center gap-1.5"
-                    >
-                      <span>{typeInfo.prefix}</span>
-                      <span>Click to Identify</span>
-                    </button>
-                  )}
-                  <h2 className="text-xl font-black text-slate-900">{String(sel?.guest_name || "Guest")}</h2>
-                  <p className="text-sm text-slate-500 mt-0.5">{String(sel?.check_in)} → {String(sel?.check_out)}{sel?.nights ? ` · ${String(sel?.nights)}n` : ''}{(sel?.guest_count || sel?.number_of_people) ? ` · ${String(sel?.guest_count || sel?.number_of_people)} pax` : ''}</p>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  {(sel.notes || sel.description) && (
-                    <button 
-                      onClick={() => setShowNotes(!showNotes)}
-                      className="text-[10px] font-black text-indigo-600 hover:text-indigo-700 flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100 transition-all active:scale-95"
-                    >
-                      <svg className={`w-3 h-3 transition-transform ${showNotes ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                      {showNotes ? 'Hide Notes' : 'View Notes'}
-                    </button>
-                  )}
+                )}
+                <h2 className="text-xl font-black text-slate-900">{String(sel?.guest_name || "Guest")}</h2>
+                <p className="text-sm text-slate-500 mt-0.5">{String(sel?.check_in)} → {String(sel?.check_out)}{sel?.nights ? ` · ${String(sel?.nights)}n` : ''}{(sel?.guest_count || sel?.number_of_people) ? ` · ${String(sel?.guest_count || sel?.number_of_people)} pax` : ''}</p>
+              </div>
+              <div className="flex flex-col items-end gap-2">
+                {(sel?.notes || sel?.description) && (
+                  <button 
+                    onClick={() => setShowNotes(!showNotes)}
+                    className="text-[10px] font-black text-indigo-600 hover:text-indigo-700 flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100 transition-all active:scale-95"
+                  >
+                    <svg className={`w-3 h-3 transition-transform ${showNotes ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                    {showNotes ? 'Hide Notes' : 'View Notes'}
+                  </button>
+                )}
+                {sel && (
                   <span className={`text-xs font-bold px-3 py-1 rounded-full capitalize ${statusColor(sel.status)} flex items-center gap-1`}>
                     {statusIcon(sel.status) && <span className={statusIconColor(sel.status)}>{statusIcon(sel.status)}</span>}
                     {String(sel.status).replace('_', ' ')}
                   </span>
-                </div>
+                )}
               </div>
+            </div>
 
-              {showNotes && (sel.notes || sel.description) && (
-                <div className="bg-amber-50 rounded-[20px] p-4 border border-amber-100 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-6 h-6 bg-amber-100 rounded-lg flex items-center justify-center text-amber-600">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    </div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">Booking & Stay Notes</p>
+            {showNotes && sel && (sel.notes || sel.description) && (
+              <div className="bg-amber-50 rounded-[20px] p-4 border border-amber-100 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-6 h-6 bg-amber-100 rounded-lg flex items-center justify-center text-amber-600">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                   </div>
-                  <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed font-medium">{String(sel.notes || sel.description)}</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">Booking & Stay Notes</p>
                 </div>
-              )}
-
-              {actionMsg && (
-                <div className={`text-sm font-medium px-3 py-2 rounded-lg ${actionMsg.startsWith('⚠') ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>{String(actionMsg)}</div>
-              )}
-
-              {syncWarnings[sel.id] === 'deleted' && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
-                  <p className="font-bold mb-0.5">⚠ Calendar event deleted</p>
-                  <p className="text-xs">The linked Google Calendar event was removed. The booking remains here.</p>
-                </div>
-              )}
-
-              {sel.status === 'checked_in' && sel.check_out === today && isAfterNoon && (
-                <div className={`border-2 rounded-2xl p-4 flex items-center gap-4 ${isAfterTwo ? 'bg-rose-50 border-rose-200 text-rose-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${isAfterTwo ? 'bg-rose-100' : 'bg-amber-100'}`}>
-                    <span className="text-2xl">⚠</span>
-                  </div>
-                  <div>
-                    <p className="font-black uppercase tracking-widest text-xs">
-                      {isAfterTwo ? 'Critical: Guest Not Checked Out' : 'Late Checkout Warning'}
-                    </p>
-                    <p className="text-sm font-bold opacity-80">
-                      Standard checkout time is 12:00 PM. {isAfterTwo ? 'It is past 2:00 PM. Please check the guest immediately.' : 'Please coordinate with the guest.'}
-                    </p>
-                    {isAfterTwo && (
-                      <p className="text-[10px] mt-2 font-black text-rose-600 bg-white px-2 py-1 rounded w-fit border border-rose-200">
-                        CEO MESSAGE: CHECK OUT TIME IS 12 PM
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {syncWarnings[sel.id] === 'dates_changed' && (() => {
-                const linkedEv = gcEvents.find((e: any) => e.id === sel.google_event_id);
-                if (!linkedEv) return null;
-                return (
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
-                    <p className="text-sm font-bold text-amber-800">⚠ Dates changed in Google Calendar</p>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div className="bg-white rounded-lg p-2 border border-amber-100">
-                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Saved</p>
-                        <p className="text-black font-bold">{String(sel.check_in)} → {String(sel.check_out)}</p>
-                      </div>
-                      <div className="bg-white rounded-lg p-2 border border-emerald-200">
-                        <p className="text-[9px] font-black uppercase tracking-widest text-emerald-500">Calendar</p>
-                        <p className="text-black font-bold">{String(linkedEv.start)} → {String(linkedEv.end)}</p>
-                      </div>
-                    </div>
-                    {userRole === 'Manager' && onUpdateBooking && (
-                      <button
-                        onClick={async () => {
-                          if (!confirm(`Approve new booking dates from Calendar: ${linkedEv.start} → ${linkedEv.end}?`)) return;
-                          await handleApproveDatesLogic({
-                            booking: sel,
-                            gcEvents,
-                            onUpdateBooking,
-                            setLoadingAction,
-                            setSyncWarnings,
-                            flash,
-                            onRefresh
-                          });
-                        }}
-                        disabled={loadingAction === `syncdates-${sel.id}`}
-                        className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold rounded-lg transition-all disabled:opacity-60 flex items-center justify-center gap-2">
-                        {loadingAction === `syncdates-${sel.id}` ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '⇵'}
-                        Approve dates
-                      </button>
-                    )}
-                  </div>
-                );
-              })()}
+                <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed font-medium">{String(sel.notes || sel.description)}</p>
+              </div>
+            )}
 
               {(sel.status === 'no_arrival' || sel.status === 'cancelled') && (
                 <div className={`px-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 select-none cursor-not-allowed ${statusColor(sel.status)}`}>
@@ -595,6 +581,8 @@ export function BookingModal(props: BookingModalProps) {
                   {sel.status === 'no_arrival' && <span className="text-[10px] font-medium opacity-70">· permanent</span>}
                 </div>
               )}
+
+
 
               {sel.status === 'completed' && !isGracePeriodActive && (() => {
                 const isPOS = currentMeta.guest_category === 'local' || currentMeta.guest_category === 'pool';
@@ -614,9 +602,9 @@ export function BookingModal(props: BookingModalProps) {
                       
                       <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex flex-col items-center justify-center gap-1 shadow-inner">
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount Taken</p>
-                        <p className="text-3xl font-black text-slate-900 flex items-baseline gap-1">
+                        <p className="text-3xl font-black text-slate-900 flex items-baseline gap-1 font-mono">
                           {(sel.collected_amount || sel.total_price || 0).toLocaleString()} 
-                          <span className="text-lg text-slate-500 font-bold">{sel.collected_currency || 'UZS'}</span>
+                          <span className="text-lg text-slate-500 font-bold font-mono">{sel.collected_currency || 'UZS'}</span>
                         </p>
                       </div>
                       
@@ -671,25 +659,21 @@ export function BookingModal(props: BookingModalProps) {
                     </div>
                   )}
                   {editingDates && (
-                    <div className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Edit Stay Dates</p>
+                    <div className="w-full bg-white border border-black p-4 space-y-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                      <div className="flex items-center justify-between border-b border-black pb-2">
+                        <p className="text-[10px] font-black text-black uppercase tracking-[0.2em]">Bento Stay Editor</p>
                         {(sel.collected_amount || 0) > 0 && (
-                          <span className="text-[9px] font-black bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded uppercase">Tab Settled</span>
+                          <span className="text-[9px] font-black bg-sky-100 text-sky-700 px-2 py-0.5 border border-sky-300 uppercase">Financial Locked</span>
                         )}
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-400 uppercase">Check In</label>
-                          <input
-                            type="date"
-                            value={String(editCheckIn)}
-                            disabled
-                            className="w-full px-2 py-1.5 text-sm rounded-lg border border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed outline-none"
-                          />
+                      
+                      <div className="grid grid-cols-2 border border-black">
+                        <div className="p-3 border-r border-black bg-slate-50/50">
+                          <label className="text-[9px] font-black text-black uppercase tracking-widest mb-1 block">Inbound</label>
+                          <div className="hc-mono text-sm font-black text-slate-500 opacity-60">{String(editCheckIn)}</div>
                         </div>
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-400 uppercase">Check Out</label>
+                        <div className="p-3 bg-white">
+                          <label className="text-[9px] font-black text-sky-600 uppercase tracking-widest mb-1 block">Outbound</label>
                           <input
                             type="date"
                             value={String(editCheckOut)}
@@ -698,7 +682,7 @@ export function BookingModal(props: BookingModalProps) {
                               setEditCheckOut(v);
                               if (v === sel.check_out) setDateAdjAmount('');
                             }}
-                            className="w-full px-2 py-2 text-base rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 text-black"
+                            className="w-full bg-white text-sm font-black text-black hc-mono focus:outline-none focus:ring-1 focus:ring-sky-500"
                           />
                         </div>
                       </div>
@@ -709,48 +693,42 @@ export function BookingModal(props: BookingModalProps) {
                         const firstReceiptDate = firstReceipt?.stay?.end || firstReceipt?.checkOut;
                         return !firstReceiptDate || editCheckOut > firstReceiptDate;
                       })() && (
-                        <div className="pt-2 border-t border-slate-200 animate-in fade-in slide-in-from-top-1">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-tight mb-1 block">
-                            Stay Extension Price (USD) <span className="text-rose-500">*</span>
+                        <div className="p-3 bg-sky-50 border border-black border-t-0 -mt-4">
+                          <label className="text-[9px] font-black text-sky-700 uppercase tracking-tight mb-1 block">
+                            Extension Surcharge (USD)
                           </label>
                           <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500 font-bold text-sm">+</span>
+                            <span className="absolute left-0 top-1/2 -translate-y-1/2 text-sky-600 font-bold text-sm">$</span>
                             <input
                               type="number"
                               value={String(dateAdjAmount)}
                               onChange={e => setDateAdjAmount(e.target.value)}
-                              placeholder="0.00 (required)"
-                              className={`w-full pl-7 pr-3 py-2 bg-white border-2 ${!dateAdjAmount || parseFloat(dateAdjAmount) <= 0 ? 'border-rose-300 bg-rose-50' : 'border-emerald-300'} rounded-lg text-base font-black text-black focus:border-indigo-500 outline-none transition-all`}
+                              placeholder="0.00"
+                              className="w-full pl-4 py-1 bg-transparent text-sm font-black text-black hc-mono focus:outline-none border-b border-sky-200"
                             />
                           </div>
-                          <p className="text-[8px] text-slate-400 font-bold mt-1 uppercase italic">
-                            * Required — will be added to guest tab as extra Accommodation charge.
-                          </p>
                         </div>
                       )}
 
                       {editCheckOut < sel.check_out && (
-                        <div className="pt-2 border-t border-slate-200 animate-in fade-in slide-in-from-top-1">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-tight mb-1 block">
-                            Refund Amount (USD) — Optional
+                        <div className="p-3 bg-rose-50 border border-black border-t-0 -mt-4">
+                          <label className="text-[9px] font-black text-rose-700 uppercase tracking-tight mb-1 block">
+                            Shortening Refund (USD)
                           </label>
                           <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-rose-400 font-bold text-sm">−</span>
+                            <span className="absolute left-0 top-1/2 -translate-y-1/2 text-rose-600 font-bold text-sm">−$</span>
                             <input
                               type="number"
                               value={String(dateAdjAmount)}
                               onChange={e => setDateAdjAmount(e.target.value)}
-                              placeholder="0.00 (leave blank if no refund)"
-                              className="w-full pl-7 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-base font-black text-black focus:border-rose-400 outline-none transition-all"
+                              placeholder="0.00"
+                              className="w-full pl-6 py-1 bg-transparent text-sm font-black text-black hc-mono focus:outline-none border-b border-rose-200"
                             />
                           </div>
-                          <p className="text-[8px] text-rose-400 font-bold mt-1 uppercase italic">
-                            * If entered, this amount will be deducted from collected payments.
-                          </p>
                         </div>
                       )}
-
-                      <div className="flex gap-2">
+                      
+                      <div className="flex gap-2 pt-2">
                         <button
                           onClick={async () => {
                             if (!confirm(`Update dates to ${editCheckIn} → ${editCheckOut}?`)) return;
@@ -808,19 +786,36 @@ export function BookingModal(props: BookingModalProps) {
                               // Sync to Google Calendar
                               if (sel.google_event_id) {
                                 try {
-                                  await fetch('/api/calendar/events', {
-                                    method: 'PATCH',
+                                  const syncRes = await fetch('/api/calendar/update-event', {
+                                    method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({
                                       eventId: sel.google_event_id,
                                       start: updates.check_in,
-                                      end: updates.check_out
+                                      end: updates.check_out,
+                                      summary: sel.guest_name,
+                                      description: updates.notes || sel.notes
                                     })
                                   });
-                                  flash('✓ Dates updated in System & Google Calendar.');
-                                } catch (err) {
+                                  
+                                  let syncData: any = {};
+                                  const contentType = syncRes.headers.get('content-type');
+                                  if (contentType && contentType.indexOf('application/json') !== -1) {
+                                    syncData = await syncRes.json();
+                                  } else {
+                                    throw new Error(`Server returned non-JSON response (${syncRes.status})`);
+                                  }
+                                  
+                                  if (syncData.success) {
+                                    flash('✓ Dates updated in System & Google Calendar.');
+                                  } else {
+                                    throw new Error(syncData.error || `GC sync failed with status ${syncRes.status}`);
+                                  }
+                                } catch (err: any) {
                                   console.error('GC Sync Error:', err);
-                                  flash('✓ System updated. GC sync failed.');
+                                  // High-contrast alert for sync failure but DB success
+                                  flash(`⚠ DATABASE SAVED BUT GOOGLE SYNC FAILED: ${err.message}`);
+                                  // We don't throw here because DB update was successful
                                 }
                               } else {
                                 flash('✓ Dates updated.');
@@ -836,9 +831,9 @@ export function BookingModal(props: BookingModalProps) {
                             }
                           }}
                           disabled={loadingAction === 'editdates' || !editCheckIn || !editCheckOut || editCheckIn > editCheckOut}
-                          className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg transition-all disabled:opacity-60 flex items-center justify-center gap-2">
+                          className="flex-1 py-3 bg-[#047857] hover:bg-[#035e44] text-white text-xs font-black uppercase tracking-[0.2em] rounded-none transition-all disabled:opacity-60 flex items-center justify-center gap-2 border border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]">
                           {loadingAction === 'editdates' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '✓'}
-                          Save
+                          Save & Sync
                         </button>
                         <button
                           onClick={() => setEditingDates(false)}
@@ -855,58 +850,57 @@ export function BookingModal(props: BookingModalProps) {
                       Check In
                     </button>
                   )}
-                  {canCheckOut && (
-                    <button onClick={async () => {
-                        const receipts = getSettledReceiptsForSel();
-                        const hasSettled = receipts.length > 0 || (sel.collected_amount || 0) > 0;
-                        const guestNum = sel.number_of_people || sel.guest_count || 0;
-                        const price = sel.total_price || 0;
-                        const isPrepaidVal = isPrepaid || sel.is_prepaid || false;
+                  {canCheckOut && (() => {
+                    return (
+                      <div className="flex flex-col gap-2">
+                        <button
+                          onClick={async () => {
+                            if (guestStatement?.status === 'OPEN TAB') {
+                              flash(`⚠ Guest has an open balance of $${guestStatement.remaining.toFixed(2)}. Settle tab first.`);
+                              return;
+                            }
 
-                        if (guestNum <= 0) {
-                          flash(`⚠ Please enter the Number of Guests before checking out.`);
-                          return;
-                        }
-                        if (price <= 0 && !isPrepaidVal && !hasSettled) {
-                          flash(`⚠ Please enter a Total Price or mark as Prepaid before checking out.`);
-                          return;
-                        }
-                        if (gTotal > 0.01) {
-                          if (isPrepaidVal) {
-                             // If it's prepaid, we allow checkout but still trigger tab closure
-                          } else {
-                            flash(`⚠ Guest has an open tab of $${gTotal.toFixed(2)}. Please settle Tab before checking out.`);
-                            return;
-                          }
-                        }
-                        if (!confirm(`Complete stay for ${sel.guest_name}?`)) return;
-                        setLoadingAction('checkout_manual');
-                        try { 
-                          if (finalizeTab && gTotal >= 0) {
-                             const success = await finalizeTab();
-                             if (success === false) {
-                               setLoadingAction('');
-                               return; // Stop checkout if validation failed
-                             }
-                          }
-                          if (onCheckOut) await onCheckOut(sel.id); 
-                          flash('✓ Guest checked out successfully!'); 
-                          setSelectedItem(null); 
-                        }
-                        catch { flash('⚠ Check-out failed.'); }
-                        finally { setLoadingAction(''); }
-                      }}
-                      disabled={loadingAction === 'checkout_manual'}
-                      className={`px-4 py-2 text-sm font-bold rounded-xl transition-all disabled:opacity-60 flex items-center gap-2 ${
-                        (gTotal > 0.01 || (sel.number_of_people || sel.guest_count || 0) <= 0 || ((sel.total_price || 0) <= 0 && !sel.is_prepaid))
-                          ? 'bg-rose-100 border-2 border-rose-300 text-rose-700'
-                          : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-100'
-                      }`}
-                    >
-                      {loadingAction === 'checkout_manual' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '✈'}
-                      {gTotal > 0.01 ? `Open Tab $${gTotal.toFixed(2)}` : 'Check Out Guest'}
-                    </button>
-                  )}
+                            const receipts = getSettledReceiptsForSel();
+                            const hasSettled = receipts.length > 0 || (sel.collected_amount || 0) > 0;
+                            const guestNum = sel.number_of_people || sel.guest_count || 0;
+                            const price = sel.total_price || 0;
+                            const isPrepaidVal = isPrepaid || sel.is_prepaid || false;
+
+                            if (guestNum <= 0) {
+                              flash(`⚠ Please enter the Number of Guests before checking out.`);
+                              return;
+                            }
+                            
+                            if (!confirm(`Complete stay for ${sel.guest_name}?`)) return;
+                            setLoadingAction('checkout_manual');
+                            try { 
+                              if (finalizeTab && gTotal >= 0) {
+                                 const success = await finalizeTab();
+                                 if (success === false) {
+                                   setLoadingAction('');
+                                   return; 
+                                 }
+                              }
+                              if (onCheckOut) await onCheckOut(sel.id); 
+                              flash('✓ Guest checked out successfully!'); 
+                              setSelectedItem(null); 
+                            }
+                            catch { flash('⚠ Check-out failed.'); }
+                            finally { setLoadingAction(''); }
+                          }}
+                          disabled={loadingAction === 'checkout_manual' || guestStatement?.status === 'OPEN TAB'}
+                          className={`px-4 py-3 text-sm font-bold rounded-xl transition-all disabled:opacity-60 flex items-center justify-center gap-2 ${
+                            (guestStatement?.status === 'OPEN TAB' || (sel.number_of_people || sel.guest_count || 0) <= 0)
+                              ? 'bg-rose-100 border-2 border-rose-300 text-rose-700'
+                              : 'bg-black hover:bg-zinc-950 text-white shadow-lg shadow-zinc-200 border-2 border-black'
+                          }`}
+                        >
+                          {loadingAction === 'checkout_manual' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '✈'}
+                          {guestStatement?.status === 'OPEN TAB' ? `Pay $${guestStatement.remaining.toFixed(2)} to Settle` : 'Finalize Stay'}
+                        </button>
+                      </div>
+                    );
+                  })()}
                   {isComingSoon && (
                     <div className="px-4 py-2 bg-sky-50 border border-sky-200 rounded-xl text-sm font-bold text-sky-700">
                       ⏰ Coming in {String(daysUntilCheckIn)} day{daysUntilCheckIn !== 1 ? 's' : ''}
@@ -995,8 +989,8 @@ export function BookingModal(props: BookingModalProps) {
                                   type="number" 
                                   value={String(svcAdults || '')} 
                                   onChange={e => setSvcAdults(parseInt(e.target.value) || 0)}
-                                  disabled={getSettledReceiptsForSel().length > 0}
-                                  className={`w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-base font-black text-black focus:border-indigo-500 outline-none transition-all ${getSettledReceiptsForSel().length > 0 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
+                                  disabled={getSettledReceiptsForSel().length > 0 || isPrepaid}
+                                  className={`w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-base font-black text-black focus:border-indigo-500 outline-none transition-all ${(getSettledReceiptsForSel().length > 0 || isPrepaid) ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
                                 />
                               </div>
                               <div className="space-y-1.5">
@@ -1005,8 +999,8 @@ export function BookingModal(props: BookingModalProps) {
                                   type="number" 
                                   value={String(svcChildren || '')} 
                                   onChange={e => setSvcChildren(parseInt(e.target.value) || 0)}
-                                  disabled={getSettledReceiptsForSel().length > 0}
-                                  className={`w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-base font-black text-black focus:border-indigo-500 outline-none transition-all ${getSettledReceiptsForSel().length > 0 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
+                                  disabled={getSettledReceiptsForSel().length > 0 || isPrepaid}
+                                  className={`w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-base font-black text-black focus:border-indigo-500 outline-none transition-all ${(getSettledReceiptsForSel().length > 0 || isPrepaid) ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
                                 />
                               </div>
                             </div>
@@ -1018,8 +1012,8 @@ export function BookingModal(props: BookingModalProps) {
                                   type="number" 
                                   value={String(svcAmount || '')} 
                                   onChange={e => setSvcAmount(parseFloat(e.target.value) || 0)}
-                                  disabled={getSettledReceiptsForSel().length > 0}
-                                  className={`w-full pl-8 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-base font-black text-black focus:border-indigo-500 outline-none transition-all ${getSettledReceiptsForSel().length > 0 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
+                                  disabled={getSettledReceiptsForSel().length > 0 || isPrepaid}
+                                  className={`w-full pl-8 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-base font-black text-black font-mono focus:border-indigo-500 outline-none transition-all ${(getSettledReceiptsForSel().length > 0 || isPrepaid) ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
                                   placeholder="0.00"
                                 />
                               </div>
@@ -1060,9 +1054,10 @@ export function BookingModal(props: BookingModalProps) {
 
                   {isRoomStay && (
                     <div className="border border-slate-200 rounded-xl p-4 space-y-4 bg-white shadow-sm">
-                      <div className="flex justify-between items-center mb-1">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Kitchen Orders</p>
-                        <span className="px-2 py-0.5 text-[8px] font-black uppercase tracking-wider rounded-md bg-indigo-50 text-indigo-600 border border-indigo-100">Shiny Workflow</span>
+                      <div className="flex justify-between items-end mb-3">
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Kitchen Orders</p>
+                        </div>
                       </div>
                       
                       <div className="grid grid-cols-2 gap-3">
@@ -1320,7 +1315,7 @@ export function BookingModal(props: BookingModalProps) {
                                     <div className="flex items-center gap-1.5">
                                       <span className="text-[10px] font-bold text-slate-400">$</span>
                                       <input type="number" value={String(trans.price)} onChange={e => setSvcTransList(svcTransList.map((t: any, i: number) => i === ti ? { ...t, price: parseFloat(e.target.value) || 0 } : t))} placeholder="Price"
-                                        className={`w-20 px-2 py-2 border-2 ${trans.price <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} />
+                                        className={`w-20 px-3 py-2 border-2 ${trans.price <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} />
                                     </div>
                                   </div>
                                 </div>
@@ -1329,30 +1324,6 @@ export function BookingModal(props: BookingModalProps) {
                                 className="w-full py-1.5 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:border-indigo-300 hover:text-indigo-500 transition-all">+ Add Transfer</button>
                             </div>
                           )}
-                        </div>
-                        {sel?.guest_category !== 'pool' && (
-                          <div className="space-y-2 pt-2 border-t border-slate-100">
-                            <div className="flex justify-between items-center">
-                              <label className="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" checked={svcCooking} onChange={e => setSvcCooking(e.target.checked)} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
-                                <span className="text-sm font-bold text-slate-900">Cooking Class</span>
-                              </label>
-                              {svcCooking && <div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-400">$</span>
-                                <input type="number" value={String(svcCookingPrice)} onChange={e => setSvcCookingPrice(parseFloat(e.target.value) || 0)} placeholder="Price"
-                                  className={`w-24 px-3 py-2 border-2 ${svcCookingPrice <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} /></div>}
-                            </div>
-                          </div>
-                        )}
-                        <div className="space-y-2 pt-2 border-t border-slate-100">
-                          <div className="flex justify-between items-center">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input type="checkbox" checked={svcLaundry} onChange={e => setSvcLaundry(e.target.checked)} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
-                              <span className="text-sm font-bold text-slate-900">Laundry</span>
-                            </label>
-                            {svcLaundry && <div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-400">$</span>
-                              <input type="number" value={String(svcLaundryPrice)} onChange={e => setSvcLaundryPrice(parseFloat(e.target.value) || 0)} placeholder="Price"
-                                className={`w-24 px-3 py-2 border-2 ${svcLaundryPrice <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} /></div>}
-                          </div>
                         </div>
                       </div>
                     </div>
@@ -1460,18 +1431,28 @@ export function BookingModal(props: BookingModalProps) {
                     })()}
                     
                     {(() => {
-                      const acceptedOrders = kitchenOrders.filter((o: any) => o.status === 'confirmed');
+                      const acceptedOrders = kitchenOrders.filter((o: any) => o.status === 'confirmed' || o.status === 'served');
+                      
+                      // Aggregate by type to avoid long list
+                      const mealGroups: Record<string, any> = {};
+                      acceptedOrders.forEach(o => {
+                        const t = o.type.toLowerCase();
+                        if (!mealGroups[t]) {
+                          mealGroups[t] = { 
+                            name: o.type.charAt(0).toUpperCase() + o.type.slice(1), 
+                            count: 0, 
+                            price: t === 'lunch' ? pricing.lunch_price : pricing.dinner_price, 
+                            prepaid: o.prepaid 
+                          };
+                        }
+                        mealGroups[t].count += (o.quantity || 0);
+                      });
+
                       const sItems = [
-                        ...acceptedOrders.map((o: any) => ({
-                          name: o.type.charAt(0).toUpperCase() + o.type.slice(1),
-                          count: o.quantity,
-                          price: o.type === 'lunch' ? pricing.lunch_price : pricing.dinner_price,
-                          prepaid: o.prepaid || false
-                        })),
+                        ...Object.values(mealGroups),
                         svcGuide && { name: 'Guide', price: svcGuidePrice, prepaid: false },
                         svcTransport && { name: 'Transport', price: svcTransList.reduce((s: number, t: any) => s + (t.price || 0), 0), prepaid: false },
-                        svcLaundry && { name: 'Laundry', price: svcLaundryPrice, prepaid: false },
-                        svcCooking && { name: 'Cooking Class', price: svcCookingPrice, prepaid: false }
+                        svcDiscount > 0 && { name: 'Discount', price: -svcDiscount, prepaid: false }
                       ].filter(Boolean) as any[];
 
                       if (sItems.length === 0) return null;
@@ -1509,9 +1490,21 @@ export function BookingModal(props: BookingModalProps) {
 
                   <div className="mt-4 pt-4 border-t border-indigo-400 flex justify-between items-end">
                     <div className="flex-1">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-indigo-100 mb-1">
-                        {gTotal > 0 ? 'Current Open Tab' : 'Tab Settled (Ready)'}
-                      </p>
+                      <div className="flex items-center gap-3 mb-2">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-indigo-100">
+                          {gTotal > 0 ? 'Current Tab Balance' : 'Tab Settled (Zero Balance)'}
+                        </p>
+                        {sel.payment_status === 'Prepaid' && (
+                          <span className="font-mono text-[9px] font-black uppercase tracking-widest border border-white px-2 py-0.5 bg-indigo-500 text-white">
+                            [ PREPAID ]
+                          </span>
+                        )}
+                        {sel.payment_status === 'paid' && (
+                          <span className="font-mono text-[9px] font-black uppercase tracking-widest border border-white px-2 py-0.5 bg-white text-indigo-600">
+                            [ PAID - {svcPayList?.[0]?.method?.toUpperCase() || 'CASH'} ]
+                          </span>
+                        )}
+                      </div>
                       <p className="text-3xl font-black tracking-tighter leading-none mb-2">
                         ${String(gTotal.toFixed(2))}
                       </p>
@@ -1522,7 +1515,7 @@ export function BookingModal(props: BookingModalProps) {
 
               {isStaff && sel.status !== 'completed' && (
                   debtRemaining > 1.00 && (
-                    <div className="bg-white border-2 border-slate-100 rounded-2xl p-5 space-y-4 shadow-sm">
+                    <div className="bg-white border border-black p-6 space-y-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                       <div className="flex justify-between items-center">
                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Payment Collection</p>
                         {isBalanceMatched || (tPaidUsd >= debtRemaining - 1.00) ? (
@@ -1661,7 +1654,6 @@ export function BookingModal(props: BookingModalProps) {
                                       inputMode="decimal"
                                       value={String(pay.amount || '')}
                                       onChange={e => {
-                                        setPayModified(true);
                                         setSvcPayList(svcPayList.map((p: any, i: number) => i === pi ? { ...p, amount: e.target.value } : p));
                                       }}
                                       placeholder="0.00"
@@ -1765,7 +1757,7 @@ export function BookingModal(props: BookingModalProps) {
                           className="flex items-center gap-2 px-3 py-2 bg-indigo-50 border-2 border-indigo-300 text-indigo-700 text-xs font-black rounded-xl hover:bg-indigo-100 transition-all active:scale-95"
                         >
                           <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse shrink-0" />
-                          Tab {String(tabCount + 1)} — Active {gTotal > 0.01 ? `($${gTotal.toFixed(2)})` : '(Empty)'}
+                          Tab {String(tabCount + 1)} — Active {gTotal > 0.01 ? <span className="font-mono text-[11px] ml-1">(${gTotal.toFixed(2)})</span> : '(Empty)'}
                         </button>
                       )}
                     </div>
@@ -1944,8 +1936,7 @@ export function BookingModal(props: BookingModalProps) {
                                   svcDinner && { name: 'Dinner', count: svcDinnerCount, price: pricing.dinner_price, prepaid: isDinnerPrepaid },
                                   svcGuide && { name: 'Guide', price: svcGuidePrice },
                                   svcTransport && { name: 'Transport', price: svcTransList.reduce((s: number, t: any) => s + (t.price || 0), 0) },
-                                  svcLaundry && { name: 'Laundry', price: svcLaundryPrice },
-                                  svcCooking && { name: 'Cooking Class', price: svcCookingPrice }
+                                  svcDiscount > 0 && { name: 'Discount', price: -svcDiscount }
                                 ].filter(Boolean) as any[];
 
                                 return items.map((item, i) => (
@@ -1976,49 +1967,23 @@ export function BookingModal(props: BookingModalProps) {
                         </div>
                       )}
 
-                      {(selectedReceipt || sel.status === 'completed' || (sel.status === 'checked_in' && gTotal === 0 && (sel.collected_amount || 0) > 0)) ? (
-                        <div className="w-full py-5 bg-[#f0fdf4] text-emerald-700 rounded-[20px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 border-2 border-emerald-100 shadow-sm shadow-emerald-100/50">
-                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
-                          Paid & Settled
-                        </div>
-                      ) : (() => {
-                        const isPrepaidSomewhere = isPrepaid || isLunchPrepaid || isDinnerPrepaid;
-                        const kitchenOrders = currentMeta.kitchen_orders || [];
-                        const hasConfirmedOrders = kitchenOrders.some((o: any) => o.status === 'confirmed');
-                        
-                        // Case A: Fully Prepaid ($0 balance but guest had meals/stay)
-                        const isFullyPrepaid = gTotal <= 0.01 && (isPrepaidSomewhere || hasConfirmedOrders);
-                        
-                        // Case B: Billable (Total > 0)
-                        const isBillable = gTotal > 0.01;
-
-                        const isSettleDisabled = loadingAction === 'checkout' || (!isFullyPrepaid && (!isBalanceMatched || gTotal <= 0));
-
-                        return (
-                          <button
+                      <div className="space-y-4">
+                        {gTotal > 0 && (
+                          <button 
                             onClick={async () => {
-                              const receipts = getSettledReceiptsForSel();
-                              const hasSettled = receipts.length > 0 || (sel.collected_amount || 0) > 0;
-                              const needsAccom = !hasSettled && !isPrepaid && svcAmount <= 0;
-                              if (needsAccom) {
-                                setValError('Stay Price is missing. Please enter the guest\'s accommodation cost before proceeding.');
-                                setShowFinalReceipt(false);
-                                setShowServices(true);
-                                return;
+                              if (finalizeTab) {
+                                const ok = await finalizeTab();
+                                if (ok) setShowFinalReceipt(false);
                               }
-                              if (handleCheckOut) await handleCheckOut();
                             }}
-                            disabled={isSettleDisabled}
-                            className={`w-full py-5 rounded-[20px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 shadow-lg ${isSettleDisabled ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' : 'bg-[#6366f1] text-white hover:bg-[#4f46e5] active:scale-95 shadow-indigo-200'}`}
+                            disabled={loadingAction === 'finalize' || !isBalanceMatched}
+                            className={`w-full py-4 rounded-2xl font-black uppercase text-[11px] tracking-widest transition-all shadow-lg active:scale-95 ${isBalanceMatched ? 'bg-emerald-500 text-white shadow-emerald-100 hover:bg-emerald-600' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
                           >
-                            {isFullyPrepaid ? 'Complete & Archive Orders' : (isBalanceMatched ? 'Review & Pay Tab' : 'Match Balance Below to Pay')}
+                            {loadingAction === 'finalize' ? 'PROCESSING...' : isBalanceMatched ? 'SETTLE & CLOSE TAB' : 'BALANCE MISMATCH'}
                           </button>
-                        );
-                      })()}
+                        )}
+                      </div>
                     </div>
-                  </div>
                   </div>
 
                   <div className="p-6 pt-0 flex gap-3 no-print">
@@ -2039,9 +2004,140 @@ export function BookingModal(props: BookingModalProps) {
                     </button>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* SETTLEMENT HISTORY */}
+              {isStaff && getSettledReceiptsForSel().length > 0 && (
+                <div className="mt-8 border-t-2 border-black pt-6">
+                  <div className="flex justify-between items-center mb-6">
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Guest Folio History</p>
+                      <h3 className="text-xl font-black text-black uppercase tracking-tighter mt-1">Settlement History</h3>
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
+                    {getSettledReceiptsForSel().map((receipt: any, idx: number) => (
+                      <div key={idx} className="p-4 bg-white border border-black group">
+                        <div className="flex justify-between items-start mb-2 border-b border-slate-100 pb-2">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tab #{idx + 1}</span>
+                            <span className="font-mono text-[10px] text-black font-black mt-0.5">{new Date(receipt.settled_at || new Date()).toLocaleString()}</span>
+                          </div>
+                          <div className="text-right flex flex-col items-end">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Settled Amount</span>
+                            <span className="font-mono text-sm font-black text-emerald-600">${parseFloat(receipt.total || 0).toFixed(2)}</span>
+                            {receipt.payments && receipt.payments.length > 0 && (
+                               <span className="text-[8px] font-mono font-black uppercase tracking-widest text-slate-400 mt-1">
+                                 [ {receipt.payments.map((p: any) => p.method).join(', ')} ]
+                               </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                           {receipt.items?.accommodation > 0 && (
+                             <span className="text-[8px] font-mono font-black uppercase bg-slate-50 border border-slate-200 px-1.5 py-0.5 text-black">Stay: ${receipt.items.accommodation.toFixed(2)}</span>
+                           )}
+                           {receipt.items?.meals?.lunch > 0 && (
+                             <span className="text-[8px] font-mono font-black uppercase bg-slate-50 border border-slate-200 px-1.5 py-0.5 text-black">Lunch x{receipt.items.meals.lunch}</span>
+                           )}
+                           {receipt.items?.meals?.dinner > 0 && (
+                             <span className="text-[8px] font-mono font-black uppercase bg-slate-50 border border-slate-200 px-1.5 py-0.5 text-black">Dinner x{receipt.items.meals.dinner}</span>
+                           )}
+                           {receipt.items?.drinks?.length > 0 && (
+                             <span className="text-[8px] font-mono font-black uppercase bg-slate-50 border border-slate-200 px-1.5 py-0.5 text-black">Drinks</span>
+                           )}
+                           {receipt.items?.extras?.length > 0 && (
+                             <span className="text-[8px] font-mono font-black uppercase bg-slate-50 border border-slate-200 px-1.5 py-0.5 text-black">Extras</span>
+                           )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* UNIFIED GUEST FOLIO — Final Reconciliation */}
+              {isStaff && guestStatement && (
+                <div className="mt-8 border-t-2 border-black pt-6">
+                  <div className="flex justify-between items-center mb-6">
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unified Guest Folio</p>
+                      <h3 className="text-xl font-black text-black uppercase tracking-tighter mt-1">Audit Manifest</h3>
+                    </div>
+                    <span className={`px-4 py-1.5 text-[10px] font-black uppercase border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] ${
+                      guestStatement.status === 'PAID' || guestStatement.status === 'PREPAID' ? 'bg-black text-white' : 'bg-white text-black animate-pulse'
+                    }`}>
+                      [ STATUS: {guestStatement.status} {guestStatement.status === 'OPEN TAB' ? `- $${guestStatement.remaining.toFixed(2)}` : ''} ]
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {/* Line Items - Bento Style */}
+                    <div className="grid gap-2">
+                      {/* Accommodation */}
+                      <div className="flex justify-between items-center p-4 bg-white border border-black group">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Service</span>
+                          <span className="text-xs font-black text-black uppercase">Accommodation / Stay Fee</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Amount</span>
+                          <span className="font-mono text-sm font-black text-black">${guestStatement.accommodation.toFixed(2)}</span>
+                        </div>
+                      </div>
+
+                      {/* Meals */}
+                      {guestStatement.mealItems.map((item: any, idx: number) => (
+                        <div key={idx} className="flex justify-between items-center p-4 bg-white border border-black">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kitchen Request</span>
+                            <span className="text-xs font-black text-black uppercase">{item.name} · <span className="font-mono text-[9px]">{item.date}</span></span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                              <span className="font-mono">{item.qty}</span> x $<span className="font-mono">{item.price}</span>
+                            </span>
+                            <span className="font-mono text-sm font-black text-black">${item.total.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* Grand Total Row */}
+                      <div className="flex justify-between items-center p-4 bg-black text-white border border-black mt-2">
+                        <span className="text-sm font-black uppercase tracking-widest">Grand Total Manifest</span>
+                        <span className="font-mono text-lg font-black">${guestStatement.grandTotal.toFixed(2)}</span>
+                      </div>
+
+                      {/* Reconciliation / Payments */}
+                      <div className="flex justify-between items-center p-4 bg-zinc-50 border border-black mt-4 border-dashed">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Reconciliation</span>
+                          <span className="text-xs font-black text-slate-900 uppercase">Settled Payments / Pre-Paid Credit</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Total Paid</span>
+                          <span className="font-mono text-sm font-black text-emerald-600">-${guestStatement.totalReconciled.toFixed(2)}</span>
+                        </div>
+                      </div>
+
+                      {/* Final Balance */}
+                      <div className="flex justify-between items-center p-5 bg-white border-2 border-black mt-2 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                        <span className="text-md font-black uppercase tracking-[0.1em]">Remaining Balance</span>
+                        <div className="text-right">
+                          <p className={`text-2xl font-mono font-black ${guestStatement.status === 'OPEN TAB' ? 'text-rose-600' : 'text-emerald-600'}`}>
+                            {guestStatement.status === 'PREPAID' ? 'PREPAID' : `$${guestStatement.remaining.toFixed(2)}`}
+                          </p>
+                          {guestStatement.status === 'OPEN TAB' && (
+                            <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest animate-pulse mt-1">⚠ Settlement Required at Front Desk</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
-          )}
         </div>
       </div>
 

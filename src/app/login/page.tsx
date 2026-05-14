@@ -25,14 +25,25 @@ export default function LoginPage() {
   const router = useRouter();
 
   useEffect(() => {
+    if (user && mounted) {
+      const rolePaths: Record<string, string> = {
+        'CEO': '/ceo',
+        'Manager': '/manager',
+        'Cook': '/cook'
+      };
+      const path = rolePaths[user.role] || '/';
+      router.push(path);
+    }
+  }, [user, mounted, router]);
+
+  // Mark component as mounted on client to avoid SSR/hydration mismatch
+  useEffect(() => {
     setMounted(true);
   }, []);
 
-
-
   // Show nothing during SSR/hydration to prevent mismatch
   if (!mounted) {
-    return <div className="min-h-screen bg-gradient-to-br from-blue-900 to-purple-900" />;
+    return <div className="min-h-screen bg-slate-50" />;
   }
 
   if (user) {
@@ -59,14 +70,15 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 to-purple-900 relative">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 relative">
+      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-700 via-emerald-500 to-sky-600" />
       <div className="absolute top-6 right-6">
         <LanguageSwitcher />
       </div>
-      <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md">
+      <div className="bg-white p-8 rounded-xl shadow-sm w-full max-w-md border border-slate-200">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">{t('login.title')}</h1>
-          <p className="text-gray-600 mt-2">{t('login.subtitle')}</p>
+          <h1 className="text-2xl font-bold text-zinc-950">{t('login.title')}</h1>
+          <p className="text-slate-400 mt-2 text-sm font-medium">{t('login.subtitle')}</p>
         </div>
 
         {error && (
@@ -78,41 +90,41 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {isSignUp && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">
                 Full Name
               </label>
               <input
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-zinc-950 bg-white"
                 required={isSignUp}
               />
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">
               {t('login.email')}
             </label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+              className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-zinc-950 bg-white"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">
               {t('login.password')}
             </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+              className="w-full px-4 py-2 border border-black/20 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-black bg-white"
               required
             />
           </div>
@@ -120,7 +132,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+            className="w-full bg-emerald-700 text-white py-2.5 px-4 rounded-lg hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed font-bold uppercase tracking-widest text-xs shadow-sm"
           >
             {loading ? 'Loading...' : isSignUp ? t('login.signup') : t('login.signin')}
           </button>
@@ -131,10 +143,10 @@ export default function LoginPage() {
           <div className="mt-4">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300"></div>
+                <div className="w-full border-t border-slate-200"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                <span className="px-2 bg-white text-slate-400 text-sm font-medium">Or continue with</span>
               </div>
             </div>
             <button
@@ -155,7 +167,7 @@ export default function LoginPage() {
                 }
               }}
               disabled={loading}
-              className="mt-4 w-full flex items-center justify-center gap-3 bg-white border border-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-50 disabled:opacity-50 font-medium transition-all"
+              className="mt-4 w-full flex items-center justify-center gap-3 bg-white border border-slate-200 text-zinc-950 py-2 px-4 rounded-lg hover:bg-slate-50 disabled:opacity-50 font-medium transition-all shadow-sm"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -171,7 +183,7 @@ export default function LoginPage() {
         <div className="mt-6 text-center">
           <button
             onClick={() => setIsSignUp(!isSignUp)}
-            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+            className="text-emerald-700 hover:text-emerald-800 text-sm font-medium"
           >
             {isSignUp ? t('login.has_account') : t('login.no_account')}
           </button>

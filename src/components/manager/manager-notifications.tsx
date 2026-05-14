@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { supabase, type Booking, type Notification } from '@/lib/supabase';
-import { sendDateChangeResult } from '@/utils/notify';
 
 interface ManagerNotificationsProps {
   notifications: Notification[];
@@ -38,7 +37,7 @@ export function ManagerNotifications({
               key={notification.id}
               className={`p-4 transition-colors ${!notification.read ? 'bg-blue-50/70' : 'hover:bg-slate-50'}`}
               onClick={async () => {
-                if (!notification.read && notification.type !== 'date_change_request') {
+                if (!notification.read) {
                   await supabase.from('notifications').update({ read: true }).eq('id', notification.id);
                   setNotifications((prev) =>
                     prev.map((n) => (n.id === notification.id ? { ...n, read: true } : n))
@@ -78,102 +77,6 @@ export function ManagerNotifications({
                   </svg>
                 )}
               </div>
-
-              {/* Date Change Request: Approve / Reject buttons */}
-              {notification.type === 'date_change_request' && !notification.status && (
-                <div className="flex gap-2 mt-3">
-                  <button
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      if (!notification.related_id) return;
-                      const bookingId = notification.related_id;
-                      const booking = bookings.find((b) => b.id === bookingId);
-                      if (!booking) {
-                        alert('Booking not found.');
-                        return;
-                      }
-
-                      try {
-                        const res = await fetch('/api/calendar/events', { cache: 'no-store' });
-                        const eventsData = await res.json();
-                        if ('error' in eventsData) {
-                          alert('Failed to fetch calendar.');
-                          return;
-                        }
-                        const gcEvents = eventsData as any[];
-                        const linkedEv = gcEvents.find((ev: any) => ev.id === booking.google_event_id);
-                        if (!linkedEv) {
-                          alert('Calendar event not found.');
-                          return;
-                        }
-
-                        await onUpdateBooking(bookingId, {
-                          check_in: linkedEv.start,
-                          check_out: linkedEv.end,
-                        });
-
-                        await supabase
-                          .from('notifications')
-                          .update({ status: 'approved', read: true })
-                          .eq('id', notification.id);
-
-                        await sendDateChangeResult(bookingId, booking.guest_name, 'approved', {
-                          checkIn: linkedEv.start,
-                          checkOut: linkedEv.end,
-                        });
-
-                        setNotifications((prev) =>
-                          prev.map((n) =>
-                            n.id === notification.id ? { ...n, status: 'approved', read: true } : n
-                          )
-                        );
-                        onRefresh();
-                      } catch (err) {
-                        console.error('Approve date change failed:', err);
-                        alert('Failed to approve date change.');
-                      }
-                    }}
-                    className="flex-1 px-3 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-1.5"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Approve
-                  </button>
-                  <button
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      if (!notification.related_id) return;
-                      const bookingId = notification.related_id;
-                      const booking = bookings.find((b) => b.id === bookingId);
-
-                      await supabase
-                        .from('notifications')
-                        .update({ status: 'rejected', read: true })
-                        .eq('id', notification.id);
-
-                      if (booking) {
-                        await sendDateChangeResult(bookingId, booking.guest_name, 'rejected', {
-                          checkIn: booking.check_in,
-                          checkOut: booking.check_out,
-                        });
-                      }
-
-                      setNotifications((prev) =>
-                        prev.map((n) =>
-                          n.id === notification.id ? { ...n, status: 'rejected', read: true } : n
-                        )
-                      );
-                    }}
-                    className="flex-1 px-3 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold hover:bg-rose-700 transition-all flex items-center justify-center gap-1.5"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                    Reject
-                  </button>
-                </div>
-              )}
             </div>
           ))}
           {notifications.length > 5 && !showAll && (

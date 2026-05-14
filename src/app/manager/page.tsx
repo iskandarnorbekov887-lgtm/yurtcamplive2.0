@@ -41,6 +41,7 @@ function ManagerPortal() {
   const [selectedBookingDate, setSelectedBookingDate] = useState('');
   const [selectedMealBooking, setSelectedMealBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const fetchData = async (): Promise<void> => {
     try {
@@ -48,12 +49,12 @@ function ManagerPortal() {
         { data: bookingsData },
         { data: notifData },
       ] = await Promise.all([
-        supabase.from('bookings').select('*, meal_requests(*)'),
+        supabase.from('bookings').select('*, meal_requests(*), payments(*)').order('check_in', { ascending: false }),
         supabase
           .from('notifications')
           .select('*')
-          .or(`user_id.eq.${currentUserId || ''},and(target_role.eq.${userRole || ''},user_id.is.null)`)
-          .order('created_at', { ascending: false }),
+          .filter('user_id', 'eq', currentUserId || '00000000-0000-0000-0000-000000000000') // Use a dummy UUID if missing
+          .order('created_at', { ascending: false })
       ]);
 
       setBookings(bookingsData || []);
@@ -65,118 +66,198 @@ function ManagerPortal() {
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
+    
+    // Real-time listeners
+    const bookingsChannel = supabase
+      .channel('manager-bookings-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => fetchData())
+      .subscribe();
+      
+    const mealsChannel = supabase
+      .channel('manager-meals-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'meal_requests' }, () => fetchData())
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(bookingsChannel);
+      supabase.removeChannel(mealsChannel);
+    };
   }, []);
 
+  const checkedInCount = bookings.filter(b => b.status === 'checked_in').length;
+
   return (
-    <div className="min-h-screen bg-noir-950 text-white font-sans selection:bg-electric-blue/30">
+    <div className="flex h-screen overflow-hidden bg-slate-50 text-zinc-950 font-sans">
       
-      {/* ── Header ── */}
-      <header className="sticky top-0 z-50 glass-card border-x-0 border-t-0 rounded-none bg-noir-950/80">
-        <div className="max-w-7xl mx-auto px-8 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10">
-              <LayoutDashboard className="text-electric-blue" size={24} />
+      {/* ── Sidebar ── */}
+      <motion.aside 
+        initial={false}
+        animate={{ width: isCollapsed ? 80 : 256 }}
+        className="hidden md:flex flex-col bg-white border-r border-slate-200 shadow-sm relative transition-all duration-300 ease-in-out"
+      >
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="absolute -right-3 top-20 w-6 h-6 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-400 hover:text-zinc-950 hover:border-emerald-500 transition-all z-50 shadow-sm"
+        >
+          <motion.div animate={{ rotate: isCollapsed ? 180 : 0 }}>
+            <Calendar size={12} className="rotate-90" />
+          </motion.div>
+        </button>
+
+        <div className="p-6">
+          <div className="flex items-center gap-4 mb-8 overflow-hidden">
+            <div className="w-10 h-10 bg-emerald-50 rounded-xl flex-shrink-0 flex items-center justify-center border border-emerald-200">
+              <LayoutDashboard className="text-emerald-700" size={20} />
             </div>
-            <div>
-              <h1 className="text-xl font-black uppercase tracking-tight">{t('portal.manager')}</h1>
-              <p className="text-[9px] text-slate-500 font-bold tracking-[0.3em] uppercase">Executive Operations HUD</p>
-            </div>
+            {!isCollapsed && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <h1 className="text-sm font-bold uppercase tracking-tight text-zinc-950 whitespace-nowrap">{t('portal.manager')}</h1>
+                <p className="text-[10px] text-slate-400 font-medium tracking-widest uppercase whitespace-nowrap">Operations HUD</p>
+              </motion.div>
+            )}
           </div>
 
-          <div className="flex items-center gap-6">
-            <LanguageSwitcher variant="dark" />
+          <nav className="space-y-1">
+            {[
+              { id: 'checkin', label: 'Calendar', icon: Calendar },
+              { id: 'meals', label: 'Meals', icon: Utensils },
+              { id: 'procurement', label: 'Logistics', icon: ShoppingBag },
+              { id: 'inventory', label: 'Stores', icon: Box },
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id as any)}
+                title={isCollapsed ? item.label : undefined}
+                className={`w-full flex items-center gap-3 p-3 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
+                  activeTab === item.id 
+                    ? 'bg-emerald-700 text-white shadow-sm' 
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-zinc-950'
+                } ${isCollapsed ? 'justify-center' : ''}`}
+              >
+                <item.icon size={18} className="flex-shrink-0" />
+                {!isCollapsed && (
+                  <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="whitespace-nowrap">
+                    {item.label}
+                  </motion.span>
+                )}
+              </button>
+            ))}
+            {userRole === 'CEO' && (
+              <a
+                href="/ceo"
+                className={`w-full flex items-center gap-3 p-3 rounded-lg text-xs font-black uppercase tracking-[0.2em] bg-zinc-950 text-white shadow-lg shadow-zinc-200 mt-4 hover:bg-zinc-800 transition-all border border-white/10 ${isCollapsed ? 'justify-center' : ''}`}
+              >
+                <LayoutDashboard size={18} className="text-emerald-400 flex-shrink-0" />
+                {!isCollapsed && (
+                  <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="whitespace-nowrap text-[10px]">
+                    CEO Executive
+                  </motion.span>
+                )}
+              </a>
+            )}
+          </nav>
+        </div>
+
+        <div className={`mt-auto p-6 border-t border-slate-100 space-y-3 ${isCollapsed ? 'items-center flex flex-col' : ''}`}>
+           <a 
+             href="/financials" 
+             title={isCollapsed ? "Fiscal Recording" : undefined}
+             className={`block p-3 rounded-lg text-[10px] font-bold uppercase tracking-widest text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-all text-center ${isCollapsed ? 'w-full flex justify-center' : ''}`}
+           >
+             {isCollapsed ? "💰" : "💰 Fiscal Recording"}
+           </a>
+           <button 
+             onClick={signOut} 
+             title={isCollapsed ? t('btn.logout') : undefined}
+             className={`w-full flex items-center justify-center gap-2 p-3 bg-slate-50 border border-slate-200 text-slate-500 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-all`}
+           >
+             <LogOut size={18} className="flex-shrink-0" />
+             {!isCollapsed && <span className="whitespace-nowrap">{t('btn.logout')}</span>}
+           </button>
+        </div>
+      </motion.aside>
+
+      {/* ── Main Content ── */}
+      <main className="flex-1 relative overflow-y-auto bg-slate-50">
+        
+        {/* Top Bar */}
+        <div className="sticky top-0 z-30 px-8 py-4 flex justify-between items-center bg-white backdrop-blur-sm border-b border-black">
+          <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+            {activeTab === 'checkin' ? 'Guest Calendar' : activeTab === 'meals' ? 'Catering' : activeTab === 'procurement' ? 'Logistics' : 'Stores'}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <LanguageSwitcher variant="light" />
             
             <div className="relative">
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all relative"
+                className="w-9 h-9 flex items-center justify-center rounded-lg bg-white border border-slate-200 hover:bg-slate-50 shadow-sm transition-all relative"
               >
-                <Bell size={20} className="text-slate-400" />
+                <Bell size={16} className="text-slate-400" />
                 {notifications.filter(n => !n.read).length > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white text-[10px] font-black rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
                     {notifications.filter(n => !n.read).length}
                   </span>
                 )}
               </button>
               {showNotifications && (
-                <div className="absolute right-0 top-14 w-80 z-50">
-                   <ManagerNotifications
-                     notifications={notifications}
-                     setNotifications={setNotifications}
-                     bookings={bookings}
-                     onUpdateBooking={async (id, data) => { 
-                       console.log("Update triggered for:", id, data);
-                     }}
-                     onRefresh={fetchData}
-                     onClose={() => setShowNotifications(false)}
-                   />
-                </div>
+                <ManagerNotifications
+                  notifications={notifications}
+                  setNotifications={setNotifications}
+                  bookings={bookings}
+                  onUpdateBooking={async (id, data) => {
+                    const { error } = await supabase.from('bookings').update(data).eq('id', id);
+                    if (error) console.error(error);
+                    await fetchData();
+                  }}
+                  onRefresh={fetchData}
+                  onClose={() => setShowNotifications(false)}
+                />
               )}
             </div>
-
-            <button onClick={signOut} className="flex items-center gap-2 px-4 py-2 bg-rose-600/10 border border-rose-600/20 text-rose-500 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-rose-600 hover:text-white transition-all">
-              <LogOut size={14} />
-              {t('btn.logout')}
-            </button>
           </div>
         </div>
-      </header>
 
-      {/* ── Main Layout ── */}
-      <main className="max-w-7xl mx-auto p-8 flex gap-8">
-        
-        {/* Sidebar Navigation */}
-        <aside className="w-64 space-y-2 shrink-0">
-          {[
-            { id: 'checkin', label: 'Calendar', icon: Calendar },
-            { id: 'meals', label: 'Meals', icon: Utensils },
-            { id: 'procurement', label: 'Logistics', icon: ShoppingBag },
-            { id: 'inventory', label: 'Stores', icon: Box },
-          ].map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id as any)}
-              className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${
-                activeTab === item.id 
-                  ? 'bg-electric-blue text-white shadow-xl shadow-blue-900/20' 
-                  : 'text-slate-500 hover:bg-white/5'
-              }`}
-            >
-              <item.icon size={18} />
-              {item.label}
-            </button>
-          ))}
-
-          <div className="mt-12 pt-12 border-t border-white/5 space-y-4">
-             <a href="/financials" className="block px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest text-emerald-500 hover:bg-emerald-500/5 border border-emerald-500/10 transition-all text-center">
-               💰 Fiscal Recording
-             </a>
-          </div>
-        </aside>
-
-        {/* Workspace */}
-        <section className="flex-1 min-w-0">
+        <div className="max-w-[1400px] mx-auto px-8 py-8">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
             >
               {activeTab === 'checkin' && (
-                <div className="glass-card rounded-[48px] p-8">
+                <div className="bento-card p-6">
                   <GoogleGuestAgenda
                     bookings={bookings}
                     userRole={userRole}
                     currentUserId={currentUserId}
-                    onCheckIn={() => {}}
-                    onCheckOut={() => {}}
-                    onUpdateBooking={async (id, data) => { 
-                      console.log("Update triggered for:", id, data);
+                    onCheckIn={async (id) => {
+                      const { error } = await supabase.from('bookings').update({ status: 'checked_in' }).eq('id', id);
+                      if (error) console.error(error);
+                      await fetchData();
                     }}
-                    onCancelBooking={() => {}}
+                    onCheckOut={async (id) => {
+                      const { error } = await supabase.from('bookings').update({ status: 'completed' }).eq('id', id);
+                      if (error) console.error(error);
+                      await fetchData();
+                    }}
+                    onUpdateBooking={async (id, data) => {
+                      const { error } = await supabase.from('bookings').update(data).eq('id', id);
+                      if (error) {
+                        console.error('Update Error:', error.message, error.details);
+                        alert(`Database Error: ${error.message}`);
+                      }
+                      await fetchData();
+                    }}
+                    onCancelBooking={async (id) => {
+                      const { error } = await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', id);
+                      if (error) console.error(error);
+                      await fetchData();
+                    }}
                     onAddNewBooking={(data: any) => {
                       setSelectedBookingDate(data.check_in || '');
                       setShowIncomeForm(true);
@@ -187,23 +268,48 @@ function ManagerPortal() {
               )}
 
               {activeTab === 'meals' && (
-                <div className="space-y-6">
-                   <h2 className="text-3xl font-black uppercase tracking-tight">Catering Orchestration</h2>
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-8">
+                   <div className="flex justify-between items-end">
+                      <div>
+                        <h2 className="text-2xl font-bold text-zinc-950">Catering Orchestration</h2>
+                        <p className="text-xs text-slate-400 font-medium uppercase tracking-widest mt-1">Active Kitchen Protocols</p>
+                      </div>
+                      <div className="bg-white border border-slate-200 rounded-lg px-4 py-2 shadow-sm flex items-center gap-2">
+                        <span className="font-data text-lg text-zinc-950">{checkedInCount}</span>
+                        <span className="text-xs text-slate-400 font-medium">Guests In House</span>
+                      </div>
+                   </div>
+
+                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                      {bookings.filter(b => b.status === 'checked_in' || b.status === 'confirmed').map(b => (
-                       <div key={b.id} className="glass-card p-8 rounded-[40px] border border-white/5 hover:border-orange-500/30 transition-all group">
-                         <div className="flex justify-between items-start mb-6">
-                           <div>
-                             <h3 className="text-lg font-black uppercase tracking-tight">{b.guest_name}</h3>
-                             <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-1">{b.check_in} → {b.check_out}</p>
+                       <div 
+                         key={b.id} 
+                         className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-all group"
+                       >
+                         <div className="flex justify-between items-start mb-4">
+                           <div className="w-9 h-9 bg-emerald-50 rounded-lg flex items-center justify-center border border-emerald-200 text-emerald-700">
+                             <Utensils size={16} />
                            </div>
-                           <span className="px-3 py-1 bg-white/5 rounded-full text-[9px] font-black text-slate-400 uppercase">{b.status}</span>
+                           <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest ${
+                             b.status === 'checked_in' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-50 text-slate-400'
+                           }`}>
+                             {b.status === 'checked_in' ? 'LIVE' : b.status}
+                           </span>
                          </div>
+
+                         <h3 className="text-sm font-bold text-zinc-950 mb-1 group-hover:text-emerald-700 transition-colors">{b.guest_name}</h3>
+                         <div className="flex items-center gap-1.5 text-slate-400 text-[10px] font-medium uppercase tracking-widest mb-4">
+                           <Calendar size={10} />
+                           <span className="font-data text-zinc-950">{new Date(b.check_in).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                           <span>→</span>
+                           <span className="font-data text-zinc-950">{new Date(b.check_out).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                         </div>
+
                          <button
                            onClick={() => setSelectedMealBooking(b)}
-                           className="w-full py-4 bg-orange-500/10 border border-orange-500/20 text-orange-500 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-orange-500 hover:text-white transition-all"
+                           className="w-full py-2.5 bg-slate-50 border border-slate-200 text-zinc-950 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-700 hover:text-white hover:border-emerald-700 transition-all"
                          >
-                           Manage Meal Protocol
+                           Manage Protocol
                          </button>
                        </div>
                      ))}
@@ -215,7 +321,7 @@ function ManagerPortal() {
               {activeTab === 'inventory' && <InventoryDashboard />}
             </motion.div>
           </AnimatePresence>
-        </section>
+        </div>
       </main>
 
       {/* Modals */}

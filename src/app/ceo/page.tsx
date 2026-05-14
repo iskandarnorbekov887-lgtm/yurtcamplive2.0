@@ -106,7 +106,7 @@ function CEODashboard() {
         supabase
           .from('notifications')
           .select('*')
-          .or(`user_id.eq.${currentUserId || ''},and(target_role.eq.${userRole || ''},user_id.is.null)`)
+          .eq('user_id', currentUserId || '00000000-0000-0000-0000-000000000000')
           .order('created_at', { ascending: false })
       ]);
 
@@ -283,25 +283,25 @@ function CEODashboard() {
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
       <div className="flex flex-col items-center gap-4">
-        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-indigo-900 font-medium animate-pulse">Initializing Command Center...</p>
+        <div className="w-12 h-12 border-4 border-emerald-700 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-zinc-950 font-medium animate-pulse">Initializing Command Center...</p>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-900 font-sans">
-      <header className="bg-gradient-to-r from-indigo-900 via-blue-900 to-indigo-950 text-white shadow-2xl sticky top-0 z-50 backdrop-blur-md bg-opacity-95">
+    <div className="min-h-screen bg-slate-50 text-zinc-950 font-sans">
+      <header className="bg-gradient-to-r from-emerald-800 via-emerald-700 to-emerald-800 text-white shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/10 rounded-xl backdrop-blur-sm border border-white/20">
-              <svg className="w-8 h-8 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2-2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+              <svg className="w-8 h-8 text-green-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2-2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
             </div>
             <div>
-              <h1 className="text-2xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-indigo-200 uppercase">
+              <h1 className="text-2xl font-black tracking-tight text-white uppercase">
                 {t('portal.ceo')}
               </h1>
-              <p className="text-xs text-indigo-300 font-medium tracking-widest uppercase opacity-80">Isky Camp Executive Flow</p>
+              <p className="text-xs text-green-200 font-medium tracking-widest uppercase opacity-80">Isky Camp Executive Flow</p>
             </div>
           </div>
           <div className="flex gap-3">
@@ -311,7 +311,7 @@ function CEODashboard() {
                 onClick={() => setShowNotifications(!showNotifications)}
                 className="p-2 bg-white/10 rounded-xl backdrop-blur-sm border border-white/20 hover:bg-white/20 transition-all relative"
               >
-                <svg className="w-6 h-6 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 text-green-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
                 {notifications.filter(n => !n.read).length > 0 && (
@@ -492,7 +492,7 @@ function CEODashboard() {
                       {notifications.length > 5 && !showAllNotifications && (
                         <button
                           onClick={() => setShowAllNotifications(true)}
-                          className="w-full py-3 text-sm font-bold text-indigo-600 hover:bg-indigo-50 transition-all"
+                          className="w-full py-3 text-sm font-medium text-emerald-700 hover:bg-emerald-50 transition-all"
                         >
                           Show More ({notifications.length - 5} more)
                         </button>
@@ -511,13 +511,13 @@ function CEODashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto p-6 md:p-8">
-        <div className="flex bg-white/50 p-1.5 rounded-2xl mb-8 border border-slate-200 shadow-sm w-fit">
+        <div className="flex bg-white p-1 rounded-lg mb-8 border border-slate-200 shadow-sm w-fit">
           {(['checkin', 'team', 'financials', 'meals'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-8 py-3 rounded-xl font-bold capitalize transition-all duration-300 text-sm flex items-center gap-2 ${
-                activeTab === tab ? 'bg-white text-indigo-700 shadow-lg border border-slate-100 scale-105' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
+              className={`px-6 py-2.5 rounded-lg font-bold capitalize transition-all text-xs flex items-center gap-2 ${
+                activeTab === tab ? 'bg-emerald-700 text-white shadow-sm' : 'text-slate-400 hover:text-zinc-950 hover:bg-slate-50'
               }`}
             >
               {tab === 'meals' ? '🍽️ Meals' : t(`tab.${tab}`)}
@@ -526,8 +526,8 @@ function CEODashboard() {
           <button
             key="pricing"
             onClick={() => setActiveTab('pricing')}
-            className={`px-8 py-3 rounded-xl font-bold capitalize transition-all duration-300 text-sm flex items-center gap-2 ${
-              activeTab === 'pricing' ? 'bg-white text-indigo-700 shadow-lg border border-slate-100 scale-105' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
+            className={`px-6 py-2.5 rounded-lg font-bold capitalize transition-all text-xs flex items-center gap-2 ${
+              activeTab === 'pricing' ? 'bg-emerald-700 text-white shadow-sm' : 'text-slate-400 hover:text-zinc-950 hover:bg-slate-50'
             }`}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -559,7 +559,7 @@ function CEODashboard() {
             <p className="text-slate-600 mb-6">View income and expenses by date. Click on any day to see details.</p>
             <a
               href="/ceo-financials"
-              className="inline-block px-8 py-4 bg-indigo-600 text-white rounded-2xl font-bold uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200"
+              className="inline-block px-6 py-3 bg-emerald-700 text-white rounded-lg font-bold uppercase tracking-widest text-xs hover:bg-emerald-800 transition-all shadow-sm"
             >
               Go to Financial Calendar
             </a>
@@ -567,17 +567,17 @@ function CEODashboard() {
         )}
         {activeTab === 'team' && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-             <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/60 border border-slate-100 overflow-hidden">
+             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="p-8 border-b border-slate-50 bg-gradient-to-r from-slate-50/50 to-white flex justify-between items-center">
                 <h3 className="text-xl font-black text-slate-800 flex items-center gap-3">
-                  <span className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                  <span className="p-2 bg-emerald-50 text-emerald-700 rounded-lg">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
                   </span>
                   Operational Taskforce
                 </h3>
                 <button
                   onClick={() => setShowAddUserModal(true)}
-                  className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 flex items-center gap-2"
+                  className="px-4 py-2.5 bg-emerald-700 text-white rounded-lg font-bold text-xs hover:bg-emerald-800 transition-all shadow-sm flex items-center gap-2"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                   Add Staff Member
@@ -595,10 +595,10 @@ function CEODashboard() {
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {staff.map((member) => (
-                      <tr key={member.id} className="hover:bg-indigo-50/30 transition-colors group">
+                      <tr key={member.id} className="hover:bg-slate-50 transition-colors group">
                         <td className="px-8 py-5">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-2xl bg-indigo-100 flex items-center justify-center text-indigo-600 font-black shadow-inner">
+                            <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-700 font-bold border border-emerald-200">
                               {member.full_name?.charAt(0) || 'N'}
                             </div>
                             <span className="font-bold text-slate-800">{member.full_name || 'N/A'}</span>
@@ -607,7 +607,7 @@ function CEODashboard() {
                         <td className="px-8 py-5 font-medium text-slate-500">{member.email}</td>
                         <td className="px-8 py-5">
                           <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black tracking-widest uppercase shadow-sm ${
-                            member.role === 'CEO' ? 'bg-indigo-600 text-white' :
+                            member.role === 'CEO' ? 'bg-emerald-700 text-white' :
                             member.role === 'Manager' ? 'bg-blue-100 text-blue-800' :
                             member.role === 'Cook' ? 'bg-amber-100 text-amber-800' :
                             'bg-emerald-100 text-emerald-800'
@@ -662,26 +662,26 @@ function CEODashboard() {
               <input 
                 type="text" 
                 placeholder="Full Name" 
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
                 value={newUser.fullName}
                 onChange={(e) => setNewUser({ ...newUser, fullName: e.target.value })}
               />
               <input 
                 type="email" 
                 placeholder="Email Address" 
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
                 value={newUser.email}
                 onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
               />
               <input 
                 type="password" 
                 placeholder="Password" 
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
                 value={newUser.password}
                 onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
               />
               <select 
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
                 value={newUser.role}
                 onChange={(e) => setNewUser({ ...newUser, role: e.target.value as UserRole })}
               >
@@ -700,7 +700,7 @@ function CEODashboard() {
               <button 
                 onClick={handleAddUser}
                 disabled={loadingUser}
-                className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all disabled:opacity-50"
+                className="flex-1 py-3 bg-emerald-700 text-white rounded-lg font-bold hover:bg-emerald-800 shadow-sm transition-all disabled:opacity-50"
               >
                 {loadingUser ? 'Adding...' : 'Add Member'}
               </button>
@@ -742,7 +742,7 @@ function CEODashboard() {
               <button 
                 onClick={handleUpdateUser}
                 disabled={loadingUser}
-                className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all disabled:opacity-50"
+                className="flex-1 py-3 bg-emerald-700 text-white rounded-lg font-bold hover:bg-emerald-800 shadow-sm transition-all disabled:opacity-50"
               >
                 {loadingUser ? 'Saving...' : 'Save Changes'}
               </button>
@@ -856,12 +856,12 @@ function PricingSettings() {
 
   return (
     <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/60 border border-slate-100 overflow-hidden max-w-2xl mx-auto">
-      <div className="p-8 border-b border-slate-50 bg-gradient-to-r from-indigo-900 to-blue-900 text-white">
+      <div className="p-8 border-b border-slate-100 bg-gradient-to-r from-emerald-800 to-emerald-700 text-white">
         <h3 className="text-xl font-black flex items-center gap-3">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m10 4a2 2 0 100-4m0 4a2 2 0 110-4M6 20v-2m0 0V12m0 0V8m12 12v-2m0 0V12m0 0V8m-6 8v-2" /></svg>
           Global Pricing Configuration
         </h3>
-        <p className="text-indigo-200 text-xs mt-1 font-bold uppercase tracking-widest">Set official rates for all accounts</p>
+        <p className="text-green-200 text-xs mt-1 font-bold uppercase tracking-widest">Set official rates for all accounts</p>
       </div>
       
       <div className="p-8 space-y-6">
@@ -869,38 +869,38 @@ function PricingSettings() {
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Lunch Price (USD)</label>
             <input type="number" value={pricing.lunch_price} onChange={e => setPricing({...pricing, lunch_price: parseFloat(e.target.value) || 0})}
-              className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-indigo-500 outline-none transition-all" />
+              className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-green-500 outline-none transition-all" />
           </div>
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Dinner Price (USD)</label>
             <input type="number" value={pricing.dinner_price} onChange={e => setPricing({...pricing, dinner_price: parseFloat(e.target.value) || 0})}
-              className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-indigo-500 outline-none transition-all" />
+              className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-green-500 outline-none transition-all" />
           </div>
         </div>
 
         <div className="space-y-2">
           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Guide Service (USD / Guide)</label>
           <input type="number" value={pricing.guide_price} onChange={e => setPricing({...pricing, guide_price: parseFloat(e.target.value) || 0})}
-            className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-indigo-500 outline-none transition-all" />
+            className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-green-500 outline-none transition-all" />
         </div>
 
         <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-100">
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Exchange: 1 USD to UZS</label>
             <input type="number" value={pricing.usd_to_uzs} onChange={e => setPricing({...pricing, usd_to_uzs: parseFloat(e.target.value) || 0})}
-              className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-indigo-500 outline-none transition-all" />
+              className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-green-500 outline-none transition-all" />
           </div>
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Exchange: 1 USD to EUR</label>
             <input type="number" value={pricing.usd_to_eur} onChange={e => setPricing({...pricing, usd_to_eur: parseFloat(e.target.value) || 0})}
-              className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-indigo-500 outline-none transition-all" />
+              className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-green-500 outline-none transition-all" />
           </div>
         </div>
 
         <button 
           onClick={handleSave}
           disabled={saving}
-          className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 disabled:opacity-50 active:scale-95 mt-4"
+          className="w-full py-3 bg-emerald-700 text-white rounded-lg font-bold uppercase tracking-widest text-xs hover:bg-emerald-800 transition-all shadow-sm disabled:opacity-50 active:scale-95 mt-4"
         >
           {saving ? 'Saving...' : 'Save Configuration'}
         </button>

@@ -122,7 +122,7 @@ export function ProductSearch({ products, onSelect, onAddNew, placeholder = 'Sea
   return (
     <div className="relative">
       <div className="relative">
-        <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
         <input
@@ -134,7 +134,7 @@ export function ProductSearch({ products, onSelect, onAddNew, placeholder = 'Sea
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
-          className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-slate-900 placeholder:text-slate-300 focus:border-orange-400 focus:bg-white outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-zinc-950 placeholder:text-slate-300 focus:border-emerald-500 outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           autoComplete="off"
         />
       </div>
@@ -142,23 +142,23 @@ export function ProductSearch({ products, onSelect, onAddNew, placeholder = 'Sea
       {isOpen && (filtered.length > 0 || showAddNew) && (
         <div
           ref={dropdownRef}
-          className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200"
+          className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg border border-slate-200 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200"
         >
           {filtered.map((product, i) => (
             <button
               key={product.id}
               onClick={() => handleSelect(product)}
-              className={`w-full text-left px-5 py-3.5 flex items-center justify-between transition-all ${
-                i === highlightIndex ? 'bg-orange-50 border-l-4 border-l-orange-400' : 'hover:bg-slate-50 border-l-4 border-l-transparent'
+              className={`w-full text-left px-4 py-3 flex items-center justify-between transition-all ${
+                i === highlightIndex ? 'bg-emerald-50 border-l-2 border-l-emerald-500' : 'hover:bg-slate-50 border-l-2 border-l-transparent'
               }`}
             >
               <div>
-                <p className="font-bold text-slate-900">{product.item_name}</p>
+                <p className="font-bold text-zinc-950 text-sm">{product.item_name}</p>
                 <p className="text-[10px] text-slate-400 font-medium">
-                  {unitLabel[product.use_unit] || product.use_unit} · Stock: {product.current_stock} {product.use_unit}
+                  {unitLabel[product.use_unit] || product.use_unit} · Stock: <span className="font-data">{product.current_stock}</span> {product.use_unit}
                 </p>
               </div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-300 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
                 {product.use_unit}
               </span>
             </button>
@@ -167,12 +167,12 @@ export function ProductSearch({ products, onSelect, onAddNew, placeholder = 'Sea
           {showAddNew && (
             <button
               onClick={handleAddNew}
-              className="w-full text-left px-5 py-4 bg-gradient-to-r from-orange-50 to-amber-50 hover:from-orange-100 hover:to-amber-100 transition-all border-t border-slate-100 flex items-center gap-3"
+              className="w-full text-left px-4 py-3.5 bg-emerald-50/30 hover:bg-emerald-50 transition-all border-t border-slate-100 flex items-center gap-3"
             >
-              <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600 font-black text-lg">+</div>
+              <div className="w-8 h-8 bg-emerald-100 rounded-md flex items-center justify-center text-emerald-700 font-bold text-lg">+</div>
               <div>
-                <p className="font-black text-orange-700 text-sm">Add New Item</p>
-                <p className="text-[10px] text-orange-500 font-bold">"{query}" not found — create it</p>
+                <p className="font-bold text-emerald-700 text-xs uppercase tracking-widest">Add New Item</p>
+                <p className="text-[10px] text-emerald-600/60 font-medium">"{query}" not found — create it</p>
               </div>
             </button>
           )}

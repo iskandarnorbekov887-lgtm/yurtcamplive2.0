@@ -8,19 +8,19 @@ import { useAuth } from '@/lib/auth-context';
 import { Scale, Box, AlertTriangle, CheckCircle2, History, Zap, Plus, Search, Trash2, AlertCircle, XCircle, Keyboard, Cpu, Info } from 'lucide-react';
 
 const fetchInventory = async () => {
-  const { data } = await supabase.from('inventory').select('*').order('item_name');
-  return data as InventoryItem[];
+  const { data } = await supabase.from('inventory_items').select('*').order('item_name');
+  return (data || []) as InventoryItem[];
 };
 
 const fetchTodaysUsage = async () => {
   const today = new Date().toISOString().split('T')[0];
   const { data } = await supabase
     .from('inventory_ledger')
-    .select('*, inventory(*)')
+    .select('*, inventory:inventory_items(*)')
     .eq('type', 'OUT')
     .gte('created_at', today)
     .order('created_at', { ascending: false });
-  return data as (InventoryLedger & { inventory: InventoryItem })[];
+  return (data || []) as (InventoryLedger & { inventory: InventoryItem })[];
 };
 
 export function CookUsage() {
@@ -90,10 +90,10 @@ export function CookUsage() {
     setLastScan({ name: item.item_name, weight, unit: item.use_unit });
     setTimeout(() => setLastScan(null), 1800);
 
-    const updated = items.map(i => i.id === item.id ? { ...i, current_stock: i.current_stock - weight } : i);
+    const updated = (items || []).map(i => i.id === item.id ? { ...i, current_stock: i.current_stock - weight } : i);
     mutate('inventory', updated, false);
 
-    await supabase.from('inventory').update({ current_stock: item.current_stock - weight }).eq('id', item.id);
+    await supabase.from('inventory_items').update({ current_stock: item.current_stock - weight }).eq('id', item.id);
     await supabase.from('inventory_ledger').insert([{
       item_id: item.id,
       type: 'OUT',
@@ -126,7 +126,7 @@ export function CookUsage() {
     if (match) {
       const name = match[1].trim().toLowerCase();
       const weight = parseFloat(match[2]);
-      const item = items.find(i => i.item_name.toLowerCase() === name);
+      const item = (items || []).find(i => i.item_name.toLowerCase() === name);
       if (item) {
         await processUsage(item, weight);
         return;
@@ -153,30 +153,30 @@ export function CookUsage() {
     }, 3000);
   };
 
-  const filteredItems = items.filter(i => 
+  const filteredItems = (items || []).filter(i => 
     i.item_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
-    <div className="min-h-screen bg-noir-950 text-white p-8 font-sans selection:bg-electric-blue/30 overflow-x-hidden">
+    <div className="min-h-screen bg-white text-black p-8 font-sans overflow-x-hidden">
       
       {/* ── Overlays ── */}
       <AnimatePresence>
         {lastScan && (
           <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
-            <div className="bg-emerald-500 text-white px-16 py-10 rounded-[40px] shadow-2xl flex flex-col items-center gap-2">
-              <CheckCircle2 size={80} className="mb-4" />
-              <p className="text-8xl font-black tracking-tighter uppercase">{lastScan.weight}</p>
+            <div className="bg-black text-white px-16 py-10 border border-white shadow-2xl flex flex-col items-center gap-2">
+              <CheckCircle2 size={80} className="mb-4 text-emerald-400" />
+              <p className="text-8xl font-mono font-black tracking-tighter uppercase">{lastScan.weight}</p>
               <p className="text-2xl font-bold opacity-80 uppercase tracking-widest">{lastScan.unit} OF {lastScan.name}</p>
             </div>
           </motion.div>
         )}
         {stockError && (
           <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
-            <div className="bg-safety-orange text-white px-16 py-10 rounded-[40px] shadow-2xl flex flex-col items-center gap-2 border-4 border-white/20">
-              <XCircle size={80} className="mb-4" />
+            <div className="bg-white border-2 border-black text-black px-16 py-10 shadow-2xl flex flex-col items-center gap-2">
+              <XCircle size={80} className="mb-4 text-red-600" />
               <p className="text-4xl font-black tracking-tighter uppercase">Stock Limit</p>
-              <p className="text-7xl font-black my-2">{stockError.available} {stockError.unit}</p>
+              <p className="text-7xl font-mono font-black my-2">{stockError.available} {stockError.unit}</p>
               <p className="text-xl font-bold opacity-80 uppercase tracking-widest text-center">Available stock for {stockError.name} is only {stockError.available}</p>
             </div>
           </motion.div>
@@ -186,27 +186,27 @@ export function CookUsage() {
       <div className="max-w-7xl mx-auto space-y-12">
         
         {/* Header HUD */}
-        <div className="flex justify-between items-end">
+        <div className="flex justify-between items-end border-b-2 border-black pb-6">
           <div className="flex items-center gap-6">
-             <div className="w-16 h-16 bg-white/5 rounded-3xl flex items-center justify-center border border-white/10 group hover:border-electric-blue transition-all">
-                <Cpu className="text-electric-blue group-hover:animate-spin" size={32} />
+             <div className="w-12 h-12 border border-black flex items-center justify-center bg-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                <Cpu className="text-black" size={24} />
              </div>
              <div>
-                <h1 className="text-4xl font-black tracking-tighter uppercase">Hybrid Intelligence</h1>
-                <p className="text-slate-500 font-bold tracking-[0.3em] text-[10px] uppercase mt-2">Executive Logistics HUD v3.0</p>
+                <h1 className="text-3xl font-black text-black uppercase tracking-tighter">Hybrid Usage Station</h1>
+                <p className="text-slate-400 font-black text-[10px] uppercase tracking-[0.2em] mt-1">Real-Time Inventory Augmentation</p>
              </div>
           </div>
 
-          <div className="flex bg-white/5 p-1.5 rounded-2xl border border-white/10">
+          <div className="flex bg-white p-1 border border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
              <button 
                onClick={() => setMode('scale')}
-               className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${mode === 'scale' ? 'bg-electric-blue text-white shadow-lg' : 'text-slate-500'}`}
+               className={`px-5 py-2 text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${mode === 'scale' ? 'bg-black text-white' : 'text-black hover:bg-zinc-50'}`}
              >
                <Scale size={14} /> Scale Mode
              </button>
              <button 
                onClick={() => setMode('manual')}
-               className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${mode === 'manual' ? 'bg-emerald-500 text-white shadow-lg' : 'text-slate-500'}`}
+               className={`px-5 py-2 text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${mode === 'manual' ? 'bg-black text-white' : 'text-black hover:bg-zinc-50'}`}
              >
                <Keyboard size={14} /> Manual Mode
              </button>
@@ -219,13 +219,13 @@ export function CookUsage() {
           <div className="col-span-12 lg:col-span-8 space-y-8">
             
             {/* Input Engine */}
-            <section className={`glass-card rounded-[48px] p-12 relative overflow-hidden transition-all duration-500 border-2 ${mode === 'scale' ? 'border-electric-blue animate-pulse-glow shadow-[0_0_50px_rgba(59,130,246,0.2)]' : 'border-white/5'}`}>
+            <section className={`bg-white p-10 relative overflow-hidden transition-all border border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] ${mode === 'scale' ? 'bg-zinc-50/50' : ''}`}>
               
               <div className="flex flex-col items-center">
                 <div className="flex items-center gap-4 mb-12">
-                   <span className="px-4 py-1.5 rounded-full bg-white/5 text-slate-500 text-[10px] font-black uppercase tracking-widest border border-white/5 flex items-center gap-2">
-                      <div className={`w-1.5 h-1.5 rounded-full ${mode === 'scale' ? 'bg-electric-blue animate-ping' : 'bg-slate-700'}`} />
-                      {mode === 'scale' ? 'Listening for Scale Wedge' : 'Keyboard Input Active'}
+                   <span className="px-3 py-1 border border-black bg-white text-black text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                      <div className={`w-1.5 h-1.5 rounded-full ${mode === 'scale' ? 'bg-emerald-500 animate-pulse' : 'bg-black'}`} />
+                      {mode === 'scale' ? 'System: Listening' : 'System: Keyboard Input'}
                    </span>
                 </div>
 
@@ -239,9 +239,9 @@ export function CookUsage() {
                       if (mode === 'manual') setSearchQuery(e.target.value);
                     }}
                     onKeyDown={handleInput}
-                    placeholder={selectedItem ? `ENTER WEIGHT FOR ${selectedItem.item_name}...` : "READY FOR PROTOCOL..."}
+                    placeholder={selectedItem ? `INPUT WEIGHT: ${selectedItem.item_name}` : "READY FOR PROTOCOL"}
                     inputMode={mode === 'scale' ? 'none' : 'text'}
-                    className="w-full bg-transparent text-center text-7xl font-black tracking-tighter placeholder:text-slate-800 focus:outline-none uppercase"
+                    className="w-full bg-transparent text-center text-6xl font-mono font-black tracking-tighter placeholder:text-zinc-100 focus:outline-none text-black uppercase"
                     autoComplete="off"
                   />
                   
@@ -252,19 +252,19 @@ export function CookUsage() {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0 }}
-                        className="absolute top-full left-0 right-0 mt-6 bg-noir-800 border border-white/10 rounded-[32px] shadow-2xl z-50 max-h-80 overflow-y-auto p-4"
+                        className="absolute top-full left-0 right-0 mt-4 bg-white border border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] z-50 max-h-60 overflow-y-auto"
                       >
-                        {filteredItems.length > 0 ? filteredItems.map(item => (
+                        {(filteredItems || []).length > 0 ? filteredItems.map(item => (
                           <button 
                             key={item.id} 
                             onClick={() => handleSelectItem(item)}
-                            className="w-full px-8 py-5 text-left hover:bg-electric-blue rounded-2xl transition-all flex justify-between items-center group"
+                            className="w-full px-6 py-4 text-left hover:bg-black hover:text-white transition-colors flex justify-between items-center group border-b border-black last:border-0"
                           >
-                            <span className="font-black text-xl uppercase tracking-tight">{item.item_name}</span>
-                            <div className="flex items-center gap-4">
-                              <span className="text-xs font-bold text-slate-400 group-hover:text-white/80">{item.current_stock} {item.use_unit}</span>
-                              <div className="bg-white/5 p-2 rounded-xl group-hover:bg-white/20">
-                                 <Plus size={16} />
+                            <span className="font-black text-sm uppercase tracking-tight">{item.item_name}</span>
+                             <div className="flex items-center gap-3">
+                              <span className="text-xs font-mono font-black opacity-60">{item.current_stock} {item.use_unit}</span>
+                              <div className="border border-black p-1.5 bg-white group-hover:bg-zinc-800">
+                                 <Plus size={16} className="text-black group-hover:text-white" />
                               </div>
                             </div>
                           </button>
@@ -281,11 +281,11 @@ export function CookUsage() {
 
                 {/* Selected Item Indicator */}
                 {selectedItem && (
-                   <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-8 flex items-center gap-4 bg-electric-blue/10 border border-electric-blue/20 px-6 py-3 rounded-2xl">
-                      <Zap className="text-electric-blue" size={16} />
-                      <span className="font-black uppercase tracking-widest text-xs text-electric-blue">{selectedItem.item_name} SELECTED</span>
-                      <button onClick={() => { setSelectedItem(null); setSearchQuery(''); }} className="text-slate-500 hover:text-white transition-colors">
-                        <Trash2 size={14} />
+                   <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="mt-8 flex items-center gap-4 bg-black text-white px-6 py-3 border border-black">
+                      <Zap className="text-emerald-400" size={14} />
+                      <span className="font-black uppercase tracking-widest text-xs">{selectedItem.item_name} ACTIVE</span>
+                      <button onClick={() => { setSelectedItem(null); setSearchQuery(''); }} className="text-zinc-500 hover:text-white transition-colors ml-4">
+                        <Trash2 size={16} />
                       </button>
                    </motion.div>
                 )}
@@ -296,10 +296,10 @@ export function CookUsage() {
             <AnimatePresence>
                {selectedItem && (
                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
-                    <div className="glass-card rounded-[40px] p-8 border border-emerald-500/20 bg-emerald-500/5">
-                       <div className="flex items-center gap-4 mb-6">
-                          <Info className="text-emerald-500" size={20} />
-                          <p className="text-xs font-black uppercase tracking-widest text-emerald-500">Manual Weight Entry (Fallback)</p>
+                    <div className="bg-white p-8 border border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+                       <div className="flex items-center gap-3 mb-6">
+                          <Info className="text-black" size={18} />
+                          <p className="text-[10px] font-black uppercase tracking-widest text-black">Protocol: Manual Override</p>
                        </div>
                        <div className="flex gap-4">
                           <input 
@@ -309,62 +309,50 @@ export function CookUsage() {
                             value={manualWeight}
                             onChange={(e) => setManualWeight(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && processUsage(selectedItem, parseFloat(manualWeight))}
-                            className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-8 py-6 text-5xl font-black tracking-tighter text-white outline-none focus:border-emerald-500 transition-all"
+                            className="flex-1 bg-white border border-black px-6 py-4 text-4xl font-mono font-black tracking-tighter text-black outline-none focus:bg-zinc-50 transition-all"
                           />
                           <button 
                             onClick={() => processUsage(selectedItem, parseFloat(manualWeight))}
-                            className="px-12 bg-emerald-500 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl shadow-emerald-900/20"
+                            className="px-8 py-4 bg-black text-white font-black uppercase tracking-[0.2em] text-xs hover:bg-zinc-800 transition-all border border-black"
                           >
-                            Log {selectedItem.use_unit}
+                            LOG {selectedItem.use_unit}
                           </button>
                        </div>
                     </div>
                  </motion.div>
                )}
             </AnimatePresence>
-
-            {/* Desktop Helper Toggle */}
-            <div className="flex justify-center opacity-40 hover:opacity-100 transition-opacity">
-               <button 
-                 onClick={() => setScaleInput(selectedItem ? '0.500' : 'Tomato 0.850')} 
-                 className="text-[10px] font-black uppercase tracking-[0.4em] border-b border-white/10 pb-1"
-               >
-                 Simulate Input Protocol
-               </button>
-            </div>
           </div>
 
           {/* Sticky Notepad Sidebar (Col-4) */}
-          <div className="col-span-12 lg:col-span-4 h-full">
-            <section className="relative group h-full">
-              <div className="absolute inset-0 bg-white/5 rounded-[40px] translate-x-2 translate-y-2 rotate-1" />
-              <div className="relative glass-card rounded-[40px] p-8 border border-white/10 bg-noir-900 shadow-2xl -rotate-1 min-h-[440px]">
-                <div className="absolute top-0 left-0 right-0 h-6 bg-electric-blue/20 border-b border-dashed border-white/10" />
-                <div className="flex items-center justify-between mb-8 mt-4">
+          <div className="col-span-12 lg:col-span-4">
+            <section className="relative group">
+              <div className="bg-white border border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+                <div className="flex items-center justify-between p-6 border-b border-black">
                   <div className="flex items-center gap-3">
-                    <div className="w-2 h-8 bg-electric-blue rounded-full" />
-                    <h2 className="text-sm font-black uppercase tracking-widest">Shift Log</h2>
+                    <div className="w-1.5 h-6 bg-black" />
+                    <h2 className="text-[10px] font-black uppercase tracking-widest text-black">Resource Ledger</h2>
                   </div>
-                  <span className="text-[10px] font-black text-electric-blue">{todaysUsage.length}</span>
+                  <span className="text-lg font-mono font-black text-black">{(todaysUsage || []).length}</span>
                 </div>
-                <div className="flex flex-col gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                  <AnimatePresence>
-                    {todaysUsage.map((log) => (
-                      <motion.div key={log.id} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="relative pl-4 border-l border-white/10 flex items-center justify-between group/item">
+                <div className="flex flex-col divide-y divide-black/10 px-2 max-h-[500px] overflow-y-auto">
+                   <AnimatePresence>
+                     {(todaysUsage || []).map((log) => (
+                      <motion.div key={log.id} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} className="flex items-center justify-between py-4 px-4 hover:bg-zinc-50 transition-colors">
                         <div>
-                          <span className="font-black uppercase text-slate-200 text-[12px] block">{log.inventory?.item_name}</span>
-                          <span className="text-[8px] font-bold text-slate-600 uppercase mt-1">{new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          <span className="font-black text-black text-xs uppercase tracking-tight block truncate max-w-[140px]">{log.inventory?.item_name || 'UNKNOWN'}</span>
+                          <span className="text-[9px] font-mono font-black text-slate-400 mt-1 block uppercase">{new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
                         </div>
-                        <div className="text-right">
-                          <span className="text-lg font-black text-white">{Math.abs(log.qty)}</span>
-                          <span className="text-[7px] font-black text-slate-600 uppercase ml-1">{log.unit}</span>
+                        <div className="text-right shrink-0">
+                          <span className="font-mono text-base font-black text-black">{Math.abs(log.qty)}</span>
+                          <span className="text-[9px] font-black text-slate-400 uppercase ml-2">{log.unit}</span>
                         </div>
                       </motion.div>
                     ))}
                   </AnimatePresence>
                 </div>
-                <div className="absolute bottom-4 right-6 opacity-20 rotate-12">
-                   <Scale size={48} />
+                <div className="p-4 border-t border-black bg-zinc-50/50 flex justify-center">
+                   <p className="text-[8px] font-black uppercase tracking-[0.3em] text-slate-400">Ledger End of File</p>
                 </div>
               </div>
             </section>
@@ -372,25 +360,25 @@ export function CookUsage() {
         </div>
 
         {/* Compact Inventory HUD */}
-        <section className="space-y-8 pt-12 border-t border-white/5">
+        <section className="space-y-6 pt-12 border-t-2 border-black">
           <div className="flex items-center gap-4">
-            <Box className="text-slate-600" size={24} />
-            <h2 className="text-xl font-black uppercase tracking-tighter text-slate-400">Stores HUD</h2>
+            <Box className="text-black" size={20} />
+            <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-black">Stores Audit HUD</h2>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {items.map((item) => {
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+            {(items || []).map((item) => {
               const isLow = item.current_stock < item.min_threshold;
               return (
-                <motion.div key={item.id} className={`glass-card p-4 rounded-[28px] border-2 transition-all ${isLow ? 'border-safety-orange/30 bg-safety-orange/5' : 'border-white/5'}`}>
+                <div key={item.id} className={`bg-white p-5 border shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] ${isLow ? 'border-red-600 bg-red-50/10' : 'border-black'}`}>
                   <div className="flex justify-between items-start mb-4">
-                    <div className={`p-1.5 rounded-lg ${isLow ? 'bg-safety-orange/20 text-safety-orange' : 'bg-white/5 text-slate-500'}`}>
-                      {isLow ? <AlertTriangle size={12} /> : <Box size={12} />}
+                    <div className={`w-8 h-8 border border-black flex items-center justify-center ${isLow ? 'bg-red-600 text-white' : 'bg-white text-black'}`}>
+                      {isLow ? <AlertTriangle size={14} /> : <Box size={14} />}
                     </div>
-                    <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest bg-white/5 px-1.5 py-0.5 rounded-md">{item.use_unit}</span>
+                    <span className="text-[9px] font-mono font-black text-slate-400 uppercase tracking-widest">{item.use_unit}</span>
                   </div>
-                  <h3 className="text-[10px] font-black text-slate-400 truncate uppercase">{item.item_name}</h3>
-                  <p className={`text-xl font-black mt-1 tracking-tighter ${isLow ? 'text-safety-orange' : 'text-slate-200'}`}>{item.current_stock.toFixed(1)}</p>
-                </motion.div>
+                  <h3 className="text-[10px] font-black text-black truncate uppercase tracking-tighter mb-1">{item.item_name}</h3>
+                  <p className={`font-mono text-2xl font-black tracking-tight ${isLow ? 'text-red-600' : 'text-black'}`}>{item.current_stock.toFixed(1)}</p>
+                </div>
               );
             })}
           </div>

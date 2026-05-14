@@ -8,9 +8,7 @@ import {
   ProductUnit,
   ProcurementStatus,
 } from '@/types/procurement';
-import FuzzySearchInput from './FuzzySearchInput';
-import ProcurementTable from './ProcurementTable';
-import StatusBadge from './StatusBadge';
+import { Search, Trash2, Check, Clock, AlertTriangle } from 'lucide-react';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -29,6 +27,8 @@ export default function ProcurementForm({ onSubmit, isLoading = false }: Procure
   const [quantity, setQuantity] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   // Load products on mount
   useEffect(() => {
@@ -116,15 +116,48 @@ export default function ProcurementForm({ onSubmit, isLoading = false }: Procure
       {/* Product Selection & Quantity Input */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Product</label>
-          <FuzzySearchInput
-            products={products}
-            selectedProduct={selectedProduct}
-            onSelect={setSelectedProduct}
-          />
+          <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Product Search</label>
+          <div className="relative">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
+              <input
+                type="text"
+                value={selectedProduct ? selectedProduct.name : searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setSelectedProduct(null);
+                  setIsDropdownOpen(true);
+                }}
+                onFocus={() => setIsDropdownOpen(true)}
+                placeholder="Search products..."
+                className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm text-zinc-950 placeholder:text-slate-300 focus:border-emerald-500 outline-none transition-all"
+              />
+            </div>
+            
+            {isDropdownOpen && !selectedProduct && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                {products
+                  .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                  .map(product => (
+                    <button
+                      key={product.id}
+                      onClick={() => {
+                        setSelectedProduct(product);
+                        setSearchQuery('');
+                        setIsDropdownOpen(false);
+                      }}
+                      className="w-full px-4 py-2 text-left hover:bg-slate-50 text-sm text-zinc-950 transition-colors flex justify-between items-center"
+                    >
+                      <span>{product.name}</span>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">{product.unit}</span>
+                    </button>
+                  ))}
+              </div>
+            )}
+          </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
+          <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Quantity</label>
           <div className="flex gap-2">
             <input
               type="number"
@@ -133,11 +166,11 @@ export default function ProcurementForm({ onSubmit, isLoading = false }: Procure
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
               placeholder="0.00"
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="flex-1 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm text-zinc-950 font-data focus:border-emerald-500 outline-none transition-all disabled:opacity-50"
               disabled={!selectedProduct}
             />
             {selectedProduct && (
-              <span className="flex items-center px-3 py-2 bg-gray-100 rounded-lg text-gray-700 font-medium">
+              <span className="flex items-center px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-400 uppercase">
                 {selectedProduct.unit}
               </span>
             )}
@@ -157,12 +190,41 @@ export default function ProcurementForm({ onSubmit, isLoading = false }: Procure
       {/* Items Table */}
       {items.length > 0 && (
         <>
-          <ProcurementTable
-            items={items}
-            products={products}
-            onRemove={removeItem}
-            showManagerAdjustments={false}
-          />
+          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="px-4 py-2 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Item</th>
+                  <th className="px-4 py-2 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Quantity</th>
+                  <th className="px-4 py-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {items.map((item) => {
+                  const product = products.find(p => p.id === item.product_id);
+                  return (
+                    <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-4 py-3">
+                        <p className="font-bold text-zinc-950">{product?.name || 'Unknown'}</p>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="font-data font-bold text-zinc-950">{item.requested_quantity}</span>
+                        <span className="ml-1 text-[9px] font-bold text-slate-400 uppercase">{item.requested_unit}</span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => removeItem(item.id)}
+                          className="p-1.5 text-slate-300 hover:text-rose-600 transition-colors"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
 
           {/* Summary */}
           <div className="bg-gray-50 p-4 rounded-lg">

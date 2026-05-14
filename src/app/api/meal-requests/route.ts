@@ -52,16 +52,23 @@ export async function POST(request: NextRequest) {
 
     const toInsert = meals
       .filter((m: any) => !existingKeys.has(`${m.meal_date}|${m.meal_type}`))
-      .map((m: any) => ({
-        booking_id,
-        meal_date: m.meal_date,
-        meal_type: m.meal_type,
-        adult_qty: m.adult_qty ?? 1,
-        child_qty: m.child_qty ?? 0,
-        dietary_type: m.dietary_type ?? 'Normal',
-        status: 'Pending',
-        notes: m.notes || null,
-      }));
+      .map((m: any) => {
+        const timestamp = Date.now().toString(36).toUpperCase();
+        const random = Math.random().toString(36).substring(2, 5).toUpperCase();
+        const orderId = `ORD-${timestamp}-${random}`;
+
+        return {
+          booking_id,
+          order_id: orderId,
+          meal_date: m.meal_date,
+          meal_type: m.meal_type,
+          adult_qty: m.adult_qty ?? 1,
+          child_qty: m.child_qty ?? 0,
+          dietary_type: m.dietary_type ?? 'Normal',
+          status: 'Pending',
+          notes: m.notes || null,
+        };
+      });
 
     if (toInsert.length === 0) {
       return NextResponse.json({ message: 'All meals already exist for this booking', inserted: [] }, { status: 200 });

@@ -3,7 +3,7 @@
  * Focus: Stability and Speed
  */
 
-import { sendDateChangeResult } from '@/utils/notify';
+
 
 export function localDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -16,72 +16,38 @@ export const formatSpace = (num: number, decimals = 2): string => {
   }).format(num).replace(/,/g, ' ');
 };
 
-export const isGcCancelled = (ev: { status?: string | null; colorId?: string | null; summary?: string | null }): boolean => {
-  return (
-    ev.status === 'cancelled' ||
-    ev.colorId === '11' ||
-    ev.colorId === '4' ||
-    (ev.summary?.toLowerCase() ?? '').includes('cancel')
-  );
+export const isGcCancelled = (ev: any) => {
+  return ev.colorId === '11' || ev.status === 'cancelled';
 };
 
-export const sanitizeNotes = (description: string | null | undefined): string => {
-  return String(description || '');
-};
-
-// Logic helper for approving dates
-export async function handleApproveDatesLogic({
-  booking,
-  gcEvents,
-  onUpdateBooking,
-  setLoadingAction,
-  setSyncWarnings,
-  flash,
-  onRefresh,
-}: {
-  booking: any;
-  gcEvents: any[];
-  onUpdateBooking: (id: number, data: any) => Promise<void> | void;
-  setLoadingAction: (val: string) => void;
-  setSyncWarnings: (fn: (prev: any) => any) => void;
-  flash: (msg: string) => void;
-  onRefresh?: () => Promise<void> | void;
-}) {
-  if (!onUpdateBooking) return;
-  const linkedEv = gcEvents.find((e: any) => e.id === booking.google_event_id);
-  if (!linkedEv) {
-    flash('⚠ Linked calendar event not found.');
-    return;
-  }
+export async function handleApproveDatesLogic({ 
+  booking, gcEvents, onUpdateBooking, setLoadingAction, setSyncWarnings, flash, onRefresh 
+}: any) {
+  const ev = gcEvents.find((e: any) => e.id === booking.google_event_id);
+  if (!ev) { flash('⚠ Associated Google event not found.'); return; }
   
   setLoadingAction(`syncdates-${booking.id}`);
   try {
-    await onUpdateBooking(booking.id, { 
-      check_in: linkedEv.start, 
-      check_out: linkedEv.end 
-    });
+    const updates = { check_in: ev.start, check_out: ev.end, is_manual_dates: false };
+    if (onUpdateBooking) await onUpdateBooking(booking.id, updates);
     
-    setSyncWarnings((w: any) => {
-      const next = { ...w };
+    // Clear the warning
+    setSyncWarnings((prev: any) => {
+      const next = { ...prev };
       delete next[booking.id];
       return next;
     });
     
-    flash('✓ Dates approved from calendar.');
-
-    // Notify CEO about the approval
-    await sendDateChangeResult(
-      booking.id,
-      booking.guest_name,
-      'approved',
-      { checkIn: linkedEv.start, checkOut: linkedEv.end }
-    );
-
+    flash('✓ Dates synchronized with Google Calendar.');
     if (onRefresh) await onRefresh();
-  } catch (e: any) {
-    const msg = e instanceof Error ? e.message : String(e);
-    flash(`⚠ ${msg.slice(0, 100)}`);
+  } catch (err) {
+    console.error('Sync error:', err);
+    flash('⚠ Sync failed.');
   } finally {
     setLoadingAction('');
   }
 }
+
+export const sanitizeNotes = (description: string | null | undefined): string => {
+  return String(description || '');
+};

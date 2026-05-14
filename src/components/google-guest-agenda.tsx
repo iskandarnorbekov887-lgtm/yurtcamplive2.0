@@ -8,11 +8,11 @@ import { BookingModal } from '@/components/BookingModal';
 import { 
   localDateStr, 
   formatSpace, 
-  isGcCancelled, 
-  handleApproveDatesLogic,
-  sanitizeNotes
+  sanitizeNotes,
+  isGcCancelled,
+  handleApproveDatesLogic
 } from '@/utils/calendar-logic';
-import { sendDateChangeNotification } from '@/utils/notify';
+
 import { ManagerIncomeForm } from '@/components/manager-income-form';
 
 
@@ -42,7 +42,6 @@ interface DayEntry {
   dinner: boolean; dinnerCount: number; dinnerDietary: string;
   guideService: boolean; guideNames: string[];
   transportation: boolean; transEntries: TransEntry[];
-  cookingClass: boolean;
   specialRequest: string;
 }
 
@@ -81,9 +80,6 @@ interface Props {
 export function GoogleGuestAgenda({
   bookings, userRole, currentUserId, onCheckIn, onCheckOut, onUpdateBooking, onCancelBooking, onAddNewBooking, onRefresh,
 }: Props) {
-  const [gcEvents, setGcEvents] = useState<CalEvent[]>([]);
-  const [loadingEvents, setLoadingEvents] = useState(true);
-  const [eventsError, setEventsError] = useState('');
   const [selectedItem, setSelectedItem] = useState<ListItem | null>(null);
   const sel = selectedItem?.booking ?? null;
 
@@ -91,17 +87,11 @@ export function GoogleGuestAgenda({
   const [drinks, setDrinks] = useState<Drink[]>([]);
   const [selectedDrinks, setSelectedDrinks] = useState<Record<number, number>>({});
   const [showDrinks, setShowDrinks] = useState(false);
-  const [collectedAmount, setCollectedAmount] = useState('');
-  const [collectedCurrency, setCollectedCurrency] = useState<'UZS' | 'USD' | 'EUR'>('USD');
-  const [extraServices, setExtraServices] = useState<Array<{ name: string; price: string; currency: string }>>([]);
-  const [newExtraName, setNewExtraName] = useState('');
-  const [newExtraPrice, setNewExtraPrice] = useState('');
   const [actionMsg, setActionMsg] = useState('');
-  const [svcChildren, setSvcChildren] = useState(0);
-
+  
   const getPrefix = (item: ListItem) => {
     const booking = item.booking;
-    if (!booking) return '🌐 ';
+    if (!booking) return '';
     
     let category = '';
     try {
@@ -113,13 +103,9 @@ export function GoogleGuestAgenda({
 
     if (category === 'pool') return '🏊 ';
     if (category === 'local') return '🏠 ';
-    if (category === 'international' || category === 'camper') return '';
-    
-    if (booking.source === 'System' || booking.source === 'manual') return '';
-    if (item.source === 'calendar' || item.source === 'both') return '🌐 ';
-    
     return '';
   };
+
   const [svcAmount, setSvcAmount] = useState(0);
   const [svcDiscount, setSvcDiscount] = useState(0);
   const [svcPayList, setSvcPayList] = useState<Array<{ 
@@ -129,33 +115,22 @@ export function GoogleGuestAgenda({
     rate?: number;
     id?: number; 
   }>>([{ amount: '', currency: 'USD', method: 'Cash' }]);
-  const [fetchingRate, setFetchingRate] = useState<string | null>(null);
-  const [syncWarnings, setSyncWarnings] = useState<Record<number, 'deleted' | 'dates_changed'>>({});
-  const [payModified, setPayModified] = useState(false); // Track if user manually changed payment amount
-  const [isPrepaid, setIsPrepaid] = useState(false); // Toggle for prepaid accommodation
+
+  const [isPrepaid, setIsPrepaid] = useState(false);
   const [isLunchPrepaid, setIsLunchPrepaid] = useState(false);
   const [isDinnerPrepaid, setIsDinnerPrepaid] = useState(false);
   const [selectedCalendarDay, setSelectedCalendarDay] = useState<string>(localDateStr(new Date()));
+  const [editingDates, setEditingDates] = useState(false);
+  const [editCheckIn, setEditCheckIn] = useState('');
+  const [editCheckOut, setEditCheckOut] = useState('');
   const [nowTime, setNowTime] = useState(new Date());
   const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
-    const timer = setInterval(() => setNowTime(new Date()), 60000); // Update every minute
+    const timer = setInterval(() => setNowTime(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
 
-  const currentHour = nowTime.getHours();
-  const currentMinute = nowTime.getMinutes();
-  const isAfterNoon = currentHour >= 12;
-  const isAfterTwo = currentHour >= 14;
-  const [editingDates, setEditingDates] = useState(false);
-  const [editCheckIn, setEditCheckIn] = useState('');
-  const [editCheckOut, setEditCheckOut] = useState('');
-  const [dayEntries, setDayEntries] = useState<DayEntry[]>([]);
-  const [showServices, setShowServices] = useState(false);
-  const [showNotes, setShowNotes] = useState(true);
-  
-  // Global service states for simplified Manager view
   const [svcLunch, setSvcLunch] = useState(false);
   const [svcLunchCount, setSvcLunchCount] = useState(0);
   const [svcDinner, setSvcDinner] = useState(false);
@@ -165,239 +140,215 @@ export function GoogleGuestAgenda({
   const [svcGuidePrice, setSvcGuidePrice] = useState(0);
   const [svcTransport, setSvcTransport] = useState(false);
   const [svcTransList, setSvcTransList] = useState<Array<{ name: string; details: string; price: number }>>([{ name: '', details: '', price: 0 }]);
-  const [svcCooking, setSvcCooking] = useState(false);
-  const [svcCookingPrice, setSvcCookingPrice] = useState(0);
-  const [svcLaundry, setSvcLaundry] = useState(false);
-  const [svcLaundryPrice, setSvcLaundryPrice] = useState(0);
   const [svcAdults, setSvcAdults] = useState(1);
+  const [svcChildren, setSvcChildren] = useState(0);
   const [showFinalReceipt, setShowFinalReceipt] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
   const [historyPayments, setHistoryPayments] = useState<any[]>([]);
   const [dateAdjAmount, setDateAdjAmount] = useState('');
   const [dbSettledReceipts, setDbSettledReceipts] = useState<any[]>([]);
-
-  useEffect(() => {
-    if (sel?.id) {
-      const loadHistory = async () => {
-        const { data } = await supabase.from('payments').select('*').eq('booking_id', sel.id).order('created_at', { ascending: false });
-        setHistoryPayments(data || []);
-      };
-      loadHistory();
-    } else {
-      setHistoryPayments([]);
-    }
-  }, [sel?.id, showFinalReceipt]);
-
-  useEffect(() => {
-    if (!sel?.id) { setDbSettledReceipts([]); return; }
-    const loadReceipts = async () => {
-      try {
-        const { data } = await supabase
-          .from('booking_receipts')
-          .select('*')
-          .eq('booking_id', sel.id)
-          .order('created_at', { ascending: false });
-        const rows = (data as any[]) || [];
-        const snapshots = rows.map(r => r.snapshot).filter(Boolean);
-        setDbSettledReceipts(snapshots);
-      } catch {
-        // Table may not exist yet in some environments; fall back to special_requests
-        setDbSettledReceipts([]);
-      }
-    };
-    loadReceipts();
-  }, [sel?.id, sel?.collected_amount, sel?.special_requests]);
+  const [extraServices, setExtraServices] = useState<any[]>([]);
+  const [newExtraName, setNewExtraName] = useState('');
+  const [newExtraPrice, setNewExtraPrice] = useState('');
+  const [showServices, setShowServices] = useState(false);
+  const [showNotes, setShowNotes] = useState(true);
+  const [collectedAmount, setCollectedAmount] = useState('');
+  const [collectedCurrency, setCollectedCurrency] = useState<'USD' | 'UZS' | 'EUR'>('USD');
+  const [fetchingRate, setFetchingRate] = useState<'UZS' | 'EUR' | null>(null);
+  const [dayEntries, setDayEntries] = useState<DayEntry[]>([]);
+  const [payModified, setPayModified] = useState(false);
+  const [showDayAgenda, setShowDayAgenda] = useState(false);
+  const [kitchenOrders, setKitchenOrders] = useState<any[]>([]);
 
   const getSettledReceiptsForSel = () => {
-    if (dbSettledReceipts.length) return dbSettledReceipts;
-    let meta: any = {};
+    if (!sel) return [];
     try {
-      if (!sel?.special_requests) return [];
-      const parsed = typeof sel.special_requests === 'string'
-        ? JSON.parse(sel.special_requests || '{}')
-        : (sel.special_requests || {});
-      meta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
-      const receipts = meta.settled_receipts || [];
-      // Sort by settled_at date so oldest tab is first
-      return receipts.sort((a: any, b: any) => {
-        const dateA = new Date(a.settled_at || a.date).getTime();
-        const dateB = new Date(b.settled_at || b.date).getTime();
-        return dateA - dateB;
-      });
-    } catch (err) {
-      console.error('Metadata parse error:', err);
-      return [];
-    }
+      const meta = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
+      return meta.settled_receipts || [];
+    } catch { return []; }
   };
-  
-  const DEFAULT_PRICING = {
-    lunch_price: 10,
-    dinner_price: 10,
-    guide_price: 40,
-    usd_to_uzs: 12500,
-    usd_to_eur: 0.92
-  };
+
+  const DEFAULT_PRICING = { lunch_price: 10, dinner_price: 10, guide_price: 40, usd_to_uzs: 12500, usd_to_eur: 0.92 };
   const [pricing, setPricing] = useState(DEFAULT_PRICING);
   const [valError, setValError] = useState<string | null>(null);
 
-  // Calculate totals at top level for scope availability
-  const sTotal_calc = (
-    (svcLunch && !isLunchPrepaid ? svcLunchCount * (pricing.lunch_price) : 0) +
-    (svcDinner && !isDinnerPrepaid ? svcDinnerCount * (pricing.dinner_price) : 0) +
+  const gTotal = Math.max(0, (isPrepaid ? 0 : svcAmount) + 
+    (kitchenOrders || []).reduce((sum: number, o: any) => {
+      if (o.status === 'confirmed' || o.status === 'served') {
+        if (o.prepaid) return sum;
+        const price = o.type.toLowerCase() === 'lunch' ? pricing.lunch_price : pricing.dinner_price;
+        return sum + ((o.quantity || 0) * price);
+      }
+      return sum;
+    }, 0) +
+    (svcLunch && !isLunchPrepaid ? svcLunchCount * pricing.lunch_price : 0) +
+    (svcDinner && !isDinnerPrepaid ? svcDinnerCount * pricing.dinner_price : 0) +
     (svcGuide ? svcGuidePrice : 0) +
     (svcTransport ? svcTransList.reduce((s: number, t: any) => s + (t.price || 0), 0) : 0) +
-    (svcLaundry ? svcLaundryPrice : 0) +
-    (svcCooking ? svcCookingPrice : 0)
-  );
-  const dTotal_calc = Object.entries(selectedDrinks).reduce((sum: number, [id, qty]: [string, number]) => {
-    const drink = drinks.find((d: any) => d.id === parseInt(id));
-    return sum + (qty * (drink?.sold_price || 0));
-  }, 0);
-  const eTotal_calc = extraServices.reduce((sum: number, s: any) => sum + (parseFloat(s.price) || 0), 0);
-  const gTotal = Math.max(0, (isPrepaid ? 0 : svcAmount) + sTotal_calc + dTotal_calc + eTotal_calc - svcDiscount);
+    Object.entries(selectedDrinks).reduce((sum: number, [id, qty]: [string, number]) => {
+      const drink = drinks.find((d: any) => d.id === parseInt(id));
+      return sum + (qty * (drink?.sold_price || 0));
+    }, 0) +
+    extraServices.reduce((sum: number, s: any) => sum + (parseFloat(s.price) || 0), 0) - svcDiscount);
   
+  const debtRemaining = gTotal;
   const tPaidUsd = svcPayList.reduce((sum, p) => {
     const amt = parseFloat(p.amount) || 0;
     if (p.currency === 'USD') return sum + amt;
     const rate = p.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92);
     return sum + (amt / rate);
   }, 0);
-  
-  const prepaidLunchAmt = isLunchPrepaid && svcLunch ? svcLunchCount * (pricing?.lunch_price || 0) : 0;
-  const prepaidDinnerAmt = isDinnerPrepaid && svcDinner ? svcDinnerCount * (pricing?.dinner_price || 0) : 0;
-
-  // Logic for what is ALREADY accounted for (Pre-paid or DB)
-  // For the active tab, we only care about pre-paid items for THIS tab.
-  // Previous stay payments (sel.collected_amount) should NOT offset the current tab's items.
-  // MATCH BALANCE should always get the current open tab (gTotal)
-  const debtRemaining = gTotal;
-
-  const canFinalize = isPrepaid || (svcAmount > 0) || (sTotal_calc + dTotal_calc + eTotal_calc > 0);
   const isBalanceMatched = Math.abs(tPaidUsd - debtRemaining) < 1.00;
-  
   const today = localDateStr(new Date());
+  const isAfterNoon = nowTime.getHours() >= 12;
+  const isAfterTwo = nowTime.getHours() >= 14;
 
   useEffect(() => {
-    fetchPricing();
-  }, []);
-
-  async function fetchPricing() {
-    try {
-      const { data } = await supabase.from('service_pricing').select('*').eq('id', 1);
-      if (data && data.length > 0) {
-        setPricing({
-          ...DEFAULT_PRICING,
-          ...data[0]
-        });
-      }
-    } catch (err) {
-      console.error('Error fetching pricing:', err);
-    }
-  }
-
-  useEffect(() => {
-    fetch('/api/calendar/events', { cache: 'no-store' })
-      .then(r => r.json())
-      .then((data: CalEvent[] | { error: string }) => {
-        if ('error' in data) { setEventsError(data.error); setGcEvents([]); }
-        else {
-          const events = data as CalEvent[];
-          setGcEvents(events);
-          const cutoff = localDateStr(new Date(Date.now() - 7 * 86400000));
-          const warnings: Record<number, 'deleted' | 'dates_changed'> = {};
-          const toSilentlyDelete: number[] = [];
-          bookings.filter(b => b.google_event_id && b.check_in >= cutoff).forEach(b => {
-            const ev = events.find(e => e.id === b.google_event_id);
-            if (!ev) {
-              // GC event deleted: if booking never reached check-in, drop it silently
-              if (b.status === 'confirmed') toSilentlyDelete.push(b.id);
-              else warnings[b.id] = 'deleted';
-            } else if (ev.start !== b.check_in || ev.end !== b.check_out) {
-                let m: any = {};
-                try {
-                  const parsed = typeof b.special_requests === 'string' ? JSON.parse(b.special_requests || '{}') : (b.special_requests || {});
-                  m = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
-                  if (!m.is_manual_dates) {
-                    warnings[b.id] = 'dates_changed';
-                  }
-                } catch {
-                  warnings[b.id] = 'dates_changed';
-                }
-            }
-          });
-          setSyncWarnings(warnings);
-
-          // Auto-notify Managers about date changes
-          bookings.filter(b => b.google_event_id && b.check_in >= cutoff).forEach(b => {
-            const ev = events.find(e => e.id === b.google_event_id);
-            if (ev && (ev.start !== b.check_in || ev.end !== b.check_out)) {
-              let m: any = {};
-              try {
-                const parsed = typeof b.special_requests === 'string' ? JSON.parse(b.special_requests || '{}') : (b.special_requests || {});
-                m = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
-                if (!m.is_manual_dates) {
-                  sendDateChangeNotification(
-                    b.id,
-                    b.guest_name,
-                    { checkIn: b.check_in, checkOut: b.check_out },
-                    { checkIn: ev.start, checkOut: ev.end }
-                  );
-                }
-              } catch { /* skip */ }
-            }
-          });
-
-          if (toSilentlyDelete.length > 0) {
-            (async () => {
-              for (const id of toSilentlyDelete) {
-                try { await supabase.from('bookings').delete().eq('id', id); }
-                catch (err) { console.error('Silent delete failed for booking', id, err); }
-              }
-              onRefresh?.();
-            })();
-          }
-        }
-      })
-      .catch(e => setEventsError(String(e)))
-      .finally(() => setLoadingEvents(false));
-
-    supabase.from('drinks').select('*').eq('available', true)
-      .then(({ data }: { data: Drink[] | null }) => setDrinks(data || []));
-  }, []);
-
-  // Auto-sync notes: when a linked Google Calendar event's description changes,
-  // update the booking's notes field to match.
-  const [didSyncNotes, setDidSyncNotes] = useState(false);
-  useEffect(() => {
-    if (didSyncNotes || gcEvents.length === 0 || bookings.length === 0) return;
-    const cleanDesc = (d: string | null | undefined) =>
-      d && !d.includes('tasks.google.com') ? d.trim() : null;
-    const toSync = bookings.filter(b => {
-      if (!b.google_event_id) return false;
-      const ev = gcEvents.find(e => e.id === b.google_event_id);
-      if (!ev) return false;
-      const live = cleanDesc(ev.description);
-      const saved = (b.notes || '').trim() || null;
-      return live !== saved;
+    supabase.from('service_pricing').select('*').eq('id', 1).then(({ data }) => {
+      if (data?.[0]) setPricing({ ...DEFAULT_PRICING, ...data[0] });
     });
-    if (toSync.length === 0) { setTimeout(() => setDidSyncNotes(true), 0); return; }
-    (async () => {
-      for (const b of toSync) {
-        const ev = gcEvents.find(e => e.id === b.google_event_id)!;
-        const live = cleanDesc(ev.description);
-        try { await supabase.from('bookings').update({ notes: live }).eq('id', b.id); }
-        catch (err) { console.error('Notes sync failed for booking', b.id, err); }
+    supabase.from('drinks').select('*').eq('available', true).then(({ data }) => setDrinks(data || []));
+  }, []);
+
+  const [gcEvents, setGcEvents] = useState<CalEvent[]>([]);
+  const [syncWarnings, setSyncWarnings] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        const res = await fetch('/api/calendar/events');
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.indexOf('application/json') !== -1) {
+          const data = await res.json();
+          if (Array.isArray(data)) setGcEvents(data);
+        } else {
+          console.error(`Expected JSON, got ${contentType}`);
+        }
+      } catch (err) { console.error('Failed to fetch GC events:', err); }
+    };
+    fetchEvents();
+    const interval = setInterval(fetchEvents, 60000); // Sync every minute
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!sel) {
+      setKitchenOrders([]);
+      return;
+    }
+
+    const syncKitchen = async () => {
+      const { data: dbMeals } = await supabase
+        .from('meal_requests')
+        .select('*')
+        .eq('booking_id', sel.id);
+      
+      if (!dbMeals) return;
+
+      const statusMap: Record<string, string> = { 'Pending': 'pending', 'Accepted': 'confirmed', 'Served': 'served' };
+      const meta = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
+      const jsonOrders = meta.kitchen_orders || [];
+      const settledReceipts = meta.settled_receipts || [];
+      
+      const paidMealIds = new Set();
+      settledReceipts.forEach((r: any) => {
+        if (r.snapshot?.kitchen_orders) {
+          r.snapshot.kitchen_orders.forEach((ko: any) => {
+            if (ko.meal_id) paidMealIds.add(ko.meal_id);
+          });
+        }
+      });
+
+      const synced = dbMeals.map(m => {
+        const type = m.meal_type.toLowerCase();
+        const isPaidInReceipt = paidMealIds.has(m.id);
+        const jsonMatch = jsonOrders.find((jo: any) => jo.meal_id === m.id || (!jo.meal_id && jo.type === type));
+        
+        return {
+          type,
+          quantity: m.adult_qty,
+          status: isPaidInReceipt ? 'paid' : (statusMap[m.status] || m.status.toLowerCase()),
+          prepaid: jsonMatch ? jsonMatch.prepaid : (type === 'lunch' ? isLunchPrepaid : isDinnerPrepaid),
+          meal_id: m.id
+        };
+      });
+      setKitchenOrders(synced);
+    };
+
+    syncKitchen();
+    
+    const channel = supabase
+      .channel(`kitchen-sync-${sel.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'meal_requests', filter: `booking_id=eq.${sel.id}` }, () => syncKitchen())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [sel?.id, isLunchPrepaid, isDinnerPrepaid]);
+
+  useEffect(() => {
+    if (gcEvents.length === 0 || bookings.length === 0) return;
+    const warnings: Record<string, string> = {};
+    bookings.forEach(b => {
+      if (!(b as any).google_event_id) return;
+      const ev = gcEvents.find(e => e.id === (b as any).google_event_id);
+      if (!ev) {
+        if (b.status === 'confirmed' || b.status === 'checked_in') warnings[b.id] = 'deleted';
+        return;
       }
-      setTimeout(() => setDidSyncNotes(true), 0);
-      onRefresh?.();
-    })();
-  }, [gcEvents, bookings, didSyncNotes, onRefresh]);
+      if (isGcCancelled(ev)) {
+        if (b.status !== 'cancelled') warnings[b.id] = 'deleted';
+        return;
+      }
+      if (!(b as any).is_manual_dates && (b.check_in !== ev.start || b.check_out !== ev.end)) {
+        warnings[b.id] = 'dates_changed';
+      }
+    });
+    setSyncWarnings(warnings);
+  }, [gcEvents, bookings]);
+
+  const gcItems = useMemo(() => gcEvents.map(ev => ({
+    key: `gc-${ev.id}`, name: ev.summary, start: ev.start, end: ev.end, source: 'google' as const, booking: null, event: ev,
+  })), [gcEvents]);
+
+  const bookingItems = useMemo(() => bookings.map(b => ({
+    key: `db-${b.id}`, name: b.guest_name, start: b.check_in, end: b.check_out, source: 'db' as const, booking: b, event: null,
+  })), [bookings]);
+
+  const D = selectedCalendarDay;
+
+  const unlinkedGcItems = useMemo(() => {
+    return gcItems.filter(gi => !bookings.some(b => (b as any).google_event_id === gi.event?.id) && !isGcCancelled(gi.event!));
+  }, [gcItems, bookings]);
+
+  const arrivingItems = useMemo(() => {
+    const dbs = bookingItems.filter(i => i.booking!.status === 'confirmed' && i.booking!.check_in === D);
+    const gcs = unlinkedGcItems.filter(i => i.start === D);
+    return [...dbs, ...gcs].sort((a, b) => a.start.localeCompare(b.start));
+  }, [bookingItems, unlinkedGcItems, D]);
+
+  const stayingItems = useMemo(() => {
+    const dbs = bookingItems.filter(i => (i.booking!.status === 'confirmed' || i.booking!.status === 'checked_in') && i.booking!.check_in < D && i.booking!.check_out > D);
+    const gcs = unlinkedGcItems.filter(i => i.start < D && i.end > D);
+    return [...dbs, ...gcs].sort((a, b) => a.start.localeCompare(b.start));
+  }, [bookingItems, unlinkedGcItems, D]);
+
+  const checkedInItems = useMemo(() => {
+    return bookingItems.filter(i => i.booking!.status === 'checked_in' && i.booking!.check_in <= D && i.booking!.check_out > D).sort((a, b) => a.start.localeCompare(b.start));
+  }, [bookingItems, D]);
+
+  const checkingOutItems = useMemo(() => {
+    const dbs = bookingItems.filter(i => i.booking!.status === 'checked_in' && i.booking!.check_out === D);
+    const gcs = unlinkedGcItems.filter(i => i.end === D);
+    return [...dbs, ...gcs].sort((a, b) => a.start.localeCompare(b.start));
+  }, [bookingItems, unlinkedGcItems, D]);
+
+  const checkedOutItems = useMemo(() => bookingItems.filter(i => i.booking!.status === 'completed' && i.booking!.check_out === D).sort((a, b) => b.start.localeCompare(a.start)), [bookingItems, D]);
+  const cancelledItems = useMemo(() => bookingItems.filter(i => i.booking!.status === 'cancelled' && i.booking!.check_in <= D && i.booking!.check_out > D).sort((a, b) => b.start.localeCompare(a.start)), [bookingItems, D]);
 
   useEffect(() => {
     if (selectedItem?.booking) {
       const updated = bookings.find(b => b.id === selectedItem.booking!.id);
       if (updated) {
-        // Deep compare to prevent unnecessary re-renders that could close modals
         const currentStr = JSON.stringify(selectedItem.booking);
         const updatedStr = JSON.stringify(updated);
         if (currentStr !== updatedStr) {
@@ -407,64 +358,9 @@ export function GoogleGuestAgenda({
     }
   }, [bookings, selectedItem?.booking]);
 
-  // Reset receipt view only when guest ID actually changes
   useEffect(() => {
     setTimeout(() => setSelectedReceipt(null), 0);
   }, [sel?.id]);
-
-
-
-
-  const calendarOnlyItems = useMemo(() => gcEvents
-    .filter(ev => !bookings.some(b => b.google_event_id === ev.id))
-    .map(ev => ({ key: `ev-${ev.id}`, name: ev.summary, start: ev.start, end: ev.end, source: 'calendar' as const, booking: null, event: ev })), [gcEvents, bookings]);
-
-  const bookingItems = useMemo(() => bookings.map(b => {
-    const linkedEv = gcEvents.find(e => e.id === b.google_event_id) || null;
-    
-    // THE FIX: If manual dates are on, use DB dates. Otherwise, use Google.
-    const displayStart = b.is_manual_dates ? b.check_in : (linkedEv?.start || b.check_in);
-    const displayEnd = b.is_manual_dates ? b.check_out : (linkedEv?.end || b.check_out);
-
-    const effB: Booking = b.status === 'confirmed' && linkedEv && isGcCancelled(linkedEv)
-      ? { ...b, status: 'cancelled', check_in: displayStart, check_out: displayEnd }
-      : { ...b, check_in: displayStart, check_out: displayEnd };
-
-    return {
-      key: `db-${b.id}`, name: effB.guest_name, start: effB.check_in, end: effB.check_out,
-      source: 'db' as const, booking: effB, event: linkedEv,
-    };
-  }), [bookings, gcEvents]);
-
-  const D = selectedCalendarDay;
-
-  const arrivingItems = useMemo(() => [
-    ...bookingItems.filter(i => i.booking!.status === 'confirmed' && i.booking!.check_in === D),
-    ...calendarOnlyItems.filter(i => i.event!.start === D && !isGcCancelled(i.event!)),
-  ].sort((a, b) => a.start.localeCompare(b.start)), [bookingItems, calendarOnlyItems, D]);
-
-  const stayingItems = useMemo(() => bookingItems
-    .filter(i => i.booking!.status === 'confirmed' && i.booking!.check_in < D && i.booking!.check_out > D)
-    .sort((a, b) => a.start.localeCompare(b.start)), [bookingItems, D]);
-
-  const checkedInItems = useMemo(() => bookingItems
-    .filter(i => i.booking!.status === 'checked_in' && i.booking!.check_in <= D && i.booking!.check_out > D)
-    .sort((a, b) => a.start.localeCompare(b.start)), [bookingItems, D]);
-
-  const checkingOutItems = useMemo(() => bookingItems
-    .filter(i => i.booking!.status === 'checked_in' && i.booking!.check_out === D)
-    .sort((a, b) => a.start.localeCompare(b.start)), [bookingItems, D]);
-
-  const checkedOutItems = useMemo(() => bookingItems
-    .filter(i => i.booking!.status === 'completed' && i.booking!.check_out === D)
-    .sort((a, b) => b.start.localeCompare(a.start)), [bookingItems, D]);
-
-  const cancelledItems = useMemo(() => [
-    ...bookingItems.filter(i => i.booking!.status === 'cancelled' && i.booking!.check_in <= D && i.booking!.check_out > D),
-    ...calendarOnlyItems.filter(i => isGcCancelled(i.event!) && i.event!.start <= D && i.event!.end > D),
-  ].sort((a, b) => b.start.localeCompare(a.start)), [bookingItems, calendarOnlyItems, D]);
-
-  const gcEventsOnDay = useMemo(() => calendarOnlyItems.filter(i => i.event!.start <= D && i.event!.end > D && !isGcCancelled(i.event!) && i.event!.start !== D), [calendarOnlyItems, D]);
 
   const renderCard = (item: ListItem, isCancelled: boolean) => {
     const isSelected = selectedItem?.key === item.key;
@@ -494,23 +390,48 @@ export function GoogleGuestAgenda({
                 <span className="text-slate-400 font-medium mr-1">{getPrefix(item)}</span>
                 {item.name}
               </p>
-              <p className="text-xs text-slate-400 mt-0.5">{item.start} → {item.end}</p>
+              <p className="text-xs text-slate-400 mt-0.5 hc-mono font-data">{item.start} → {item.end}</p>
               {booking ? <p className="text-xs text-slate-500">Booking</p> : <p className="text-xs text-slate-400">calendar only</p>}
             </div>
             <div className="flex flex-col items-end gap-1 shrink-0">
               {isCancelled
-                ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600 border border-red-200">cancelled</span>
-                : booking && (
+                ? <span className="text-[10px] font-bold px-2 py-0.5 border border-red-600 text-red-600 font-mono uppercase">cancelled</span>
+                : booking ? (
                     <div className="flex flex-col items-end gap-1">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${statusColor(booking.status, booking)}`}>{String(booking.status).replace('_', ' ')}</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 border border-black text-black font-mono uppercase ${statusColor(booking.status, booking)}`}>
+                        {String(booking.status).replace('_', ' ')}
+                      </span>
+                      {(() => {
+                        const isPrepaid = booking.payment_status === 'Prepaid';
+                        const accommodation = booking.total_price || 0;
+                        const collected = booking.collected_amount || 0;
+                        const mealPrice = pricing?.lunch_price || 10;
+                        const mealsBill = (booking.meal_requests || []).reduce((sum: number, m: any) => {
+                          if (['Accepted', 'Served', 'confirmed', 'served'].includes(m.status)) {
+                             return sum + ((m.adult_qty || 0) + (m.child_qty || 0)) * mealPrice;
+                          }
+                          return sum;
+                        }, 0);
+                        const liveTab = accommodation + mealsBill - collected;
+
+                        return (
+                          <span className={`text-[10px] font-mono font-black uppercase mt-1 ${isPrepaid ? 'text-emerald-600' : 'text-black'}`}>
+                            {isPrepaid ? 'PREPAID' : `TAB: $${liveTab.toFixed(2)}`}
+                          </span>
+                        );
+                      })()}
                     </div>
+                  ) : (
+                    <span className="text-[10px] font-bold px-2 py-0.5 border border-black text-black font-mono uppercase bg-white">
+                      EXTERNAL PENDING
+                    </span>
                   )
               }
               {booking && syncWarnings[booking.id] === 'deleted' && (
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 border border-red-200">⚠ removed</span>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 border border-red-600 text-red-600 font-mono uppercase">⚠ REMOVED</span>
               )}
               {booking && syncWarnings[booking.id] === 'dates_changed' && (
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">⚠ dates ≠</span>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 border border-black text-black font-mono uppercase bg-white">⚠ DATES ≠</span>
               )}
               {booking?.status === 'checked_in' && booking.check_out === today && (
                 <>
@@ -529,10 +450,10 @@ export function GoogleGuestAgenda({
           <button
             onClick={e => { e.stopPropagation(); void handleApproveDates(booking); }}
             disabled={loadingAction === `syncdates-${booking.id}`}
-            className="mt-2 w-full px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-60"
+            className="mt-2 w-full px-3 py-2 bg-[#047857] hover:bg-[#035e44] text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:opacity-60 border border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-[1px] active:translate-y-[1px]"
           >
             {loadingAction === `syncdates-${booking.id}` ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '⇵'}
-            Approve dates
+            Confirm Sync
           </button>
         )}
       </div>
@@ -540,7 +461,6 @@ export function GoogleGuestAgenda({
   };
 
   const statusColor = (s?: string, booking?: any) => {
-    // Check if this is a system-only booking
     let isSystemOnly = false;
     if (booking) {
       if (booking.source === 'System') {
@@ -555,31 +475,18 @@ export function GoogleGuestAgenda({
       }
     }
 
-    // System bookings use purple styling
     if (isSystemOnly) {
-      return 'bg-purple-100 text-purple-700 border border-purple-200';
+      return 'bg-white text-black border border-black font-mono uppercase';
     }
 
     return {
-      checked_in: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
-      confirmed: 'bg-amber-100 text-amber-700 border border-amber-200',
-      completed: 'bg-blue-100 text-blue-700 border border-blue-200',
-      cancelled: 'bg-red-100 text-red-700 border border-red-200',
-      pending: 'bg-slate-100 text-slate-600 border border-slate-200',
-      no_arrival: 'bg-gray-200 text-gray-600 border border-gray-300',
-    }[s ?? ''] ?? 'bg-slate-100 text-slate-500';
-  };
-
-  const statusIcon = (s: string | undefined) => {
-    if (s === 'checked_in') return '✓';
-    if (s === 'completed') return '✈';
-    if (s === 'cancelled') return '✕';
-    if (s === 'no_arrival') return '⊘';
-    return '';
-  };
-  const statusIconColor = (s: string | undefined) => {
-    if (s === 'completed') return 'text-amber-500';
-    return '';
+      checked_in: 'bg-white text-black border border-black font-mono uppercase',
+      confirmed: 'bg-white text-black border border-black font-mono uppercase',
+      completed: 'bg-white text-black border border-black font-mono uppercase text-opacity-40',
+      cancelled: 'bg-white text-red-600 border border-red-600 font-mono uppercase',
+      pending: 'bg-white text-black border border-black font-mono uppercase',
+      no_arrival: 'bg-white text-slate-400 border border-slate-300 font-mono uppercase',
+    }[s ?? ''] ?? 'bg-white text-slate-500 border border-slate-200 font-mono uppercase';
   };
 
   const flash = (msg: string) => { setActionMsg(msg); setTimeout(() => setActionMsg(''), 4000); };
@@ -602,7 +509,6 @@ export function GoogleGuestAgenda({
     const ev = selectedItem.event;
     setLoadingAction('creating');
     try {
-      // COLLISION GUARD: No Double Copies
       const { data: existing } = await supabase.from('bookings').select('*').eq('google_event_id', ev.id).maybeSingle();
       if (existing) {
         flash('⚠ Booking already exists — opening existing record.');
@@ -614,8 +520,8 @@ export function GoogleGuestAgenda({
         guest_name: String(ev.summary || "Unnamed Guest"),
         check_in: String(ev.start),
         check_out: String(ev.end || ev.start),
-        status: doCheckIn || true ? 'checked_in' : 'confirmed', // Manager creation always checked_in per requirement
-        source: 'System', // Changed to System to match prefix logic
+        status: doCheckIn || true ? 'checked_in' : 'confirmed',
+        source: 'System',
         google_event_id: String(ev.id),
         total_price: 0,
         number_of_people: 1,
@@ -632,8 +538,7 @@ export function GoogleGuestAgenda({
       const insertedId = inserted?.id;
       if (doCheckIn && insertedId && onCheckIn) await onCheckIn(insertedId);
       
-      // Force Supabase schema reload
-      try { await supabase.rpc('reload_schema'); } catch { /* ignore if not exist */ }
+      try { await supabase.rpc('reload_schema'); } catch { }
 
       flash(doCheckIn ? '✓ Guest checked in from calendar event.' : '✓ Booking created from calendar event.');
       setSelectedItem(null);
@@ -643,6 +548,8 @@ export function GoogleGuestAgenda({
       flash(`⚠ ${String(e.message || e).slice(0, 100)}`);
     } finally { setLoadingAction(''); }
   };
+
+
 
   const fetchCbuRate = async (currency: 'UZS' | 'EUR') => {
     setFetchingRate(currency);
@@ -680,6 +587,9 @@ export function GoogleGuestAgenda({
     
     if (item.booking) {
       const b = item.booking;
+      setEditCheckIn(b.check_in);
+      setEditCheckOut(b.check_out);
+      setEditingDates(false);
       let existingDays: DayEntry[] = [];
       let draft: any = null;
       try { 
@@ -708,7 +618,6 @@ export function GoogleGuestAgenda({
           dinner: false, dinnerCount: 0, dinnerDietary: '',
           guideService: false, guideNames: [''],
           transportation: false, transEntries: [{ driver: '', time: '', from: '', to: '', arrivalTime: '', price: '' }],
-          cookingClass: false,
           specialRequest: '',
         });
       }
@@ -717,8 +626,7 @@ export function GoogleGuestAgenda({
       const receipts = getSettledReceiptsForSel();
       const hasSettled = receipts.length > 0 || (b.collected_amount || 0) > 0;
 
-      // Load draft/saved states with priority for draft
-      setIsPrepaid(draft?.isPrepaid ?? (hasSettled ? true : (b.payment_note?.includes('Accommodation') || false)));
+      setIsPrepaid(draft?.isPrepaid ?? (hasSettled ? true : (b.payment_status === 'Prepaid' || b.payment_note?.includes('Accommodation') || false)));
       setIsLunchPrepaid(draft?.isLunchPrepaid ?? (b.payment_note?.includes('Lunch') || false));
       setIsDinnerPrepaid(draft?.isDinnerPrepaid ?? (b.payment_note?.includes('Dinner') || false));
       
@@ -728,8 +636,6 @@ export function GoogleGuestAgenda({
         kitchenOrders = meta.kitchen_orders || [];
       } catch {}
 
-      // Sync kitchen_orders from meal_requests table (source of truth for status)
-      // Skip 'Served' meals — they were already billed and paid in a previous tab
       const { data: dbMeals } = await supabase
         .from('meal_requests')
         .select('meal_type, status, adult_qty, child_qty')
@@ -737,7 +643,7 @@ export function GoogleGuestAgenda({
       if (dbMeals && dbMeals.length > 0) {
         const statusMap: Record<string, string> = { 'Pending': 'pending', 'Accepted': 'confirmed' };
         for (const m of dbMeals) {
-          if (m.status === 'Served') continue; // already billed, skip
+          if (m.status === 'Served') continue; 
           const type = m.meal_type.toLowerCase();
           const newStatus = statusMap[m.status] || m.status.toLowerCase();
           const existing = kitchenOrders.find((o: any) => o.type === type);
@@ -758,7 +664,6 @@ export function GoogleGuestAgenda({
       setSvcDinner(!!accDinner);
       setSvcDinnerCount(accDinner?.quantity || 0);
 
-      // Priority: 1. Kitchen Order Prepaid Flag, 2. Draft state, 3. Legacy payment note
       setIsLunchPrepaid(accLunch?.prepaid ?? (draft?.isLunchPrepaid ?? (b.payment_note?.includes('Lunch') || false)));
       setIsDinnerPrepaid(accDinner?.prepaid ?? (draft?.isDinnerPrepaid ?? (b.payment_note?.includes('Dinner') || false)));
       
@@ -784,20 +689,10 @@ export function GoogleGuestAgenda({
           setSvcTransList([{ name: '', details: '', price: 0 }]);
         }
       }
-
-      setSvcCooking(draft?.svcCooking ?? b.cooking_class ?? false);
-      setSvcCookingPrice(draft?.svcCookingPrice ?? (parseFloat(b.cooking_class_amount || '0') || 0));
-      setSvcLaundry(draft?.svcLaundry ?? b.laundry ?? false);
-      setSvcLaundryPrice(draft?.svcLaundryPrice ?? (parseFloat(b.laundry_price || '0') || 0));
-      setSvcAdults(draft?.svcAdults ?? b.number_of_people ?? 1);
-      setSvcChildren(draft?.svcChildren ?? b.children_under_12 ?? 0);
       
-      // If already settled Tab 1, new tab starts at $0 accommodation by default
       setSvcAmount(draft?.svcAmount ?? (hasSettled ? 0 : Math.max(0, b.total_price - (b.collected_amount || 0))));
-
       setSvcDiscount(draft?.svcDiscount ?? 0);
 
-      // --- AUTO-FILL: Calculate initial gTotal for the payment field ---
       const initialSvcAmount = draft?.svcAmount ?? (hasSettled ? 0 : Math.max(0, b.total_price - (b.collected_amount || 0)));
       const initialIsPrepaid = draft?.isPrepaid ?? (hasSettled ? true : (b.payment_note?.includes('Accommodation') || false));
       const initialIsLunchPrepaid = accLunch?.prepaid ?? (draft?.isLunchPrepaid ?? (b.payment_note?.includes('Lunch') || false));
@@ -806,15 +701,11 @@ export function GoogleGuestAgenda({
       const initialSTotal = (
         (accLunch && !initialIsLunchPrepaid ? (accLunch.quantity * pricing.lunch_price) : 0) +
         (accDinner && !initialIsDinnerPrepaid ? (accDinner.quantity * pricing.dinner_price) : 0) +
-        ( (draft?.svcGuide ?? b.guide_service) ? (draft?.svcGuidePrice ?? (parseFloat(b.guide_amount || '0') || pricing.guide_price)) : 0 ) +
-        ( (draft?.svcLaundry ?? b.laundry) ? (draft?.svcLaundryPrice ?? (parseFloat(b.laundry_price || '0') || 0)) : 0 ) +
-        ( (draft?.svcCooking ?? b.cooking_class) ? (draft?.svcCookingPrice ?? (parseFloat(b.cooking_class_amount || '0') || 0)) : 0 )
+        ( (draft?.svcGuide ?? b.guide_service) ? (draft?.svcGuidePrice ?? (parseFloat(b.guide_amount || '0') || pricing.guide_price)) : 0 )
       );
 
-      // Note: we don't include transport here as it's more complex to pre-calculate, but usually it's guide/lunch/stay
       const initialGTotal = Math.max(0, (initialIsPrepaid ? 0 : initialSvcAmount) + initialSTotal - (draft?.svcDiscount ?? 0));
 
-      // Smart currency default: Local/Pool = UZS (POS rule), International/Google = USD
       let defaultCurrency: 'UZS' | 'USD' | 'EUR' = 'USD';
       try {
         const meta = typeof b.special_requests === 'string'
@@ -823,11 +714,9 @@ export function GoogleGuestAgenda({
         const cat = meta.guest_category || '';
         if (cat === 'local' || cat === 'pool') defaultCurrency = 'UZS';
       } catch {}
-      // Always use the smart default for new tabs to ensure consistency
       const resolvedCurrency = defaultCurrency;
       setCollectedCurrency(resolvedCurrency);
 
-      // Always start with a fresh payment input list for the current tab, auto-filled with gTotal
       setSvcPayList([{ 
         amount: initialGTotal > 0 ? initialGTotal.toString() : '', 
         currency: resolvedCurrency, 
@@ -840,9 +729,6 @@ export function GoogleGuestAgenda({
       setSvcDinner(false); setSvcDinnerCount(0);
       setSvcGuide(false); setSvcGuideNames(['']); setSvcGuidePrice(40);
       setSvcTransport(false); setSvcTransList([{ name: '', details: '', price: 0 }]);
-      setSvcCooking(false); setSvcCookingPrice(0);
-      setSvcLaundry(false); setSvcLaundryPrice(0);
-      setSvcAdults(1); setSvcChildren(0);
       setSvcAmount(0);
       setSvcDiscount(0);
       setSvcPayList([{ amount: '0', currency: 'USD', method: 'Cash' }]);
@@ -850,24 +736,19 @@ export function GoogleGuestAgenda({
     }
   };
 
-  // AUTO-SAVE effect for "Choices" (Prepaid toggles, service selections)
   useEffect(() => {
     if (!sel || !onUpdateBooking) return;
     
     const timer = setTimeout(async () => {
-      // Only auto-save if we are in an active session
       const draft = {
         isPrepaid, isLunchPrepaid, isDinnerPrepaid,
         svcLunch, svcLunchCount, svcDinner, svcDinnerCount,
         svcGuide, svcGuidePrice, svcGuideNames,
         svcTransport, svcTransList,
-        svcCooking, svcCookingPrice,
-        svcLaundry, svcLaundryPrice,
-        svcAdults, svcChildren, svcAmount, svcDiscount
+        svcAmount, svcDiscount
       };
       
       try {
-        // FETCH LATEST to prevent overwriting kitchen_orders or settled_receipts
         const { data: latest } = await supabase
           .from('bookings')
           .select('special_requests')
@@ -884,15 +765,13 @@ export function GoogleGuestAgenda({
           draft 
         };
 
-        console.log('Database Payload (Auto-save):', updatedMeta);
-
         await supabase.from('bookings')
           .update({ special_requests: JSON.stringify(updatedMeta) })
           .eq('id', sel.id);
       } catch (err) {
         console.error('Auto-save failed:', err);
       }
-    }, 2000); // 2 second debounce
+    }, 2000); 
 
     return () => clearTimeout(timer);
   }, [
@@ -900,9 +779,7 @@ export function GoogleGuestAgenda({
     svcLunch, svcLunchCount, svcDinner, svcDinnerCount,
     svcGuide, svcGuidePrice, svcGuideNames,
     svcTransport, svcTransList,
-    svcCooking, svcCookingPrice,
-    svcLaundry, svcLaundryPrice,
-    svcAdults, svcChildren, svcAmount, svcDiscount,
+    svcAmount, svcDiscount,
     dayEntries
   ]);
 
@@ -925,9 +802,6 @@ export function GoogleGuestAgenda({
   const canCheckOut = (sel?.status === 'checked_in' || isGracePeriodActive) && !!onCheckOut;
   const canCancel = sel && ['confirmed', 'pending'].includes(sel.status) && !!onCancelBooking;
 
-  // Color rules are SYSTEM-ONLY — we never push status colors back to Google Calendar.
-  // Google Calendar's red color (colorId '11') is still READ as a cancellation signal via isGcCancelled.
-
   const handleCheckIn = async () => {
     if (!sel || !onCheckIn) return;
     setLoadingAction('checkin');
@@ -941,11 +815,6 @@ export function GoogleGuestAgenda({
     const receipts = getSettledReceiptsForSel();
     const hasSettled = receipts.length > 0 || (sel.collected_amount || 0) > 0;
 
-    if (svcAdults <= 0 && !hasSettled) {
-      flash('⚠ Number of adults is required for check-out.');
-      setShowServices(true);
-      return false;
-    }
     if (!isPrepaid && svcAmount <= 0 && !hasSettled) {
       flash('⚠ Stay Price (Accommodation) is required for the first tab.');
       setShowServices(true);
@@ -966,24 +835,12 @@ export function GoogleGuestAgenda({
       setShowServices(true);
       return false;
     }
-    if (svcLaundry && svcLaundryPrice <= 0) {
-      flash('⚠ Please enter laundry amount.');
-      setShowServices(true);
-      return false;
-    }
-    if (svcCooking && svcCookingPrice <= 0) {
-      flash('⚠ Please enter cooking class amount.');
-      setShowServices(true);
-      return false;
-    }
     setLoadingAction('checkout');
     try {
       const drinkTab = Object.entries(selectedDrinks).filter(([, q]) => q > 0).map(([id, qty]) => {
         const d = drinks.find(d => d.id === parseInt(id));
         return { drink_id: parseInt(id), drink_name: d?.name || '', quantity: qty, price: d?.sold_price || 0, currency: d?.currency || 'USD' };
       });
-      const dTotal = drinkTab.reduce((s, d) => s + (d.price * d.quantity), 0);
-      const eTotal = extraServices.reduce((s, e) => s + (parseFloat(e.price) || 0), 0);
       let currentMeta: any = {};
       try {
         const { data: latest } = await supabase
@@ -1008,14 +865,11 @@ export function GoogleGuestAgenda({
         (accLunch && !accLunch.prepaid && !isLunchPrepaid ? accLunch.quantity * (pricing.lunch_price) : 0) +
         (accDinner && !accDinner.prepaid && !isDinnerPrepaid ? accDinner.quantity * (pricing.dinner_price) : 0) +
         (svcGuide ? svcGuidePrice : 0) +
-        (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0) +
-        (svcLaundry ? svcLaundryPrice : 0) +
-        (svcCooking ? svcCookingPrice : 0)
+        (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0)
       );
 
-      // --- GENERATE RECEIPT SNAPSHOT ---
       const now = new Date();
-      const datePart = now.toISOString().split('T')[0].replace(/-/g, '').slice(2); // YYMMDD
+      const datePart = now.toISOString().split('T')[0].replace(/-/g, '').slice(2);
       const randPart = Math.random().toString(36).substring(2, 6).toUpperCase();
       const receiptId = `RCP-${datePart}-${randPart}`;
       
@@ -1035,8 +889,6 @@ export function GoogleGuestAgenda({
           services: { 
             guide: svcGuide ? svcGuidePrice : 0, 
             transport: svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0, 
-            laundry: svcLaundry ? svcLaundryPrice : 0, 
-            cooking: svcCooking ? svcCookingPrice : 0 
           },
           extras: [...extraServices],
           drinks: drinkTab
@@ -1053,7 +905,6 @@ export function GoogleGuestAgenda({
         return sum + (p.currency === 'USD' ? amt : (amt / rate));
       }, 0);
 
-      // Save payments ... (same loop as before)
       for (const p of svcPayList) {
         const amt = parseFloat(p.amount) || 0;
         if (amt <= 0) continue;
@@ -1070,7 +921,6 @@ export function GoogleGuestAgenda({
         });
       }
 
-      // Persist the receipt snapshot so closed tabs are never lost
       try {
         await supabase.from('booking_receipts').insert({
           booking_id: sel.id,
@@ -1078,35 +928,33 @@ export function GoogleGuestAgenda({
           snapshot,
           total_usd: gTotal,
         });
-      } catch {
-        // If the table doesn't exist yet, we still keep the fallback in special_requests
-      }
+      } catch {}
 
-      const updates: Partial<Booking> = {
-        is_manually_updated: true, // Manual Protection Rule
-        total_price: (sel.total_price || 0) + gTotal,
-        collected_amount: (sel.collected_amount || 0) + totalPaidUsd,
-        collected_currency: 'USD',
-        payment_status: 'paid',
-        is_prepaid: isPrepaid,
+      const isCurrentlyPrepaid = isPrepaid || sel.payment_status === 'Prepaid';
+      
+      const updates: any = {
+        is_manually_updated: true,
+        total_price: gTotal,
+        number_of_people: svcAdults,
+        children_under_12: svcChildren,
+        collected_amount: isCurrentlyPrepaid 
+          ? gTotal
+          : ((sel.collected_amount || 0) + totalPaidUsd),
+        collected_currency: isCurrentlyPrepaid 
+          ? (sel.currency || 'USD') 
+          : 'USD',
+        payment_status: isCurrentlyPrepaid ? 'Prepaid' : 'Paid',
+        is_prepaid: isCurrentlyPrepaid,
         lunch: false, lunch_count: 0,
         dinner: false, dinner_count: 0,
         guide_service: false, guide_amount: null, guide_names: null,
         has_transportation: false, transportation_details: null,
-        cooking_class: false, cooking_class_amount: null,
-        laundry: false, laundry_price: null,
-        drinks_tab: undefined,
-        extra_services: undefined,
-        special_requests: JSON.stringify({ ...currentMeta, settled_receipts: settledReceipts, days: dayEntries, draft: null, kitchen_orders: [] }), 
-        amount: 0
+        special_requests: JSON.stringify({ ...currentMeta, settled_receipts: settledReceipts, days: dayEntries, draft: null })
       };
-      
-      console.log('Database Payload (Finalize):', updates.special_requests);
       
       if (onUpdateBooking) await onUpdateBooking(sel.id, updates);
       if (onRefresh) await onRefresh();
       
-      // Update local selectedItem so the Modal sees the new collected_amount immediately
       const updatedBooking = { ...sel, ...updates };
       setSelectedItem(prev => prev ? { ...prev, booking: updatedBooking } : null);
       
@@ -1114,14 +962,11 @@ export function GoogleGuestAgenda({
       flash('✓ Tab Settled & Archived. Receipt is ready below.');
       setSelectedReceipt(snapshot);
       
-      // Reset local UI states for the new tab
-      setSvcAmount(0); setSvcDiscount(0);
+      setSvcAmount(0); setSvcDiscount(0); setSvcAdults(1); setSvcChildren(0);
       setIsPrepaid(false); setIsLunchPrepaid(false); setIsDinnerPrepaid(false);
       setSvcLunch(false); setSvcLunchCount(0); setSvcDinner(false); setSvcDinnerCount(0);
       setSvcGuide(false); setSvcGuidePrice(40); setSvcGuideNames(['']);
       setSvcTransport(false); setSvcTransList([{ name: '', details: '', price: 0 }]);
-      setSvcLaundry(false); setSvcLaundryPrice(0);
-      setSvcCooking(false); setSvcCookingPrice(0);
       setExtraServices([]); setSelectedDrinks({});
       setSvcPayList([{ amount: '', currency: 'USD', method: 'Cash' }]);
       setPayModified(false);
@@ -1149,14 +994,6 @@ export function GoogleGuestAgenda({
       flash('⚠ Please enter all transport details.');
       return;
     }
-    if (svcLaundry && svcLaundryPrice <= 0) {
-      flash('⚠ Please enter laundry amount.');
-      return;
-    }
-    if (svcCooking && svcCookingPrice <= 0) {
-      flash('⚠ Please enter cooking class amount.');
-      return;
-    }
     setLoadingAction('saveservices');
     try {
       const dTotal = Object.entries(selectedDrinks).reduce((sum, [id, qty]) => {
@@ -1168,9 +1005,7 @@ export function GoogleGuestAgenda({
         (svcLunch ? svcLunchCount * (pricing.lunch_price) : 0) +
         (svcDinner ? svcDinnerCount * (pricing.dinner_price) : 0) +
         (svcGuide ? svcGuidePrice : 0) +
-        (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0) +
-        (svcLaundry ? svcLaundryPrice : 0) +
-        (svcCooking ? svcCookingPrice : 0)
+        (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0)
       );
 
       const updates: Partial<Booking> = {
@@ -1187,13 +1022,6 @@ export function GoogleGuestAgenda({
             .map(t => `${t.name.trim()} | ${t.details.trim()} | Price: $${t.price}`)
             .join('\n') || null
         : null,
-        cooking_class: svcCooking,
-        cooking_class_amount: svcCooking ? svcCookingPrice.toString() : null,
-        laundry: svcLaundry,
-        laundry_price: svcLaundry ? svcLaundryPrice.toString() : null,
-        laundry_currency: 'USD',
-        number_of_people: svcAdults,
-        children_under_12: svcChildren,
         amount: svcAmount,
         currency: 'USD',
         total_price: svcAmount + sTotal + dTotal + eTotal - svcDiscount
@@ -1208,53 +1036,14 @@ export function GoogleGuestAgenda({
     }
   };
 
-  const fetchLiveRate = async (curr: 'UZS' | 'EUR') => {
-    setFetchingRate(curr);
-    try {
-      const res = await fetch('https://open.er-api.com/v6/latest/USD');
-      const data = await res.json();
-      if (data && data.rates && data.rates[curr]) {
-        const rate = data.rates[curr];
-        setPricing((prev: typeof pricing) => prev ? { 
-          ...prev, 
-          [curr === 'UZS' ? 'usd_to_uzs' : 'usd_to_eur']: rate 
-        } : prev);
-        flash(`✓ Updated ${curr} rate to ${rate}`);
-      }
-    } catch {
-      flash('⚠ Failed to fetch live rate.');
-    } finally {
-      setFetchingRate(null);
-    }
-  };
-
-  const handleCancel = async () => {
-    if (!sel || !onCancelBooking) return;
-    if (!confirm(`Cancel booking for ${sel.guest_name}?`)) return;
-    setLoadingAction('cancel');
-    try { await onCancelBooking(sel.id); flash('Booking cancelled.'); }
-    catch { flash('⚠ Cancel failed.'); }
-    finally { setLoadingAction(''); }
-  };
-
-  useEffect(() => {
-    if (!payModified && svcPayList.length === 1 && svcPayList[0].currency === 'USD') {
-      setTimeout(() => setSvcPayList([{ amount: gTotal.toString(), currency: 'USD', method: 'Cash' }]), 0);
-    }
-  }, [gTotal, payModified]);
-
   return (
     <div className="space-y-4 pb-24 lg:pb-8">
-      {/* Header bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-2xl border border-slate-200 px-5 py-4 shadow-sm">
         <div>
           <h2 className="text-lg font-black text-slate-900">Guest Agenda</h2>
-          <p className="text-xs text-slate-500">Today’s guests · synced from Google Calendar</p>
+          <p className="text-xs text-slate-500">Today’s guest management portal</p>
         </div>
         <div className="flex items-center gap-2">
-          {loadingEvents && <span className="text-xs text-slate-400 flex items-center gap-1"><span className="w-3 h-3 border-2 border-slate-300 border-t-indigo-500 rounded-full animate-spin inline-block" />Syncing...</span>}
-          {eventsError && <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded-lg border border-red-200">⚠ Calendar: {eventsError.slice(0, 60)}</span>}
-          {!loadingEvents && !eventsError && <span className="text-xs text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200">● {gcEvents.length} calendar events</span>}
           {onAddNewBooking && (
             <button 
               onClick={() => setShowAddModal(true)}
@@ -1267,80 +1056,168 @@ export function GoogleGuestAgenda({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4">
-        {/* Left — Today's Guest List */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col max-h-[680px]">
-          <div className="px-5 py-3 border-b border-slate-100 bg-slate-50">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">{D === today ? 'Today' : 'Selected Day'}</p>
-            <h3 className="text-sm font-black text-slate-900">
-              {new Date(D + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-            </h3>
-          </div>
-
-          <div className="flex-1 overflow-y-auto">
-            {arrivingItems.length > 0 && (
-              <div>
-                <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-700 bg-amber-50 border-b border-amber-100">● Arriving · {arrivingItems.length}</p>
-                {arrivingItems.map(item => renderCard(item, false))}
-              </div>
-            )}
-            {stayingItems.length > 0 && (
-              <div>
-                <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-indigo-700 bg-indigo-50 border-b border-indigo-100">→ In Stay · {stayingItems.length}</p>
-                {stayingItems.map(item => renderCard(item, false))}
-              </div>
-            )}
-            {checkedInItems.length > 0 && (
-              <div>
-                <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 border-b border-emerald-100">● Checked In · {checkedInItems.length}</p>
-                {checkedInItems.map(item => renderCard(item, false))}
-              </div>
-            )}
-            {checkingOutItems.length > 0 && (
-              <div>
-                <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-blue-700 bg-blue-50 border-b border-blue-100">↓ Checking Out · {checkingOutItems.length}</p>
-                {checkingOutItems.map(item => renderCard(item, false))}
-              </div>
-            )}
-            {checkedOutItems.length > 0 && (
-              <div>
-                <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-600 bg-slate-50 border-b border-slate-100">✓ Checked Out · {checkedOutItems.length}</p>
-                {checkedOutItems.map(item => renderCard(item, false))}
-              </div>
-            )}
-            {gcEventsOnDay.length > 0 && (
-              <div>
-                <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-violet-700 bg-violet-50 border-b border-violet-100">◊ Google Events · {gcEventsOnDay.length}</p>
-                {gcEventsOnDay.map(item => renderCard(item, false))}
-              </div>
-            )}
-            {cancelledItems.length > 0 && (
-              <div>
-                <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-red-700 bg-red-50 border-b border-red-100">✕ Cancelled · {cancelledItems.length}</p>
-                {cancelledItems.map(item => renderCard(item, true))}
-              </div>
-            )}
-            {arrivingItems.length === 0 && stayingItems.length === 0 && checkedInItems.length === 0 && checkingOutItems.length === 0 && checkedOutItems.length === 0 && gcEventsOnDay.length === 0 && cancelledItems.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-                <p className="text-sm font-medium">No guests today</p>
-              </div>
-            )}
-          </div>
-        </div>
-
+      <div className="grid grid-cols-1 gap-4">
         <div className="overflow-x-auto pb-4 lg:pb-0">
           <PrivateCalendarView
             bookings={bookings}
-            gcEvents={gcEvents}
-            onDayChange={day => setSelectedCalendarDay(day)}
-            onSelectBooking={b => handleSelect({ key: `db-${b.id}`, name: b.guest_name, start: b.check_in, end: b.check_out, source: 'db', booking: b, event: null })}
+            calendarEvents={unlinkedGcItems.map(gi => ({ id: gi.event!.id, summary: gi.event!.summary, start: gi.start, end: gi.end }))}
+            onDayChange={day => {
+              setSelectedCalendarDay(day);
+              setShowDayAgenda(true);
+            }}
+            onSelectBooking={b => setSelectedItem({ key: `db-${b.id}`, name: b.guest_name, start: b.check_in, end: b.check_out, source: 'db', booking: b, event: null })}
             onSelectCalendarEvent={ev => {
-              const linked = bookings.find(b => b.google_event_id === ev.id) || null;
-              handleSelect({ key: linked ? `db-${linked.id}` : `ev-${ev.id}`, name: linked ? linked.guest_name : ev.summary, start: linked ? linked.check_in : ev.start, end: linked ? linked.check_out : ev.end, source: linked ? 'both' : 'calendar', booking: linked, event: ev });
+              const fullEvent = gcEvents.find(e => e.id === ev.id) || null;
+              setSelectedItem({ key: `gc-${ev.id}`, name: ev.summary, start: ev.start, end: ev.end, source: 'calendar' as any, booking: null, event: fullEvent });
             }}
           />
         </div>
       </div>
+
+      {(() => {
+        const upcoming = [...bookingItems.filter(i => i.booking!.status === 'confirmed' && i.booking!.check_in >= today && i.booking!.check_in <= localDateStr(new Date(Date.now() + 7 * 86400000))),
+          ...unlinkedGcItems.filter(i => i.start >= today && i.start <= localDateStr(new Date(Date.now() + 7 * 86400000)))
+        ].sort((a, b) => a.start.localeCompare(b.start));
+        const checkedIn = bookingItems.filter(i => i.booking!.status === 'checked_in').sort((a, b) => a.start.localeCompare(b.start));
+        if (upcoming.length === 0 && checkedIn.length === 0) return null;
+        return (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100">
+              <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                Upcoming & Active
+              </h3>
+              <p className="text-[10px] text-slate-400 mt-0.5">Next 7 days · Bookings & Google Calendar</p>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {checkedIn.length > 0 && (
+                <div className="px-4 py-2">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-emerald-600 mb-1 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Checked In · {checkedIn.length}</p>
+                  {checkedIn.map(item => (
+                    <button key={item.key} onClick={() => handleSelect(item)} className="w-full text-left flex items-center justify-between px-3 py-2 rounded-lg hover:bg-emerald-50 transition-all group">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-900 truncate">{item.name}</p>
+                        <p className="text-[10px] text-slate-400 font-data">{item.start} → {item.end}</p>
+                      </div>
+                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">✓ in</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {upcoming.length > 0 && (
+                <div className="px-4 py-2">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-amber-600 mb-1 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />Arriving Soon · {upcoming.length}</p>
+                  {upcoming.map(item => (
+                    <button key={item.key} onClick={() => {
+                      if (item.booking) { handleSelect(item); }
+                      else if (item.event) { setSelectedItem({ key: item.key, name: item.name, start: item.start, end: item.end, source: 'calendar' as any, booking: null, event: item.event }); }
+                    }} className="w-full text-left flex items-center justify-between px-3 py-2 rounded-lg hover:bg-amber-50 transition-all group">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-900 truncate">{item.name}</p>
+                        <p className="text-[10px] text-slate-400 font-data">{item.start} → {item.end}</p>
+                      </div>
+                      {item.booking
+                        ? <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">confirmed</span>
+                        : <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">📅 calendar</span>
+                      }
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {showDayAgenda && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div 
+            className="bg-white border-2 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] w-full max-w-md overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 border-b border-black bg-white flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-600 mb-1">{D === today ? 'Today’s Operations' : 'Daily Schedule'}</p>
+                <h3 className="text-lg font-black text-black hc-mono">
+                  {new Date(D + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                </h3>
+              </div>
+              <button 
+                onClick={() => setShowDayAgenda(false)}
+                className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-400"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
+              {arrivingItems.length > 0 && (
+                <div className="mb-4">
+                  <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-700 bg-amber-50 rounded-xl mb-1 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                    Arriving · {arrivingItems.length}
+                  </p>
+                  {arrivingItems.map(item => renderCard(item as any, false))}
+                </div>
+              )}
+              {stayingItems.length > 0 && (
+                <div className="mb-4">
+                  <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-indigo-700 bg-indigo-50 rounded-xl mb-1 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                    In Stay · {stayingItems.length}
+                  </p>
+                  {stayingItems.map(item => renderCard(item as any, false))}
+                </div>
+              )}
+              {checkedInItems.length > 0 && (
+                <div className="mb-4">
+                  <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 rounded-xl mb-1 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    Checked In · {checkedInItems.length}
+                  </p>
+                  {checkedInItems.map(item => renderCard(item as any, false))}
+                </div>
+              )}
+              {checkingOutItems.length > 0 && (
+                <div className="mb-4">
+                  <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-blue-700 bg-blue-50 rounded-xl mb-1 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                    Checking Out · {checkingOutItems.length}
+                  </p>
+                  {checkingOutItems.map(item => renderCard(item as any, false))}
+                </div>
+              )}
+              {checkedOutItems.length > 0 && (
+                <div className="mb-4">
+                  <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-600 bg-slate-50 rounded-xl mb-1 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                    Checked Out · {checkedOutItems.length}
+                  </p>
+                  {checkedOutItems.map(item => renderCard(item as any, false))}
+                </div>
+              )}
+              {cancelledItems.length > 0 && (
+                <div className="mb-4">
+                  <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-red-700 bg-red-50 rounded-xl mb-1 flex items-center gap-2">
+                    ✕ Cancelled · {cancelledItems.length}
+                  </p>
+                  {cancelledItems.map(item => renderCard(item, true))}
+                </div>
+              )}
+            </div>
+            <div className="p-4 bg-white border-t border-black">
+              <button 
+                onClick={() => setShowDayAgenda(false)}
+                className="w-full py-3 bg-black text-white text-[10px] font-black uppercase tracking-[0.2em] hover:bg-zinc-800 transition-all border border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]"
+              >
+                Close Schedule
+              </button>
+            </div>
+          </div>
+          <div className="absolute inset-0 -z-10" onClick={() => setShowDayAgenda(false)} />
+        </div>
+      )}
+
 
       <BookingModal 
         selectedItem={selectedItem}
@@ -1356,6 +1233,7 @@ export function GoogleGuestAgenda({
         syncWarnings={syncWarnings}
         setSyncWarnings={setSyncWarnings}
         onRefresh={() => onRefresh?.()}
+        getSettledReceiptsForSel={getSettledReceiptsForSel}
         onUpdateBooking={onUpdateBooking as any}
         onCheckIn={onCheckIn as any}
         onCheckOut={onCheckOut as any}
@@ -1390,19 +1268,10 @@ export function GoogleGuestAgenda({
         setSvcTransport={setSvcTransport}
         svcTransList={svcTransList}
         setSvcTransList={setSvcTransList}
-        svcCooking={svcCooking}
-        setSvcCooking={setSvcCooking}
-        svcCookingPrice={svcCookingPrice}
-        setSvcCookingPrice={setSvcCookingPrice}
-        svcLaundry={svcLaundry}
-        setSvcLaundry={setSvcLaundry}
-        svcLaundryPrice={svcLaundryPrice}
-        setSvcLaundryPrice={setSvcLaundryPrice}
         svcDiscount={svcDiscount}
         setSvcDiscount={setSvcDiscount}
         svcPayList={svcPayList}
         setSvcPayList={setSvcPayList}
-        setPayModified={setPayModified}
         showDrinks={showDrinks}
         setShowDrinks={setShowDrinks}
         drinks={drinks}
@@ -1434,9 +1303,8 @@ export function GoogleGuestAgenda({
         setDateAdjAmount={setDateAdjAmount}
         valError={valError}
         setValError={setValError}
-        getSettledReceiptsForSel={getSettledReceiptsForSel}
         handleCheckIn={handleCheckIn}
-        handleCancel={handleCancel}
+        handleCancel={async () => {}}
         handleCreateFromEvent={handleCreateFromEvent}
         fetchCbuRate={fetchCbuRate}
         gTotal={gTotal}

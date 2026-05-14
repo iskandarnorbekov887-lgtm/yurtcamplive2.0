@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 
 export default function FinancialsPage() {
   return (
-    <ProtectedRoute allowedRoles={['Manager']}>
+    <ProtectedRoute allowedRoles={['Manager', 'CEO']}>
       <ManagerFinancials />
     </ProtectedRoute>
   );

@@ -5,15 +5,15 @@ import useSWR, { mutate } from 'swr';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase, type ProcurementRequest, type InventoryItem, type ProcurementItem } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
-import { ShoppingBag, Search, Plus, Send, ClipboardCheck, AlertCircle, MessageSquare, CheckCircle2 } from 'lucide-react';
+import { ShoppingBag, Search, Plus, Send, ClipboardCheck, AlertCircle, MessageSquare, CheckCircle2, Truck, Info, Zap } from 'lucide-react';
 
 const fetchDrafts = async () => {
   const { data } = await supabase
     .from('procurement_requests')
-    .select('*, procurement_items(*, inventory(*))')
-    .in('status', ['draft', 'sent', 'reviewed'])
+    .select('*, procurement_items(*, inventory:inventory_items(*))')
+    .in('status', ['draft', 'sent', 'reviewed', 'finalized'])
     .order('created_at', { ascending: false });
-  return data as ProcurementRequest[];
+  return (data || []) as ProcurementRequest[];
 };
 
 export function CookProcurement() {
@@ -24,7 +24,7 @@ export function CookProcurement() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
 
   useEffect(() => {
-    supabase.from('inventory').select('*').then(({ data }) => setInventory(data || []));
+    supabase.from('inventory_items').select('*').then(({ data }) => setInventory(data || []));
   }, []);
 
   const handleCreateRequest = async () => {
@@ -59,7 +59,6 @@ export function CookProcurement() {
   };
 
   const finalizeVerification = async (requestId: string) => {
-    // ── RPC: Atomic Handshake ──
     const { error } = await supabase.rpc('finalize_procurement_request', { 
       p_request_id: requestId,
       p_user_id: user?.id
@@ -72,26 +71,26 @@ export function CookProcurement() {
     }
   };
 
-  const filteredInventory = inventory.filter(i => 
+  const filteredInventory = (inventory || []).filter(i => 
     i.item_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
-    <div className="min-h-screen bg-noir-950 text-white p-8">
-      <div className="max-w-6xl mx-auto space-y-10">
+    <div className="min-h-screen bg-white text-black p-8 font-sans">
+      <div className="max-w-6xl mx-auto space-y-12">
         
         {/* Header */}
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-end border-b-2 border-black pb-8">
           <div>
             <h1 className="text-4xl font-black uppercase tracking-tighter flex items-center gap-4">
-              <ShoppingBag className="text-electric-blue" size={32} />
+              <ShoppingBag className="text-black" size={32} />
               Supply Handshake
             </h1>
-            <p className="text-slate-500 font-bold tracking-[0.3em] text-[10px] uppercase mt-2">Inventory Augmentation Protocol</p>
+            <p className="text-slate-400 font-black tracking-[0.3em] text-[10px] uppercase mt-2">Inventory Augmentation Interface</p>
           </div>
           <button 
             onClick={handleCreateRequest}
-            className="px-8 py-4 bg-electric-blue text-white rounded-2xl font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-xl shadow-blue-900/20 active:scale-95 flex items-center gap-3"
+            className="px-8 py-4 bg-black text-white rounded-none font-black uppercase tracking-[0.2em] text-xs hover:bg-zinc-800 transition-all border border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none flex items-center gap-3"
           >
             <Plus size={20} />
             New Manifest
@@ -99,75 +98,90 @@ export function CookProcurement() {
         </div>
 
         {/* Manifest List */}
-        <div className="space-y-8">
-          {requests.map((req) => (
+        <div className="space-y-12">
+          {(requests || []).map((req) => (
             <motion.div 
               key={req.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="glass-card rounded-[40px] overflow-hidden"
+              className="bg-white border border-black rounded-none overflow-hidden shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]"
             >
               {/* Header */}
-              <div className="px-10 py-8 border-b border-white/5 bg-white/5 flex justify-between items-center">
-                <div className="flex items-center gap-6">
-                  <div className={`w-3 h-3 rounded-full ${
-                    req.status === 'draft' ? 'bg-slate-500' :
-                    req.status === 'sent' ? 'bg-electric-blue animate-pulse' :
-                    'bg-safety-orange glow-pending'
+              <div className="px-8 py-6 border-b border-black bg-zinc-50/50 flex justify-between items-center">
+                <div className="flex items-center gap-8">
+                  <div className={`w-4 h-4 border border-black ${
+                    req.status === 'draft' ? 'bg-slate-300' :
+                    req.status === 'sent' ? 'bg-amber-400 animate-pulse' :
+                    req.status === 'finalized' ? 'bg-emerald-500' :
+                    'bg-black'
                   }`} />
                   <div>
-                    <h3 className="font-black uppercase tracking-tight text-lg">Manifest #{req.id.slice(0, 8)}</h3>
-                    <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Status: {req.status}</p>
+                    <h3 className="font-black text-black text-sm uppercase tracking-tight">Manifest #{req.id.slice(0, 8)}</h3>
+                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mt-0.5 font-mono">STATUS: {req.status}</p>
                   </div>
                 </div>
                 
-                {req.status === 'draft' && (
-                  <button 
-                    onClick={() => sendToManager(req.id)}
-                    className="px-6 py-2.5 bg-electric-blue/10 border border-electric-blue/20 text-electric-blue rounded-xl text-xs font-black uppercase tracking-widest hover:bg-electric-blue hover:text-white transition-all flex items-center gap-2"
-                  >
-                    <Send size={14} />
-                    Transmit to Manager
-                  </button>
-                )}
+                <div className="flex items-center gap-4">
+                  {req.status === 'draft' && (
+                    <button 
+                      onClick={() => sendToManager(req.id)}
+                      className="px-6 py-2.5 bg-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition-all flex items-center gap-2 border border-black"
+                    >
+                      <Send size={14} />
+                      Transmit to Manager
+                    </button>
+                  )}
 
-                {req.status === 'reviewed' && (
-                  <button 
-                    onClick={() => finalizeVerification(req.id)}
-                    className="px-8 py-3 bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-900/20 flex items-center gap-2"
-                  >
-                    <ClipboardCheck size={14} />
-                    Finalize & Inbound
-                  </button>
-                )}
+                  {req.status === 'reviewed' && (
+                    <button 
+                      onClick={() => finalizeVerification(req.id)}
+                      className="px-6 py-2.5 bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] flex items-center gap-2 border border-black"
+                    >
+                      <ClipboardCheck size={14} />
+                      Finalize & Inbound
+                    </button>
+                  )}
+
+                  {req.status === 'finalized' && (
+                    <div className="bg-emerald-50 border border-black px-6 py-2 flex flex-col items-end">
+                       <p className="text-[10px] font-black text-black uppercase">Finalized Spent</p>
+                       <p className="text-lg font-mono font-black text-black">{(req.total_spent_uzs || 0).toLocaleString()} UZS</p>
+                       {req.currency !== 'UZS' && (
+                         <p className="text-[8px] font-mono font-black text-emerald-600 uppercase">
+                           Original: {req.total_cost?.toLocaleString()} {req.currency} @ {req.exchange_rate?.toLocaleString()}
+                         </p>
+                       )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Items Table */}
-              <div className="p-10">
+              <div className="p-8">
                 <table className="w-full">
                   <thead>
-                    <tr className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">
-                      <th className="text-left pb-6">Item Specification</th>
-                      <th className="text-center pb-6">Expected (Order)</th>
-                      {req.status === 'reviewed' && <th className="text-center pb-6 text-safety-orange">Inbound (Actual)</th>}
+                    <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-black pb-4">
+                      <th className="text-left pb-6">Specification</th>
+                      <th className="text-center pb-6">Target Qty</th>
+                      {req.status === 'reviewed' && <th className="text-center pb-6 text-black">Inbound Act.</th>}
                       <th className="text-right pb-6">Unit</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {req.procurement_items?.map((item) => {
+                  <tbody className="divide-y divide-black/10">
+                    {(req.procurement_items || []).map((item) => {
                       const isDiscrepancy = req.status === 'reviewed' && item.actual_received_qty !== item.requested_qty;
                       return (
-                        <tr key={item.id} className={`group transition-all ${isDiscrepancy ? 'bg-safety-orange/5' : ''}`}>
+                        <tr key={item.id} className={`group transition-all ${isDiscrepancy ? 'bg-amber-50/30' : ''}`}>
                           <td className="py-6">
-                            <div className="flex items-center gap-4">
-                              <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 font-black">
-                                {item.inventory?.item_name[0]}
+                            <div className="flex items-center gap-6">
+                              <div className="w-10 h-10 border border-black flex items-center justify-center text-black font-black text-sm bg-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                                {item.inventory?.item_name?.[0] || '?'}
                               </div>
                               <div>
-                                <p className="font-bold uppercase tracking-tight">{item.inventory?.item_name}</p>
+                                <p className="font-black uppercase tracking-tight text-black text-sm">{item.inventory?.item_name || 'NULL_SPEC'}</p>
                                 {isDiscrepancy && (
-                                  <span className="text-[9px] font-black text-safety-orange flex items-center gap-1 mt-1">
-                                    <AlertCircle size={10} /> DISCREPANCY DETECTED
+                                  <span className="text-[9px] font-black text-amber-600 flex items-center gap-1 mt-1">
+                                    <AlertCircle size={10} /> VARIANCE DETECTED
                                   </span>
                                 )}
                               </div>
@@ -182,23 +196,23 @@ export function CookProcurement() {
                                   const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
                                   updateRequestedQty(item.id, val);
                                 }}
-                                className="w-24 bg-white/5 border border-white/10 rounded-lg py-1 px-2 text-center font-bold focus:border-electric-blue outline-none"
+                                className="w-24 bg-white border border-black py-2 px-3 text-center font-mono font-black text-black outline-none focus:bg-zinc-50"
                               />
                             ) : (
-                              <span className="font-black text-lg">{item.requested_qty}</span>
+                               <span className="font-mono text-base font-black text-black">{item.requested_qty}</span>
                             )}
                           </td>
                           {req.status === 'reviewed' && (
                             <td className="py-6 text-center">
-                              <div className={`inline-block px-4 py-2 rounded-xl font-black text-xl ${
-                                isDiscrepancy ? 'text-safety-orange bg-safety-orange/10 border-discrepancy' : 'text-emerald-500'
+                              <div className={`inline-block px-4 py-1 border border-black font-mono text-xl font-black ${
+                                isDiscrepancy ? 'bg-amber-400 text-black' : 'bg-emerald-500 text-white'
                               }`}>
                                 {item.actual_received_qty}
                               </div>
                             </td>
                           )}
                           <td className="py-6 text-right">
-                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest bg-white/5 px-3 py-1.5 rounded-lg">
+                            <span className="text-[9px] font-black text-black uppercase tracking-widest border border-black px-3 py-1 bg-white">
                               {req.status === 'reviewed' ? item.inventory?.buy_unit : item.inventory?.use_unit}
                             </span>
                           </td>
@@ -209,13 +223,13 @@ export function CookProcurement() {
                 </table>
 
                 {req.status === 'draft' && (
-                  <div className="mt-8 relative">
-                    <div className="flex items-center gap-4 bg-white/5 rounded-2xl px-6 py-4 border border-white/5 focus-within:border-electric-blue transition-all">
-                      <Search className="text-slate-500" size={18} />
+                  <div className="mt-10 relative">
+                    <div className="flex items-center gap-4 bg-white px-6 py-4 border border-black focus-within:bg-zinc-50 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                      <Search className="text-black" size={18} />
                       <input 
                         type="text" 
-                        placeholder="Search Inventory to augment..."
-                        className="bg-transparent w-full font-bold uppercase tracking-tight outline-none placeholder:text-slate-700"
+                        placeholder="SEARCH INVENTORY TO AUGMENT..."
+                        className="bg-transparent w-full font-black text-xs uppercase tracking-widest outline-none placeholder:text-slate-200 text-black"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         onFocus={() => setIsAdding(true)}
@@ -228,9 +242,9 @@ export function CookProcurement() {
                           initial={{ opacity: 0, y: -10 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0 }}
-                          className="absolute top-full left-0 right-0 mt-2 bg-noir-800 border border-white/10 rounded-2xl shadow-2xl z-50 max-h-60 overflow-y-auto"
+                          className="absolute top-full left-0 right-0 mt-4 bg-white border border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] z-50 max-h-64 overflow-y-auto"
                         >
-                          {filteredInventory.length > 0 ? (
+                          {(filteredInventory || []).length > 0 ? (
                             filteredInventory.map(item => (
                               <button
                                 key={item.id}
@@ -239,22 +253,22 @@ export function CookProcurement() {
                                   setSearchQuery('');
                                   setIsAdding(false);
                                 }}
-                                className="w-full px-6 py-4 text-left hover:bg-electric-blue/10 transition-colors flex justify-between items-center group"
+                                className="w-full px-6 py-4 text-left hover:bg-black hover:text-white transition-colors flex justify-between items-center group border-b border-black last:border-0"
                               >
                                 <div>
-                                  <span className="font-black uppercase tracking-tight block">{item.item_name}</span>
-                                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Base Unit: {item.use_unit}</span>
+                                  <span className="font-black text-sm text-black block uppercase tracking-tight group-hover:text-white">{item.item_name}</span>
+                                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] group-hover:text-slate-300">BASE UNIT: {item.use_unit}</span>
                                 </div>
-                                <div className="flex items-center gap-2 bg-white/5 px-3 py-1 rounded-lg border border-white/5 group-hover:bg-electric-blue/20 group-hover:border-electric-blue/30 transition-all">
-                                  <Plus size={12} className="text-electric-blue" />
-                                  <span className="text-[10px] font-black uppercase text-slate-400 group-hover:text-electric-blue">Add {item.use_unit}</span>
+                                <div className="flex items-center gap-2 border border-black px-3 py-1 bg-white group-hover:bg-zinc-800 transition-all">
+                                  <Plus size={14} className="text-black group-hover:text-white" />
+                                  <span className="text-[9px] font-black text-black group-hover:text-white uppercase tracking-widest">ADD</span>
                                 </div>
                               </button>
                             ))
                           ) : (
-                            <div className="px-6 py-8 text-center">
-                              <AlertCircle className="mx-auto mb-2 text-safety-orange" size={24} />
-                              <p className="text-xs font-black uppercase tracking-widest text-slate-500">No matching resource found</p>
+                            <div className="px-6 py-12 text-center">
+                              <AlertCircle className="mx-auto mb-4 text-black" size={32} />
+                              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Resource Not Found</p>
                             </div>
                           )}
                         </motion.div>
@@ -265,6 +279,18 @@ export function CookProcurement() {
               </div>
             </motion.div>
           ))}
+        </div>
+        
+        {/* Footnote on Fiscal Handshake */}
+        <div className="bg-zinc-50 border border-black p-6 flex items-start gap-4">
+           <Zap className="text-black mt-1" size={18} />
+           <div>
+              <p className="text-[10px] font-black text-black uppercase tracking-widest mb-1">Fiscal Handshake Logic</p>
+              <p className="text-[10px] font-medium text-slate-500 uppercase tracking-tighter leading-relaxed">
+                All supply requests are converted to UZS upon finalization. 
+                Unit valuation is calculated based on current market exchange rates and distributed across the inbound manifest.
+              </p>
+           </div>
         </div>
       </div>
     </div>

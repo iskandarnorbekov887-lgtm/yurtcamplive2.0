@@ -45,7 +45,6 @@ export interface Booking {
   last_edited_by_id: string;
   last_edited_by_role: string;
   created_at: string;
-  google_event_id?: string;
   cooking_class?: boolean; // Database column for cooking class
   cooking_class_amount?: string | null;
   laundry_price?: string | null;
@@ -81,8 +80,6 @@ export interface Booking {
   is_prepaid?: boolean;
   lunch_prepaid?: boolean;
   dinner_prepaid?: boolean;
-  is_manual_dates?: boolean;
-  is_manually_updated?: boolean;
   /** Joined meal_requests from the normalized table (not a DB column) */
   meal_requests?: MealRequest[];
 }
@@ -168,6 +165,7 @@ export interface Payment {
 export interface MealRequest {
   id: number;
   booking_id: number;
+  order_id?: string;
   meal_date: string;
   meal_type: 'Lunch' | 'Dinner';
   adult_qty: number;
@@ -214,6 +212,9 @@ export interface ProcurementRequest {
   id: string; // UUID
   status: ProcurementStatus;
   total_cost: number;
+  currency?: 'UZS' | 'USD' | 'EUR';
+  exchange_rate?: number;
+  total_spent_uzs?: number;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -228,6 +229,7 @@ export interface ProcurementItem {
   requested_qty: number;
   actual_received_qty: number; // In BUY_UNIT
   unit_price: number;
+  unit_price_uzs?: number;
   item_status: ItemStatus;
   reason_code?: string; // NEW
   cook_comment?: string; // NEW

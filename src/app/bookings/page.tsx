@@ -72,7 +72,7 @@ function BookingPortal() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-emerald-700 border-t-transparent"></div>
       </div>
     );
   }
@@ -82,14 +82,14 @@ function BookingPortal() {
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-100 rounded-xl">
-              <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            <div className="p-2 bg-emerald-50 border border-emerald-100 rounded-lg text-emerald-700">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
             </div>
-            <h1 className="text-xl font-black text-slate-800 uppercase tracking-tight">Booking Portal</h1>
+            <h1 className="text-lg font-bold text-zinc-950 uppercase tracking-tight">Booking Portal</h1>
           </div>
           <div className="flex items-center gap-4">
             <LanguageSwitcher variant="light" />
-            <button onClick={signOut} className="px-4 py-2.5 text-slate-500 hover:text-rose-600 font-bold text-sm transition-all flex items-center gap-2">
+            <button onClick={signOut} className="px-4 py-2 text-slate-400 hover:text-rose-700 font-bold text-[10px] uppercase tracking-widest transition-all flex items-center gap-2">
               {t('btn.logout')}
             </button>
           </div>
@@ -107,34 +107,34 @@ function BookingPortal() {
           onRefresh={fetchData}
         />
         
-        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-xl overflow-hidden">
+        <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
           <table className="w-full">
-            <thead className="bg-slate-50 border-b border-slate-100">
+            <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('table.name')}</th>
-                <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('table.dates')}</th>
-                <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('table.status')}</th>
-                <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('table.price')}</th>
+                <th className="px-8 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('table.name')}</th>
+                <th className="px-8 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('table.dates')}</th>
+                <th className="px-8 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('table.status')}</th>
+                <th className="px-8 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('table.price')}</th>
               </tr>
             </thead>
             <tbody>
               {bookings.map((booking) => (
-                <tr key={booking.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                  <td className="px-8 py-4 font-semibold text-slate-800">{booking.guest_name}</td>
-                  <td className="px-8 py-4 text-slate-600 text-sm">
+                <tr key={booking.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors group">
+                  <td className="px-8 py-4 font-bold text-zinc-950 text-sm">{booking.guest_name}</td>
+                  <td className="px-8 py-4 text-slate-400 font-data text-xs">
                     {new Date(booking.check_in).toLocaleDateString()} - {new Date(booking.check_out).toLocaleDateString()}
                   </td>
                   <td className="px-8 py-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                      booking.status === 'confirmed' ? 'bg-green-100 text-green-700' :
-                      booking.status === 'cancelled' ? 'bg-red-100 text-red-700' :
-                      booking.status === 'checked_in' ? 'bg-blue-100 text-blue-700' :
-                      'bg-gray-100 text-gray-700'
+                    <span className={`px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border ${
+                      booking.status === 'confirmed' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                      booking.status === 'cancelled' ? 'bg-rose-50 text-rose-700 border-rose-100' :
+                      booking.status === 'checked_in' ? 'bg-sky-50 text-sky-700 border-sky-100' :
+                      'bg-slate-50 text-slate-400 border-slate-200'
                     }`}>
                       {t(`status.${booking.status}`)}
                     </span>
                   </td>
-                  <td className="px-8 py-4 text-right font-bold text-slate-800">${booking.total_price}</td>
+                  <td className="px-8 py-4 text-right font-data font-bold text-zinc-950">${booking.total_price}</td>
                 </tr>
               ))}
             </tbody>

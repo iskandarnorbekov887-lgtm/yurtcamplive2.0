@@ -34,26 +34,15 @@ function getDisplayId(booking: Booking): string {
     }
   })();
 
-  // Google Calendar sync
-  if (booking.google_event_id && !currentMeta.is_system_only) {
-    return `G-${booking.id}`;
-  }
-
-  // Manager-created bookings
-  if (currentMeta.is_system_only) {
-    const category = currentMeta.guest_category || 'international';
-    const prefixMap: Record<string, string> = {
-      'international': 'M',
-      'local': 'L',
-      'camper': 'C',
-      'pool': 'P'
-    };
-    const prefix = prefixMap[category] || 'M';
-    return `${prefix}-${booking.id}`;
-  }
-
-  // Default
-  return `${booking.id}`;
+  const category = currentMeta.guest_category || 'international';
+  const prefixMap: Record<string, string> = {
+    'international': 'M',
+    'local': 'L',
+    'camper': 'C',
+    'pool': 'P'
+  };
+  const prefix = prefixMap[category] || 'M';
+  return `${prefix}-${booking.id}`;
 }
 
 function getCalendarWeeks(year: number, month: number): Date[][] {
@@ -134,68 +123,39 @@ function isLocalGuest(b: Booking): boolean {
 }
 
 function color(b: Booking, today: string, userRole: UserRole) {
-  // Check if this is a system-only booking (not from Google Calendar)
-  let isSystemOnly = false;
-  if (b.source === 'System') {
-    isSystemOnly = true;
-  } else {
-    try {
-      const meta = typeof b.special_requests === 'string'
-        ? JSON.parse(b.special_requests || '{}')
-        : (b.special_requests || {});
-      if (meta.is_system_only) isSystemOnly = true;
-    } catch {}
-  }
-
-  // Manager view: System bookings show in emerald green when active
-  if (isSystemOnly && userRole === 'Manager') {
-    const status = getBookingStatus(b, today);
-    switch (status) {
-      case 'checked-in':
-        return { bg: '#10B981', text: '#FFFFFF' }; // Emerald green for active
-      case 'checked-out':
-        return { bg: '#059669', text: '#FFFFFF' }; // Darker green
-      case 'upcoming':
-        return { bg: '#6EE7B7', text: '#064E3B' }; // Light green
-      default:
-        return { bg: '#10B981', text: '#FFFFFF' }; // Emerald green
-    }
-  }
-
-  // CEO view: System bookings use purple styling to differentiate from Google Calendar bookings
-  if (isSystemOnly && userRole === 'CEO') {
-    const status = getBookingStatus(b, today);
-    switch (status) {
-      case 'checked-in':
-        return { bg: '#8B5CF6', text: '#FFFFFF' }; // Purple
-      case 'checked-out':
-        return { bg: '#A78BFA', text: '#FFFFFF' }; // Light purple
-      case 'upcoming':
-        return { bg: '#C4B5FD', text: '#4C1D95' }; // Lighter purple
-      default:
-        return { bg: '#8B5CF6', text: '#FFFFFF' }; // Purple
-    }
-  }
-
-  // Google Calendar bookings use original colors
   const status = getBookingStatus(b, today);
+  
+  if (userRole === 'Manager') {
+    switch (status) {
+      case 'checked-in': return { bg: '#10B981', text: '#FFFFFF' };
+      case 'checked-out': return { bg: '#059669', text: '#FFFFFF' };
+      case 'upcoming': return { bg: '#6EE7B7', text: '#064E3B' };
+      case 'cancelled': return { bg: '#EF4444', text: '#FFFFFF' };
+      case 'no-arrival': return { bg: '#9CA3AF', text: '#FFFFFF' };
+      default: return { bg: '#10B981', text: '#FFFFFF' };
+    }
+  }
+
+  if (userRole === 'CEO') {
+    switch (status) {
+      case 'checked-in': return { bg: '#8B5CF6', text: '#FFFFFF' };
+      case 'checked-out': return { bg: '#A78BFA', text: '#FFFFFF' };
+      case 'upcoming': return { bg: '#C4B5FD', text: '#4C1D95' };
+      case 'cancelled': return { bg: '#EF4444', text: '#FFFFFF' };
+      default: return { bg: '#8B5CF6', text: '#FFFFFF' };
+    }
+  }
+
+  // Fallback
   switch (status) {
-    case 'checked-in':
-      return { bg: '#10B981', text: '#064E3B' }; // Bright green
-    case 'checked-out':
-      return { bg: '#3B82F6', text: '#1E3A5F' }; // Blue
+    case 'checked-in': return { bg: '#10B981', text: '#064E3B' };
+    case 'checked-out': return { bg: '#3B82F6', text: '#1E3A5F' };
     case 'upcoming':
-      return { bg: '#F59E0B', text: '#78350F' }; // Yellow
-    case 'overdue-checkin':
-      return { bg: '#F59E0B', text: '#78350F' }; // Yellow
-    case 'neglected-checkin':
-      return { bg: '#EF4444', text: '#7F1D1D' }; // Red (attention)
-    case 'cancelled':
-      return { bg: '#EF4444', text: '#7F1D1D' }; // Red
-    case 'no-arrival':
-      return { bg: '#9CA3AF', text: '#374151' }; // Gray
-    default:
-      return PALETTE[(b.id || 0) % PALETTE.length];
+    case 'overdue-checkin': return { bg: '#F59E0B', text: '#78350F' };
+    case 'neglected-checkin': return { bg: '#EF4444', text: '#7F1D1D' };
+    case 'cancelled': return { bg: '#EF4444', text: '#7F1D1D' };
+    case 'no-arrival': return { bg: '#9CA3AF', text: '#374151' };
+    default: return PALETTE[(b.id || 0) % PALETTE.length];
   }
 }
 
@@ -447,59 +407,25 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
     }
   };
 
-  const syncToGoogleCalendar = async (booking: Booking) => {
-    if (!booking.google_event_id) return;
-    console.log('🔄 SYNCING TO GOOGLE CALENDAR:', {
-      id: booking.google_event_id,
-      start: booking.check_in,
-      end: booking.check_out
-    });
-    try {
-      const res = await fetch('/api/calendar/events', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          eventId: booking.google_event_id,
-          start: booking.check_in,
-          end: booking.check_out
-        })
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        console.error('GC Sync Failed:', data.error);
-      } else {
-        console.log('✓ GC Sync Success');
-      }
-    } catch (err) {
-      console.error('GC Sync Error:', err);
-    }
-  };
-
   const handleUpdate = async () => {
     if (!sel || !onUpdateBooking) return;
 
-    // 1. Initialize metadata with a safe default to prevent ReferenceErrors
     let currentMeta: any = {}; 
-    
     try {
-      // 2. Safely parse existing metadata from special_requests
       const parsed = typeof sel.special_requests === 'string'
         ? JSON.parse(sel.special_requests || '{}')
         : (sel.special_requests || {});
-
-      // 3. Ensure the result is an object, preserving previous day entries
       currentMeta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
     } catch (err) {
       console.error('Metadata parse error:', err);
-      currentMeta = {}; // Fallback to empty object if JSON is broken
+      currentMeta = {};
     }
 
-    // 4. Prepare the update payload
     const updates: Partial<Booking> = {
-      ...editData, // Spread the new check-in/out dates
+      ...editData,
       special_requests: JSON.stringify({ 
         ...currentMeta, 
-        is_manual_dates: true // CRITICAL: Tells the map to ignore Google Calendar dates
+        is_manual_dates: true
       })
     };
 
@@ -508,19 +434,13 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
     setIsEditing(false);
 
     try {
-      // 5. Execute backend update
       await onUpdateBooking(sel.id, updates);
-
-      // 6. Sync local memory (Refs) so the UI doesn't revert
       if (originalCheckoutRef) {
         originalCheckoutRef.current = updates.check_out || '';
       }
       if (typeof setPreEditCheckoutRef === 'function') {
         setPreEditCheckoutRef(''); 
       }
-
-      // 7. Success actions
-      syncToGoogleCalendar(updatedSel);
       if (typeof onRefresh === 'function') onRefresh();
     } catch (err) {
       console.error('Update failed:', err);
@@ -559,11 +479,11 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
     [...confirmed, ...cancelled].filter(b => b.check_in <= dayStr && b.check_out >= dayStr).length;
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden font-sans">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/30">
+    <div className="bento-card rounded-2xl overflow-hidden font-sans">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-black bg-white">
         <div className="flex items-center gap-4">
-          <h2 className="text-xl font-bold text-slate-800">
-            {t(`month.${month}`)} <span className="text-slate-400 font-normal">{year}</span>
+          <h2 className="text-xl font-bold text-black">
+            {t(`month.${month}`)} <span className="hc-body font-normal">{year}</span>
           </h2>
         </div>
         <div className="flex items-center gap-2">
@@ -591,9 +511,9 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
         </div>
       </div>
 
-      <div className="grid grid-cols-7 border-b border-slate-100">
+      <div className="grid grid-cols-7 border-b border-black">
         {[0,1,2,3,4,5,6].map(d => (
-          <div key={d} className="py-3 text-center text-xs sm:text-sm font-semibold text-slate-400 uppercase tracking-wider">
+          <div key={d} className="py-3 text-center text-xs sm:text-sm font-semibold hc-body uppercase tracking-wider">
             {t(`day.${d}`)}
           </div>
         ))}
@@ -616,7 +536,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                 return (
                   <div 
                     key={di} 
-                    className={`min-h-[56px] sm:min-h-[64px] px-2 sm:px-3 pt-2 sm:pt-3 border-r border-slate-100 last:border-r-0 cursor-pointer hover:bg-indigo-50 transition-colors ${!isCurrentMonth ? 'bg-slate-50/60' : ''}`}
+                    className={`min-h-[56px] sm:min-h-[64px] px-2 sm:px-3 pt-2 sm:pt-3 border-r border-black last:border-r-0 cursor-pointer transition-colors ${!isCurrentMonth ? 'bg-slate-50/60' : ''}`}
                     onClick={() => {
                       if (onDayClick) {
                         onDayClick(ds);

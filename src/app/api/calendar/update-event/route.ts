@@ -1,44 +1,26 @@
-import { calendar_v3, auth as googleAuth } from '@googleapis/calendar';
 import { NextRequest, NextResponse } from 'next/server';
+import { updateEvent } from '@/utils/calendar-sync';
 
-export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function PATCH(req: NextRequest) {
-  const { eventId, colorId } = await req.json();
-
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const rawKey = process.env.GOOGLE_PRIVATE_KEY;
-  const calendarId = process.env.GOOGLE_CALENDAR_ID;
-
-  if (!email || !rawKey || !calendarId || !eventId) {
-    return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
-  }
-
+export async function POST(request: NextRequest) {
   try {
-    const auth = new googleAuth.JWT({
-      email,
-      key: rawKey.replace(/\\n/g, '\n'),
-      scopes: ['https://www.googleapis.com/auth/calendar.events'],
-    });
-
-    const calendar = new calendar_v3.Calendar({ auth });
-
-    await calendar.events.patch({
-      calendarId,
-      eventId,
-      requestBody: { colorId: colorId ?? null },
-    });
-
-    return NextResponse.json({ success: true }, {
-      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate', 'Pragma': 'no-cache' },
-    });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('Calendar color update error:', message);
-    return NextResponse.json({ error: message }, {
-      status: 500,
-      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate', 'Pragma': 'no-cache' },
-    });
+    const body = await request.json();
+    const { eventId, start, end, summary, description } = body;
+    
+    if (!eventId) {
+      return NextResponse.json({ error: 'eventId is required' }, { status: 400 });
+    }
+    
+    // We use PATCH to only update provided fields
+    const updated = await updateEvent(eventId, { start, end, summary, description });
+    
+    return NextResponse.json({ success: true, event: updated });
+  } catch (err: any) {
+    console.error('Google Calendar Update Error:', err);
+    return NextResponse.json({ 
+      success: false, 
+      error: err.message || 'Failed to sync with Google Calendar' 
+    }, { status: 500 });
   }
 }

@@ -59,27 +59,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               console.error('Profile fetch failed:', profileErr.message);
             }
 
-            if (mounted && profile) {
-              const userProfile = { ...profile };
-              // Strictly preserve the role from the profiles table — no silent fallback to Manager
-              const rawRole = (userProfile.role || '').toString().trim();
-              const normalizedRole = rawRole.toLowerCase();
-              if (normalizedRole === 'cook') {
-                userProfile.role = 'Cook';
-              } else if (normalizedRole === 'ceo') {
-                userProfile.role = 'CEO';
-              } else if (normalizedRole === 'manager') {
-                userProfile.role = 'Manager';
+            if (mounted) {
+              if (profile) {
+                const userProfile = { ...profile };
+                // Strictly preserve the role from the profiles table — no silent fallback to Manager
+                const rawRole = (userProfile.role || '').toString().trim();
+                const normalizedRole = rawRole.toLowerCase();
+                if (normalizedRole === 'cook') {
+                  userProfile.role = 'Cook';
+                } else if (normalizedRole === 'ceo') {
+                  userProfile.role = 'CEO';
+                } else if (normalizedRole === 'manager') {
+                  userProfile.role = 'Manager';
+                } else {
+                  // If DB has an empty / unknown role, keep it as-is (ProtectedRoute will reject)
+                  userProfile.role = rawRole || 'UNKNOWN';
+                }
+                console.log('AuthContext loaded role:', userProfile.role, '| raw from DB:', profile.role);
+                setUser(userProfile);
               } else {
-                // If DB has an empty / unknown role, keep it as-is (ProtectedRoute will reject)
-                // Do NOT silently default to Manager
-                userProfile.role = rawRole || 'UNKNOWN';
+                console.warn('AuthContext: User is authenticated but NO profile found in "profiles" table.');
+                // We can't do much here without a role, but we must stop loading
+                setUser(null);
               }
-              console.log('AuthContext loaded role:', userProfile.role, '| raw from DB:', profile.role);
-              setUser(userProfile);
             }
           } catch (err: any) {
             console.error('Profile fetch exception:', err?.message || err);
+            if (mounted) setUser(null);
           }
         }
       } else {
