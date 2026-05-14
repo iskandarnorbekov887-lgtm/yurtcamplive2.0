@@ -29,6 +29,8 @@ interface BookingModalProps {
   setSvcChildren: (v: number) => void;
   svcAmount: number;
   setSvcAmount: (v: number) => void;
+  svcDateAdjustment: number;
+  setSvcDateAdjustment: (v: number) => void;
   isPrepaid: boolean;
   setIsPrepaid: (v: boolean) => void;
   isLunchPrepaid: boolean;
@@ -117,7 +119,10 @@ export function BookingModal(props: BookingModalProps) {
     selectedItem, setSelectedItem, userRole, currentUserId, pricing, setPricing,
     loadingAction, setLoadingAction, actionMsg, flash,
     onRefresh, onUpdateBooking, onCheckIn, onCheckOut, onCancelBooking,
-    svcAdults, setSvcAdults, svcChildren, setSvcChildren, svcAmount, setSvcAmount,
+    svcAdults, setSvcAdults,
+    svcChildren, setSvcChildren,
+    svcAmount, setSvcAmount,
+    svcDateAdjustment, setSvcDateAdjustment,
     isPrepaid, setIsPrepaid, isLunchPrepaid, setIsLunchPrepaid, isDinnerPrepaid, setIsDinnerPrepaid,
     svcLunch, setSvcLunch, svcLunchCount, setSvcLunchCount, svcDinner, setSvcDinner, svcDinnerCount, setSvcDinnerCount,
     svcGuide, setSvcGuide, svcGuidePrice, setSvcGuidePrice, svcGuideNames, setSvcGuideNames,
@@ -244,7 +249,8 @@ export function BookingModal(props: BookingModalProps) {
           const statusMap: Record<string, string> = { 
             'Pending': 'pending', 
             'Accepted': 'confirmed',
-            'Served': 'served'
+            'Served': 'served',
+            'Paid': 'paid'
           };
           const newStatus = statusMap[m.status] || m.status.toLowerCase();
           
@@ -290,9 +296,11 @@ export function BookingModal(props: BookingModalProps) {
     setLoadingAction('save');
     try {
       const data: any = {
-        num_people: svcAdults,
-        children_under_12: svcChildren,
+        number_of_people: svcAdults,
+        number_of_adults: svcAdults,
+        number_of_children: svcChildren,
         amount: svcAmount,
+        stay_price: svcAmount,
         is_prepaid: isPrepaid,
         lunch: svcLunch,
         lunch_count: svcLunchCount,
@@ -539,7 +547,7 @@ export function BookingModal(props: BookingModalProps) {
                   </div>
                 )}
                 <h2 className="text-xl font-black text-slate-900">{String(sel?.guest_name || "Guest")}</h2>
-                <p className="text-sm text-slate-500 mt-0.5">{String(sel?.check_in)} → {String(sel?.check_out)}{sel?.nights ? ` · ${String(sel?.nights)}n` : ''}{(sel?.guest_count || sel?.number_of_people) ? ` · ${String(sel?.guest_count || sel?.number_of_people)} pax` : ''}</p>
+                <p className="text-sm text-slate-500 mt-0.5">{String(sel?.check_in)} → {String(sel?.check_out)}{sel?.nights ? ` · ${String(sel?.nights)}n` : ''}{(sel?.guest_count || sel?.number_of_adults) ? ` · ${String(sel?.guest_count || sel?.number_of_adults)} pax` : ''}</p>
               </div>
               <div className="flex flex-col items-end gap-2">
                 {(sel?.notes || sel?.description) && (
@@ -610,7 +618,7 @@ export function BookingModal(props: BookingModalProps) {
                       
                       <div className="flex items-center justify-between px-2 text-sm font-bold text-slate-600 border-b border-slate-100 pb-2">
                         <span className="uppercase tracking-widest text-[10px] text-slate-400">Guest Count:</span>
-                        <span className="text-slate-900 text-base">{sel.number_of_people || sel.guest_count || 0} pax</span>
+                        <span className="text-slate-900 text-base">{sel.number_of_adults || sel.guest_count || 0} pax</span>
                       </div>
                       
                       <button className="w-full py-4 bg-slate-100 text-slate-400 font-black uppercase tracking-[0.2em] text-[11px] rounded-2xl cursor-not-allowed border border-slate-200">
@@ -687,64 +695,15 @@ export function BookingModal(props: BookingModalProps) {
                         </div>
                       </div>
 
-                      {editCheckOut > sel.check_out && (() => {
-                        const settledReceipts = getSettledReceiptsForSel();
-                        const firstReceipt = settledReceipts[0];
-                        const firstReceiptDate = firstReceipt?.stay?.end || firstReceipt?.checkOut;
-                        return !firstReceiptDate || editCheckOut > firstReceiptDate;
-                      })() && (
-                        <div className="p-3 bg-sky-50 border border-black border-t-0 -mt-4">
-                          <label className="text-[9px] font-black text-sky-700 uppercase tracking-tight mb-1 block">
-                            Extension Surcharge (USD)
-                          </label>
-                          <div className="relative">
-                            <span className="absolute left-0 top-1/2 -translate-y-1/2 text-sky-600 font-bold text-sm">$</span>
-                            <input
-                              type="number"
-                              value={String(dateAdjAmount)}
-                              onChange={e => setDateAdjAmount(e.target.value)}
-                              placeholder="0.00"
-                              className="w-full pl-4 py-1 bg-transparent text-sm font-black text-black hc-mono focus:outline-none border-b border-sky-200"
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {editCheckOut < sel.check_out && (
-                        <div className="p-3 bg-rose-50 border border-black border-t-0 -mt-4">
-                          <label className="text-[9px] font-black text-rose-700 uppercase tracking-tight mb-1 block">
-                            Shortening Refund (USD)
-                          </label>
-                          <div className="relative">
-                            <span className="absolute left-0 top-1/2 -translate-y-1/2 text-rose-600 font-bold text-sm">−$</span>
-                            <input
-                              type="number"
-                              value={String(dateAdjAmount)}
-                              onChange={e => setDateAdjAmount(e.target.value)}
-                              placeholder="0.00"
-                              className="w-full pl-6 py-1 bg-transparent text-sm font-black text-black hc-mono focus:outline-none border-b border-rose-200"
-                            />
-                          </div>
-                        </div>
-                      )}
-                      
                       <div className="flex gap-2 pt-2">
                         <button
                           onClick={async () => {
-                            if (!confirm(`Update dates to ${editCheckIn} → ${editCheckOut}?`)) return;
+                            if (!confirm(`Update check-out date to ${editCheckOut}?`)) return;
                             setLoadingAction('editdates');
                             try {
-                              const adj = parseFloat(dateAdjAmount) || 0;
-                              const isExtension = editCheckOut > sel.check_out;
-                              const isShortening = editCheckOut < sel.check_out;
-
-                              // Block save if extension with no price entered
-                              if (isExtension && adj <= 0) {
-                                flash('⚠ Extension price is required. Please enter the extra amount to charge.');
-                                setLoadingAction('');
-                                return;
-                              }
-
+                              const settledReceipts = getSettledReceiptsForSel ? getSettledReceiptsForSel() : [];
+                              const isTab1Closed = settledReceipts.length > 0 || (sel.collected_amount || 0) > 0;
+                              
                               let currentMeta: any = {};
                               try {
                                 const parsed = typeof sel.special_requests === 'string'
@@ -758,82 +717,53 @@ export function BookingModal(props: BookingModalProps) {
                               const updates: any = { 
                                 check_in: editCheckIn,
                                 check_out: editCheckOut,
-                                is_manual_dates: true
+                                is_manually_updated: true,
+                                total_price: isTab1Closed ? ((sel.total_price || 0) + svcDateAdjustment) : (svcAmount + svcDateAdjustment)
                               };
 
-                              const prevAdj = parseFloat(currentMeta.last_adjustment) || 0;
-                              if (isExtension) {
-                                updates.total_price = (sel.total_price || 0) - prevAdj + adj;
-                                setSvcAmount((parseFloat(String(svcAmount)) || 0) - prevAdj + adj);
-                                flash(`✓ Extended to ${editCheckOut}. Adjustment updated to $${adj}.`);
-                              } else if (isShortening && adj > 0) {
-                                // Shortening logic (assuming it's a new reduction)
-                                updates.total_price = Math.max(0, (sel.total_price || 0) - adj);
-                                updates.collected_amount = Math.max(0, (sel.collected_amount || 0) - adj);
-                                flash(`✓ Stay shortened. $${adj} refund deducted from collected payments.`);
-                              } else {
-                                flash('✓ Dates updated.');
-                              }
+                              // collected_amount will be updated in finalizeTab when the refund is physically given/settled
 
+                              // Save metadata change history natively
                               updates.special_requests = JSON.stringify({ 
                                 ...currentMeta, 
                                 is_manual_dates: true, 
                                 days: dayEntries,
-                                last_adjustment: adj
+                                last_adjustment: svcDateAdjustment
                               });
+
                               if (onUpdateBooking) await onUpdateBooking(sel.id, updates);
 
-                              // Sync to Google Calendar
+                              // Sync straight to Google Calendar
                               if (sel.google_event_id) {
                                 try {
-                                  const syncRes = await fetch('/api/calendar/update-event', {
+                                  await fetch('/api/calendar/update-event', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({
                                       eventId: sel.google_event_id,
                                       start: updates.check_in,
                                       end: updates.check_out,
-                                      summary: sel.guest_name,
-                                      description: updates.notes || sel.notes
+                                      summary: sel.guest_name
                                     })
                                   });
-                                  
-                                  let syncData: any = {};
-                                  const contentType = syncRes.headers.get('content-type');
-                                  if (contentType && contentType.indexOf('application/json') !== -1) {
-                                    syncData = await syncRes.json();
-                                  } else {
-                                    throw new Error(`Server returned non-JSON response (${syncRes.status})`);
-                                  }
-                                  
-                                  if (syncData.success) {
-                                    flash('✓ Dates updated in System & Google Calendar.');
-                                  } else {
-                                    throw new Error(syncData.error || `GC sync failed with status ${syncRes.status}`);
-                                  }
-                                } catch (err: any) {
-                                  console.error('GC Sync Error:', err);
-                                  // High-contrast alert for sync failure but DB success
-                                  flash(`⚠ DATABASE SAVED BUT GOOGLE SYNC FAILED: ${err.message}`);
-                                  // We don't throw here because DB update was successful
+                                } catch (err) {
+                                  console.warn('Google Calendar sync bypassed.');
                                 }
-                              } else {
-                                flash('✓ Dates updated.');
                               }
+
                               setEditingDates(false);
-                              setDateAdjAmount('');
                               if (onRefresh) onRefresh();
+                              flash('✓ Stay dates and adjustment updated.');
                             } catch (e: any) {
-                              const msg = e instanceof Error ? e.message : String(e);
-                              flash(`⚠ ${msg.slice(0, 100)}`);
+                              flash(`⚠ Error executing adjustment: ${e.message}`);
                             } finally {
                               setLoadingAction('');
                             }
                           }}
-                          disabled={loadingAction === 'editdates' || !editCheckIn || !editCheckOut || editCheckIn > editCheckOut}
+                          disabled={loadingAction === 'editdates' || !editCheckOut}
                           className="flex-1 py-3 bg-[#047857] hover:bg-[#035e44] text-white text-xs font-black uppercase tracking-[0.2em] rounded-none transition-all disabled:opacity-60 flex items-center justify-center gap-2 border border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]">
                           {loadingAction === 'editdates' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '✓'}
-                          Save & Sync
+                          Save & Sync Dates
                         </button>
                         <button
                           onClick={() => setEditingDates(false)}
@@ -958,96 +888,103 @@ export function BookingModal(props: BookingModalProps) {
 
               {showServices && (sel.status === 'checked_in' || sel.status === 'confirmed') && isStaff && (
                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300 mt-4">
-                  {(() => {
-                    const receipts = getSettledReceiptsForSel();
-                    const hasSettled = receipts.length > 0 || (sel.collected_amount || 0) > 0;
-                    if (hasSettled) return null; // HIDE ACCOMMODATION ENTIRELY IN SERVICES AFTER SETTLEMENT
-                    
-                    const isStayLocked = hasSettled;
-                    const isPool = sel?.guest_category === 'pool';
-                    if (!isStayLocked && !isPool) {
-                      return (
-                        <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-white animate-in slide-in-from-top-2">
-                          <div className="flex justify-between items-center">
-                            <div className="flex items-center gap-2">
-                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Stay Price</p>
-                              <button onClick={() => { 
-                                  const next = !isPrepaid;
-                                  setIsPrepaid(next);
-                                  if (next) setSvcAmount(0); 
-                                }}
-                                className={`px-2 py-0.5 text-[8px] font-black uppercase tracking-wider rounded-md border transition-all ${isPrepaid ? 'bg-emerald-100 text-emerald-700 border-emerald-300' : 'bg-slate-50 text-slate-400 border-slate-200 hover:border-slate-300'}`}>
-                                {isPrepaid ? '✓ Pre-paid' : 'Pre-paid'}
-                              </button>
-                            </div>
+                  {isRoomStay && sel?.guest_category !== 'pool' && (() => {
+                    const isTab1Closed = getSettledReceiptsForSel().length > 0 || (sel.collected_amount || 0) > 0;
+                    const isDatesChanged = editCheckOut !== sel.check_out;
+                    const isExtended = editCheckOut > sel.check_out;
+                    const isShortened = editCheckOut < sel.check_out;
+
+                    return (
+                      <div className="border border-black p-4 bg-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] space-y-4">
+                        <div className="flex justify-between items-center">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Stay Configuration</p>
+                          {isPrepaid && (
+                            <span className="px-2 py-0.5 text-[8px] font-black bg-emerald-100 text-emerald-700 rounded uppercase border border-emerald-300">
+                              ✓ Original Stay Prepaid
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Entrants Grid */}
+                        <div className="grid grid-cols-2 gap-4 pb-4 border-b border-slate-100">
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Adults *</label>
+                            <input 
+                              type="number" 
+                              value={String(svcAdults || '')} 
+                              onChange={e => {
+                                const val = parseInt(e.target.value) || 0;
+                                setSvcAdults(val);
+                                if (onUpdateBooking) onUpdateBooking(sel.id, { number_of_people: val, number_of_adults: val });
+                              }}
+                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm font-black text-black focus:outline-none"
+                            />
                           </div>
-                          <div className="space-y-4 pt-2">
-                            <div className="grid grid-cols-2 gap-4 pb-4 border-b border-slate-100">
-                              <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Adults *</label>
-                                <input 
-                                  type="number" 
-                                  value={String(svcAdults || '')} 
-                                  onChange={e => setSvcAdults(parseInt(e.target.value) || 0)}
-                                  disabled={getSettledReceiptsForSel().length > 0 || isPrepaid}
-                                  className={`w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-base font-black text-black focus:border-indigo-500 outline-none transition-all ${(getSettledReceiptsForSel().length > 0 || isPrepaid) ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
-                                />
-                              </div>
-                              <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Children</label>
-                                <input 
-                                  type="number" 
-                                  value={String(svcChildren || '')} 
-                                  onChange={e => setSvcChildren(parseInt(e.target.value) || 0)}
-                                  disabled={getSettledReceiptsForSel().length > 0 || isPrepaid}
-                                  className={`w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-base font-black text-black focus:border-indigo-500 outline-none transition-all ${(getSettledReceiptsForSel().length > 0 || isPrepaid) ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
-                                />
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Children</label>
+                            <input 
+                              type="number" 
+                              value={String(svcChildren || '')} 
+                              onChange={e => {
+                                const val = parseInt(e.target.value) || 0;
+                                setSvcChildren(val);
+                                if (onUpdateBooking) onUpdateBooking(sel.id, { number_of_children: val });
+                              }}
+                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm font-black text-black focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        {isTab1Closed ? (
+                          <div className="space-y-4">
+                            {/* Condition A: Tab 1 Closed (Locked Mode) */}
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Original Stay Price (Baseline)</label>
+                              <div className="px-3 py-2 bg-slate-100 border border-slate-200 text-sm font-mono text-slate-500 font-bold">
+                                ${String((sel.stay_price || sel.total_price || 0).toFixed(2))}
                               </div>
                             </div>
+
+                            {isExtended && (
+                              <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-indigo-600">Extension Fee (USD)</label>
+                                <div className="relative mt-1.5">
+                                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-400 font-mono text-xs">+$</span>
+                                  <input 
+                                    type="number" 
+                                    value={svcDateAdjustment > 0 ? svcDateAdjustment : ''} 
+                                    onChange={e => setSvcDateAdjustment(Math.abs(parseFloat(e.target.value) || 0))}
+                                    placeholder="0.00"
+                                    className="w-full pl-8 pr-3 py-2 bg-indigo-50/50 border border-indigo-100 text-sm font-black font-mono focus:outline-none"
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                          </div>
+                        ) : (
+                          /* Condition B: No Tab Closed (Fresh Mode) */
+                          <div className="space-y-4">
                             <div className="space-y-1.5">
-                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">{isPrepaid ? 'Advance Payment Received (USD)' : 'Stay Price (USD)'}</label>
+                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Original Stay Price (USD)</label>
                               <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-xs">$</span>
                                 <input 
                                   type="number" 
                                   value={String(svcAmount || '')} 
-                                  onChange={e => setSvcAmount(parseFloat(e.target.value) || 0)}
-                                  disabled={getSettledReceiptsForSel().length > 0 || isPrepaid}
-                                  className={`w-full pl-8 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-base font-black text-black font-mono focus:border-indigo-500 outline-none transition-all ${(getSettledReceiptsForSel().length > 0 || isPrepaid) ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
+                                  onChange={e => {
+                                    const val = parseFloat(e.target.value) || 0;
+                                    setSvcAmount(val);
+                                    setSvcDateAdjustment(0);
+                                    if (onUpdateBooking) onUpdateBooking(sel.id, { total_price: val, stay_price: val, amount: val });
+                                  }}
+                                  className="w-full pl-7 pr-3 py-2 bg-slate-50 border border-slate-200 text-sm font-black text-black font-mono focus:outline-none"
                                   placeholder="0.00"
                                 />
                               </div>
-                              <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest italic">* Enter total price for the stay.</p>
                             </div>
                           </div>
-                        </div>
-                      );
-                    }
-
-                    // LOCKED — Stay is already paid (Pre-paid toggle or Tab 1 settled)
-                    return (
-                      <div className="border border-emerald-200 rounded-xl p-4 bg-emerald-50/50 animate-in slide-in-from-top-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white shrink-0">
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2 mb-0.5">
-                                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest leading-none">Stay Paid</p>
-                                <span className="w-1 h-1 bg-emerald-300 rounded-full" />
-                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">{svcAdults} Adults{svcChildren > 0 ? ` · ${svcChildren} Children` : ''}</p>
-                              </div>
-                              <p className="text-xs font-bold text-slate-500">{(sel.collected_amount || 0) > 0 ? 'Settled in previous tab' : 'Marked as pre-paid'}</p>
-                            </div>
-                          </div>
-                          {(sel.collected_amount || 0) > 0 && (
-                            <div className="text-right">
-                              <p className="text-[9px] font-bold text-slate-400 uppercase">Paid</p>
-                              <p className="text-sm font-black text-emerald-600">${String((sel.collected_amount || 0).toFixed(2))}</p>
-                            </div>
-                          )}
-                        </div>
+                        )}
                       </div>
                     );
                   })()}
@@ -1409,47 +1346,38 @@ export function BookingModal(props: BookingModalProps) {
                     })()}
 
                     {(() => {
-                      let currentMeta: any = {};
-                      try {
-                        const parsed = typeof sel.special_requests === 'string'
-                          ? JSON.parse(sel.special_requests || '{}')
-                          : (sel.special_requests || {});
-                        currentMeta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
-                      } catch {
-                        currentMeta = {};
-                      }
-                      const lastAdjustment = parseFloat(currentMeta.last_adjustment) || 0;
-                      if (lastAdjustment > 0) {
-                        return (
-                          <div className="flex justify-between items-center opacity-90 border-b border-white/20 pb-2 mb-2">
-                            <span className="font-bold text-amber-200">Stay Extension</span>
-                            <span className="font-black text-amber-300">+${String(lastAdjustment.toFixed(2))}</span>
+                      const adjustmentValue = parseFloat(String(svcDateAdjustment)) || 0;
+                      if (adjustmentValue <= 0) return null; // ONLY SHOW EXTENSIONS
+
+                      return (
+                        <div className="flex justify-between items-center opacity-90 border-b border-white/20 pb-2 mb-2 font-mono text-xs bg-black/10 p-2 rounded-lg border border-white/10 animate-in fade-in">
+                          <div className="flex flex-col">
+                            <span className="font-bold flex items-center gap-1.5">
+                              ➕ Stay Extension Fee
+                            </span>
+                            <span className="text-[8px] uppercase text-white/50 tracking-widest font-sans mt-0.5">
+                              Reason: Additional nights added
+                            </span>
                           </div>
-                        );
-                      }
-                      return null;
+                          <span className="font-black tracking-tight text-sm text-amber-300">
+                            +${adjustmentValue.toFixed(2)}
+                          </span>
+                        </div>
+                      );
                     })()}
-                    
                     {(() => {
-                      const acceptedOrders = kitchenOrders.filter((o: any) => o.status === 'confirmed' || o.status === 'served');
+                      const acceptedOrders = kitchenOrders.filter((o: any) => 
+                        (o.status === 'confirmed' || o.status === 'served') && !o.is_paid
+                      );
                       
-                      // Aggregate by type to avoid long list
-                      const mealGroups: Record<string, any> = {};
-                      acceptedOrders.forEach(o => {
-                        const t = o.type.toLowerCase();
-                        if (!mealGroups[t]) {
-                          mealGroups[t] = { 
-                            name: o.type.charAt(0).toUpperCase() + o.type.slice(1), 
-                            count: 0, 
-                            price: t === 'lunch' ? pricing.lunch_price : pricing.dinner_price, 
-                            prepaid: o.prepaid 
-                          };
-                        }
-                        mealGroups[t].count += (o.quantity || 0);
-                      });
+                      const individualMeals = acceptedOrders.map((o: any) => ({
+                        name: `${o.type.charAt(0).toUpperCase() + o.type.slice(1)} (${o.meal_date || 'N/A'}) - ID: #${o.meal_id}`,
+                        price: (o.quantity || 1) * (o.type === 'lunch' ? pricing.lunch_price : pricing.dinner_price),
+                        prepaid: o.prepaid
+                      }));
 
                       const sItems = [
-                        ...Object.values(mealGroups),
+                        ...individualMeals,
                         svcGuide && { name: 'Guide', price: svcGuidePrice, prepaid: false },
                         svcTransport && { name: 'Transport', price: svcTransList.reduce((s: number, t: any) => s + (t.price || 0), 0), prepaid: false },
                         svcDiscount > 0 && { name: 'Discount', price: -svcDiscount, prepaid: false }
@@ -1459,11 +1387,11 @@ export function BookingModal(props: BookingModalProps) {
 
                       return sItems.map((item: any, idx: number) => (
                         <div key={idx} className="flex justify-between items-center opacity-90 border-b border-white/10 pb-1 mb-1 last:border-none last:pb-0 last:mb-0">
-                          <span className="font-bold">{String(item.name)} {item.count ? `x${String(item.count)}` : ''}</span>
+                          <span className="font-bold">{String(item.name)}</span>
                           {item.prepaid ? (
                             <span className="text-[9px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">Prepaid</span>
                           ) : (
-                            <span className="font-black">${String((item.count ? item.count * item.price : item.price).toFixed(2))}</span>
+                            <span className="font-black">${String(item.price.toFixed(2))}</span>
                           )}
                         </div>
                       ));
@@ -1486,13 +1414,34 @@ export function BookingModal(props: BookingModalProps) {
                         </div>
                       );
                     })()}
+
+                    {(() => {
+                      const paidOrders = kitchenOrders.filter((o: any) => o.is_paid === true);
+                      if (paidOrders.length === 0) return null;
+
+                      const individualPaidMeals = paidOrders.map((o: any) => ({
+                        name: `${o.type.charAt(0).toUpperCase() + o.type.slice(1)} (${o.meal_date || 'N/A'}) - ID: #${o.meal_id}`
+                      }));
+
+                      return (
+                        <div className="mt-4 pt-4 border-t border-white/20 animate-in fade-in duration-700">
+                          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-indigo-200 mb-2 opacity-70">Historical Receipts / Settled</p>
+                          {individualPaidMeals.map((item: any, idx: number) => (
+                            <div key={idx} className="flex justify-between items-center opacity-60 text-xs italic line-through decoration-indigo-300/50">
+                              <span>{String(item.name)}</span>
+                              <span>Settled</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   <div className="mt-4 pt-4 border-t border-indigo-400 flex justify-between items-end">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <p className="text-[10px] font-black uppercase tracking-widest text-indigo-100">
-                          {gTotal > 0 ? 'Current Tab Balance' : 'Tab Settled (Zero Balance)'}
+                          {gTotal > 0 ? 'Current Tab Balance' : gTotal < 0 ? 'Refund Due to Guest' : 'Tab Settled (Zero Balance)'}
                         </p>
                         {sel.payment_status === 'Prepaid' && (
                           <span className="font-mono text-[9px] font-black uppercase tracking-widest border border-white px-2 py-0.5 bg-indigo-500 text-white">
@@ -1514,7 +1463,7 @@ export function BookingModal(props: BookingModalProps) {
               )}
 
               {isStaff && sel.status !== 'completed' && (
-                  debtRemaining > 1.00 && (
+                  Math.abs(debtRemaining) > 0.01 && (
                     <div className="bg-white border border-black p-6 space-y-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                       <div className="flex justify-between items-center">
                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Payment Collection</p>
@@ -1557,7 +1506,7 @@ export function BookingModal(props: BookingModalProps) {
                                             const r = p.currency === 'USD' ? 1 : (p.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92));
                                             return sum + (amt / r);
                                           }, 0);
-                                        const stillOwedUsd = Math.max(0, debtRemaining - otherRowsPaidUsd);
+                                        const stillOwedUsd = debtRemaining - otherRowsPaidUsd;
                                         setSvcPayList(svcPayList.map((p: any, i: number) => {
                                           if (i !== pi) return p;
                                           const updates: any = { ...p, currency: newCurr };
@@ -1635,10 +1584,10 @@ export function BookingModal(props: BookingModalProps) {
                                             const r = p.currency === 'USD' ? 1 : (p.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92));
                                             return sum + (amt / r);
                                           }, 0);
-                                        const stillOwedUsd = Math.max(0, debtRemaining - otherRowsPaidUsd);
+                                        const stillOwedUsd = debtRemaining - otherRowsPaidUsd;
                                         const r = pay.currency === 'USD' ? 1 : (pay.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92));
                                         const matchAmt = stillOwedUsd * r;
-                                        setSvcPayList(svcPayList.map((p: any, i: number) => i === pi ? { ...p, amount: matchAmt > 0 ? (pay.currency === 'UZS' ? Math.round(matchAmt).toString() : matchAmt.toFixed(2)) : '' } : p));
+                                        setSvcPayList(svcPayList.map((p: any, i: number) => i === pi ? { ...p, amount: matchAmt !== 0 ? (pay.currency === 'UZS' ? Math.round(matchAmt).toString() : matchAmt.toFixed(2)) : '' } : p));
                                       }}
                                       className="text-[9px] font-black text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100 transition-all"
                                     >
@@ -1668,9 +1617,9 @@ export function BookingModal(props: BookingModalProps) {
 
                         <button
                           onClick={() => {
-                            const remaining = Math.max(0, debtRemaining - tPaidUsd);
+                            const remaining = debtRemaining - tPaidUsd;
                             setSvcPayList([...svcPayList, { 
-                              amount: remaining > 1.00 ? remaining.toFixed(2) : '', 
+                              amount: remaining !== 0 ? remaining.toFixed(2) : '', 
                               currency: 'USD', 
                               method: 'Cash' 
                             }]);
@@ -1681,7 +1630,7 @@ export function BookingModal(props: BookingModalProps) {
                         </button>
 
                         <div className="sticky bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-slate-100 -mx-4 -mb-4 rounded-b-[24px] z-30 flex flex-col gap-2">
-                          {!isBalanceMatched && gTotal > 0 && (
+                          {!isBalanceMatched && (
                             <div className="flex items-center justify-between px-2">
                               <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest">
                                 ⚠ Balance Mismatch: ${Math.abs(debtRemaining - tPaidUsd).toFixed(2)}
@@ -1694,11 +1643,11 @@ export function BookingModal(props: BookingModalProps) {
                                     const r = p.currency === 'USD' ? 1 : (p.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92));
                                     return sum + (amt / r);
                                   }, 0);
-                                  const stillOwedUsd = Math.max(0, debtRemaining - otherRowsPaidUsd);
+                                  const stillOwedUsd = debtRemaining - otherRowsPaidUsd;
                                   const lastPay = svcPayList[lastIdx];
                                   const r = lastPay.currency === 'USD' ? 1 : (lastPay.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92));
                                   const matchAmt = stillOwedUsd * r;
-                                  setSvcPayList(svcPayList.map((p: any, i: number) => i === lastIdx ? { ...p, amount: matchAmt > 0 ? (lastPay.currency === 'UZS' ? Math.round(matchAmt).toString() : matchAmt.toFixed(2)) : '' } : p));
+                                  setSvcPayList(svcPayList.map((p: any, i: number) => i === lastIdx ? { ...p, amount: matchAmt !== 0 ? (lastPay.currency === 'UZS' ? Math.round(matchAmt).toString() : matchAmt.toFixed(2)) : '' } : p));
                                 }}
                                 className="text-[9px] font-black text-indigo-600 underline uppercase"
                               >
@@ -1722,7 +1671,7 @@ export function BookingModal(props: BookingModalProps) {
                               setShowFinalReceipt(true);
                             }}
                             disabled={loadingAction === 'checkout'}
-                            className={`w-full py-4 rounded-2xl font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 shadow-xl ${(!isBalanceMatched || gTotal <= 0) ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' : 'bg-indigo-600 text-white hover:bg-indigo-700 hover:scale-[1.02] active:scale-95 shadow-indigo-100'}`}
+                            className={`w-full py-4 rounded-2xl font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 shadow-xl ${!isBalanceMatched ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' : 'bg-indigo-600 text-white hover:bg-indigo-700 hover:scale-[1.02] active:scale-95 shadow-indigo-100'}`}
                           >
                             {loadingAction === 'checkout' ? 'Processing...' : 'Review & Pay Tab'}
                           </button>
@@ -1871,6 +1820,13 @@ export function BookingModal(props: BookingModalProps) {
                                 });
                               })()}
 
+                              {(selectedReceipt.items?.stay_adjustment > 0) && (
+                                <div className="flex justify-between items-center text-sm">
+                                  <span className="text-slate-400 font-medium">Stay Extension Fee</span>
+                                  <span className="text-slate-500 font-bold">${String(selectedReceipt.items.stay_adjustment.toFixed(2))}</span>
+                                </div>
+                              )}
+
                               {(selectedReceipt.items?.drinks?.length > 0) && (
                                 <div className="flex justify-between items-center text-sm">
                                   <span className="text-slate-400 font-medium">Drinks</span>
@@ -2018,15 +1974,19 @@ export function BookingModal(props: BookingModalProps) {
                   </div>
                   <div className="grid gap-2">
                     {getSettledReceiptsForSel().map((receipt: any, idx: number) => (
-                      <div key={idx} className="p-4 bg-white border border-black group">
+                      <div key={idx} className={`p-4 border border-black group ${parseFloat(receipt.total_usd || 0) < 0 ? 'bg-rose-50 border-rose-200' : 'bg-white'}`}>
                         <div className="flex justify-between items-start mb-2 border-b border-slate-100 pb-2">
                           <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tab #{idx + 1}</span>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                              {parseFloat(receipt.total_usd || 0) < 0 ? 'Settled Refund' : `Tab #${idx + 1}`}
+                            </span>
                             <span className="font-mono text-[10px] text-black font-black mt-0.5">{new Date(receipt.settled_at || new Date()).toLocaleString()}</span>
                           </div>
                           <div className="text-right flex flex-col items-end">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Settled Amount</span>
-                            <span className="font-mono text-sm font-black text-emerald-600">${parseFloat(receipt.total || 0).toFixed(2)}</span>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Amount</span>
+                            <span className={`font-mono text-sm font-black ${parseFloat(receipt.total_usd || 0) < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                              {parseFloat(receipt.total_usd || 0) < 0 ? '-' : ''}${Math.abs(parseFloat(receipt.total_usd || 0)).toFixed(2)}
+                            </span>
                             {receipt.payments && receipt.payments.length > 0 && (
                                <span className="text-[8px] font-mono font-black uppercase tracking-widest text-slate-400 mt-1">
                                  [ {receipt.payments.map((p: any) => p.method).join(', ')} ]

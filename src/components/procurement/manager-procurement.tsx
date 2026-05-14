@@ -17,7 +17,8 @@ const fetchSentRequests = async () => {
 };
 
 export function ManagerProcurement() {
-  const { data: requests = [] } = useSWR('procurement_manager', fetchSentRequests);
+  const { data: requestsData } = useSWR('procurement_manager', fetchSentRequests);
+  const requests = requestsData || [];
   const [fiscalInputs, setFiscalInputs] = useState<Record<string, { amount: number; currency: 'UZS' | 'USD' | 'EUR'; rate: number }>>({});
 
   const getFiscal = (reqId: string) => fiscalInputs[reqId] || { amount: 0, currency: 'UZS', rate: 12500 };

@@ -109,16 +109,16 @@ export function ManagerMealRequests({ booking, onClose, onSent }: ManagerMealReq
         drafts.push({
           meal_date: dateStr,
           meal_type: 'Lunch',
-          adult_qty: b.guest_count || b.number_of_people || 1,
-          child_qty: b.children_under_12 || 0,
+          adult_qty: (b as any).number_of_people || (b as any).number_of_adults || b.guest_count || 1,
+          child_qty: 0,
           dietary_type: 'Normal',
           sent: existingKeys.has(lunchKey),
         });
         drafts.push({
           meal_date: dateStr,
           meal_type: 'Dinner',
-          adult_qty: b.guest_count || b.number_of_people || 1,
-          child_qty: b.children_under_12 || 0,
+          adult_qty: (b as any).number_of_people || (b as any).number_of_adults || b.guest_count || 1,
+          child_qty: 0,
           dietary_type: 'Normal',
           sent: existingKeys.has(dinnerKey),
         });

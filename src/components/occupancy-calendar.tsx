@@ -621,7 +621,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                         }}
                         className="truncate shadow-sm"
                       >
-                        <span className="truncate">{ev.booking.guest_name} | {ev.booking.number_of_people}p | {pricePaid} UZS</span>
+                        <span className="truncate">{ev.booking.guest_name} | {(ev.booking as any).number_of_people || ev.booking.guest_count}p | {pricePaid} UZS</span>
                       </button>
                     );
                   }
@@ -698,7 +698,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                   <h3 className="text-2xl font-black text-slate-900 leading-none">{String(sel.guest_name)}</h3>
                   <div className="flex items-center gap-2 mt-2">
                     <p className="text-sm font-black text-slate-600">
-                      {String(sel.num_people || sel.number_of_people || sel.guest_count)} Pax
+                      {String((sel as any).number_of_people || (sel as any).number_of_adults || sel.guest_count)} Pax
                     </p>
                     <span className="w-1 h-1 bg-slate-300 rounded-full" />
                     <p className="text-sm font-bold text-slate-500">
@@ -756,7 +756,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                                 <div className="grid grid-cols-2 gap-3">
                                   <div className="opacity-75">
                                     <p className="text-[9px] font-bold text-slate-400 uppercase">Pax & Base Price</p>
-                                    <p className="text-sm font-black text-slate-900">{String(sel?.num_people || sel?.number_of_people || 0)} Guests @ ${String(sel?.total_price || 0)}</p>
+                                    <p className="text-sm font-black text-slate-900">{String((sel as any).number_of_people || (sel as any).number_of_adults || 0)} Guests @ ${String(sel?.total_price || 0)}</p>
                                   </div>
                                   <button 
                                     disabled={isTab1Closed}
@@ -1087,11 +1087,11 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Number of People</label>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Number of Adults</label>
                 <input
                   type="number"
-                  value={editRequestData.num_people || editRequestData.number_of_people || ''}
-                  onChange={e => setEditRequestData({ ...editRequestData, num_people: parseInt(e.target.value) })}
+                  value={(editRequestData as any).number_of_people || ''}
+                  onChange={e => setEditRequestData({ ...editRequestData, number_of_people: parseInt(e.target.value) })}
                   className="w-full px-4 py-3 text-base rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
               </div>

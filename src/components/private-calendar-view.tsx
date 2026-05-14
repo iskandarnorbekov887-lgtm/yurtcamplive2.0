@@ -50,7 +50,7 @@ export function PrivateCalendarView({ bookings, calendarEvents, onSelectBooking,
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
-  useEffect(() => { onDayChange?.(selectedDay); }, [selectedDay]);
+  // Removed useEffect onDayChange to prevent automatic popup on mount
 
   const getFullDateStr = (y: number, m: number, d: number) => {
     const dt = new Date(y, m, d);
@@ -171,7 +171,7 @@ export function PrivateCalendarView({ bookings, calendarEvents, onSelectBooking,
           <span className="text-sm font-black text-slate-800 min-w-[130px] text-center">{MONTHS[month]} {year}</span>
           <button onClick={() => setCurrentDate(new Date(year, month + 1, 1))}
             className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-600 font-bold text-lg transition-all">›</button>
-          <button onClick={() => { setCurrentDate(new Date()); setSelectedDay(todayStr); }}
+          <button onClick={() => { setCurrentDate(new Date()); setSelectedDay(todayStr); onDayChange?.(todayStr); }}
             className="px-3 py-1 text-xs font-bold bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-all">Today</button>
         </div>
       </div>
@@ -200,7 +200,7 @@ export function PrivateCalendarView({ bookings, calendarEvents, onSelectBooking,
                   const totalInCol = lanes.filter(lane => lane.some(b => b.startCol <= col && b.endCol >= col)).length;
                   const hidden = Math.max(0, totalInCol - VISIBLE);
                   return (
-                    <div key={col} onClick={() => setSelectedDay(d)}
+                    <div key={col} onClick={() => { setSelectedDay(d); onDayChange?.(d); }}
                       className={`border-r border-b border-slate-200 px-1 pt-1 cursor-pointer transition-colors relative ${
                         isSelected ? 'bg-indigo-50/70' : 'hover:bg-slate-50/60'
                       } ${!cell.currentMonth ? 'bg-slate-50/40 opacity-50' : ''}`}>

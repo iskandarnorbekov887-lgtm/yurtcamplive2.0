@@ -116,6 +116,8 @@ export function GoogleGuestAgenda({
     id?: number; 
   }>>([{ amount: '', currency: 'USD', method: 'Cash' }]);
 
+  const [svcDateAdjustment, setSvcDateAdjustment] = useState<number>(0);
+
   const [isPrepaid, setIsPrepaid] = useState(false);
   const [isLunchPrepaid, setIsLunchPrepaid] = useState(false);
   const [isDinnerPrepaid, setIsDinnerPrepaid] = useState(false);
@@ -172,24 +174,26 @@ export function GoogleGuestAgenda({
   const [pricing, setPricing] = useState(DEFAULT_PRICING);
   const [valError, setValError] = useState<string | null>(null);
 
-  const gTotal = Math.max(0, (isPrepaid ? 0 : svcAmount) + 
-    (kitchenOrders || []).reduce((sum: number, o: any) => {
-      if (o.status === 'confirmed' || o.status === 'served') {
-        if (o.prepaid) return sum;
-        const price = o.type.toLowerCase() === 'lunch' ? pricing.lunch_price : pricing.dinner_price;
-        return sum + ((o.quantity || 0) * price);
-      }
-      return sum;
-    }, 0) +
-    (svcLunch && !isLunchPrepaid ? svcLunchCount * pricing.lunch_price : 0) +
-    (svcDinner && !isDinnerPrepaid ? svcDinnerCount * pricing.dinner_price : 0) +
-    (svcGuide ? svcGuidePrice : 0) +
-    (svcTransport ? svcTransList.reduce((s: number, t: any) => s + (t.price || 0), 0) : 0) +
-    Object.entries(selectedDrinks).reduce((sum: number, [id, qty]: [string, number]) => {
-      const drink = drinks.find((d: any) => d.id === parseInt(id));
-      return sum + (qty * (drink?.sold_price || 0));
-    }, 0) +
-    extraServices.reduce((sum: number, s: any) => sum + (parseFloat(s.price) || 0), 0) - svcDiscount);
+  const gTotal = (() => {
+    const unpaidMeals = kitchenOrders.filter((m: any) => !m.is_paid && (m.status === 'confirmed' || m.status === 'served'));
+    const mealTotal = unpaidMeals.reduce((sum: number, m: any) => {
+      if (m.prepaid) return sum;
+      const price = m.type === 'lunch' ? pricing.lunch_price : pricing.dinner_price;
+      return sum + ((m.quantity || 0) * price);
+    }, 0);
+
+    return Math.max(0, (isPrepaid ? 0 : svcAmount) + 
+      svcDateAdjustment + 
+      mealTotal + 
+      (svcGuide ? svcGuidePrice : 0) +
+      (svcTransport ? svcTransList.reduce((s: number, t: any) => s + (t.price || 0), 0) : 0) +
+      Object.entries(selectedDrinks).reduce((sum: number, [id, qty]: [string, number]) => {
+        const drink = drinks.find((d: any) => d.id === parseInt(id));
+        return sum + (qty * (drink?.sold_price || 0));
+      }, 0) +
+      extraServices.reduce((sum: number, s: any) => sum + (parseFloat(s.price) || 0), 0) - svcDiscount
+    );
+  })();
   
   const debtRemaining = gTotal;
   const tPaidUsd = svcPayList.reduce((sum, p) => {
@@ -245,31 +249,17 @@ export function GoogleGuestAgenda({
       
       if (!dbMeals) return;
 
-      const statusMap: Record<string, string> = { 'Pending': 'pending', 'Accepted': 'confirmed', 'Served': 'served' };
-      const meta = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
-      const jsonOrders = meta.kitchen_orders || [];
-      const settledReceipts = meta.settled_receipts || [];
-      
-      const paidMealIds = new Set();
-      settledReceipts.forEach((r: any) => {
-        if (r.snapshot?.kitchen_orders) {
-          r.snapshot.kitchen_orders.forEach((ko: any) => {
-            if (ko.meal_id) paidMealIds.add(ko.meal_id);
-          });
-        }
-      });
+      const statusMap: Record<string, string> = { 'Pending': 'pending', 'Accepted': 'confirmed', 'Served': 'served', 'Paid': 'paid' };
 
       const synced = dbMeals.map(m => {
-        const type = m.meal_type.toLowerCase();
-        const isPaidInReceipt = paidMealIds.has(m.id);
-        const jsonMatch = jsonOrders.find((jo: any) => jo.meal_id === m.id || (!jo.meal_id && jo.type === type));
-        
         return {
-          type,
+          meal_id: m.id,              // THE UNIQUE ID from DB
+          type: m.meal_type.toLowerCase(),
           quantity: m.adult_qty,
-          status: isPaidInReceipt ? 'paid' : (statusMap[m.status] || m.status.toLowerCase()),
-          prepaid: jsonMatch ? jsonMatch.prepaid : (type === 'lunch' ? isLunchPrepaid : isDinnerPrepaid),
-          meal_id: m.id
+          status: statusMap[m.status] || m.status.toLowerCase(), // 'pending', 'confirmed', 'served', 'paid'
+          prepaid: m.prepaid || false,  // Check if it was marked as prepaid at request time
+          is_paid: m.is_paid || false,
+          meal_date: m.created_at ? m.created_at.split('T')[0] : ''
         };
       });
       setKitchenOrders(synced);
@@ -404,7 +394,7 @@ export function GoogleGuestAgenda({
                       {(() => {
                         const isPrepaid = booking.payment_status === 'Prepaid';
                         const accommodation = booking.total_price || 0;
-                        const collected = booking.collected_amount || 0;
+                        // collected defined below
                         const mealPrice = pricing?.lunch_price || 10;
                         const mealsBill = (booking.meal_requests || []).reduce((sum: number, m: any) => {
                           if (['Accepted', 'Served', 'confirmed', 'served'].includes(m.status)) {
@@ -412,6 +402,7 @@ export function GoogleGuestAgenda({
                           }
                           return sum;
                         }, 0);
+                        const collected = ((booking as any).settled_receipts || []).reduce((sum: number, r: any) => sum + (r.amount || 0), 0);
                         const liveTab = accommodation + mealsBill - collected;
 
                         return (
@@ -520,11 +511,12 @@ export function GoogleGuestAgenda({
         guest_name: String(ev.summary || "Unnamed Guest"),
         check_in: String(ev.start),
         check_out: String(ev.end || ev.start),
-        status: doCheckIn || true ? 'checked_in' : 'confirmed',
+        status: 'checked_in',
         source: 'System',
         google_event_id: String(ev.id),
         total_price: 0,
-        number_of_people: 1,
+        number_of_adults: 1,
+        number_of_children: 0,
         payment_status: 'Unpaid',
         approved_by_manager: true,
         created_by_id: String(currentUserId),
@@ -603,6 +595,16 @@ export function GoogleGuestAgenda({
           }
         }
       } catch (e) { console.error('Failed to parse special_requests', e); }
+
+      let existingAdj = 0;
+      try {
+        const meta = typeof b.special_requests === 'string' ? JSON.parse(b.special_requests || '{}') : (b.special_requests || {});
+        existingAdj = parseFloat(meta.last_adjustment) || 0;
+      } catch {}
+      setSvcDateAdjustment(existingAdj);
+
+      setSvcAdults(b.number_of_adults || b.number_of_people || 1);
+      setSvcChildren(b.number_of_children || 0);
       
       const ci = new Date(b.check_in + 'T00:00:00');
       const co = new Date(b.check_out + 'T00:00:00');
@@ -630,42 +632,8 @@ export function GoogleGuestAgenda({
       setIsLunchPrepaid(draft?.isLunchPrepaid ?? (b.payment_note?.includes('Lunch') || false));
       setIsDinnerPrepaid(draft?.isDinnerPrepaid ?? (b.payment_note?.includes('Dinner') || false));
       
-      let kitchenOrders: any[] = [];
-      try {
-        const meta = typeof b.special_requests === 'string' ? JSON.parse(b.special_requests || '{}') : (b.special_requests || {});
-        kitchenOrders = meta.kitchen_orders || [];
-      } catch {}
-
-      const { data: dbMeals } = await supabase
-        .from('meal_requests')
-        .select('meal_type, status, adult_qty, child_qty')
-        .eq('booking_id', b.id);
-      if (dbMeals && dbMeals.length > 0) {
-        const statusMap: Record<string, string> = { 'Pending': 'pending', 'Accepted': 'confirmed' };
-        for (const m of dbMeals) {
-          if (m.status === 'Served') continue; 
-          const type = m.meal_type.toLowerCase();
-          const newStatus = statusMap[m.status] || m.status.toLowerCase();
-          const existing = kitchenOrders.find((o: any) => o.type === type);
-          if (existing) {
-            existing.status = newStatus;
-            existing.quantity = m.adult_qty;
-          } else {
-            kitchenOrders.push({ type, quantity: m.adult_qty, status: newStatus, prepaid: false, guest_name: b.guest_name, id: b.id, requested_at: new Date().toISOString() });
-          }
-        }
-      }
-
-      const accLunch = kitchenOrders.find((o: any) => o.type === 'lunch' && o.status === 'confirmed');
-      const accDinner = kitchenOrders.find((o: any) => o.type === 'dinner' && o.status === 'confirmed');
-
-      setSvcLunch(!!accLunch);
-      setSvcLunchCount(accLunch?.quantity || 0);
-      setSvcDinner(!!accDinner);
-      setSvcDinnerCount(accDinner?.quantity || 0);
-
-      setIsLunchPrepaid(accLunch?.prepaid ?? (draft?.isLunchPrepaid ?? (b.payment_note?.includes('Lunch') || false)));
-      setIsDinnerPrepaid(accDinner?.prepaid ?? (draft?.isDinnerPrepaid ?? (b.payment_note?.includes('Dinner') || false)));
+      setIsLunchPrepaid(draft?.isLunchPrepaid ?? (b.payment_note?.includes('Lunch') || false));
+      setIsDinnerPrepaid(draft?.isDinnerPrepaid ?? (b.payment_note?.includes('Dinner') || false));
       
       setSvcGuide(draft?.svcGuide ?? b.guide_service ?? false);
       setSvcGuideNames(draft?.svcGuideNames ?? (b.guide_names ? b.guide_names.split(', ') : ['']));
@@ -695,12 +663,10 @@ export function GoogleGuestAgenda({
 
       const initialSvcAmount = draft?.svcAmount ?? (hasSettled ? 0 : Math.max(0, b.total_price - (b.collected_amount || 0)));
       const initialIsPrepaid = draft?.isPrepaid ?? (hasSettled ? true : (b.payment_note?.includes('Accommodation') || false));
-      const initialIsLunchPrepaid = accLunch?.prepaid ?? (draft?.isLunchPrepaid ?? (b.payment_note?.includes('Lunch') || false));
-      const initialIsDinnerPrepaid = accDinner?.prepaid ?? (draft?.isDinnerPrepaid ?? (b.payment_note?.includes('Dinner') || false));
+      const initialIsLunchPrepaid = draft?.isLunchPrepaid ?? (b.payment_note?.includes('Lunch') || false);
+      const initialIsDinnerPrepaid = draft?.isDinnerPrepaid ?? (b.payment_note?.includes('Dinner') || false);
       
       const initialSTotal = (
-        (accLunch && !initialIsLunchPrepaid ? (accLunch.quantity * pricing.lunch_price) : 0) +
-        (accDinner && !initialIsDinnerPrepaid ? (accDinner.quantity * pricing.dinner_price) : 0) +
         ( (draft?.svcGuide ?? b.guide_service) ? (draft?.svcGuidePrice ?? (parseFloat(b.guide_amount || '0') || pricing.guide_price)) : 0 )
       );
 
@@ -805,7 +771,36 @@ export function GoogleGuestAgenda({
   const handleCheckIn = async () => {
     if (!sel || !onCheckIn) return;
     setLoadingAction('checkin');
-    try { await onCheckIn(sel.id); flash('✓ Guest checked in.'); }
+    try {
+      await onCheckIn(sel.id);
+
+      // Double-Sync: Scan meal_requests from DB and sync flat columns for UI display
+      try {
+        const { data: dbMeals } = await supabase
+          .from('meal_requests')
+          .select('*')
+          .eq('booking_id', sel.id);
+
+        let currentMeta: any = {};
+        try {
+          currentMeta = typeof sel.special_requests === 'string'
+            ? JSON.parse(sel.special_requests || '{}')
+            : (sel.special_requests || {});
+          if (Array.isArray(currentMeta)) currentMeta = { days: currentMeta };
+        } catch { currentMeta = {}; }
+
+        const flatUpdates: any = {
+          has_lunch: (dbMeals || []).some((m: any) => m.meal_type.toLowerCase() === 'lunch' && (m.adult_qty || 0) > 0),
+          has_dinner: (dbMeals || []).some((m: any) => m.meal_type.toLowerCase() === 'dinner' && (m.adult_qty || 0) > 0),
+          has_guide: currentMeta.draft?.svcGuide || false,
+        };
+        if (onUpdateBooking) await onUpdateBooking(sel.id, flatUpdates);
+      } catch (syncErr) {
+        console.error('Double-sync during check-in failed:', syncErr);
+      }
+
+      flash('✓ Guest checked in.');
+    }
     catch { flash('⚠ Check-in failed.'); }
     finally { setLoadingAction(''); }
   };
@@ -857,13 +852,12 @@ export function GoogleGuestAgenda({
         currentMeta = {};
       }
       
-      const kitchenOrders = currentMeta.kitchen_orders || [];
-      const accLunch = kitchenOrders.find((o: any) => o.type === 'lunch' && o.status === 'confirmed');
-      const accDinner = kitchenOrders.find((o: any) => o.type === 'dinner' && o.status === 'confirmed');
+      // No longer using currentMeta.kitchen_orders. We rely on the state variable kitchenOrders!
+      const unpaidMeals = kitchenOrders.filter((m: any) => !m.is_paid && (m.status === 'confirmed' || m.status === 'served'));
+      const mealsToClear = unpaidMeals.map((m: any) => m.meal_id).filter(Boolean);
 
       const sTotal = (
-        (accLunch && !accLunch.prepaid && !isLunchPrepaid ? accLunch.quantity * (pricing.lunch_price) : 0) +
-        (accDinner && !accDinner.prepaid && !isDinnerPrepaid ? accDinner.quantity * (pricing.dinner_price) : 0) +
+        unpaidMeals.reduce((sum: number, m: any) => sum + (m.prepaid ? 0 : (m.quantity || 0) * (m.type === 'lunch' ? pricing.lunch_price : pricing.dinner_price)), 0) +
         (svcGuide ? svcGuidePrice : 0) +
         (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0)
       );
@@ -880,21 +874,17 @@ export function GoogleGuestAgenda({
         items: {
           accommodation: svcAmount,
           isPrepaid: isPrepaid,
-          meals: { 
-            lunch: svcLunch ? svcLunchCount : 0, 
-            dinner: svcDinner ? svcDinnerCount : 0,
-            isLunchPrepaid: accLunch?.prepaid || isLunchPrepaid,
-            isDinnerPrepaid: accDinner?.prepaid || isDinnerPrepaid
-          },
+          settled_meal_ids: mealsToClear,
           services: { 
             guide: svcGuide ? svcGuidePrice : 0, 
             transport: svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0, 
           },
+          stay_adjustment: svcDateAdjustment,
           extras: [...extraServices],
           drinks: drinkTab
         },
         total: gTotal,
-        payments: svcPayList.filter(p => parseFloat(p.amount) > 0)
+        payments: svcPayList.filter(p => parseFloat(p.amount) !== 0)
       };
 
       const settledReceipts = [...(currentMeta.settled_receipts || []), snapshot];
@@ -907,7 +897,7 @@ export function GoogleGuestAgenda({
 
       for (const p of svcPayList) {
         const amt = parseFloat(p.amount) || 0;
-        if (amt <= 0) continue;
+        if (amt === 0) continue; // Allow negative amounts for refunds
         const rate = p.currency === 'USD' ? 1 : (p.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92));
         const usdEquiv = p.currency === 'USD' ? amt : (amt / rate);
         await supabase.from('payments').insert({
@@ -930,26 +920,36 @@ export function GoogleGuestAgenda({
         });
       } catch {}
 
+      if (mealsToClear.length > 0) {
+        // 1. Mark them as 'Paid' in the meal_requests table
+        await supabase
+          .from('meal_requests')
+          .update({ is_paid: true })
+          .in('id', mealsToClear);
+      }
+
       const isCurrentlyPrepaid = isPrepaid || sel.payment_status === 'Prepaid';
+      const finalAdjustment = parseFloat(String(svcDateAdjustment)) || 0;
       
       const updates: any = {
         is_manually_updated: true,
-        total_price: gTotal,
+        total_price: hasSettled ? ((sel.total_price || 0) + finalAdjustment) : (svcAmount + finalAdjustment),
+        stay_price: hasSettled ? (sel.stay_price || sel.total_price) : svcAmount,
         number_of_people: svcAdults,
-        children_under_12: svcChildren,
-        collected_amount: isCurrentlyPrepaid 
-          ? gTotal
-          : ((sel.collected_amount || 0) + totalPaidUsd),
-        collected_currency: isCurrentlyPrepaid 
-          ? (sel.currency || 'USD') 
-          : 'USD',
+        number_of_adults: svcAdults,
+        number_of_children: svcChildren,
+        collected_amount: (sel.collected_amount || 0) + totalPaidUsd,
+        collected_currency: sel.collected_currency || 'USD',
         payment_status: isCurrentlyPrepaid ? 'Prepaid' : 'Paid',
         is_prepaid: isCurrentlyPrepaid,
-        lunch: false, lunch_count: 0,
-        dinner: false, dinner_count: 0,
-        guide_service: false, guide_amount: null, guide_names: null,
-        has_transportation: false, transportation_details: null,
-        special_requests: JSON.stringify({ ...currentMeta, settled_receipts: settledReceipts, days: dayEntries, draft: null })
+        has_lunch: false,   // Removes the icon from the agenda card
+        has_dinner: false,  // Removes the icon from the agenda card
+        special_requests: JSON.stringify({ 
+          ...currentMeta, 
+          settled_receipts: settledReceipts, 
+          days: dayEntries, 
+          draft: null // Clears the "phantom" memory
+        })
       };
       
       if (onUpdateBooking) await onUpdateBooking(sel.id, updates);
@@ -962,7 +962,7 @@ export function GoogleGuestAgenda({
       flash('✓ Tab Settled & Archived. Receipt is ready below.');
       setSelectedReceipt(snapshot);
       
-      setSvcAmount(0); setSvcDiscount(0); setSvcAdults(1); setSvcChildren(0);
+      setSvcAmount(0); setSvcDiscount(0); setSvcDateAdjustment(0);
       setIsPrepaid(false); setIsLunchPrepaid(false); setIsDinnerPrepaid(false);
       setSvcLunch(false); setSvcLunchCount(0); setSvcDinner(false); setSvcDinnerCount(0);
       setSvcGuide(false); setSvcGuidePrice(40); setSvcGuideNames(['']);
@@ -1008,7 +1008,17 @@ export function GoogleGuestAgenda({
         (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0)
       );
 
-      const updates: Partial<Booking> = {
+      const isTab1Closed = (getSettledReceiptsForSel ? getSettledReceiptsForSel() : []).length > 0 || (sel.collected_amount || 0) > 0;
+      
+      let currentMeta: any = {};
+      try {
+        const parsed = typeof sel.special_requests === 'string'
+          ? JSON.parse(sel.special_requests || '{}')
+          : (sel.special_requests || {});
+        currentMeta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
+      } catch { currentMeta = {}; }
+
+      const updates: Partial<Booking> & { special_requests?: string } = {
         lunch: svcLunch,
         lunch_count: svcLunch ? svcLunchCount : 0,
         dinner: svcDinner,
@@ -1022,9 +1032,13 @@ export function GoogleGuestAgenda({
             .map(t => `${t.name.trim()} | ${t.details.trim()} | Price: $${t.price}`)
             .join('\n') || null
         : null,
-        amount: svcAmount,
-        currency: 'USD',
-        total_price: svcAmount + sTotal + dTotal + eTotal - svcDiscount
+        total_price: isTab1Closed 
+          ? ((sel.total_price || 0) + svcDateAdjustment)
+          : (svcAmount + svcDateAdjustment + sTotal + dTotal + eTotal - svcDiscount),
+        special_requests: JSON.stringify({
+          ...currentMeta,
+          last_adjustment: svcDateAdjustment
+        })
       };
       await onUpdateBooking(sel.id, updates);
       flash('✓ Services updated.');
@@ -1244,6 +1258,8 @@ export function GoogleGuestAgenda({
         setSvcChildren={setSvcChildren}
         svcAmount={svcAmount}
         setSvcAmount={setSvcAmount}
+        svcDateAdjustment={svcDateAdjustment}
+        setSvcDateAdjustment={setSvcDateAdjustment}
         isPrepaid={isPrepaid}
         setIsPrepaid={setIsPrepaid}
         isLunchPrepaid={isLunchPrepaid}

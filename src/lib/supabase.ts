@@ -28,8 +28,10 @@ export interface Booking {
   check_in: string;
   check_out: string;
   total_price: number;
-  number_of_people: number;
-  num_people: number;
+  stay_price?: number;
+  number_of_people?: number;
+  number_of_adults?: number;
+  number_of_children?: number;
   payment_status: string;
   source: string;
   status: string;
@@ -50,7 +52,6 @@ export interface Booking {
   laundry_price?: string | null;
   laundry_currency?: 'UZS' | 'USD' | null;
   guest_count?: number;
-  children_under_12?: number;
   nights?: string;
   guide_service?: boolean;
   guide_names?: string | null;

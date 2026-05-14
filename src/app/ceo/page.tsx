@@ -186,8 +186,8 @@ function CEODashboard() {
       amount_uzs: amountUZS,
       description: booking.description || `Booking: ${booking.guest_name} (${booking.check_in} - ${booking.check_out})`,
       guest_name: booking.guest_name,
-      guest_count: booking.guest_count || booking.number_of_people,
-      children_under_12: booking.children_under_12,
+      guest_count: (booking as any).number_of_people || (booking as any).number_of_adults || booking.guest_count,
+      children_under_12: 0,
       nights: booking.nights,
       guide_service: booking.guide_service || booking.guide_required,
       guide_names: booking.guide_names,
@@ -776,7 +776,7 @@ function CEODashboard() {
                             <div>
                               <p className="font-bold text-slate-900">{booking.guest_name}</p>
                               <p className="text-sm text-slate-600">{booking.check_in} → {booking.check_out}</p>
-                              <p className="text-sm text-slate-500">{booking.number_of_people || booking.guest_count || 1} guests</p>
+                              <p className="text-sm text-slate-500">{(booking as any).number_of_people || (booking as any).number_of_adults || booking.guest_count || 1} guests</p>
                             </div>
                             <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
                               booking.status === 'checked_in' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
