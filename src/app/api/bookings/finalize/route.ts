@@ -17,13 +17,13 @@ export const dynamic = 'force-dynamic';
  *     total: number,
  *     payments: Array<{ amount, currency, method }>
  *   },
- *   last_edited_by_id?: string
+ *   last_edited_by?: string
  * }
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { booking_id, tab_data, last_edited_by_id } = body;
+    const { booking_id, tab_data, last_edited_by } = body;
 
     if (!booking_id || !tab_data) {
       return NextResponse.json({ error: 'booking_id and tab_data are required' }, { status: 400 });
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
         amount: tab_data.total || 0,
         currency: tab_data.payments?.[0]?.currency || 'USD',
         settled_at: tab_data.date || new Date().toISOString(),
-        created_by_id: last_edited_by_id || booking.created_by_id,
+        created_by: last_edited_by || booking.created_by,
         note: JSON.stringify(tab_data),
       }])
       .select()
@@ -92,19 +92,12 @@ export async function POST(request: NextRequest) {
       last_edited_at: new Date().toISOString(),
     };
 
-    if (last_edited_by_id) {
-      updates.last_edited_by_id = last_edited_by_id;
+    if (last_edited_by) {
+      updates.last_edited_by = last_edited_by;
     }
 
-    // Merge settled_receipts into special_requests metadata
-    let meta: Record<string, any> = {};
-    try {
-      meta = typeof booking.special_requests === 'string'
-        ? JSON.parse(booking.special_requests || '{}')
-        : (booking.special_requests || {});
-    } catch { /* ignore */ }
-
-    const settledReceipts = meta.settled_receipts || [];
+    // Merge settled_receipts directly
+    const settledReceipts = booking.settled_receipts || [];
     settledReceipts.push({
       id: receipt.id,
       date: tab_data.date,
@@ -114,8 +107,7 @@ export async function POST(request: NextRequest) {
       settled_at: new Date().toISOString(),
     });
 
-    meta.settled_receipts = settledReceipts;
-    updates.special_requests = JSON.stringify(meta);
+    updates.settled_receipts = settledReceipts;
 
     const { data: updated, error: updErr } = await supabase
       .from('bookings')

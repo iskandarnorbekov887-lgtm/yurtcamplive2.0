@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
  *   amount?: number,
  *   currency?: 'UZS' | 'USD' | 'EUR',
  *   services?: { lunch?, dinner?, guide?, transport?, cooking?, laundry? },
- *   created_by_id: string,
+ *   created_by: string,
  *   notes?: string,
  *   is_system_only?: boolean,
  *   is_manual_dates?: boolean
@@ -30,13 +30,13 @@ export async function POST(request: NextRequest) {
       guest_name,
       check_in,
       check_out,
-      number_of_people = 1,
+      number_of_adults = 1,
       guest_category = 'international',
       local_stay_type,
       amount = 0,
       currency = 'USD',
       services = {},
-      created_by_id,
+      created_by,
       notes = '',
       is_system_only = false,
       is_manual_dates = true,
@@ -48,8 +48,8 @@ export async function POST(request: NextRequest) {
     if (!check_in) {
       return NextResponse.json({ error: 'check_in is required' }, { status: 400 });
     }
-    if (!created_by_id) {
-      return NextResponse.json({ error: 'created_by_id is required' }, { status: 400 });
+    if (!created_by) {
+      return NextResponse.json({ error: 'created_by is required' }, { status: 400 });
     }
 
     const isFinancial = guest_category === 'local' || guest_category === 'pool';
@@ -71,8 +71,8 @@ export async function POST(request: NextRequest) {
       guest_name: guest_name.trim(),
       check_in,
       check_out: finalCheckOut,
-      number_of_people,
-      guest_count: number_of_people,
+      number_of_adults,
+      guest_count: number_of_adults,
       status: isFinancial ? 'completed' : 'checked_in',
       source: is_system_only ? 'System' : 'manual',
       total_price: isFinancial ? amount : 0,
@@ -80,10 +80,14 @@ export async function POST(request: NextRequest) {
       currency,
       amount,
       exchange_rate: currency === 'UZS' ? 1 : (currency === 'USD' ? 1 : await fetchUsdToEur()),
-      created_by_id,
+      created_by,
       approved_by_manager: true,
       notes,
-      special_requests: JSON.stringify(meta),
+      is_manual_dates: meta.is_manual_dates,
+      guest_category: meta.guest_category,
+      local_stay_type: meta.local_stay_type,
+      is_pool_visitor: meta.is_pool_visitor,
+      is_room_stay: meta.is_room_stay,
     };
 
     // Purge room-related fields for Local/Pool/Financials
@@ -109,7 +113,7 @@ export async function POST(request: NextRequest) {
         amount,
         currency,
         settled_at: check_in,
-        created_by_id,
+        created_by,
         note: guest_category === 'pool' ? 'Instant Pool Payment' : `Local ${local_stay_type} payment`,
       }]);
     }

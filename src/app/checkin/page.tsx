@@ -56,7 +56,16 @@ function CheckinPortal() {
     // Optimistic UI: Update state instantly for Uzbekistan Speed
     setBookings(prev => prev.map(b => b.id === id ? { ...b, status: 'checked_in' } : b));
     
-    const { error } = await supabase.from('bookings').update({ status: 'checked_in' }).eq('id', id);
+    const payloadToSave = { status: 'checked_in' } as any;
+    delete payloadToSave.special_requests;
+    delete payloadToSave.number_of_people;
+    delete payloadToSave.lunch_count;
+    delete payloadToSave.dinner_count;
+    delete payloadToSave.guide_service;
+    delete payloadToSave.guide_names;
+    delete payloadToSave.guide_amount;
+    delete payloadToSave.last_edited_by_id;
+    const { error } = await supabase.from('bookings').update(payloadToSave).eq('id', id);
     if (error) {
       console.error(error);
       fetchData(); // Rollback if error
@@ -83,14 +92,12 @@ function CheckinPortal() {
       original_amount: amountValue,
       exchange_rate: rateValue,
       amount_uzs: amountUZS,
-      description: booking.description || `Booking: ${booking.guest_name} (${booking.check_in} - ${booking.check_out})`,
       guest_name: booking.guest_name,
-      guest_count: (booking as any).number_of_people || (booking as any).number_of_adults || booking.guest_count,
+      guest_count: (booking.number_of_adults || 0) + (booking.number_of_children || 0) || booking.guest_count,
       children_under_12: 0,
       nights: booking.nights,
-      guide_service: booking.guide_service || booking.guide_required,
-      guide_names: booking.guide_names,
-      transportation: booking.has_transportation,
+      has_guide: booking.has_guide,
+      has_transportation: booking.has_transportation,
       transportation_details: booking.transportation_details,
       lunch: booking.lunch,
       lunch_count: booking.lunch_count,
@@ -105,7 +112,16 @@ function CheckinPortal() {
       created_by: booking.created_by_role || 'System',
     }]);
 
-    const { error } = await supabase.from('bookings').update({ status: 'completed', payment_status: 'paid' }).eq('id', id);
+    const payloadToSave = { status: 'completed', payment_status: 'paid' } as any;
+    delete payloadToSave.special_requests;
+    delete payloadToSave.number_of_people;
+    delete payloadToSave.lunch_count;
+    delete payloadToSave.dinner_count;
+    delete payloadToSave.guide_service;
+    delete payloadToSave.guide_names;
+    delete payloadToSave.guide_amount;
+    delete payloadToSave.last_edited_by_id;
+    const { error } = await supabase.from('bookings').update(payloadToSave).eq('id', id);
     if (error) fetchData();
   };
 
@@ -113,7 +129,16 @@ function CheckinPortal() {
     // Optimistic UI update
     setBookings(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
     
-    const { error } = await supabase.from('bookings').update({ ...updates, last_edited_by_id: currentUserId || '', last_edited_at: new Date().toISOString() }).eq('id', id);
+    const payloadToSave = { ...updates, last_edited_by: currentUserId || '', last_edited_at: new Date().toISOString() } as any;
+    delete payloadToSave.special_requests;
+    delete payloadToSave.number_of_people;
+    delete payloadToSave.lunch_count;
+    delete payloadToSave.dinner_count;
+    delete payloadToSave.guide_service;
+    delete payloadToSave.guide_names;
+    delete payloadToSave.guide_amount;
+    delete payloadToSave.last_edited_by_id;
+    const { error } = await supabase.from('bookings').update(payloadToSave).eq('id', id);
     if (error) fetchData();
   };
 

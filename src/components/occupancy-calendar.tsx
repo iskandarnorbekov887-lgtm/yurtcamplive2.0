@@ -208,13 +208,12 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
     
     setLoadingAction('applyExt');
     try {
-      const newMeta = { ...currentMeta, last_adjustment: amount };
       await onUpdateBooking(sel.id, { 
         total_price: newTotal,
-        special_requests: JSON.stringify(newMeta)
+        last_adjustment: String(amount)
       });
       setExtFee(String(amount));
-      setSel({ ...sel, total_price: newTotal, special_requests: JSON.stringify(newMeta) });
+      setSel({ ...sel, total_price: newTotal, last_adjustment: String(amount) });
     } catch (e) {
       console.error(e);
     } finally {
@@ -273,13 +272,12 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
     
     setLoadingAction('applyRed');
     try {
-      const newMeta = { ...currentMeta, last_reduction: amount };
       await onUpdateBooking(sel.id, { 
         total_price: newTotal,
-        special_requests: JSON.stringify(newMeta)
+        last_reduction: String(amount)
       });
       setRedFee(String(amount));
-      setSel({ ...sel, total_price: newTotal, special_requests: JSON.stringify(newMeta) });
+      setSel({ ...sel, total_price: newTotal, last_reduction: String(amount) });
     } catch (e) {
       console.error(e);
     } finally {
@@ -384,7 +382,8 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
       // Save signature to booking metadata if present
       if (signatureData && onUpdateBooking) {
         await onUpdateBooking(id, {
-          special_requests: JSON.stringify({ ...currentMeta, checkin_signature: signatureData, checkin_signed_at: new Date().toISOString() })
+          checkin_signature: signatureData,
+          checkin_signed_at: new Date().toISOString()
         });
       }
       await onCheckIn(id);
@@ -423,10 +422,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
 
     const updates: Partial<Booking> = {
       ...editData,
-      special_requests: JSON.stringify({ 
-        ...currentMeta, 
-        is_manual_dates: true
-      })
+      is_manual_dates: true
     };
 
     const updatedSel = { ...sel, ...updates } as Booking;
@@ -621,7 +617,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                         }}
                         className="truncate shadow-sm"
                       >
-                        <span className="truncate">{ev.booking.guest_name} | {(ev.booking as any).number_of_people || ev.booking.guest_count}p | {pricePaid} UZS</span>
+                        <span className="truncate">{ev.booking.guest_name} | {(ev.booking.number_of_adults || 0) + (ev.booking.number_of_children || 0) || ev.booking.guest_count}p | {pricePaid} UZS</span>
                       </button>
                     );
                   }
@@ -698,7 +694,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                   <h3 className="text-2xl font-black text-slate-900 leading-none">{String(sel.guest_name)}</h3>
                   <div className="flex items-center gap-2 mt-2">
                     <p className="text-sm font-black text-slate-600">
-                      {String((sel as any).number_of_people || (sel as any).number_of_adults || sel.guest_count)} Pax
+                      {String((sel.number_of_adults || 0) + (sel.number_of_children || 0) || sel.guest_count)} Pax
                     </p>
                     <span className="w-1 h-1 bg-slate-300 rounded-full" />
                     <p className="text-sm font-bold text-slate-500">
@@ -756,7 +752,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                                 <div className="grid grid-cols-2 gap-3">
                                   <div className="opacity-75">
                                     <p className="text-[9px] font-bold text-slate-400 uppercase">Pax & Base Price</p>
-                                    <p className="text-sm font-black text-slate-900">{String((sel as any).number_of_people || (sel as any).number_of_adults || 0)} Guests @ ${String(sel?.total_price || 0)}</p>
+                                    <p className="text-sm font-black text-slate-900">{String((sel.number_of_adults || 0) + (sel.number_of_children || 0) || 0)} Guests @ ${String(sel?.total_price || 0)}</p>
                                   </div>
                                   <button 
                                     disabled={isTab1Closed}
@@ -970,7 +966,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                       )}
 
                       {/* Restore button for cancelled/no-arrival bookings (creator or CEO only) */}
-                      {(sel.status === 'cancelled' || sel.status === 'no_arrival') && onUpdateBooking && (userRole === 'CEO' || currentUserId === sel.created_by_id) && (
+                      {(sel.status === 'cancelled' || sel.status === 'no_arrival') && onUpdateBooking && (userRole === 'CEO' || currentUserId === sel.created_by) && (
                         <button
                           onClick={async () => {
                             setLoadingAction('restore');
@@ -1090,8 +1086,8 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                 <label className="block text-sm font-bold text-slate-700 mb-2">Number of Adults</label>
                 <input
                   type="number"
-                  value={(editRequestData as any).number_of_people || ''}
-                  onChange={e => setEditRequestData({ ...editRequestData, number_of_people: parseInt(e.target.value) })}
+                  value={editRequestData.number_of_adults || ''}
+                  onChange={e => setEditRequestData({ ...editRequestData, number_of_adults: parseInt(e.target.value) })}
                   className="w-full px-4 py-3 text-base rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
               </div>

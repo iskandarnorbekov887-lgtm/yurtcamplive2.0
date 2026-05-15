@@ -60,12 +60,30 @@ function BookingPortal() {
   };
 
   const cancelBooking = async (id: number) => {
-    await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', id);
+    const payloadToSave = { status: 'cancelled' } as any;
+    delete payloadToSave.special_requests;
+    delete payloadToSave.number_of_people;
+    delete payloadToSave.lunch_count;
+    delete payloadToSave.dinner_count;
+    delete payloadToSave.guide_service;
+    delete payloadToSave.guide_names;
+    delete payloadToSave.guide_amount;
+    delete payloadToSave.last_edited_by_id;
+    await supabase.from('bookings').update(payloadToSave).eq('id', id);
     fetchData();
   };
 
   const handleUpdateBooking = async (id: number, updates: Partial<Booking>) => {
-    await supabase.from('bookings').update({ ...updates, last_edited_by_id: currentUserId || '', last_edited_at: new Date().toISOString() }).eq('id', id);
+    const payloadToSave = { ...updates, last_edited_by: currentUserId || '', last_edited_at: new Date().toISOString() } as any;
+    delete payloadToSave.special_requests;
+    delete payloadToSave.number_of_people;
+    delete payloadToSave.lunch_count;
+    delete payloadToSave.dinner_count;
+    delete payloadToSave.guide_service;
+    delete payloadToSave.guide_names;
+    delete payloadToSave.guide_amount;
+    delete payloadToSave.last_edited_by_id;
+    await supabase.from('bookings').update(payloadToSave).eq('id', id);
     fetchData();
   };
 

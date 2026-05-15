@@ -76,7 +76,7 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
         guest_name: guestName.trim(),
         check_in: checkIn,
         check_out: checkOut || checkIn,
-        number_of_people: guestCount,
+        number_of_adults: guestCount,
         guest_count: guestCount,
         status: isFinancial ? 'completed' : 'checked_in', // Local (Day/Night) and Pool are instant-completed
         source: 'manual',
@@ -85,16 +85,13 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
         currency: 'UZS',
         amount: price,
         exchange_rate: 1,
-        created_by_id: currentUserId,
+        created_by: currentUserId,
         approved_by_manager: true,
-        special_requests: JSON.stringify({
-          is_system_only: true,
-          is_manual_dates: true,
-          guest_category: finalCategory,
-          local_stay_type: mainCategory === 'local' ? localType : null,
-          is_pool_visitor: mainCategory === 'pool',
-          is_room_stay: isRoomStay
-        })
+        is_manual_dates: true,
+        guest_category: finalCategory,
+        local_stay_type: mainCategory === 'local' ? localType : null,
+        is_pool_visitor: mainCategory === 'pool',
+        is_room_stay: isRoomStay
       };
 
       // Absolute Data Isolation: Purge room-related fields for Local/Pool/Financials
@@ -123,7 +120,7 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
           amount: price,
           currency: 'UZS',
           settled_at: checkIn,
-          created_by_id: currentUserId,
+          created_by: currentUserId,
           note: mainCategory === 'pool' ? 'Instant Pool Payment' : `Local ${localType} payment`
         }]);
       }

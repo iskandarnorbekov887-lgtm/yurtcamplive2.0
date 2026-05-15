@@ -208,7 +208,16 @@ function ManagerPortal() {
                   setNotifications={setNotifications}
                   bookings={bookings}
                   onUpdateBooking={async (id, data) => {
-                    const { error } = await supabase.from('bookings').update(data).eq('id', id);
+                    const payloadToSave = { ...data } as any;
+                    delete payloadToSave.special_requests;
+                    delete payloadToSave.number_of_people;
+                    delete payloadToSave.lunch_count;
+                    delete payloadToSave.dinner_count;
+                    delete payloadToSave.guide_service;
+                    delete payloadToSave.guide_names;
+                    delete payloadToSave.guide_amount;
+                    delete payloadToSave.last_edited_by_id;
+                    const { error } = await supabase.from('bookings').update(payloadToSave).eq('id', id);
                     if (error) console.error(error);
                     await fetchData();
                   }}
@@ -246,7 +255,16 @@ function ManagerPortal() {
                       await fetchData();
                     }}
                     onUpdateBooking={async (id, data) => {
-                      const { error } = await supabase.from('bookings').update(data).eq('id', id);
+                      const payloadToSave = { ...data } as any;
+                      delete payloadToSave.special_requests;
+                      delete payloadToSave.number_of_people;
+                      delete payloadToSave.lunch_count;
+                      delete payloadToSave.dinner_count;
+                      delete payloadToSave.guide_service;
+                      delete payloadToSave.guide_names;
+                      delete payloadToSave.guide_amount;
+                      delete payloadToSave.last_edited_by_id;
+                      const { error } = await supabase.from('bookings').update(payloadToSave).eq('id', id);
                       if (error) {
                         console.error('Update Error:', error.message, error.details);
                         alert(`Database Error: ${error.message}`);

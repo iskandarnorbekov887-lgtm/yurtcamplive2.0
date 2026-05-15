@@ -112,6 +112,7 @@ interface BookingModalProps {
   dayEntries: any[];
   syncWarnings?: any;
   setSyncWarnings?: (v: any) => void;
+  activeMeals: any[];
 }
 
 export function BookingModal(props: BookingModalProps) {
@@ -135,7 +136,7 @@ export function BookingModal(props: BookingModalProps) {
     editCheckIn, setEditCheckIn, editCheckOut, setEditCheckOut, dateAdjAmount, setDateAdjAmount,
     valError, setValError, getSettledReceiptsForSel, handleCheckIn, handleCheckOut, handleCancel,
     fetchCbuRate, gTotal, debtRemaining, tPaidUsd, isBalanceMatched, today,
-    dayEntries, finalizeTab
+    dayEntries, finalizeTab, activeMeals
   } = props;
 
   const isStaff = userRole === 'Manager' || userRole === 'CEO';
@@ -195,7 +196,19 @@ export function BookingModal(props: BookingModalProps) {
     });
     
     const mealsTotal = mealItems.reduce((s: number, i: any) => s + i.total, 0);
-    const grandTotal = accommodation + mealsTotal;
+    
+    // Guide service from booking data
+    const guideTotal = sel.has_guide ? (parseFloat(sel.guide_amount || '0') || (pricing?.guide_price || 40)) : 0;
+    const guideNames = sel.guide_names || '';
+    
+    // Transportation from booking data
+    const transportTotal = sel.has_transportation ? 
+      (sel.transportation_details || '').split('\n').reduce((sum: number, line: string) => {
+        const match = line.match(/Price: \$(\d+(?:\.\d+)?)/);
+        return sum + (match ? parseFloat(match[1]) || 0 : 0);
+      }, 0) : 0;
+    
+    const grandTotal = accommodation + mealsTotal + guideTotal + transportTotal;
     
     const paymentsTotal = payments.reduce((s: number, p: any) => s + (p.amount_usd_equivalent || 0), 0);
     const totalReconciled = collected + paymentsTotal;
@@ -209,6 +222,10 @@ export function BookingModal(props: BookingModalProps) {
       accommodation,
       mealItems,
       mealsTotal,
+      guideTotal,
+      guideNames,
+      transportTotal,
+      transportationDetails: sel.transportation_details || '',
       grandTotal,
       totalReconciled,
       remaining,
@@ -218,77 +235,19 @@ export function BookingModal(props: BookingModalProps) {
 
   const isPOS = currentMeta.guest_category === 'local' || currentMeta.guest_category === 'pool';
 
-  const [kitchenOrders, setKitchenOrders] = useState<any[]>(currentMeta.kitchen_orders || []);
   const [mealAssurance, setMealAssurance] = useState({ accepted: 0, served: 0 });
   const [showMealRequestModal, setShowMealRequestModal] = useState(false);
   const [currentMealType, setCurrentMealType] = useState<'lunch' | 'dinner' | null>(null);
   const [mealRequestAmount, setMealRequestAmount] = useState(0);
+  const [mealRequestDietary, setMealRequestDietary] = useState<'Normal' | 'Vegetarian'>('Normal');
+  const [mealRequestNotes, setMealRequestNotes] = useState('');
 
-  // Sync kitchen_orders from the meal_requests table (source of truth for status)
+  // Meal assurance logic (calculated from the prop)
   useEffect(() => {
-    if (!sel) return;
-    async function syncKitchenOrdersFromDB() {
-      const { data: meals } = await supabase
-        .from('meal_requests')
-        .select('*')
-        .eq('booking_id', sel.id);
-
-      if (meals) {
-        const acceptedCount = meals.filter(m => m.status === 'Accepted').length;
-        const servedCount = meals.filter(m => m.status === 'Served').length;
-        setMealAssurance({ accepted: acceptedCount, served: servedCount });
-      }
-
-      // Source of Truth: DB meals
-      const finalOrders: any[] = [];
-      const jsonOrders = currentMeta.kitchen_orders || [];
-
-      if (meals) {
-        for (const m of meals) {
-          const type = m.meal_type.toLowerCase();
-          const statusMap: Record<string, string> = { 
-            'Pending': 'pending', 
-            'Accepted': 'confirmed',
-            'Served': 'served',
-            'Paid': 'paid'
-          };
-          const newStatus = statusMap[m.status] || m.status.toLowerCase();
-          
-          // Try to find matching info in JSON (for metadata like prepaid status)
-          const jsonMatch = jsonOrders.find((o: any) => o.meal_id === m.id || (!o.meal_id && o.type === type));
-          
-          finalOrders.push({
-            type,
-            quantity: m.adult_qty,
-            status: newStatus,
-            prepaid: jsonMatch ? jsonMatch.prepaid : (type === 'lunch' ? isLunchPrepaid : isDinnerPrepaid),
-            guest_name: sel.guest_name,
-            id: sel.id,
-            meal_id: m.id,
-            requested_at: jsonMatch ? jsonMatch.requested_at : (m.created_at || new Date().toISOString())
-          });
-        }
-      }
-      
-      // Also include any JSON orders that aren't in the DB yet (for local-first feeling)
-      for (const jo of jsonOrders) {
-        if (jo.meal_id && !finalOrders.some(fo => fo.meal_id === jo.meal_id)) {
-          finalOrders.push(jo);
-        } else if (!jo.meal_id && !finalOrders.some(fo => fo.type === jo.type)) {
-          finalOrders.push(jo);
-        }
-      }
-
-      // Sort: Pending first, then Accepted, then Served
-      finalOrders.sort((a, b) => {
-        const p: any = { 'pending': 0, 'confirmed': 1, 'served': 2 };
-        return (p[a.status] ?? 3) - (p[b.status] ?? 3);
-      });
-
-      setKitchenOrders(finalOrders);
-    }
-    syncKitchenOrdersFromDB();
-  }, [sel?.id, currentMeta.kitchen_orders]);
+    const acceptedCount = activeMeals.filter(m => m.status === 'confirmed').length;
+    const servedCount = activeMeals.filter(m => m.status === 'served').length;
+    setMealAssurance({ accepted: acceptedCount, served: servedCount });
+  }, [activeMeals]);
 
 
   const handleSaveProgress = async () => {
@@ -296,7 +255,6 @@ export function BookingModal(props: BookingModalProps) {
     setLoadingAction('save');
     try {
       const data: any = {
-        number_of_people: svcAdults,
         number_of_adults: svcAdults,
         number_of_children: svcChildren,
         amount: svcAmount,
@@ -304,13 +262,11 @@ export function BookingModal(props: BookingModalProps) {
         is_prepaid: isPrepaid,
         lunch: svcLunch,
         lunch_count: svcLunchCount,
-        lunch_prepaid: isLunchPrepaid,
+        lunch_paid: isLunchPrepaid,
         dinner: svcDinner,
         dinner_count: svcDinnerCount,
-        dinner_prepaid: isDinnerPrepaid,
-        guide_service: svcGuide,
-        guide_amount: svcGuidePrice.toString(),
-        guide_names: svcGuideNames,
+        dinner_paid: isDinnerPrepaid,
+        has_guide: svcGuide,
         has_transportation: svcTransport,
         extra_services: extraServices,
       };
@@ -792,7 +748,7 @@ export function BookingModal(props: BookingModalProps) {
 
                             const receipts = getSettledReceiptsForSel();
                             const hasSettled = receipts.length > 0 || (sel.collected_amount || 0) > 0;
-                            const guestNum = sel.number_of_people || sel.guest_count || 0;
+                            const guestNum = (sel.number_of_adults || 0) + (sel.number_of_children || 0) || sel.guest_count || 0;
                             const price = sel.total_price || 0;
                             const isPrepaidVal = isPrepaid || sel.is_prepaid || false;
 
@@ -820,7 +776,7 @@ export function BookingModal(props: BookingModalProps) {
                           }}
                           disabled={loadingAction === 'checkout_manual' || guestStatement?.status === 'OPEN TAB'}
                           className={`px-4 py-3 text-sm font-bold rounded-xl transition-all disabled:opacity-60 flex items-center justify-center gap-2 ${
-                            (guestStatement?.status === 'OPEN TAB' || (sel.number_of_people || sel.guest_count || 0) <= 0)
+                            (guestStatement?.status === 'OPEN TAB' || ((sel.number_of_adults || 0) + (sel.number_of_children || 0) || sel.guest_count || 0) <= 0)
                               ? 'bg-rose-100 border-2 border-rose-300 text-rose-700'
                               : 'bg-black hover:bg-zinc-950 text-white shadow-lg shadow-zinc-200 border-2 border-black'
                           }`}
@@ -911,26 +867,28 @@ export function BookingModal(props: BookingModalProps) {
                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Adults *</label>
                             <input 
                               type="number" 
-                              value={String(svcAdults || '')} 
+                              value={svcAdults ?? ''} 
+                              disabled={isTab1Closed}
                               onChange={e => {
                                 const val = parseInt(e.target.value) || 0;
                                 setSvcAdults(val);
-                                if (onUpdateBooking) onUpdateBooking(sel.id, { number_of_people: val, number_of_adults: val });
+                                if (onUpdateBooking) onUpdateBooking(sel.id, { number_of_adults: val });
                               }}
-                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm font-black text-black focus:outline-none"
+                              className={`w-full px-3 py-2 border text-sm font-black focus:outline-none ${isTab1Closed ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed' : 'bg-slate-50 border-slate-200 text-black'}`}
                             />
                           </div>
                           <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Children</label>
                             <input 
                               type="number" 
-                              value={String(svcChildren || '')} 
+                              value={svcChildren ?? ''} 
+                              disabled={isTab1Closed}
                               onChange={e => {
                                 const val = parseInt(e.target.value) || 0;
                                 setSvcChildren(val);
                                 if (onUpdateBooking) onUpdateBooking(sel.id, { number_of_children: val });
                               }}
-                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm font-black text-black focus:outline-none"
+                              className={`w-full px-3 py-2 border text-sm font-black focus:outline-none ${isTab1Closed ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed' : 'bg-slate-50 border-slate-200 text-black'}`}
                             />
                           </div>
                         </div>
@@ -1001,7 +959,7 @@ export function BookingModal(props: BookingModalProps) {
                         {/* Lunch Request Button */}
                         <div className="space-y-2">
                           {(() => {
-                            const lunchOrders = kitchenOrders.filter(o => o.type === 'lunch');
+                            const lunchOrders = activeMeals.filter(o => o.type === 'lunch');
                             const totalLunchQty = lunchOrders.reduce((sum, o) => sum + (o.quantity || 0), 0);
                             const isPending = lunchOrders.some(o => o.status === 'pending');
                             const hasAcceptedLunch = lunchOrders.some(o => o.status === 'confirmed');
@@ -1029,7 +987,7 @@ export function BookingModal(props: BookingModalProps) {
                         {/* Dinner Request Button */}
                         <div className="space-y-2">
                           {(() => {
-                            const dinnerOrders = kitchenOrders.filter(o => o.type === 'dinner');
+                            const dinnerOrders = activeMeals.filter(o => o.type === 'dinner');
                             const totalDinnerQty = dinnerOrders.reduce((sum, o) => sum + (o.quantity || 0), 0);
                             const isPending = dinnerOrders.some(o => o.status === 'pending');
                             const hasAcceptedDinner = dinnerOrders.some(o => o.status === 'confirmed');
@@ -1089,6 +1047,30 @@ export function BookingModal(props: BookingModalProps) {
                             </button>
                           </div>
 
+                          <div className="space-y-3">
+                            <div>
+                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Dietary Type</label>
+                              <select
+                                value={mealRequestDietary}
+                                onChange={(e) => setMealRequestDietary(e.target.value as 'Normal' | 'Vegetarian')}
+                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-900 outline-none focus:border-indigo-500 transition-all"
+                              >
+                                <option value="Normal">Normal</option>
+                                <option value="Vegetarian">Vegetarian</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Notes (Optional)</label>
+                              <input
+                                type="text"
+                                value={mealRequestNotes}
+                                onChange={(e) => setMealRequestNotes(e.target.value)}
+                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-900 outline-none focus:border-indigo-500 transition-all"
+                                placeholder="e.g., No peanuts, Extra spicy"
+                              />
+                            </div>
+                          </div>
+
                           {(currentMealType === 'lunch' ? isLunchPrepaid : isDinnerPrepaid) && (
                             <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-center gap-3 animate-in fade-in slide-in-from-top-1">
                               <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 shrink-0">
@@ -1124,7 +1106,8 @@ export function BookingModal(props: BookingModalProps) {
                                 meal_type: dbMealType,
                                 adult_qty: mealRequestAmount,
                                 child_qty: 0,
-                                dietary_type: 'Normal',
+                                dietary_type: mealRequestDietary,
+                                notes: mealRequestNotes,
                                 status: 'Pending',
                               };
                               console.log('Inserting into meal_requests:', mealRow);
@@ -1148,27 +1131,9 @@ export function BookingModal(props: BookingModalProps) {
                                 requested_at: new Date().toISOString()
                               };
 
-                              const nextOrders = [...(latestMeta.kitchen_orders || []), order];
-                              const updatedMeta = { ...latestMeta, kitchen_orders: nextOrders };
-
-                              console.log('Database Payload (Kitchen):', updatedMeta);
-
-                              // 2. Write kitchen_orders JSON for backward-compat (BookingModal display)
-                              const { error: metaErr } = await supabase
-                                .from('bookings')
-                                .update({ special_requests: JSON.stringify(updatedMeta) })
-                                .eq('id', sel.id);
-
-                              if (metaErr) {
-                                console.error('Handshake Failed:', metaErr.message);
-                                flash('⚠ Database Error: ' + metaErr.message);
-                                setShowMealRequestModal(false);
-                                return;
-                              }
-
-                              console.log('Handshake Success: Data is now in Supabase + meal_requests');
-                              setKitchenOrders(nextOrders);
-                              if (onRefresh) onRefresh(); // Force dashboard to sync
+                              // meal_requests table is the Single Source of Truth.
+                              // The parent's realtime subscription will auto-update activeMeals.
+                              if (onRefresh) onRefresh();
                               flash('✓ Sent to Kitchen!');
                               setShowMealRequestModal(false);
                             }}
@@ -1366,15 +1331,19 @@ export function BookingModal(props: BookingModalProps) {
                       );
                     })()}
                     {(() => {
-                      const acceptedOrders = kitchenOrders.filter((o: any) => 
+                      const acceptedOrders = activeMeals.filter((o: any) => 
                         (o.status === 'confirmed' || o.status === 'served') && !o.is_paid
                       );
                       
-                      const individualMeals = acceptedOrders.map((o: any) => ({
-                        name: `${o.type.charAt(0).toUpperCase() + o.type.slice(1)} (${o.meal_date || 'N/A'}) - ID: #${o.meal_id}`,
-                        price: (o.quantity || 1) * (o.type === 'lunch' ? pricing.lunch_price : pricing.dinner_price),
-                        prepaid: o.prepaid
-                      }));
+                      const individualMeals = acceptedOrders.map((o: any) => {
+                        const dietaryInfo = o.dietary_type && o.dietary_type !== 'Normal' ? ` - ${o.dietary_type}` : '';
+                        const notesInfo = o.notes ? ` - *${o.notes}*` : '';
+                        return {
+                          name: `${o.type.charAt(0).toUpperCase() + o.type.slice(1)} (${o.meal_date || 'N/A'})${dietaryInfo}${notesInfo} - ID: #${o.meal_id}`,
+                          price: (o.quantity || 1) * (o.type === 'lunch' ? pricing.lunch_price : pricing.dinner_price),
+                          prepaid: o.prepaid
+                        };
+                      });
 
                       const sItems = [
                         ...individualMeals,
@@ -1416,12 +1385,16 @@ export function BookingModal(props: BookingModalProps) {
                     })()}
 
                     {(() => {
-                      const paidOrders = kitchenOrders.filter((o: any) => o.is_paid === true);
+                      const paidOrders = activeMeals.filter((o: any) => o.is_paid === true);
                       if (paidOrders.length === 0) return null;
 
-                      const individualPaidMeals = paidOrders.map((o: any) => ({
-                        name: `${o.type.charAt(0).toUpperCase() + o.type.slice(1)} (${o.meal_date || 'N/A'}) - ID: #${o.meal_id}`
-                      }));
+                      const individualPaidMeals = paidOrders.map((o: any) => {
+                        const dietaryInfo = o.dietary_type && o.dietary_type !== 'Normal' ? ` - ${o.dietary_type}` : '';
+                        const notesInfo = o.notes ? ` - *${o.notes}*` : '';
+                        return {
+                          name: `${o.type.charAt(0).toUpperCase() + o.type.slice(1)} (${o.meal_date || 'N/A'})${dietaryInfo}${notesInfo} - ID: #${o.meal_id}`
+                        };
+                      });
 
                       return (
                         <div className="mt-4 pt-4 border-t border-white/20 animate-in fade-in duration-700">
@@ -1556,7 +1529,7 @@ export function BookingModal(props: BookingModalProps) {
                                 <div className="col-span-12 space-y-1.5">
                                   <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Method</span>
                                   <div className="flex gap-2">
-                                    {(['Cash', 'Card/Online'] as const).map((m: any) => (
+                                    {(['Cash', 'Online'] as const).map((m: any) => (
                                       <button
                                         key={m}
                                         onClick={() => setSvcPayList(svcPayList.map((p: any, i: number) => i === pi ? { ...p, method: m } : p))}
@@ -2062,6 +2035,34 @@ export function BookingModal(props: BookingModalProps) {
                           </div>
                         </div>
                       ))}
+
+                      {/* Guide Service */}
+                      {guestStatement.guideTotal > 0 && (
+                        <div className="flex justify-between items-center p-4 bg-white border border-black">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Guide Service</span>
+                            <span className="text-xs font-black text-black uppercase">{guestStatement.guideNames || 'Guide'}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Amount</span>
+                            <span className="font-mono text-sm font-black text-black">${guestStatement.guideTotal.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Transportation */}
+                      {guestStatement.transportTotal > 0 && (
+                        <div className="flex justify-between items-center p-4 bg-white border border-black">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Transportation</span>
+                            <span className="text-xs font-black text-black uppercase max-w-[200px] truncate">{guestStatement.transportationDetails || 'Transport'}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Amount</span>
+                            <span className="font-mono text-sm font-black text-black">${guestStatement.transportTotal.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Grand Total Row */}
                       <div className="flex justify-between items-center p-4 bg-black text-white border border-black mt-2">

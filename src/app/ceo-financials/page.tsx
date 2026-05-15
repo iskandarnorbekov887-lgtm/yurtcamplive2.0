@@ -54,7 +54,7 @@ function CEOFinancialCalendar() {
     try {
       const { data } = await supabase
         .from('bookings')
-        .select('check_in, check_out, status, number_of_people, guest_count')
+        .select('check_in, check_out, status, number_of_adults, number_of_children, guest_count')
         .gte('check_in', start)
         .lte('check_in', end)
         .in('status', ['checked_in', 'completed']);
@@ -64,7 +64,7 @@ function CEOFinancialCalendar() {
         (data as Booking[]).forEach((booking: Booking) => {
           const checkIn = booking.check_in;
           const checkOut = booking.check_out;
-          const people = (booking as any).number_of_people || (booking as any).number_of_adults || booking.guest_count || 1;
+          const people = (booking.number_of_adults || 0) + (booking.number_of_children || 0) || booking.guest_count || 1;
           
           // Count for each day of the stay
           const current = new Date(checkIn);

@@ -29,7 +29,7 @@ export interface Booking {
   check_out: string;
   total_price: number;
   stay_price?: number;
-  number_of_people?: number;
+  special_requests?: any;
   number_of_adults?: number;
   number_of_children?: number;
   payment_status: string;
@@ -40,11 +40,23 @@ export interface Booking {
   transportation: string;
   meal_preference: string;
   guide_required: boolean;
-  special_requests: string; // Contains guest_category in JSON metadata
   created_by_role: string;
   approved_by_manager: boolean;
-  created_by_id: string;
-  last_edited_by_id: string;
+  guest_category?: string;
+  local_stay_type?: string;
+  last_adjustment?: string;
+  last_reduction?: string;
+  checkin_signature?: string;
+  checkin_signed_at?: string;
+  is_manual_dates?: boolean;
+  kitchen_orders?: any[];
+  settled_receipts?: any[];
+  stay_paid?: boolean;
+  days?: any[];
+  draft?: any;
+  is_system_only?: boolean;
+  created_by: string;
+  last_edited_by: string;
   last_edited_by_role: string;
   created_at: string;
   cooking_class?: boolean; // Database column for cooking class
@@ -53,6 +65,7 @@ export interface Booking {
   laundry_currency?: 'UZS' | 'USD' | null;
   guest_count?: number;
   nights?: string;
+  has_guide?: boolean;
   guide_service?: boolean;
   guide_names?: string | null;
   guide_amount?: string | null;

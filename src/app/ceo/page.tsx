@@ -152,17 +152,44 @@ function CEODashboard() {
 
 
   const handleUpdateBooking = async (id: number, updates: Partial<Booking>) => {
-    await supabase.from('bookings').update({ ...updates, last_edited_by_id: currentUserId || '', last_edited_by_role: userRole, last_edited_at: new Date().toISOString() }).eq('id', id);
+    const payloadToSave = { ...updates, last_edited_by: currentUserId || '', last_edited_by_role: userRole, last_edited_at: new Date().toISOString() } as any;
+    delete payloadToSave.special_requests;
+    delete payloadToSave.number_of_people;
+    delete payloadToSave.lunch_count;
+    delete payloadToSave.dinner_count;
+    delete payloadToSave.guide_service;
+    delete payloadToSave.guide_names;
+    delete payloadToSave.guide_amount;
+    delete payloadToSave.last_edited_by_id;
+    await supabase.from('bookings').update(payloadToSave).eq('id', id);
     fetchData();
   };
 
   const handleCancelBooking = async (id: number) => {
-    await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', id);
+    const payloadToSave = { status: 'cancelled' } as any;
+    delete payloadToSave.special_requests;
+    delete payloadToSave.number_of_people;
+    delete payloadToSave.lunch_count;
+    delete payloadToSave.dinner_count;
+    delete payloadToSave.guide_service;
+    delete payloadToSave.guide_names;
+    delete payloadToSave.guide_amount;
+    delete payloadToSave.last_edited_by_id;
+    await supabase.from('bookings').update(payloadToSave).eq('id', id);
     fetchData();
   };
 
   const handleCheckIn = async (id: number) => {
-    await supabase.from('bookings').update({ status: 'checked_in' }).eq('id', id);
+    const payloadToSave = { status: 'checked_in' } as any;
+    delete payloadToSave.special_requests;
+    delete payloadToSave.number_of_people;
+    delete payloadToSave.lunch_count;
+    delete payloadToSave.dinner_count;
+    delete payloadToSave.guide_service;
+    delete payloadToSave.guide_names;
+    delete payloadToSave.guide_amount;
+    delete payloadToSave.last_edited_by_id;
+    await supabase.from('bookings').update(payloadToSave).eq('id', id);
     fetchData();
   };
 
@@ -184,14 +211,12 @@ function CEODashboard() {
       original_amount: amountValue,
       exchange_rate: rateValue,
       amount_uzs: amountUZS,
-      description: booking.description || `Booking: ${booking.guest_name} (${booking.check_in} - ${booking.check_out})`,
       guest_name: booking.guest_name,
-      guest_count: (booking as any).number_of_people || (booking as any).number_of_adults || booking.guest_count,
+      guest_count: (booking.number_of_adults || 0) + (booking.number_of_children || 0) || booking.guest_count,
       children_under_12: 0,
       nights: booking.nights,
-      guide_service: booking.guide_service || booking.guide_required,
-      guide_names: booking.guide_names,
-      transportation: booking.has_transportation,
+      has_guide: booking.has_guide,
+      has_transportation: booking.has_transportation,
       transportation_details: booking.transportation_details,
       lunch: booking.lunch,
       lunch_count: booking.lunch_count,
@@ -207,7 +232,16 @@ function CEODashboard() {
     }]);
 
     // Then mark booking as completed
-    await supabase.from('bookings').update({ status: 'completed' }).eq('id', id);
+    const payloadToSave = { status: 'completed' } as any;
+    delete payloadToSave.special_requests;
+    delete payloadToSave.number_of_people;
+    delete payloadToSave.lunch_count;
+    delete payloadToSave.dinner_count;
+    delete payloadToSave.guide_service;
+    delete payloadToSave.guide_names;
+    delete payloadToSave.guide_amount;
+    delete payloadToSave.last_edited_by_id;
+    await supabase.from('bookings').update(payloadToSave).eq('id', id);
     fetchData();
   };
 
@@ -776,7 +810,7 @@ function CEODashboard() {
                             <div>
                               <p className="font-bold text-slate-900">{booking.guest_name}</p>
                               <p className="text-sm text-slate-600">{booking.check_in} → {booking.check_out}</p>
-                              <p className="text-sm text-slate-500">{(booking as any).number_of_people || (booking as any).number_of_adults || booking.guest_count || 1} guests</p>
+                              <p className="text-sm text-slate-500">{(booking.number_of_adults || 0) + (booking.number_of_children || 0) || booking.guest_count || 1} guests</p>
                             </div>
                             <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
                               booking.status === 'checked_in' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'

@@ -13,6 +13,7 @@ interface MealDraft {
   adult_qty: number;
   child_qty: number;
   dietary_type: 'Normal' | 'Vegetarian';
+  notes: string;
   sent: boolean;
 }
 
@@ -109,17 +110,19 @@ export function ManagerMealRequests({ booking, onClose, onSent }: ManagerMealReq
         drafts.push({
           meal_date: dateStr,
           meal_type: 'Lunch',
-          adult_qty: (b as any).number_of_people || (b as any).number_of_adults || b.guest_count || 1,
+          adult_qty: (b as any).number_of_adults || b.guest_count || 1,
           child_qty: 0,
           dietary_type: 'Normal',
+          notes: '',
           sent: existingKeys.has(lunchKey),
         });
         drafts.push({
           meal_date: dateStr,
           meal_type: 'Dinner',
-          adult_qty: (b as any).number_of_people || (b as any).number_of_adults || b.guest_count || 1,
+          adult_qty: (b as any).number_of_adults || b.guest_count || 1,
           child_qty: 0,
           dietary_type: 'Normal',
+          notes: '',
           sent: existingKeys.has(dinnerKey),
         });
       }
@@ -142,6 +145,7 @@ export function ManagerMealRequests({ booking, onClose, onSent }: ManagerMealReq
       adult_qty: draft.adult_qty,
       child_qty: draft.child_qty,
       dietary_type: draft.dietary_type,
+      notes: draft.notes,
       status: 'Pending',
     };
 
@@ -165,6 +169,7 @@ export function ManagerMealRequests({ booking, onClose, onSent }: ManagerMealReq
       adult_qty: d.adult_qty,
       child_qty: d.child_qty,
       dietary_type: d.dietary_type,
+      notes: d.notes,
       status: 'Pending',
     }));
 
@@ -315,6 +320,19 @@ export function ManagerMealRequests({ booking, onClose, onSent }: ManagerMealReq
                             <option value="Normal">STD</option>
                             <option value="Vegetarian">VEG</option>
                           </select>
+                        </div>
+                        <div className="flex-[2]">
+                          <input
+                            type="text"
+                            value={draft.notes}
+                            onChange={(e) => {
+                              const next = [...mealDrafts];
+                              next[idx].notes = e.target.value;
+                              setMealDrafts(next);
+                            }}
+                            className="w-full px-3 py-2 bg-white border border-black text-[10px] font-black text-black outline-none"
+                            placeholder="Notes (e.g., No peanuts)"
+                          />
                         </div>
                       </div>
                       <button

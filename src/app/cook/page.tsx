@@ -118,33 +118,7 @@ function CookPortal() {
     }
   };
 
-  const syncKitchenOrdersJSON = async (bookingId: number, mealType: string, newStatus: string, mealId?: number) => {
-    try {
-      const { data: booking } = await supabase
-        .from('bookings')
-        .select('special_requests')
-        .eq('id', bookingId)
-        .single();
-      if (!booking) return;
-
-      const meta = booking.special_requests
-        ? (typeof booking.special_requests === 'string' ? JSON.parse(booking.special_requests) : booking.special_requests)
-        : {};
-      const orders = [...(meta.kitchen_orders || [])];
-      const type = mealType.toLowerCase();
-      const existingIndex = orders.findIndex((o: any) => mealId ? o.meal_id === mealId : o.type === type);
-      
-      if (existingIndex !== -1) {
-        orders[existingIndex].status = newStatus;
-      } else {
-        orders.push({ type, quantity: 0, status: newStatus, prepaid: false, guest_name: '', id: bookingId, meal_id: mealId, requested_at: new Date().toISOString() });
-      }
-      meta.kitchen_orders = orders;
-      await supabase.from('bookings').update({ special_requests: JSON.stringify(meta) }).eq('id', bookingId);
-    } catch (err) {
-      console.error('Failed to sync kitchen_orders JSON:', err);
-    }
-  };
+  // legacy JSON sync removed
 
   const handleAcceptMeal = async (meal: MealRequest) => {
     // Optimistic Update
@@ -170,7 +144,7 @@ function CookPortal() {
       
       if (error) throw error;
       
-      await syncKitchenOrdersJSON(meal.booking_id, meal.meal_type, 'served', meal.id);
+      // Legacy JSON sync removed
       fetchData();
     } catch (err) {
       console.error('Mark served failed:', err);
@@ -190,9 +164,16 @@ function CookPortal() {
         currency: drink.currency 
       }];
       
-      await supabase.from('bookings').update({ 
-        drinks_tab: nextTab 
-      }).eq('id', selectedBooking.id);
+      const payloadToSave = { drinks_tab: nextTab } as any;
+      delete payloadToSave.special_requests;
+      delete payloadToSave.number_of_people;
+      delete payloadToSave.lunch_count;
+      delete payloadToSave.dinner_count;
+      delete payloadToSave.guide_service;
+      delete payloadToSave.guide_names;
+      delete payloadToSave.guide_amount;
+      delete payloadToSave.last_edited_by_id;
+      await supabase.from('bookings').update(payloadToSave).eq('id', selectedBooking.id);
       
       setSelectedBooking({ ...selectedBooking, drinks_tab: nextTab });
       fetchData();
@@ -442,9 +423,8 @@ function CookPortal() {
               <div className="space-y-6">
                 <div className="grid grid-cols-2 gap-3">
                   {['lunch', 'dinner'].map((meal) => {
-                    const meta = typeof selectedBooking.special_requests === 'string' ? JSON.parse(selectedBooking.special_requests || '{}') : (selectedBooking.special_requests || {});
-                    const order = (meta.kitchen_orders || []).find((o: any) => o.type === meal);
-                    const isConfirmed = order?.status === 'confirmed';
+                    const order = mealRequests.find((m) => m.booking_id === selectedBooking.id && (m.meal_type || '').toLowerCase() === meal);
+                    const isConfirmed = order?.status === 'Accepted' || order?.status === 'Served';
                     return (
                       <div key={meal} className={`p-4 rounded-lg border transition-all ${isConfirmed ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>
                          <div className="flex items-center gap-2 mb-1">
