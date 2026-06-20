@@ -725,7 +725,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                     </button>
                   </div>
 
-                  <div className={`p-6 rounded-[2.5rem] border-2 transition-all ${activeTabIdx === -1 ? 'bg-[#1C232E] border-[#0B6E4F]/40 shadow-xl shadow-[#0B6E4F]/20' : 'bg-[#1C232E]/50 border-[#5C4A2E]/30 grayscale-[0.5]'}`}>>
+                  <div className={`p-6 rounded-[2.5rem] border-2 transition-all ${activeTabIdx === -1 ? 'bg-[#1C232E] border-[#0B6E4F]/40 shadow-xl shadow-[#0B6E4F]/20' : 'bg-[#1C232E]/50 border-[#5C4A2E]/30 grayscale-[0.5]'}`}>
                     {(() => {
                       const tabs = getTabs(sel);
                       const isHistory = activeTabIdx !== -1;
