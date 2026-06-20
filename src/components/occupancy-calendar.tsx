@@ -1559,7 +1559,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
               >
                 PAY & SETTLE
               </button>
-            </div></div>
+            </div>
           </div>
         </div>
       )}
