@@ -52,7 +52,6 @@ export interface Booking {
   kitchen_orders?: any[];
   settled_receipts?: any[];
   stay_paid?: boolean;
-  days?: any[];
   draft?: any;
   is_system_only?: boolean;
   created_by: string;

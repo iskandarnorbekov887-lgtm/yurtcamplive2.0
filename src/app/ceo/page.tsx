@@ -161,6 +161,7 @@ function CEODashboard() {
     delete payloadToSave.guide_names;
     delete payloadToSave.guide_amount;
     delete payloadToSave.last_edited_by_id;
+    delete payloadToSave.days;
     await supabase.from('bookings').update(payloadToSave).eq('id', id);
     fetchData();
   };
@@ -175,6 +176,7 @@ function CEODashboard() {
     delete payloadToSave.guide_names;
     delete payloadToSave.guide_amount;
     delete payloadToSave.last_edited_by_id;
+    delete payloadToSave.days;
     await supabase.from('bookings').update(payloadToSave).eq('id', id);
     fetchData();
   };
@@ -189,6 +191,7 @@ function CEODashboard() {
     delete payloadToSave.guide_names;
     delete payloadToSave.guide_amount;
     delete payloadToSave.last_edited_by_id;
+    delete payloadToSave.days;
     await supabase.from('bookings').update(payloadToSave).eq('id', id);
     fetchData();
   };
@@ -241,6 +244,7 @@ function CEODashboard() {
     delete payloadToSave.guide_names;
     delete payloadToSave.guide_amount;
     delete payloadToSave.last_edited_by_id;
+    delete payloadToSave.days;
     await supabase.from('bookings').update(payloadToSave).eq('id', id);
     fetchData();
   };
@@ -315,27 +319,27 @@ function CEODashboard() {
 
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+    <div className="min-h-screen flex items-center justify-center bg-[#0F1419]">
       <div className="flex flex-col items-center gap-4">
-        <div className="w-12 h-12 border-4 border-emerald-700 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-zinc-950 font-medium animate-pulse">Initializing Command Center...</p>
+        <div className="w-12 h-12 border-4 border-[#0B6E4F] border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-[#EDE6D6] font-medium animate-pulse">Initializing Command Center...</p>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 text-zinc-950 font-sans">
-      <header className="bg-gradient-to-r from-emerald-800 via-emerald-700 to-emerald-800 text-white shadow-sm sticky top-0 z-50">
+    <div className="min-h-screen bg-[#0F1419] text-[#EDE6D6] font-sans">
+      <header className="bg-gradient-to-r from-[#0B6E4F] via-[#0B6E4F] to-[#0B6E4F] text-[#C9A227] shadow-lg sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/10 rounded-xl backdrop-blur-sm border border-white/20">
-              <svg className="w-8 h-8 text-green-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2-2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+            <div className="p-2 bg-[#1C232E]/30 rounded-xl backdrop-blur-sm border border-[#5C4A2E]/30">
+              <svg className="w-8 h-8 text-[#C9A227]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2-2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
             </div>
             <div>
-              <h1 className="text-2xl font-black tracking-tight text-white uppercase">
+              <h1 className="text-2xl font-black tracking-tight text-[#EDE6D6] uppercase font-heading">
                 {t('portal.ceo')}
               </h1>
-              <p className="text-xs text-green-200 font-medium tracking-widest uppercase opacity-80">Isky Camp Executive Flow</p>
+              <p className="text-xs text-[#9C9384] font-medium tracking-widest uppercase opacity-80">Isky Camp Executive Flow</p>
             </div>
           </div>
           <div className="flex gap-3">
@@ -343,31 +347,31 @@ function CEODashboard() {
             <div className="relative">
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="p-2 bg-white/10 rounded-xl backdrop-blur-sm border border-white/20 hover:bg-white/20 transition-all relative"
+                className="p-2 bg-[#1C232E]/30 rounded-xl backdrop-blur-sm border border-[#5C4A2E]/30 hover:bg-[#1C232E]/50 transition-all relative"
               >
-                <svg className="w-6 h-6 text-green-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 text-[#C9A227]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
                 {notifications.filter(n => !n.read).length > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#722F37] text-white text-xs font-bold rounded-full flex items-center justify-center">
                     {notifications.filter(n => !n.read).length}
                   </span>
                 )}
               </button>
               
               {showNotifications && (
-                <div className="absolute right-0 top-12 w-80 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 max-h-96 overflow-y-auto">
-                  <div className="p-4 border-b border-slate-200">
-                    <h3 className="font-black text-slate-900">Notifications</h3>
+                <div className="absolute right-0 top-12 w-80 bg-[#1C232E] rounded-xl shadow-2xl border border-[#5C4A2E]/30 z-50 max-h-96 overflow-y-auto">
+                  <div className="p-4 border-b border-[#5C4A2E]/30">
+                    <h3 className="font-black text-[#EDE6D6]">Notifications</h3>
                   </div>
                   {notifications.length === 0 ? (
-                    <p className="p-4 text-slate-500 text-sm">No notifications</p>
+                    <p className="p-4 text-[#9C9384] text-sm">No notifications</p>
                   ) : (
-                    <div className="divide-y divide-slate-100">
+                    <div className="divide-y divide-[#5C4A2E]/20">
                       {(showAllNotifications ? notifications : notifications.slice(0, 5)).map((notification) => (
                         <div
                           key={notification.id}
-                          className={`p-4 ${!notification.read ? 'bg-indigo-50' : ''}`}
+                          className={`p-4 ${!notification.read ? 'bg-[#0B6E4F]/10' : ''}`}
                           onClick={async () => {
                             if (!notification.read && notification.type !== 'delete_request') {
                               await supabase.from('notifications').update({ read: true }).eq('id', notification.id);
@@ -375,28 +379,28 @@ function CEODashboard() {
                             }
                           }}
                         >
-                          <div className="flex items-start justify-between">
+                            <div className="flex items-start justify-between">
                             <div className="flex-1">
-                              <p className="font-bold text-slate-900 text-sm">{notification.title}</p>
-                              <p className="text-slate-600 text-xs mt-1">{notification.message}</p>
+                              <p className="font-bold text-[#EDE6D6] text-sm">{notification.title}</p>
+                              <p className="text-[#9C9384] text-xs mt-1">{notification.message}</p>
                               {notification.status && (
                                 <div className={`inline-block mt-2 px-2 py-1 rounded text-xs font-bold ${
-                                  notification.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
-                                  (notification.status === 'denied' || notification.status === 'rejected') ? 'bg-rose-100 text-rose-700' :
-                                  'bg-slate-100 text-slate-700'
+                                  notification.status === 'approved' ? 'bg-[#0B6E4F]/20 text-[#0B6E4F]' :
+                                  (notification.status === 'denied' || notification.status === 'rejected') ? 'bg-[#722F37]/20 text-[#722F37]' :
+                                  'bg-[#1C232E]/20 text-[#9C9384]'
                                 }`}>
                                   {notification.status.charAt(0).toUpperCase() + notification.status.slice(1)}
                                 </div>
                               )}
-                              <p className="text-slate-400 text-xs mt-2">{new Date(notification.created_at).toLocaleString()}</p>
+                              <p className="text-[#9C9384] text-xs mt-2">{new Date(notification.created_at).toLocaleString()}</p>
                             </div>
                             {notification.status === 'approved' && (
-                              <svg className="w-5 h-5 text-emerald-600 ml-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-5 h-5 text-[#0B6E4F] ml-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                               </svg>
                             )}
                             {(notification.status === 'denied' || notification.status === 'rejected') && (
-                              <svg className="w-5 h-5 text-rose-600 ml-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-5 h-5 text-[#722F37] ml-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                               </svg>
                             )}
@@ -484,7 +488,7 @@ function CEODashboard() {
                                     console.error('Error approving delete:', err);
                                   }
                                 }}
-                                className="px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-all"
+                                className="px-3 py-1 bg-[#0B6E4F] text-[#C9A227] rounded-lg text-xs font-bold hover:bg-[#0B6E4F] transition-all"
                               >
                                 Approve
                               </button>
@@ -515,7 +519,7 @@ function CEODashboard() {
                                   
                                   setNotifications(notifications.map(n => n.id === notification.id ? { ...n, status: 'denied', read: true } : n));
                                 }}
-                                className="px-3 py-1 bg-rose-600 text-white rounded-lg text-xs font-bold hover:bg-rose-700 transition-all"
+                                className="px-3 py-1 bg-[#722F37] text-[#C9A227] rounded-lg text-xs font-bold hover:bg-[#722F37] transition-all"
                               >
                                 Deny
                               </button>
@@ -526,7 +530,7 @@ function CEODashboard() {
                       {notifications.length > 5 && !showAllNotifications && (
                         <button
                           onClick={() => setShowAllNotifications(true)}
-                          className="w-full py-3 text-sm font-medium text-emerald-700 hover:bg-emerald-50 transition-all"
+                          className="w-full py-3 text-sm font-medium text-[#0B6E4F] hover:bg-[#0B6E4F]/10 transition-all"
                         >
                           Show More ({notifications.length - 5} more)
                         </button>
@@ -536,7 +540,7 @@ function CEODashboard() {
                 </div>
               )}
             </div>
-            <button onClick={signOut} className="px-5 py-2.5 bg-rose-600/90 hover:bg-rose-600 rounded-xl text-xs font-black transition-all shadow-lg hover:shadow-rose-500/20 active:scale-95 flex items-center gap-2">
+            <button onClick={signOut} className="px-5 py-2.5 bg-[#722F37]/90 hover:bg-[#722F37] rounded-xl text-xs font-black transition-all shadow-lg hover:shadow-[#722F37]/20 active:scale-95 flex items-center gap-2">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
               {t('btn.logout')}
             </button>
@@ -545,13 +549,13 @@ function CEODashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto p-6 md:p-8">
-        <div className="flex bg-white p-1 rounded-lg mb-8 border border-slate-200 shadow-sm w-fit">
+        <div className="flex bg-[#1C232E] p-1 rounded-lg mb-8 border border-[#5C4A2E]/30 shadow-lg w-fit">
           {(['checkin', 'team', 'financials', 'meals'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`px-6 py-2.5 rounded-lg font-bold capitalize transition-all text-xs flex items-center gap-2 ${
-                activeTab === tab ? 'bg-emerald-700 text-white shadow-sm' : 'text-slate-400 hover:text-zinc-950 hover:bg-slate-50'
+                activeTab === tab ? 'bg-[#0B6E4F] text-[#C9A227] shadow-lg' : 'text-[#9C9384] hover:text-[#EDE6D6] hover:bg-[#2A1518]'
               }`}
             >
               {tab === 'meals' ? '🍽️ Meals' : t(`tab.${tab}`)}
@@ -561,7 +565,7 @@ function CEODashboard() {
             key="pricing"
             onClick={() => setActiveTab('pricing')}
             className={`px-6 py-2.5 rounded-lg font-bold capitalize transition-all text-xs flex items-center gap-2 ${
-              activeTab === 'pricing' ? 'bg-emerald-700 text-white shadow-sm' : 'text-slate-400 hover:text-zinc-950 hover:bg-slate-50'
+              activeTab === 'pricing' ? 'bg-[#0B6E4F] text-[#C9A227] shadow-lg' : 'text-[#9C9384] hover:text-[#EDE6D6] hover:bg-[#2A1518]'
             }`}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -588,12 +592,12 @@ function CEODashboard() {
           </div>
         )}
         {activeTab === 'financials' && (
-          <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/60 border border-slate-100 p-8 animate-in fade-in duration-500">
-            <h2 className="text-2xl font-black text-slate-800 mb-4">Financial Calendar</h2>
-            <p className="text-slate-600 mb-6">View income and expenses by date. Click on any day to see details.</p>
+          <div className="bg-[#1C232E] rounded-[2.5rem] shadow-xl border border-[#5C4A2E]/30 p-8 animate-in fade-in duration-500">
+            <h2 className="text-2xl font-black text-[#EDE6D6] mb-4 font-heading">Financial Calendar</h2>
+            <p className="text-[#9C9384] mb-6">View income and expenses by date. Click on any day to see details.</p>
             <a
               href="/ceo-financials"
-              className="inline-block px-6 py-3 bg-emerald-700 text-white rounded-lg font-bold uppercase tracking-widest text-xs hover:bg-emerald-800 transition-all shadow-sm"
+              className="inline-block px-6 py-3 bg-[#0B6E4F] text-[#C9A227] rounded-lg font-bold uppercase tracking-widest text-xs hover:bg-[#0B6E4F] transition-all shadow-lg"
             >
               Go to Financial Calendar
             </a>
@@ -601,17 +605,17 @@ function CEODashboard() {
         )}
         {activeTab === 'team' && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="p-8 border-b border-slate-50 bg-gradient-to-r from-slate-50/50 to-white flex justify-between items-center">
-                <h3 className="text-xl font-black text-slate-800 flex items-center gap-3">
-                  <span className="p-2 bg-emerald-50 text-emerald-700 rounded-lg">
+             <div className="bg-[#1C232E] rounded-xl shadow-lg border border-[#5C4A2E]/30 overflow-hidden">
+              <div className="p-8 border-b border-[#5C4A2E]/30 bg-gradient-to-r from-[#1C232E]/50 to-[#1C232E] flex justify-between items-center">
+                <h3 className="text-xl font-black text-[#EDE6D6] flex items-center gap-3 font-heading">
+                  <span className="p-2 bg-[#0B6E4F]/20 text-[#0B6E4F] rounded-lg">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
                   </span>
                   Operational Taskforce
                 </h3>
                 <button
                   onClick={() => setShowAddUserModal(true)}
-                  className="px-4 py-2.5 bg-emerald-700 text-white rounded-lg font-bold text-xs hover:bg-emerald-800 transition-all shadow-sm flex items-center gap-2"
+                  className="px-4 py-2.5 bg-[#0B6E4F] text-[#C9A227] rounded-lg font-bold text-xs hover:bg-[#0B6E4F] transition-all shadow-lg flex items-center gap-2"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                   Add Staff Member
@@ -619,30 +623,30 @@ function CEODashboard() {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-slate-50/50 border-b border-slate-100">
+                  <thead className="bg-[#1C232E]/50 border-b border-[#5C4A2E]/30">
                     <tr>
-                      <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('table.name')}</th>
-                      <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('table.email')}</th>
-                      <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('table.role')}</th>
-                      <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Actions</th>
+                      <th className="px-8 py-5 text-left text-[10px] font-black text-[#9C9384] uppercase tracking-widest">{t('table.name')}</th>
+                      <th className="px-8 py-5 text-left text-[10px] font-black text-[#9C9384] uppercase tracking-widest">{t('table.email')}</th>
+                      <th className="px-8 py-5 text-left text-[10px] font-black text-[#9C9384] uppercase tracking-widest">{t('table.role')}</th>
+                      <th className="px-8 py-5 text-left text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-50">
+                  <tbody className="divide-y divide-[#5C4A2E]/20">
                     {staff.map((member) => (
-                      <tr key={member.id} className="hover:bg-slate-50 transition-colors group">
+                      <tr key={member.id} className="hover:bg-[#2A1518] transition-colors group">
                         <td className="px-8 py-5">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-700 font-bold border border-emerald-200">
+                            <div className="w-10 h-10 rounded-lg bg-[#0B6E4F]/20 flex items-center justify-center text-[#0B6E4F] font-bold border border-[#0B6E4F]/40">
                               {member.full_name?.charAt(0) || 'N'}
                             </div>
-                            <span className="font-bold text-slate-800">{member.full_name || 'N/A'}</span>
+                            <span className="font-bold text-[#EDE6D6]">{member.full_name || 'N/A'}</span>
                           </div>
                         </td>
-                        <td className="px-8 py-5 font-medium text-slate-500">{member.email}</td>
+                        <td className="px-8 py-5 font-medium text-[#9C9384]">{member.email}</td>
                         <td className="px-8 py-5">
-                          <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black tracking-widest uppercase shadow-sm ${
-                            member.role === 'CEO' ? 'bg-emerald-700 text-white' :
-                            member.role === 'Manager' ? 'bg-blue-100 text-blue-800' :
+                          <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black tracking-widest uppercase shadow-lg ${
+                            member.role === 'CEO' ? 'bg-[#0B6E4F] text-[#C9A227]' :
+                            member.role === 'Manager' ? 'bg-[#0B6E4F]/20 text-[#0B6E4F]' :
                             member.role === 'Cook' ? 'bg-amber-100 text-amber-800' :
                             'bg-emerald-100 text-emerald-800'
                           }`}>
@@ -689,33 +693,33 @@ function CEODashboard() {
 
       {/* Add User Modal */}
       {showAddUserModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-[2rem] w-full max-w-md p-8 shadow-2xl animate-in zoom-in duration-200">
-            <h3 className="text-xl font-black text-slate-800 mb-6">Add Team Member</h3>
+        <div className="fixed inset-0 bg-[#0F1419]/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-[#1C232E] rounded-[2rem] w-full max-w-md p-8 shadow-2xl animate-in zoom-in duration-200 border border-[#5C4A2E]/30">
+            <h3 className="text-xl font-black text-[#EDE6D6] mb-6">Add Team Member</h3>
             <div className="space-y-4">
               <input 
                 type="text" 
                 placeholder="Full Name" 
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+                className="w-full px-4 py-3 bg-[#1C232E] border border-[#5C4A2E]/30 rounded-xl focus:ring-2 focus:ring-[#0B6E4F] outline-none text-[#EDE6D6] placeholder:text-[#9C9384]"
                 value={newUser.fullName}
                 onChange={(e) => setNewUser({ ...newUser, fullName: e.target.value })}
               />
               <input 
                 type="email" 
                 placeholder="Email Address" 
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+                className="w-full px-4 py-3 bg-[#1C232E] border border-[#5C4A2E]/30 rounded-xl focus:ring-2 focus:ring-[#0B6E4F] outline-none text-[#EDE6D6] placeholder:text-[#9C9384]"
                 value={newUser.email}
                 onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
               />
               <input 
                 type="password" 
                 placeholder="Password" 
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+                className="w-full px-4 py-3 bg-[#1C232E] border border-[#5C4A2E]/30 rounded-xl focus:ring-2 focus:ring-[#0B6E4F] outline-none text-[#EDE6D6] placeholder:text-[#9C9384]"
                 value={newUser.password}
                 onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
               />
               <select 
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+                className="w-full px-4 py-3 bg-[#1C232E] border border-[#5C4A2E]/30 rounded-xl focus:ring-2 focus:ring-[#0B6E4F] outline-none text-[#EDE6D6]"
                 value={newUser.role}
                 onChange={(e) => setNewUser({ ...newUser, role: e.target.value as UserRole })}
               >
@@ -727,14 +731,14 @@ function CEODashboard() {
             <div className="flex gap-3 mt-8">
               <button 
                 onClick={() => setShowAddUserModal(false)}
-                className="flex-1 py-3 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-all"
+                className="flex-1 py-3 border border-[#5C4A2E]/30 rounded-xl font-bold text-[#EDE6D6] hover:bg-[#2A1518] transition-all"
               >
                 Cancel
               </button>
               <button 
                 onClick={handleAddUser}
                 disabled={loadingUser}
-                className="flex-1 py-3 bg-emerald-700 text-white rounded-lg font-bold hover:bg-emerald-800 shadow-sm transition-all disabled:opacity-50"
+                className="flex-1 py-3 bg-[#0B6E4F] text-[#C9A227] rounded-lg font-bold hover:bg-[#0B6E4F]/80 shadow-sm transition-all disabled:opacity-50 border border-[#0B6E4F]/40"
               >
                 {loadingUser ? 'Adding...' : 'Add Member'}
               </button>
@@ -745,19 +749,19 @@ function CEODashboard() {
 
       {/* Edit User Modal */}
       {showEditUserModal && editingUser && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-[2rem] w-full max-w-md p-8 shadow-2xl animate-in zoom-in duration-200">
-            <h3 className="text-xl font-black text-slate-800 mb-6">Edit Team Member</h3>
+        <div className="fixed inset-0 bg-[#0F1419]/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-[#1C232E] rounded-[2rem] w-full max-w-md p-8 shadow-2xl animate-in zoom-in duration-200 border border-[#5C4A2E]/30">
+            <h3 className="text-xl font-black text-[#EDE6D6] mb-6">Edit Team Member</h3>
             <div className="space-y-4">
               <input 
                 type="text" 
                 placeholder="Full Name" 
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="w-full px-4 py-3 bg-[#1C232E] border border-[#5C4A2E]/30 rounded-xl focus:ring-2 focus:ring-[#0B6E4F] outline-none text-[#EDE6D6] placeholder:text-[#9C9384]"
                 value={editingUser.full_name || ''}
                 onChange={(e) => setEditingUser({ ...editingUser, full_name: e.target.value })}
               />
               <select 
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="w-full px-4 py-3 bg-[#1C232E] border border-[#5C4A2E]/30 rounded-xl focus:ring-2 focus:ring-[#0B6E4F] outline-none text-[#EDE6D6]"
                 value={editingUser.role}
                 onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as UserRole })}
               >
@@ -769,14 +773,14 @@ function CEODashboard() {
             <div className="flex gap-3 mt-8">
               <button 
                 onClick={() => setShowEditUserModal(false)}
-                className="flex-1 py-3 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-all"
+                className="flex-1 py-3 border border-[#5C4A2E]/30 rounded-xl font-bold text-[#EDE6D6] hover:bg-[#2A1518] transition-all"
               >
                 Cancel
               </button>
               <button 
                 onClick={handleUpdateUser}
                 disabled={loadingUser}
-                className="flex-1 py-3 bg-emerald-700 text-white rounded-lg font-bold hover:bg-emerald-800 shadow-sm transition-all disabled:opacity-50"
+                className="flex-1 py-3 bg-[#0B6E4F] text-[#C9A227] rounded-lg font-bold hover:bg-[#0B6E4F]/80 shadow-sm transition-all disabled:opacity-50 border border-[#0B6E4F]/40"
               >
                 {loadingUser ? 'Saving...' : 'Save Changes'}
               </button>
@@ -787,15 +791,15 @@ function CEODashboard() {
 
         {activeTab === 'meals' && (
           <div className="animate-in fade-in duration-500 space-y-6">
-            <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/60 border border-slate-100 p-8">
-              <h2 className="text-2xl font-black text-slate-800 mb-6 flex items-center gap-3">
-                <span className="p-2 bg-orange-100 text-orange-600 rounded-xl">🍽️</span>
+            <div className="bg-[#1C232E] rounded-[2.5rem] shadow-xl shadow-[#5C4A2E]/30 border border-[#5C4A2E]/30 p-8">
+              <h2 className="text-2xl font-black text-[#EDE6D6] mb-6 flex items-center gap-3">
+                <span className="p-2 bg-[#C9A227]/20 text-[#C9A227] rounded-xl">🍽️</span>
                 Active Stays — Meal Requests
               </h2>
               {(() => {
                 const activeBookings = bookings.filter(b => b.status === 'checked_in' || b.status === 'confirmed');
                 if (activeBookings.length === 0) {
-                  return <p className="text-slate-600">No active stays</p>;
+                  return <p className="text-[#9C9384]">No active stays</p>;
                 }
                 return (
                   <div className="grid md:grid-cols-2 gap-6">
@@ -805,29 +809,29 @@ function CEODashboard() {
                       const acceptedMeals = meals.filter(m => m.status === 'Accepted').length;
                       const servedMeals = meals.filter(m => m.status === 'Served').length;
                       return (
-                        <div key={booking.id} className="border-2 border-slate-200 rounded-2xl p-5 bg-white hover:border-orange-200 transition-all">
+                        <div key={booking.id} className="border-2 border-[#5C4A2E]/30 rounded-2xl p-5 bg-[#1C232E] hover:border-[#C9A227]/50 transition-all">
                           <div className="flex justify-between items-start">
                             <div>
-                              <p className="font-bold text-slate-900">{booking.guest_name}</p>
-                              <p className="text-sm text-slate-600">{booking.check_in} → {booking.check_out}</p>
-                              <p className="text-sm text-slate-500">{(booking.number_of_adults || 0) + (booking.number_of_children || 0) || booking.guest_count || 1} guests</p>
+                              <p className="font-bold text-[#EDE6D6]">{booking.guest_name}</p>
+                              <p className="text-sm text-[#9C9384]">{booking.check_in} → {booking.check_out}</p>
+                              <p className="text-sm text-[#9C9384]">{(booking.number_of_adults || 0) + (booking.number_of_children || 0) || booking.guest_count || 1} guests</p>
                             </div>
                             <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                              booking.status === 'checked_in' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
+                              booking.status === 'checked_in' ? 'bg-[#0B6E4F]/20 text-[#0B6E4F]' : 'bg-[#C9A227]/20 text-[#C9A227]'
                             }`}>
                               {booking.status === 'checked_in' ? 'Checked In' : 'Upcoming'}
                             </span>
                           </div>
                           {meals.length > 0 && (
                             <div className="flex gap-4 mt-4 text-xs font-black uppercase tracking-wider">
-                              <span className="text-rose-600 bg-rose-50 px-2 py-1 rounded-lg">{pendingMeals} Pending</span>
-                              <span className="text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">{acceptedMeals} Accepted</span>
-                              <span className="text-slate-500 bg-slate-50 px-2 py-1 rounded-lg">{servedMeals} Served</span>
+                              <span className="text-[#722F37] bg-[#722F37]/10 px-2 py-1 rounded-lg">{pendingMeals} Pending</span>
+                              <span className="text-[#0B6E4F] bg-[#0B6E4F]/10 px-2 py-1 rounded-lg">{acceptedMeals} Accepted</span>
+                              <span className="text-[#9C9384] bg-[#1C232E]/50 px-2 py-1 rounded-lg">{servedMeals} Served</span>
                             </div>
                           )}
                           <button
                             onClick={() => setSelectedMealBooking(booking)}
-                            className="w-full mt-4 bg-orange-500 text-white py-2.5 rounded-xl hover:bg-orange-600 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-orange-100 active:scale-95"
+                            className="w-full mt-4 bg-[#C9A227] text-[#1C232E] py-2.5 rounded-xl hover:bg-[#C9A227]/80 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-[#C9A227]/20 active:scale-95"
                           >
                             {meals.length > 0 ? 'Edit Meal Requests' : 'Request Food'}
                           </button>
@@ -889,58 +893,58 @@ function PricingSettings() {
   };
 
   return (
-    <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/60 border border-slate-100 overflow-hidden max-w-2xl mx-auto">
-      <div className="p-8 border-b border-slate-100 bg-gradient-to-r from-emerald-800 to-emerald-700 text-white">
+    <div className="bg-[#1C232E] rounded-[2.5rem] shadow-xl shadow-[#5C4A2E]/30 border border-[#5C4A2E]/30 overflow-hidden max-w-2xl mx-auto">
+      <div className="p-8 border-b border-[#5C4A2E]/30 bg-gradient-to-r from-[#0B6E4F] to-[#0B6E4F]/80 text-[#C9A227]">
         <h3 className="text-xl font-black flex items-center gap-3">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m10 4a2 2 0 100-4m0 4a2 2 0 110-4M6 20v-2m0 0V12m0 0V8m12 12v-2m0 0V12m0 0V8m-6 8v-2" /></svg>
           Global Pricing Configuration
         </h3>
-        <p className="text-green-200 text-xs mt-1 font-bold uppercase tracking-widest">Set official rates for all accounts</p>
+        <p className="text-[#C9A227]/80 text-xs mt-1 font-bold uppercase tracking-widest">Set official rates for all accounts</p>
       </div>
       
       <div className="p-8 space-y-6">
         <div className="grid grid-cols-2 gap-6">
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Lunch Price (USD)</label>
+            <label className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Lunch Price (USD)</label>
             <input type="number" value={pricing.lunch_price} onChange={e => setPricing({...pricing, lunch_price: parseFloat(e.target.value) || 0})}
-              className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-green-500 outline-none transition-all" />
+              className="w-full px-4 py-3 bg-[#1C232E] border-2 border-[#5C4A2E]/30 rounded-xl font-black text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all" />
           </div>
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Dinner Price (USD)</label>
+            <label className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Dinner Price (USD)</label>
             <input type="number" value={pricing.dinner_price} onChange={e => setPricing({...pricing, dinner_price: parseFloat(e.target.value) || 0})}
-              className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-green-500 outline-none transition-all" />
+              className="w-full px-4 py-3 bg-[#1C232E] border-2 border-[#5C4A2E]/30 rounded-xl font-black text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all" />
           </div>
         </div>
 
         <div className="space-y-2">
-          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Guide Service (USD / Guide)</label>
+          <label className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Guide Service (USD / Guide)</label>
           <input type="number" value={pricing.guide_price} onChange={e => setPricing({...pricing, guide_price: parseFloat(e.target.value) || 0})}
-            className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-green-500 outline-none transition-all" />
+            className="w-full px-4 py-3 bg-[#1C232E] border-2 border-[#5C4A2E]/30 rounded-xl font-black text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all" />
         </div>
 
-        <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-100">
+        <div className="grid grid-cols-2 gap-6 pt-6 border-t border-[#5C4A2E]/30">
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Exchange: 1 USD to UZS</label>
+            <label className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Exchange: 1 USD to UZS</label>
             <input type="number" value={pricing.usd_to_uzs} onChange={e => setPricing({...pricing, usd_to_uzs: parseFloat(e.target.value) || 0})}
-              className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-green-500 outline-none transition-all" />
+              className="w-full px-4 py-3 bg-[#1C232E] border-2 border-[#5C4A2E]/30 rounded-xl font-black text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all" />
           </div>
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Exchange: 1 USD to EUR</label>
+            <label className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Exchange: 1 USD to EUR</label>
             <input type="number" value={pricing.usd_to_eur} onChange={e => setPricing({...pricing, usd_to_eur: parseFloat(e.target.value) || 0})}
-              className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-black focus:border-green-500 outline-none transition-all" />
+              className="w-full px-4 py-3 bg-[#1C232E] border-2 border-[#5C4A2E]/30 rounded-xl font-black text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all" />
           </div>
         </div>
 
         <button 
           onClick={handleSave}
           disabled={saving}
-          className="w-full py-3 bg-emerald-700 text-white rounded-lg font-bold uppercase tracking-widest text-xs hover:bg-emerald-800 transition-all shadow-sm disabled:opacity-50 active:scale-95 mt-4"
+          className="w-full py-3 bg-[#0B6E4F] text-[#C9A227] rounded-lg font-bold uppercase tracking-widest text-xs hover:bg-[#0B6E4F]/80 transition-all shadow-sm disabled:opacity-50 active:scale-95 mt-4 border border-[#0B6E4F]/40"
         >
           {saving ? 'Saving...' : 'Save Configuration'}
         </button>
         
         {message && (
-          <p className="text-center text-emerald-600 font-bold text-sm animate-bounce mt-4">{message}</p>
+          <p className="text-center text-[#0B6E4F] font-bold text-sm animate-bounce mt-4">{message}</p>
         )}
       </div>
     </div>

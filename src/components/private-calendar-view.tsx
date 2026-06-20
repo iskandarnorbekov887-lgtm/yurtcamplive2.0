@@ -159,31 +159,31 @@ export function PrivateCalendarView({ bookings, calendarEvents, onSelectBooking,
   };
 
   return (
-    <div className="mt-6 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-3">
+    <div className="mt-6 bg-[#1C232E] rounded-2xl border border-[#5C4A2E]/30 shadow-lg overflow-hidden">
+      <div className="px-5 py-4 border-b border-[#5C4A2E]/30 flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-lg font-black text-slate-900">Calendar View</h2>
-          <p className="text-xs text-slate-500">Private Booking Calendar</p>
+          <h2 className="text-lg font-black text-[#EDE6D6] font-heading">Calendar View</h2>
+          <p className="text-xs text-[#9C9384]">Private Booking Calendar</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setCurrentDate(new Date(year, month - 1, 1))}
-            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-600 font-bold text-lg transition-all">‹</button>
-          <span className="text-sm font-black text-slate-800 min-w-[130px] text-center">{MONTHS[month]} {year}</span>
+            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#2A1518] text-[#9C9384] font-bold text-lg transition-all">‹</button>
+          <span className="text-sm font-black text-[#EDE6D6] min-w-[130px] text-center">{MONTHS[month]} {year}</span>
           <button onClick={() => setCurrentDate(new Date(year, month + 1, 1))}
-            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-600 font-bold text-lg transition-all">›</button>
+            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#2A1518] text-[#9C9384] font-bold text-lg transition-all">›</button>
           <button onClick={() => { setCurrentDate(new Date()); setSelectedDay(todayStr); onDayChange?.(todayStr); }}
-            className="px-3 py-1 text-xs font-bold bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-all">Today</button>
+            className="px-3 py-1 text-xs font-bold bg-[#0B6E4F]/20 text-[#0B6E4F] rounded-lg hover:bg-[#0B6E4F]/30 transition-all">Today</button>
         </div>
       </div>
 
       <div className="p-3">
         <div className="grid grid-cols-7 mb-1">
           {DAYS.map(d => (
-            <div key={d} className="text-center text-[10px] font-black uppercase tracking-widest text-slate-400 py-1">{d}</div>
+            <div key={d} className="text-center text-[10px] font-black uppercase tracking-widest text-[#9C9384] py-1">{d}</div>
           ))}
         </div>
 
-        <div className="border-l border-t border-slate-200">
+        <div className="border-l border-t border-[#5C4A2E]/30">
           {weeks.map((week, wi) => {
             const lanes = getWeekLanes(week);
             const VISIBLE = 5;
@@ -201,16 +201,16 @@ export function PrivateCalendarView({ bookings, calendarEvents, onSelectBooking,
                   const hidden = Math.max(0, totalInCol - VISIBLE);
                   return (
                     <div key={col} onClick={() => { setSelectedDay(d); onDayChange?.(d); }}
-                      className={`border-r border-b border-slate-200 px-1 pt-1 cursor-pointer transition-colors relative ${
-                        isSelected ? 'bg-indigo-50/70' : 'hover:bg-slate-50/60'
-                      } ${!cell.currentMonth ? 'bg-slate-50/40 opacity-50' : ''}`}>
+                      className={`border-r border-b border-[#5C4A2E]/30 px-1 pt-1 cursor-pointer transition-colors relative ${
+                        isSelected ? 'bg-[#0B6E4F]/20' : 'hover:bg-[#2A1518]'
+                      } ${!cell.currentMonth ? 'bg-[#1C232E]/40 opacity-50' : ''}`}>
                       <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-black transition-all ${
-                        isToday ? 'bg-indigo-600 text-white' : isSelected ? 'text-indigo-700' : 'text-slate-700'
+                        isToday ? 'bg-[#0B6E4F] text-[#C9A227]' : isSelected ? 'text-[#0B6E4F]' : 'text-[#EDE6D6]'
                       }`}>{cell.day}</span>
                       {hidden > 0 && (
                         <button onClick={e => { e.stopPropagation(); setMoreDay(d); }}
                           style={{ position: 'absolute', bottom: 2, left: 4, right: 4 }}
-                          className="text-[10px] font-bold text-slate-500 hover:text-indigo-600 hover:bg-indigo-100 rounded px-1 py-0.5 text-left transition-colors z-10">
+                          className="text-[10px] font-bold text-[#9C9384] hover:text-[#0B6E4F] hover:bg-[#0B6E4F]/10 rounded px-1 py-0.5 text-left transition-colors z-10">
                           +{hidden} more
                         </button>
                       )}
@@ -245,38 +245,38 @@ export function PrivateCalendarView({ bookings, calendarEvents, onSelectBooking,
         {moreDay && (() => {
           const dayBookings = bookings.filter(b => b.status !== 'cancelled' && b.check_in <= moreDay && b.check_out >= moreDay);
           return (
-            <div onClick={() => setMoreDay(null)} className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4">
-              <div onClick={e => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-y-auto">
-                <div className="px-5 py-4 border-b border-slate-100 sticky top-0 bg-white flex items-center justify-between rounded-t-2xl">
+            <div onClick={() => setMoreDay(null)} className="fixed inset-0 z-50 bg-[#0F1419]/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <div onClick={e => e.stopPropagation()} className="bg-[#1C232E] rounded-2xl shadow-2xl border border-[#5C4A2E]/30 w-full max-w-md max-h-[80vh] overflow-y-auto">
+                <div className="px-5 py-4 border-b border-[#5C4A2E]/30 sticky top-0 bg-[#1C232E] flex items-center justify-between rounded-t-2xl">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500">All Bookings</p>
-                    <h3 className="text-sm font-black text-slate-900">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-[#0B6E4F]">All Bookings</p>
+                    <h3 className="text-sm font-black text-[#EDE6D6]">
                       {new Date(moreDay + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
                     </h3>
                   </div>
-                  <button onClick={() => setMoreDay(null)} className="w-8 h-8 hover:bg-slate-100 rounded-xl text-slate-500 font-bold text-xl">×</button>
+                  <button onClick={() => setMoreDay(null)} className="w-8 h-8 hover:bg-[#2A1518] rounded-xl text-[#9C9384] font-bold text-xl">×</button>
                 </div>
                 <div className="p-3 space-y-1.5">
                   {dayBookings.length === 0 && (
-                    <p className="text-sm text-slate-400 text-center py-6">No bookings</p>
+                    <p className="text-sm text-[#9C9384] text-center py-6">No bookings</p>
                   )}
                   {dayBookings.map(b => (
                     <button key={b.id} onClick={() => { onSelectBooking?.(b); setMoreDay(null); }}
                       className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all hover:opacity-80 ${
-                        b.status === 'checked_in' ? 'bg-emerald-50 border-emerald-200' :
-                        b.status === 'completed' ? 'bg-blue-50 border-blue-200' :
-                        'bg-amber-50 border-amber-200'
+                        b.status === 'checked_in' ? 'bg-[#0B6E4F]/20 border-[#0B6E4F]/40' :
+                        b.status === 'completed' ? 'bg-[#5C4A2E]/20 border-[#5C4A2E]/40' :
+                        'bg-[#B8860B]/20 border-[#B8860B]/40'
                       }`}>
                       <span className={`w-2 h-2 rounded-full shrink-0 ${
-                        b.status === 'checked_in' ? 'bg-emerald-500' :
-                        b.status === 'completed' ? 'bg-blue-500' :
-                        'bg-amber-500'
+                        b.status === 'checked_in' ? 'bg-[#0B6E4F]' :
+                        b.status === 'completed' ? 'bg-[#5C4A2E]' :
+                        'bg-[#B8860B]'
                       }`} />
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-slate-900 truncate">{b.guest_name}</p>
-                        <p className="text-xs text-slate-500 capitalize">{b.check_in} → {b.check_out} · {b.status.replace('_', ' ')}</p>
+                        <p className="text-sm font-bold text-[#EDE6D6] truncate">{b.guest_name}</p>
+                        <p className="text-xs text-[#9C9384] capitalize">{b.check_in} → {b.check_out} · {b.status.replace('_', ' ')}</p>
                       </div>
-                      <span className="text-xs text-slate-400">›</span>
+                      <span className="text-xs text-[#9C9384]">›</span>
                     </button>
                   ))}
                 </div>
@@ -285,14 +285,14 @@ export function PrivateCalendarView({ bookings, calendarEvents, onSelectBooking,
           );
         })()}
 
-        <div className="mt-3 flex gap-4 flex-wrap pt-2 border-t border-slate-100">
-          <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-amber-400 inline-block" />Confirmed</span>
-          <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-emerald-500 inline-block" />✓ Checked In</span>
-          <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-blue-500 inline-block" />✈ Checked Out</span>
-          <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-red-500 inline-block" />✕ Cancelled</span>
-          <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-violet-500 inline-block" />🏠 Local</span>
-          <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-teal-500 inline-block" />Pool</span>
-          <span className="flex items-center gap-1.5 text-[10px] text-slate-500"><span className="w-2 h-2 rounded-sm bg-slate-500 inline-block" />📅 Calendar</span>
+        <div className="mt-3 flex gap-4 flex-wrap pt-2 border-t border-[#5C4A2E]/30">
+          <span className="flex items-center gap-1.5 text-[10px] text-[#9C9384]"><span className="w-2 h-2 rounded-sm bg-[#B8860B] inline-block" />Confirmed</span>
+          <span className="flex items-center gap-1.5 text-[10px] text-[#9C9384]"><span className="w-2 h-2 rounded-sm bg-[#0B6E4F] inline-block" />✓ Checked In</span>
+          <span className="flex items-center gap-1.5 text-[10px] text-[#9C9384]"><span className="w-2 h-2 rounded-sm bg-[#5C4A2E] inline-block" />✈ Checked Out</span>
+          <span className="flex items-center gap-1.5 text-[10px] text-[#9C9384]"><span className="w-2 h-2 rounded-sm bg-[#722F37] inline-block" />✕ Cancelled</span>
+          <span className="flex items-center gap-1.5 text-[10px] text-[#9C9384]"><span className="w-2 h-2 rounded-sm bg-[#8B5CF6] inline-block" />🏠 Local</span>
+          <span className="flex items-center gap-1.5 text-[10px] text-[#9C9384]"><span className="w-2 h-2 rounded-sm bg-[#14B8A6] inline-block" />Pool</span>
+          <span className="flex items-center gap-1.5 text-[10px] text-[#9C9384]"><span className="w-2 h-2 rounded-sm bg-[#5C4A2E] inline-block" />📅 Calendar</span>
         </div>
       </div>
     </div>

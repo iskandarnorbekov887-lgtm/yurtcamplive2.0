@@ -10,17 +10,17 @@ export function LanguageSwitcher({ variant = 'dark' }: { variant?: 'light' | 'da
   return (
     <div className={`flex p-1 rounded-xl border ${
       isDark 
-        ? 'bg-white/10 backdrop-blur-md border-white/20' 
-        : 'bg-slate-100 border-slate-200'
+        ? 'bg-[#1C232E]/50 backdrop-blur-md border-[#5C4A2E]/30' 
+        : 'bg-[#1C232E]/50 border-[#5C4A2E]/30'
     }`}>
       <button
         onClick={() => setLanguage('en')}
         className={`px-3 py-1.5 rounded-lg text-[11px] font-black transition-all ${
           language === 'en' 
-            ? 'bg-white text-indigo-900 shadow-lg' 
+            ? 'bg-[#0B6E4F] text-[#C9A227] shadow-lg' 
             : isDark 
-              ? 'text-white/70 hover:bg-white/10' 
-              : 'text-slate-500 hover:bg-slate-200'
+              ? 'text-[#9C9384] hover:bg-[#2A1518]' 
+              : 'text-[#9C9384] hover:bg-[#2A1518]'
         }`}
       >
         ENG
@@ -29,10 +29,10 @@ export function LanguageSwitcher({ variant = 'dark' }: { variant?: 'light' | 'da
         onClick={() => setLanguage('uz')}
         className={`px-3 py-1.5 rounded-lg text-[11px] font-black transition-all ${
           language === 'uz' 
-            ? 'bg-white text-indigo-900 shadow-lg' 
+            ? 'bg-[#0B6E4F] text-[#C9A227] shadow-lg' 
             : isDark 
-              ? 'text-white/70 hover:bg-white/10' 
-              : 'text-slate-500 hover:bg-slate-200'
+              ? 'text-[#9C9384] hover:bg-[#2A1518]' 
+              : 'text-[#9C9384] hover:bg-[#2A1518]'
         }`}
       >
         UZ

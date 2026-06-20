@@ -157,38 +157,38 @@ function ManagerFinancialDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen bg-[#0F1419] flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-[#0B6E4F] border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
   if (!finance) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <p className="text-slate-600">Record not found</p>
+      <div className="min-h-screen bg-[#0F1419] flex items-center justify-center">
+        <p className="text-[#9C9384]">Record not found</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans">
-      <header className="bg-gradient-to-r from-emerald-800 to-teal-900 text-white shadow-2xl sticky top-0 z-50">
+    <div className="min-h-screen bg-[#0F1419] font-sans">
+      <header className="bg-gradient-to-r from-[#0B6E4F] to-[#0B6E4F]/80 text-[#C9A227] shadow-2xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.back()}
-              className="p-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all shadow-lg"
+              className="p-3 bg-[#0B6E4F] text-[#C9A227] rounded-xl hover:bg-[#0B6E4F]/80 transition-all shadow-lg border border-[#0B6E4F]/40"
             >
-              <svg className="w-8 h-8 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-8 h-8 text-[#C9A227]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
             </button>
             <div>
-              <h1 className="text-2xl font-black tracking-tight">
+              <h1 className="text-2xl font-black tracking-tight text-[#EDE6D6]">
                 {finance.type === 'income' ? 'Income' : 'Expense'} Details
               </h1>
-              <p className="text-xs text-emerald-300 font-bold tracking-widest uppercase opacity-80">Manager View</p>
+              <p className="text-xs text-[#C9A227]/80 font-bold tracking-widest uppercase opacity-80">Manager View</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -221,22 +221,22 @@ function ManagerFinancialDetail() {
       <main className="max-w-4xl mx-auto p-6">
         {message && (
           <div className={`mb-4 p-4 rounded-xl ${
-            message.includes('Error') ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+            message.includes('Error') ? 'bg-[#722F37]/10 text-[#722F37] border border-[#722F37]/30' : 'bg-[#0B6E4F]/10 text-[#0B6E4F] border border-[#0B6E4F]/30'
           }`}>
             {message}
           </div>
         )}
 
-        <div className="bg-white rounded-2xl shadow-xl p-8 space-y-6">
+        <div className="bg-[#1C232E] rounded-2xl shadow-xl p-8 space-y-6 border border-[#5C4A2E]/30">
           {/* Basic Info */}
           <div className="grid grid-cols-2 gap-6">
             <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Date</p>
-              <p className="text-lg font-semibold text-slate-800">{finance.date}</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-[#9C9384] mb-2">Date</p>
+              <p className="text-lg font-semibold text-[#EDE6D6]">{finance.date}</p>
             </div>
             <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Type</p>
-              <p className={`text-lg font-bold ${finance.type === 'income' ? 'text-emerald-600' : 'text-rose-600'}`}>
+              <p className="text-xs font-bold uppercase tracking-widest text-[#9C9384] mb-2">Type</p>
+              <p className={`text-lg font-bold ${finance.type === 'income' ? 'text-[#0B6E4F]' : 'text-[#722F37]'}`}>
                 {finance.type === 'income' ? 'Income' : 'Expense'}
               </p>
             </div>
@@ -386,9 +386,9 @@ function ManagerFinancialDetail() {
       {deleteModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => setDeleteModalOpen(false)}>
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-            <h2 className="text-xl font-black text-slate-800 mb-4">Request Deletion</h2>
-            <p className="text-sm text-slate-600 mb-4">
+          <div className="relative bg-[#1C232E] rounded-2xl shadow-2xl w-full max-w-md p-8 animate-in zoom-in-95 duration-200 border border-[#5C4A2E]/30" onClick={e => e.stopPropagation()}>
+            <h2 className="text-xl font-black text-[#EDE6D6] mb-4">Request Deletion</h2>
+            <p className="text-sm text-[#9C9384] mb-4">
               Please provide a reason why you want to delete this {finance?.type === 'income' ? 'income' : 'expense'} record.
             </p>
             <textarea
@@ -396,19 +396,19 @@ function ManagerFinancialDetail() {
               onChange={(e) => setDeleteReason(e.target.value)}
               placeholder="Enter reason for deletion..."
               rows={4}
-              className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl text-slate-900 mb-4 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+              className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl text-[#EDE6D6] mb-4 focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 bg-[#1C232E] placeholder:text-[#9C9384]"
             />
             <div className="flex gap-3">
               <button
                 onClick={() => setDeleteModalOpen(false)}
-                className="flex-1 py-3 bg-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-300 transition-all"
+                className="flex-1 py-3 bg-[#1C232E]/50 text-[#9C9384] rounded-xl font-bold hover:bg-[#2A1518] transition-all border border-[#5C4A2E]/30"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmDelete}
                 disabled={!deleteReason.trim() || requestingDelete}
-                className="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-all disabled:opacity-50"
+                className="flex-1 py-3 bg-[#722F37] text-[#EDE6D6] rounded-xl font-bold hover:bg-[#722F37]/80 transition-all disabled:opacity-50 border border-[#722F37]/40"
               >
                 {requestingDelete ? 'Sending...' : 'Send Request'}
               </button>

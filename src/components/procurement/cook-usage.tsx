@@ -158,14 +158,14 @@ export function CookUsage() {
   );
 
   return (
-    <div className="min-h-screen bg-white text-black p-8 font-sans overflow-x-hidden">
+    <div className="min-h-screen bg-[#0F1419] text-[#EDE6D6] p-8 font-sans overflow-x-hidden">
       
       {/* ── Overlays ── */}
       <AnimatePresence>
         {lastScan && (
           <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
-            <div className="bg-black text-white px-16 py-10 border border-white shadow-2xl flex flex-col items-center gap-2">
-              <CheckCircle2 size={80} className="mb-4 text-emerald-400" />
+            <div className="bg-[#1C232E] text-[#C9A227] px-16 py-10 border border-[#5C4A2E]/30 shadow-2xl flex flex-col items-center gap-2">
+              <CheckCircle2 size={80} className="mb-4 text-[#0B6E4F]" />
               <p className="text-8xl font-mono font-black tracking-tighter uppercase">{lastScan.weight}</p>
               <p className="text-2xl font-bold opacity-80 uppercase tracking-widest">{lastScan.unit} OF {lastScan.name}</p>
             </div>
@@ -173,8 +173,8 @@ export function CookUsage() {
         )}
         {stockError && (
           <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
-            <div className="bg-white border-2 border-black text-black px-16 py-10 shadow-2xl flex flex-col items-center gap-2">
-              <XCircle size={80} className="mb-4 text-red-600" />
+            <div className="bg-[#1C232E] border-2 border-[#5C4A2E]/30 text-[#EDE6D6] px-16 py-10 shadow-2xl flex flex-col items-center gap-2">
+              <XCircle size={80} className="mb-4 text-[#722F37]" />
               <p className="text-4xl font-black tracking-tighter uppercase">Stock Limit</p>
               <p className="text-7xl font-mono font-black my-2">{stockError.available} {stockError.unit}</p>
               <p className="text-xl font-bold opacity-80 uppercase tracking-widest text-center">Available stock for {stockError.name} is only {stockError.available}</p>
@@ -186,27 +186,27 @@ export function CookUsage() {
       <div className="max-w-7xl mx-auto space-y-12">
         
         {/* Header HUD */}
-        <div className="flex justify-between items-end border-b-2 border-black pb-6">
+        <div className="flex justify-between items-end border-b-2 border-[#5C4A2E]/30 pb-6">
           <div className="flex items-center gap-6">
-             <div className="w-12 h-12 border border-black flex items-center justify-center bg-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-                <Cpu className="text-black" size={24} />
+             <div className="w-12 h-12 border border-[#5C4A2E]/30 flex items-center justify-center bg-[#1C232E] shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)]">
+                <Cpu className="text-[#EDE6D6]" size={24} />
              </div>
              <div>
-                <h1 className="text-3xl font-black text-black uppercase tracking-tighter">Hybrid Usage Station</h1>
-                <p className="text-slate-400 font-black text-[10px] uppercase tracking-[0.2em] mt-1">Real-Time Inventory Augmentation</p>
+                <h1 className="text-3xl font-black text-[#EDE6D6] uppercase tracking-tighter">Hybrid Usage Station</h1>
+                <p className="text-[#9C9384] font-black text-[10px] uppercase tracking-[0.2em] mt-1">Real-Time Inventory Augmentation</p>
              </div>
           </div>
 
-          <div className="flex bg-white p-1 border border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+          <div className="flex bg-[#1C232E] p-1 border border-[#5C4A2E]/30 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)]">
              <button 
                onClick={() => setMode('scale')}
-               className={`px-5 py-2 text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${mode === 'scale' ? 'bg-black text-white' : 'text-black hover:bg-zinc-50'}`}
+               className={`px-5 py-2 text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${mode === 'scale' ? 'bg-[#0B6E4F] text-[#C9A227]' : 'text-[#EDE6D6] hover:bg-[#2A1518]'}`}
              >
                <Scale size={14} /> Scale Mode
              </button>
              <button 
                onClick={() => setMode('manual')}
-               className={`px-5 py-2 text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${mode === 'manual' ? 'bg-black text-white' : 'text-black hover:bg-zinc-50'}`}
+               className={`px-5 py-2 text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${mode === 'manual' ? 'bg-[#0B6E4F] text-[#C9A227]' : 'text-[#EDE6D6] hover:bg-[#2A1518]'}`}
              >
                <Keyboard size={14} /> Manual Mode
              </button>
@@ -219,12 +219,12 @@ export function CookUsage() {
           <div className="col-span-12 lg:col-span-8 space-y-8">
             
             {/* Input Engine */}
-            <section className={`bg-white p-10 relative overflow-hidden transition-all border border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] ${mode === 'scale' ? 'bg-zinc-50/50' : ''}`}>
+            <section className={`bg-[#1C232E] p-10 relative overflow-hidden transition-all border border-[#5C4A2E]/30 shadow-[8px_8px_0px_0px_rgba(92,74,46,0.3)] ${mode === 'scale' ? 'bg-[#1C232E]/50' : ''}`}>
               
               <div className="flex flex-col items-center">
                 <div className="flex items-center gap-4 mb-12">
-                   <span className="px-3 py-1 border border-black bg-white text-black text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-                      <div className={`w-1.5 h-1.5 rounded-full ${mode === 'scale' ? 'bg-emerald-500 animate-pulse' : 'bg-black'}`} />
+                   <span className="px-3 py-1 border border-[#5C4A2E]/30 bg-[#1C232E] text-[#EDE6D6] text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                      <div className={`w-1.5 h-1.5 rounded-full ${mode === 'scale' ? 'bg-[#0B6E4F] animate-pulse' : 'bg-[#9C9384]'}`} />
                       {mode === 'scale' ? 'System: Listening' : 'System: Keyboard Input'}
                    </span>
                 </div>
@@ -241,7 +241,7 @@ export function CookUsage() {
                     onKeyDown={handleInput}
                     placeholder={selectedItem ? `INPUT WEIGHT: ${selectedItem.item_name}` : "READY FOR PROTOCOL"}
                     inputMode={mode === 'scale' ? 'none' : 'text'}
-                    className="w-full bg-transparent text-center text-6xl font-mono font-black tracking-tighter placeholder:text-zinc-100 focus:outline-none text-black uppercase"
+                    className="w-full bg-transparent text-center text-6xl font-mono font-black tracking-tighter placeholder:text-[#9C9384]/30 focus:outline-none text-[#EDE6D6] uppercase"
                     autoComplete="off"
                   />
                   
@@ -252,19 +252,19 @@ export function CookUsage() {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0 }}
-                        className="absolute top-full left-0 right-0 mt-4 bg-white border border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] z-50 max-h-60 overflow-y-auto"
+                        className="absolute top-full left-0 right-0 mt-4 bg-[#1C232E] border border-[#5C4A2E]/30 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)] z-50 max-h-60 overflow-y-auto"
                       >
                         {(filteredItems || []).length > 0 ? filteredItems.map(item => (
                           <button 
                             key={item.id} 
                             onClick={() => handleSelectItem(item)}
-                            className="w-full px-6 py-4 text-left hover:bg-black hover:text-white transition-colors flex justify-between items-center group border-b border-black last:border-0"
+                            className="w-full px-6 py-4 text-left hover:bg-[#2A1518] hover:text-[#C9A227] transition-colors flex justify-between items-center group border-b border-[#5C4A2E]/30 last:border-0"
                           >
-                            <span className="font-black text-sm uppercase tracking-tight">{item.item_name}</span>
+                            <span className="font-black text-sm uppercase tracking-tight text-[#EDE6D6]">{item.item_name}</span>
                              <div className="flex items-center gap-3">
-                              <span className="text-xs font-mono font-black opacity-60">{item.current_stock} {item.use_unit}</span>
-                              <div className="border border-black p-1.5 bg-white group-hover:bg-zinc-800">
-                                 <Plus size={16} className="text-black group-hover:text-white" />
+                              <span className="text-xs font-mono font-black opacity-60 text-[#9C9384]">{item.current_stock} {item.use_unit}</span>
+                              <div className="border border-[#5C4A2E]/30 p-1.5 bg-[#1C232E] group-hover:bg-[#2A1518]">
+                                 <Plus size={16} className="text-[#EDE6D6] group-hover:text-[#C9A227]" />
                               </div>
                             </div>
                           </button>
@@ -296,10 +296,10 @@ export function CookUsage() {
             <AnimatePresence>
                {selectedItem && (
                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
-                    <div className="bg-white p-8 border border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+                    <div className="bg-[#1C232E] p-8 border border-[#5C4A2E]/30 shadow-[8px_8px_0px_0px_rgba(92,74,46,0.3)]">
                        <div className="flex items-center gap-3 mb-6">
-                          <Info className="text-black" size={18} />
-                          <p className="text-[10px] font-black uppercase tracking-widest text-black">Protocol: Manual Override</p>
+                          <Info className="text-[#EDE6D6]" size={18} />
+                          <p className="text-[10px] font-black uppercase tracking-widest text-[#EDE6D6]">Protocol: Manual Override</p>
                        </div>
                        <div className="flex gap-4">
                           <input 
@@ -309,11 +309,11 @@ export function CookUsage() {
                             value={manualWeight}
                             onChange={(e) => setManualWeight(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && processUsage(selectedItem, parseFloat(manualWeight))}
-                            className="flex-1 bg-white border border-black px-6 py-4 text-4xl font-mono font-black tracking-tighter text-black outline-none focus:bg-zinc-50 transition-all"
+                            className="flex-1 bg-[#1C232E] border border-[#5C4A2E]/30 px-6 py-4 text-4xl font-mono font-black tracking-tighter text-[#EDE6D6] outline-none focus:bg-[#2A1518] transition-all"
                           />
                           <button 
                             onClick={() => processUsage(selectedItem, parseFloat(manualWeight))}
-                            className="px-8 py-4 bg-black text-white font-black uppercase tracking-[0.2em] text-xs hover:bg-zinc-800 transition-all border border-black"
+                            className="px-8 py-4 bg-[#0B6E4F] text-[#C9A227] font-black uppercase tracking-[0.2em] text-xs hover:bg-[#0B6E4F]/80 transition-all border border-[#0B6E4F]/40"
                           >
                             LOG {selectedItem.use_unit}
                           </button>
@@ -327,32 +327,32 @@ export function CookUsage() {
           {/* Sticky Notepad Sidebar (Col-4) */}
           <div className="col-span-12 lg:col-span-4">
             <section className="relative group">
-              <div className="bg-white border border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
-                <div className="flex items-center justify-between p-6 border-b border-black">
+              <div className="bg-[#1C232E] border border-[#5C4A2E]/30 shadow-[8px_8px_0px_0px_rgba(92,74,46,0.3)]">
+                <div className="flex items-center justify-between p-6 border-b border-[#5C4A2E]/30">
                   <div className="flex items-center gap-3">
-                    <div className="w-1.5 h-6 bg-black" />
-                    <h2 className="text-[10px] font-black uppercase tracking-widest text-black">Resource Ledger</h2>
+                    <div className="w-1.5 h-6 bg-[#0B6E4F]" />
+                    <h2 className="text-[10px] font-black uppercase tracking-widest text-[#EDE6D6]">Resource Ledger</h2>
                   </div>
-                  <span className="text-lg font-mono font-black text-black">{(todaysUsage || []).length}</span>
+                  <span className="text-lg font-mono font-black text-[#EDE6D6]">{(todaysUsage || []).length}</span>
                 </div>
-                <div className="flex flex-col divide-y divide-black/10 px-2 max-h-[500px] overflow-y-auto">
+                <div className="flex flex-col divide-y divide-[#5C4A2E]/30 px-2 max-h-[500px] overflow-y-auto">
                    <AnimatePresence>
                      {(todaysUsage || []).map((log) => (
-                      <motion.div key={log.id} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} className="flex items-center justify-between py-4 px-4 hover:bg-zinc-50 transition-colors">
+                      <motion.div key={log.id} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} className="flex items-center justify-between py-4 px-4 hover:bg-[#2A1518] transition-colors">
                         <div>
-                          <span className="font-black text-black text-xs uppercase tracking-tight block truncate max-w-[140px]">{log.inventory?.item_name || 'UNKNOWN'}</span>
-                          <span className="text-[9px] font-mono font-black text-slate-400 mt-1 block uppercase">{new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
+                          <span className="font-black text-[#EDE6D6] text-xs uppercase tracking-tight block truncate max-w-[140px]">{log.inventory?.item_name || 'UNKNOWN'}</span>
+                          <span className="text-[9px] font-mono font-black text-[#9C9384] mt-1 block uppercase">{new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
                         </div>
                         <div className="text-right shrink-0">
-                          <span className="font-mono text-base font-black text-black">{Math.abs(log.qty)}</span>
-                          <span className="text-[9px] font-black text-slate-400 uppercase ml-2">{log.unit}</span>
+                          <span className="font-mono text-base font-black text-[#EDE6D6]">{Math.abs(log.qty)}</span>
+                          <span className="text-[9px] font-black text-[#9C9384] uppercase ml-2">{log.unit}</span>
                         </div>
                       </motion.div>
                     ))}
                   </AnimatePresence>
                 </div>
-                <div className="p-4 border-t border-black bg-zinc-50/50 flex justify-center">
-                   <p className="text-[8px] font-black uppercase tracking-[0.3em] text-slate-400">Ledger End of File</p>
+                <div className="p-4 border-t border-[#5C4A2E]/30 bg-[#1C232E]/50 flex justify-center">
+                   <p className="text-[8px] font-black uppercase tracking-[0.3em] text-[#9C9384]">Ledger End of File</p>
                 </div>
               </div>
             </section>
@@ -360,24 +360,24 @@ export function CookUsage() {
         </div>
 
         {/* Compact Inventory HUD */}
-        <section className="space-y-6 pt-12 border-t-2 border-black">
+        <section className="space-y-6 pt-12 border-t-2 border-[#5C4A2E]/30">
           <div className="flex items-center gap-4">
-            <Box className="text-black" size={20} />
-            <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-black">Stores Audit HUD</h2>
+            <Box className="text-[#EDE6D6]" size={20} />
+            <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-[#EDE6D6]">Stores Audit HUD</h2>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
             {(items || []).map((item) => {
               const isLow = item.current_stock < item.min_threshold;
               return (
-                <div key={item.id} className={`bg-white p-5 border shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] ${isLow ? 'border-red-600 bg-red-50/10' : 'border-black'}`}>
+                <div key={item.id} className={`bg-[#1C232E] p-5 border shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)] transition-all hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[6px_6px_0px_0px_rgba(92,74,46,0.3)] ${isLow ? 'border-[#722F37] bg-[#722F37]/10' : 'border-[#5C4A2E]/30'}`}>
                   <div className="flex justify-between items-start mb-4">
-                    <div className={`w-8 h-8 border border-black flex items-center justify-center ${isLow ? 'bg-red-600 text-white' : 'bg-white text-black'}`}>
+                    <div className={`w-8 h-8 border border-[#5C4A2E]/30 flex items-center justify-center ${isLow ? 'bg-[#722F37] text-[#EDE6D6]' : 'bg-[#1C232E] text-[#EDE6D6]'}`}>
                       {isLow ? <AlertTriangle size={14} /> : <Box size={14} />}
                     </div>
-                    <span className="text-[9px] font-mono font-black text-slate-400 uppercase tracking-widest">{item.use_unit}</span>
+                    <span className="text-[9px] font-mono font-black text-[#9C9384] uppercase tracking-widest">{item.use_unit}</span>
                   </div>
-                  <h3 className="text-[10px] font-black text-black truncate uppercase tracking-tighter mb-1">{item.item_name}</h3>
-                  <p className={`font-mono text-2xl font-black tracking-tight ${isLow ? 'text-red-600' : 'text-black'}`}>{item.current_stock.toFixed(1)}</p>
+                  <h3 className="text-[10px] font-black text-[#EDE6D6] truncate uppercase tracking-tighter mb-1">{item.item_name}</h3>
+                  <p className={`font-mono text-2xl font-black tracking-tight ${isLow ? 'text-[#722F37]' : 'text-[#EDE6D6]'}`}>{item.current_stock.toFixed(1)}</p>
                 </div>
               );
             })}

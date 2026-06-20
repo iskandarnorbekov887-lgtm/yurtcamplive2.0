@@ -43,7 +43,7 @@ export default function LoginPage() {
 
   // Show nothing during SSR/hydration to prevent mismatch
   if (!mounted) {
-    return <div className="min-h-screen bg-slate-50" />;
+    return <div className="min-h-screen bg-[#0F1419]" />;
   }
 
   if (user) {
@@ -70,19 +70,19 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 relative">
-      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-700 via-emerald-500 to-sky-600" />
+    <div className="min-h-screen flex items-center justify-center bg-[#0F1419] relative">
+      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#0B6E4F] via-[#0B6E4F]/80 to-[#C9A227]" />
       <div className="absolute top-6 right-6">
         <LanguageSwitcher />
       </div>
-      <div className="bg-white p-8 rounded-xl shadow-sm w-full max-w-md border border-slate-200">
+      <div className="bg-[#1C232E] p-8 rounded-xl shadow-sm w-full max-w-md border border-[#5C4A2E]/30">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-zinc-950">{t('login.title')}</h1>
-          <p className="text-slate-400 mt-2 text-sm font-medium">{t('login.subtitle')}</p>
+          <h1 className="text-2xl font-bold text-[#EDE6D6]">{t('login.title')}</h1>
+          <p className="text-[#9C9384] mt-2 text-sm font-medium">{t('login.subtitle')}</p>
         </div>
 
         {error && (
-          <div className={`mb-4 p-3 rounded-lg text-sm ${error.includes('created') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+          <div className={`mb-4 p-3 rounded-lg text-sm ${error.includes('created') ? 'bg-[#0B6E4F]/10 text-[#0B6E4F]' : 'bg-[#722F37]/10 text-[#722F37]'}`}>
             {error}
           </div>
         )}
@@ -90,41 +90,41 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {isSignUp && (
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">
+              <label className="block text-xs font-bold text-[#9C9384] uppercase tracking-widest mb-1">
                 Full Name
               </label>
               <input
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-zinc-950 bg-white"
+                className="w-full px-4 py-2 border border-[#5C4A2E]/30 rounded-lg focus:ring-2 focus:ring-[#0B6E4F] focus:border-transparent text-[#EDE6D6] bg-[#1C232E]"
                 required={isSignUp}
               />
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">
+            <label className="block text-xs font-bold text-[#9C9384] uppercase tracking-widest mb-1">
               {t('login.email')}
             </label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-zinc-950 bg-white"
+              className="w-full px-4 py-2 border border-[#5C4A2E]/30 rounded-lg focus:ring-2 focus:ring-[#0B6E4F] focus:border-transparent text-[#EDE6D6] bg-[#1C232E]"
               required
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">
+            <label className="block text-xs font-bold text-[#9C9384] uppercase tracking-widest mb-1">
               {t('login.password')}
             </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border border-black/20 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-black bg-white"
+              className="w-full px-4 py-2 border border-[#5C4A2E]/30 rounded-lg focus:ring-2 focus:ring-[#0B6E4F] focus:border-transparent text-[#EDE6D6] bg-[#1C232E]"
               required
             />
           </div>
@@ -132,7 +132,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-emerald-700 text-white py-2.5 px-4 rounded-lg hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed font-bold uppercase tracking-widest text-xs shadow-sm"
+            className="w-full bg-[#0B6E4F] text-[#C9A227] py-2.5 px-4 rounded-lg hover:bg-[#0B6E4F]/80 disabled:opacity-50 disabled:cursor-not-allowed font-bold uppercase tracking-widest text-xs shadow-sm border border-[#0B6E4F]/40"
           >
             {loading ? 'Loading...' : isSignUp ? t('login.signup') : t('login.signin')}
           </button>
@@ -143,10 +143,10 @@ export default function LoginPage() {
           <div className="mt-4">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-200"></div>
+                <div className="w-full border-t border-[#5C4A2E]/30"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-slate-400 text-sm font-medium">Or continue with</span>
+                <span className="px-2 bg-[#1C232E] text-[#9C9384] text-sm font-medium">Or continue with</span>
               </div>
             </div>
             <button
@@ -167,7 +167,7 @@ export default function LoginPage() {
                 }
               }}
               disabled={loading}
-              className="mt-4 w-full flex items-center justify-center gap-3 bg-white border border-slate-200 text-zinc-950 py-2 px-4 rounded-lg hover:bg-slate-50 disabled:opacity-50 font-medium transition-all shadow-sm"
+              className="mt-4 w-full flex items-center justify-center gap-3 bg-[#1C232E] border border-[#5C4A2E]/30 text-[#EDE6D6] py-2 px-4 rounded-lg hover:bg-[#2A1518] disabled:opacity-50 font-medium transition-all shadow-sm"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>

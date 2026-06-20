@@ -1,32 +1,28 @@
 @import "tailwindcss";
 
 @theme {
-  /* ── Technical Minimalist Palette ── */
-  --color-forest-50: #ecfdf5;
-  --color-forest-100: #d1fae5;
-  --color-forest-600: #059669;
-  --color-forest-700: #047857;
+  /* ── Classic Deep Colors Palette ── */
+  --color-deep-charcoal: #0F1419;
+  --color-warm-off-black: #181412;
+  --color-dark-slate: #1C232E;
+  --color-deep-burgundy: #2A1518;
+  --color-deep-emerald: #0B6E4F;
+  --color-antique-gold: #C9A227;
+  --color-muted-bronze: #5C4A2E;
+  --color-warm-ivory: #EDE6D6;
+  --color-muted-taupe: #9C9384;
+  --color-deep-amber: #B8860B;
+  --color-jewel-emerald: #0B6E4F;
+  --color-jewel-burgundy: #722F37;
 
-  --color-sky-50: #f0f9ff;
-  --color-sky-100: #e0f2fe;
-  --color-sky-500: #0ea5e9;
-  --color-sky-600: #0284c7;
-  --color-sky-700: #0369a1;
-
-  --color-safety-orange: #f59e0b;
-
-  --font-sans: var(--font-geist-sans);
-  --font-mono: 'JetBrains Mono', var(--font-geist-mono), ui-monospace, monospace;
+  --font-serif: 'Playfair Display', 'Lora', Georgia, serif;
+  --font-sans: 'Inter', var(--font-geist-sans), system-ui, sans-serif;
 }
 
 :root {
-  --background: #f8fafc; /* slate-50 */
-  --foreground: #09090b; /* zinc-950 */
-}
-:root {
-  /* Slightly darker page background to increase contrast with white cards */
-  --background: #f1f5f9; /* slate-100 - darker than previous */
-  --foreground: #09090b; /* zinc-950 */
+  /* Classic Deep Colors Theme */
+  --background: #0F1419; /* deep charcoal navy */
+  --foreground: #EDE6D6; /* warm ivory */
 }
 
 body {
@@ -35,14 +31,27 @@ body {
   font-family: var(--font-sans);
 }
 
-/* ── Mono Utility for Data-First Numbers ── */
-.font-data {
-  font-family: 'JetBrains Mono', var(--font-geist-mono), ui-monospace, monospace;
-  letter-spacing: -0.025em;
-  font-weight: 700;
+/* ── Classic Typography ── */
+.font-heading {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
-/* High-Contrast Bento Grid and Card styles */
+.font-label {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.font-data {
+  font-family: var(--font-sans);
+  letter-spacing: 0.01em;
+  font-weight: 600;
+}
+
+/* ── Classic Card Styles ── */
 .bento-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -50,44 +59,133 @@ body {
 }
 
 .bento-card {
-  background: #ffffff; /* pure white */
-  border: 1px solid #000000; /* 1px solid black */
-  border-radius: 0.5rem;
-  padding: 16px;
-  box-shadow: none;
-  color: #000000; /* solid black text */
+  background: linear-gradient(145deg, var(--color-dark-slate) 0%, #1a202c 100%);
+  border: 1px solid rgba(92, 74, 46, 0.3); /* muted bronze at low opacity */
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(201, 162, 39, 0.05);
+  color: var(--color-warm-ivory);
 }
 
-.hc-accent-forest { color: var(--color-forest-600); }
-.hc-accent-forest-bg { background: var(--color-forest-600); color: #ffffff; }
-.hc-accent-sky { color: var(--color-sky-500); }
-
-.hc-body { color: #000000; }
-.hc-mono { font-family: var(--font-mono); font-weight: 700; color: #000000; }
-
-/* ── Clean Card Surfaces ── */
-.clean-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0; /* slate-200 */
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
-}
-.clean-card {
-  background: #ffffff;
-  border: 1px solid #cbd5e1; /* slightly stronger border for contrast */
-  border-radius: 0.75rem;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+.classic-card {
+  background: linear-gradient(145deg, var(--color-dark-slate) 0%, #1a202c 100%);
+  border: 1px solid rgba(92, 74, 46, 0.3);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(201, 162, 39, 0.05);
+  color: var(--color-warm-ivory);
 }
 
-.glass-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+.burgundy-card {
+  background: linear-gradient(145deg, var(--color-deep-burgundy) 0%, #1a0f10 100%);
+  border: 1px solid rgba(92, 74, 46, 0.3);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(201, 162, 39, 0.05);
+  color: var(--color-warm-ivory);
 }
-.glass-card {
-  background: #ffffffcc; /* subtle translucency */
-  border: 1px solid #cbd5e1;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+
+/* ── Classic Button Styles ── */
+.btn-primary {
+  background: var(--color-deep-emerald);
+  color: var(--color-antique-gold);
+  border: 1px solid rgba(201, 162, 39, 0.2);
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  box-shadow: 0 4px 12px rgba(11, 110, 79, 0.3), 0 0 20px rgba(201, 162, 39, 0.1);
+  transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+  background: var(--color-deep-emerald);
+  box-shadow: 0 6px 20px rgba(11, 110, 79, 0.5), 0 0 30px rgba(201, 162, 39, 0.2);
+  transform: translateY(-1px);
+}
+
+.btn-burgundy {
+  background: var(--color-jewel-burgundy);
+  color: var(--color-antique-gold);
+  border: 1px solid rgba(201, 162, 39, 0.2);
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  box-shadow: 0 4px 12px rgba(114, 47, 55, 0.3), 0 0 20px rgba(201, 162, 39, 0.1);
+  transition: all 0.3s ease;
+}
+
+.btn-burgundy:hover {
+  background: var(--color-jewel-burgundy);
+  box-shadow: 0 6px 20px rgba(114, 47, 55, 0.5), 0 0 30px rgba(201, 162, 39, 0.2);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--color-antique-gold);
+  border: 1px solid var(--color-antique-gold);
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+  background: rgba(201, 162, 39, 0.1);
+  box-shadow: 0 0 20px rgba(201, 162, 39, 0.15);
+}
+
+/* ── Classic Status Badges ── */
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.status-paid {
+  background: rgba(11, 110, 79, 0.2);
+  color: var(--color-jewel-emerald);
+  border: 1px solid rgba(11, 110, 79, 0.4);
+}
+
+.status-accepted {
+  background: rgba(184, 134, 11, 0.2);
+  color: var(--color-deep-amber);
+  border: 1px solid rgba(184, 134, 11, 0.4);
+}
+
+.status-pending {
+  background: rgba(114, 47, 55, 0.2);
+  color: var(--color-jewel-burgundy);
+  border: 1px solid rgba(114, 47, 55, 0.4);
+}
+
+/* ── Classic Text Colors ── */
+.text-heading {
+  color: var(--color-warm-ivory);
+}
+
+.text-secondary {
+  color: var(--color-muted-taupe);
+}
+
+.text-accent {
+  color: var(--color-antique-gold);
+}
+
+/* ── Classic Dividers ── */
+.classic-divider {
+  border: none;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(92, 74, 46, 0.3), transparent);
+  margin: 16px 0;
 }
 
 /* High-contrast utility for numbers/signs (use where values are hard to read) */
@@ -100,53 +198,53 @@ body {
 /* Improve visibility of small edge/modal action buttons (close, toggles) */
 .fixed.inset-0 .relative.bg-white button.w-8.h-8,
 .fixed.inset-0 .relative.bg-white .w-8.h-8 {
-  background: #ffffff;
-  color: var(--foreground);
-  border: 1px solid rgba(15,23,42,0.06);
-  box-shadow: 0 6px 18px rgba(2,6,23,0.08);
+  background: var(--color-dark-slate);
+  color: var(--color-warm-ivory);
+  border: 1px solid rgba(92, 74, 46, 0.3);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
   transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
 }
 .fixed.inset-0 .relative.bg-white button.w-8.h-8:hover,
 .fixed.inset-0 .relative.bg-white .w-8.h-8:hover {
   transform: translateY(-1px);
-  background: #f8fafc;
+  background: var(--color-deep-burgundy);
 }
 
 /* Generic utility to mark an element as an edge control that must stay visible */
 .edge-control {
-  background: #fff !important;
-  color: var(--foreground) !important;
+  background: var(--color-dark-slate) !important;
+  color: var(--color-warm-ivory) !important;
   border-radius: 0.5rem !important;
-  border: 1px solid rgba(15,23,42,0.06) !important;
-  box-shadow: 0 6px 18px rgba(2,6,23,0.06) !important;
+  border: 1px solid rgba(92, 74, 46, 0.3) !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4) !important;
 }
 
 /* ── Focus ring ── */
 *:focus-visible {
-  outline: 2px solid #09090b;
+  outline: 2px solid var(--color-antique-gold);
   outline-offset: 2px;
 }
 
 /* ── Status Animations ── */
 @keyframes status-glow-pending {
-  0%, 100% { box-shadow: 0 0 8px rgba(245, 158, 11, 0.1); }
-  50% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.25); }
+  0%, 100% { box-shadow: 0 0 8px rgba(184, 134, 11, 0.2); }
+  50% { box-shadow: 0 0 20px rgba(184, 134, 11, 0.4); }
 }
 .glow-pending { animation: status-glow-pending 2s infinite ease-in-out; }
 
 @keyframes status-glow-sent {
-  0%, 100% { box-shadow: 0 0 8px rgba(14, 165, 233, 0.1); }
-  50% { box-shadow: 0 0 20px rgba(14, 165, 233, 0.25); }
+  0%, 100% { box-shadow: 0 0 8px rgba(11, 110, 79, 0.2); }
+  50% { box-shadow: 0 0 20px rgba(11, 110, 79, 0.4); }
 }
 .glow-sent { animation: status-glow-sent 2s infinite ease-in-out; }
 
 @keyframes discrepancy-pulse {
-  0%, 100% { border-color: rgba(245, 158, 11, 0.3); }
-  50% { border-color: rgba(245, 158, 11, 1); }
+  0%, 100% { border-color: rgba(184, 134, 11, 0.3); }
+  50% { border-color: rgba(184, 134, 11, 0.8); }
 }
 .border-discrepancy {
   animation: discrepancy-pulse 1s infinite ease-in-out;
-  border-width: 3px;
+  border-width: 2px;
 }
 
 /* ── UI Animations ── */
@@ -163,15 +261,15 @@ body {
 .zoom-in-95 { animation: zoom-in 0.2s ease-out; }
 
 .custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(92, 74, 46, 0.1);
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #e2e8f0;
+  background: rgba(92, 74, 46, 0.4);
   border-radius: 10px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #cbd5e1;
+  background: rgba(201, 162, 39, 0.5);
 }

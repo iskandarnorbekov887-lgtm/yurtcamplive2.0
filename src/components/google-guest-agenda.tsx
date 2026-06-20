@@ -360,16 +360,16 @@ export function GoogleGuestAgenda({
     return (
       <div key={item.key} className={`w-full px-4 py-3 transition-all border-l-4 ${
         isCancelled
-          ? 'border-red-300 bg-red-50/50'
+          ? 'border-red-300 bg-[#722F37]/10/50'
           : isSelected
-          ? 'bg-indigo-50 border-indigo-400'
+          ? 'bg-[#0B6E4F]/10 border-[#0B6E4F]/40'
           : booking?.status === 'checked_in'
-          ? 'border-emerald-400 hover:bg-emerald-50'
+          ? 'border-[#0B6E4F]/40 hover:bg-[#0B6E4F]/10'
           : booking?.status === 'confirmed'
-          ? 'border-amber-400 hover:bg-amber-50'
+          ? 'border-[#B8860B]/40 hover:bg-[#B8860B]/10'
           : booking?.status === 'completed'
-          ? 'border-blue-300 hover:bg-blue-50'
-          : 'border-slate-200 hover:bg-slate-50'
+          ? 'border-[#5C4A2E]/40 hover:bg-[#5C4A2E]/10'
+          : 'border-[#5C4A2E]/30 hover:bg-[#2A1518]'
       }`}>
         <button
           className="w-full text-left"
@@ -377,19 +377,19 @@ export function GoogleGuestAgenda({
         >
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className={`font-bold text-sm truncate ${isCancelled ? 'text-red-600 line-through' : 'text-slate-900'}`}>
-                <span className="text-slate-400 font-medium mr-1">{getPrefix(item)}</span>
+              <p className={`font-bold text-sm truncate ${isCancelled ? 'text-[#722F37] line-through' : 'text-[#EDE6D6]'}`}>
+                <span className="text-[#9C9384] font-medium mr-1">{getPrefix(item)}</span>
                 {item.name}
               </p>
-              <p className="text-xs text-slate-400 mt-0.5 hc-mono font-data">{item.start} → {item.end}</p>
-              {booking ? <p className="text-xs text-slate-500">Booking</p> : <p className="text-xs text-slate-400">calendar only</p>}
+              <p className="text-xs text-[#9C9384] mt-0.5 font-data">{item.start} → {item.end}</p>
+              {booking ? <p className="text-xs text-[#9C9384]">Booking</p> : <p className="text-xs text-[#9C9384]">calendar only</p>}
             </div>
             <div className="flex flex-col items-end gap-1 shrink-0">
               {isCancelled
                 ? <span className="text-[10px] font-bold px-2 py-0.5 border border-red-600 text-red-600 font-mono uppercase">cancelled</span>
                 : booking ? (
                     <div className="flex flex-col items-end gap-1">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 border border-black text-black font-mono uppercase ${statusColor(booking.status, booking)}`}>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 border border-[#5C4A2E]/30 text-[#EDE6D6] font-mono uppercase ${statusColor(booking.status, booking)}`}>
                         {String(booking.status).replace('_', ' ')}
                       </span>
                       {(() => {
@@ -407,30 +407,30 @@ export function GoogleGuestAgenda({
                         const liveTab = accommodation + mealsBill - collected;
 
                         return (
-                          <span className={`text-[10px] font-mono font-black uppercase mt-1 ${isPrepaid ? 'text-emerald-600' : 'text-black'}`}>
+                          <span className={`text-[10px] font-mono font-black uppercase mt-1 ${isPrepaid ? 'text-[#0B6E4F]' : 'text-[#EDE6D6]'}`}>
                             {isPrepaid ? 'PREPAID' : `TAB: $${liveTab.toFixed(2)}`}
                           </span>
                         );
                       })()}
                     </div>
                   ) : (
-                    <span className="text-[10px] font-bold px-2 py-0.5 border border-black text-black font-mono uppercase bg-white">
+                    <span className="text-[10px] font-bold px-2 py-0.5 border border-[#5C4A2E]/30 text-[#EDE6D6] font-mono uppercase bg-[#1C232E]">
                       EXTERNAL PENDING
                     </span>
                   )
               }
               {booking && syncWarnings[booking.id] === 'deleted' && (
-                <span className="text-[9px] font-bold px-1.5 py-0.5 border border-red-600 text-red-600 font-mono uppercase">⚠ REMOVED</span>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 border border-[#722F37] text-[#722F37] font-mono uppercase">⚠ REMOVED</span>
               )}
               {booking && syncWarnings[booking.id] === 'dates_changed' && (
-                <span className="text-[9px] font-bold px-1.5 py-0.5 border border-black text-black font-mono uppercase bg-white">⚠ DATES ≠</span>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 border border-[#5C4A2E]/30 text-[#EDE6D6] font-mono uppercase bg-[#1C232E]">⚠ DATES ≠</span>
               )}
               {booking?.status === 'checked_in' && booking.check_out === today && (
                 <>
                   {isAfterTwo ? (
                     <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-rose-600 text-white animate-pulse">⚠ OVERDUE (2PM+)</span>
                   ) : isAfterNoon ? (
-                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-amber-500 text-white">⚠ LATE (12PM+)</span>
+                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-[#C9A227]/100 text-white">⚠ LATE (12PM+)</span>
                   ) : null}
                 </>
               )}
@@ -442,7 +442,7 @@ export function GoogleGuestAgenda({
           <button
             onClick={e => { e.stopPropagation(); void handleApproveDates(booking); }}
             disabled={loadingAction === `syncdates-${booking.id}`}
-            className="mt-2 w-full px-3 py-2 bg-[#047857] hover:bg-[#035e44] text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:opacity-60 border border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-[1px] active:translate-y-[1px]"
+            className="mt-2 w-full px-3 py-2 bg-[#047857] hover:bg-[#035e44] text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:opacity-60 border border-[#5C4A2E]/30 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-[1px] active:translate-y-[1px]"
           >
             {loadingAction === `syncdates-${booking.id}` ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '⇵'}
             Confirm Sync
@@ -468,17 +468,17 @@ export function GoogleGuestAgenda({
     }
 
     if (isSystemOnly) {
-      return 'bg-white text-black border border-black font-mono uppercase';
+      return 'bg-[#1C232E] text-[#EDE6D6] border border-[#5C4A2E]/30 font-mono uppercase';
     }
 
     return {
-      checked_in: 'bg-white text-black border border-black font-mono uppercase',
-      confirmed: 'bg-white text-black border border-black font-mono uppercase',
-      completed: 'bg-white text-black border border-black font-mono uppercase text-opacity-40',
-      cancelled: 'bg-white text-red-600 border border-red-600 font-mono uppercase',
-      pending: 'bg-white text-black border border-black font-mono uppercase',
-      no_arrival: 'bg-white text-slate-400 border border-slate-300 font-mono uppercase',
-    }[s ?? ''] ?? 'bg-white text-slate-500 border border-slate-200 font-mono uppercase';
+      checked_in: 'bg-[#1C232E] text-[#EDE6D6] border border-[#5C4A2E]/30 font-mono uppercase',
+      confirmed: 'bg-[#1C232E] text-[#EDE6D6] border border-[#5C4A2E]/30 font-mono uppercase',
+      completed: 'bg-[#1C232E] text-[#EDE6D6]/40 border border-[#5C4A2E]/30 font-mono uppercase',
+      cancelled: 'bg-[#1C232E] text-[#722F37] border border-[#722F37]/40 font-mono uppercase',
+      pending: 'bg-[#1C232E] text-[#EDE6D6] border border-[#5C4A2E]/30 font-mono uppercase',
+      no_arrival: 'bg-[#1C232E] text-[#9C9384] border border-[#5C4A2E]/30 font-mono uppercase',
+    }[s ?? ''] ?? 'bg-[#1C232E] text-[#9C9384] border border-[#5C4A2E]/30 font-mono uppercase';
   };
 
   const flash = (msg: string) => { setActionMsg(msg); setTimeout(() => setActionMsg(''), 4000); };
@@ -584,7 +584,7 @@ export function GoogleGuestAgenda({
       setEditingDates(false);
 
       // ── Read directly from database columns ──
-      let existingDays: DayEntry[] = b.days || [];
+      let existingDays: DayEntry[] = [];
       let guestCategory = b.guest_category || '';
 
       // ── CRITICAL: Read directly from database columns (never from draft) ──
@@ -704,7 +704,6 @@ export function GoogleGuestAgenda({
 
         await supabase.from('bookings')
           .update({ 
-            days: dayEntries, 
             draft 
           })
           .eq('id', sel.id);
@@ -912,6 +911,7 @@ export function GoogleGuestAgenda({
         delete payloadToSave.guide_names;
         delete payloadToSave.guide_amount;
         delete payloadToSave.last_edited_by_id;
+        delete payloadToSave.days;
         await onUpdateBooking(sel.id, payloadToSave);
       }
 
@@ -1001,10 +1001,10 @@ export function GoogleGuestAgenda({
 
   return (
     <div className="space-y-4 pb-24 lg:pb-8">
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-2xl border border-slate-200 px-5 py-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-[#1C232E] rounded-2xl border border-[#5C4A2E]/30 px-5 py-4 shadow-sm">
         <div>
-          <h2 className="text-lg font-black text-slate-900">Guest Agenda</h2>
-          <p className="text-xs text-slate-500">Today’s guest management portal</p>
+          <h2 className="text-lg font-black text-[#EDE6D6]">Guest Agenda</h2>
+          <p className="text-xs text-[#9C9384]">Today’s guest management portal</p>
         </div>
         <div className="flex items-center gap-2">
           {onAddNewBooking && (
@@ -1044,44 +1044,44 @@ export function GoogleGuestAgenda({
         const checkedIn = bookingItems.filter(i => i.booking!.status === 'checked_in').sort((a, b) => a.start.localeCompare(b.start));
         if (upcoming.length === 0 && checkedIn.length === 0) return null;
         return (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100">
-              <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+          <div className="bg-[#1C232E] rounded-2xl border border-[#5C4A2E]/30 shadow-lg overflow-hidden">
+            <div className="px-5 py-4 border-b border-[#5C4A2E]/30">
+              <h3 className="text-sm font-black text-[#EDE6D6] flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#B8860B] animate-pulse" />
                 Upcoming & Active
               </h3>
-              <p className="text-[10px] text-slate-400 mt-0.5">Next 7 days · Bookings & Google Calendar</p>
+              <p className="text-[10px] text-[#9C9384] mt-0.5">Next 7 days · Bookings & Google Calendar</p>
             </div>
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-[#5C4A2E]/20">
               {checkedIn.length > 0 && (
                 <div className="px-4 py-2">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-emerald-600 mb-1 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Checked In · {checkedIn.length}</p>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-[#0B6E4F] mb-1 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#0B6E4F]" />Checked In · {checkedIn.length}</p>
                   {checkedIn.map(item => (
-                    <button key={item.key} onClick={() => handleSelect(item)} className="w-full text-left flex items-center justify-between px-3 py-2 rounded-lg hover:bg-emerald-50 transition-all group">
+                    <button key={item.key} onClick={() => handleSelect(item)} className="w-full text-left flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[#0B6E4F]/10 transition-all group">
                       <div className="min-w-0">
-                        <p className="text-sm font-bold text-slate-900 truncate">{item.name}</p>
-                        <p className="text-[10px] text-slate-400 font-data">{item.start} → {item.end}</p>
+                        <p className="text-sm font-bold text-[#EDE6D6] truncate">{item.name}</p>
+                        <p className="text-[10px] text-[#9C9384] font-data">{item.start} → {item.end}</p>
                       </div>
-                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">✓ in</span>
+                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#0B6E4F]/20 text-[#0B6E4F] border border-[#0B6E4F]/40">✓ in</span>
                     </button>
                   ))}
                 </div>
               )}
               {upcoming.length > 0 && (
                 <div className="px-4 py-2">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-amber-600 mb-1 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />Arriving Soon · {upcoming.length}</p>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-amber-600 mb-1 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#C9A227]/100 animate-pulse" />Arriving Soon · {upcoming.length}</p>
                   {upcoming.map(item => (
                     <button key={item.key} onClick={() => {
                       if (item.booking) { handleSelect(item); }
                       else if (item.event) { setSelectedItem({ key: item.key, name: item.name, start: item.start, end: item.end, source: 'calendar' as any, booking: null, event: item.event }); }
-                    }} className="w-full text-left flex items-center justify-between px-3 py-2 rounded-lg hover:bg-amber-50 transition-all group">
+                    }} className="w-full text-left flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[#B8860B]/10 transition-all group">
                       <div className="min-w-0">
-                        <p className="text-sm font-bold text-slate-900 truncate">{item.name}</p>
-                        <p className="text-[10px] text-slate-400 font-data">{item.start} → {item.end}</p>
+                        <p className="text-sm font-bold text-[#EDE6D6] truncate">{item.name}</p>
+                        <p className="text-[10px] text-[#9C9384] font-data">{item.start} → {item.end}</p>
                       </div>
                       {item.booking
-                        ? <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">confirmed</span>
-                        : <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">📅 calendar</span>
+                        ? <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#B8860B]/20 text-[#B8860B] border border-[#B8860B]/40">confirmed</span>
+                        : <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#1C232E]/20 text-[#9C9384] border border-[#5C4A2E]/30">📅 calendar</span>
                       }
                     </button>
                   ))}
@@ -1095,19 +1095,19 @@ export function GoogleGuestAgenda({
       {showDayAgenda && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div 
-            className="bg-white border-2 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] w-full max-w-md overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200"
+            className="bg-[#1C232E] border-2 border-[#5C4A2E]/30 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] w-full max-w-md overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200"
             onClick={e => e.stopPropagation()}
           >
-            <div className="px-6 py-4 border-b border-black bg-white flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-[#5C4A2E]/30 bg-[#1C232E] flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-600 mb-1">{D === today ? 'Today’s Operations' : 'Daily Schedule'}</p>
-                <h3 className="text-lg font-black text-black hc-mono">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#0B6E4F] mb-1">{D === today ? 'Today’s Operations' : 'Daily Schedule'}</p>
+                <h3 className="text-lg font-black text-[#EDE6D6] hc-mono">
                   {new Date(D + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
                 </h3>
               </div>
               <button 
                 onClick={() => setShowDayAgenda(false)}
-                className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-400"
+                className="p-2 hover:bg-[#2A1518] rounded-full transition-colors text-[#9C9384]"
               >
                 ✕
               </button>
@@ -1116,8 +1116,8 @@ export function GoogleGuestAgenda({
             <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
               {arrivingItems.length > 0 && (
                 <div className="mb-4">
-                  <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-700 bg-amber-50 rounded-xl mb-1 flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#C9A227] bg-[#C9A227]/10 rounded-xl mb-1 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#C9A227]/100 animate-pulse" />
                     Arriving · {arrivingItems.length}
                   </p>
                   {arrivingItems.map(item => renderCard(item as any, false))}
@@ -1125,8 +1125,8 @@ export function GoogleGuestAgenda({
               )}
               {stayingItems.length > 0 && (
                 <div className="mb-4">
-                  <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-indigo-700 bg-indigo-50 rounded-xl mb-1 flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                  <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#0B6E4F] bg-[#0B6E4F]/10 rounded-xl mb-1 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#0B6E4F]/100" />
                     In Stay · {stayingItems.length}
                   </p>
                   {stayingItems.map(item => renderCard(item as any, false))}
@@ -1134,8 +1134,8 @@ export function GoogleGuestAgenda({
               )}
               {checkedInItems.length > 0 && (
                 <div className="mb-4">
-                  <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 rounded-xl mb-1 flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#0B6E4F] bg-[#0B6E4F]/10 rounded-xl mb-1 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#0B6E4F]/100" />
                     Checked In · {checkedInItems.length}
                   </p>
                   {checkedInItems.map(item => renderCard(item as any, false))}
@@ -1143,8 +1143,8 @@ export function GoogleGuestAgenda({
               )}
               {checkingOutItems.length > 0 && (
                 <div className="mb-4">
-                  <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-blue-700 bg-blue-50 rounded-xl mb-1 flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#0B6E4F] bg-[#0B6E4F]/10 rounded-xl mb-1 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#0B6E4F]/100" />
                     Checking Out · {checkingOutItems.length}
                   </p>
                   {checkingOutItems.map(item => renderCard(item as any, false))}
@@ -1152,8 +1152,8 @@ export function GoogleGuestAgenda({
               )}
               {checkedOutItems.length > 0 && (
                 <div className="mb-4">
-                  <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-600 bg-slate-50 rounded-xl mb-1 flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                  <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#9C9384] bg-[#1C232E]/50 rounded-xl mb-1 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#9C9384]" />
                     Checked Out · {checkedOutItems.length}
                   </p>
                   {checkedOutItems.map(item => renderCard(item as any, false))}
@@ -1161,17 +1161,17 @@ export function GoogleGuestAgenda({
               )}
               {cancelledItems.length > 0 && (
                 <div className="mb-4">
-                  <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-red-700 bg-red-50 rounded-xl mb-1 flex items-center gap-2">
+                  <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#722F37] bg-[#722F37]/10 rounded-xl mb-1 flex items-center gap-2">
                     ✕ Cancelled · {cancelledItems.length}
                   </p>
                   {cancelledItems.map(item => renderCard(item, true))}
                 </div>
               )}
             </div>
-            <div className="p-4 bg-white border-t border-black">
+            <div className="p-4 bg-[#1C232E] border-t border-[#5C4A2E]/30">
               <button 
                 onClick={() => setShowDayAgenda(false)}
-                className="w-full py-3 bg-black text-white text-[10px] font-black uppercase tracking-[0.2em] hover:bg-zinc-800 transition-all border border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]"
+                className="w-full py-3 bg-[#0B6E4F] text-[#C9A227] text-[10px] font-black uppercase tracking-[0.2em] hover:bg-[#0B6E4F]/80 transition-all border border-[#0B6E4F]/40 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]"
               >
                 Close Schedule
               </button>

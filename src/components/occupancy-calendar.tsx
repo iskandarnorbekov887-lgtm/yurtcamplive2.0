@@ -476,9 +476,9 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
 
   return (
     <div className="bento-card rounded-2xl overflow-hidden font-sans">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-black bg-white">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-[#5C4A2E]/30 bg-[#1C232E]">
         <div className="flex items-center gap-4">
-          <h2 className="text-xl font-bold text-black">
+          <h2 className="text-xl font-bold text-[#EDE6D6]">
             {t(`month.${month}`)} <span className="hc-body font-normal">{year}</span>
           </h2>
         </div>
@@ -493,7 +493,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
             </button>
           )}
           <button onClick={() => setCur(new Date())}
-            className="px-3 py-1.5 text-xs font-semibold text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-all">
+            className="px-3 py-1.5 text-xs font-semibold text-[#9C9384] border border-[#5C4A2E]/30 rounded-lg hover:bg-[#2A1518] transition-all">
             Today
           </button>
           {[[-1,'M15 19l-7-7 7-7'],[1,'M9 5l7 7-7 7']].map(([dir,d]) => (
@@ -532,7 +532,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                 return (
                   <div 
                     key={di} 
-                    className={`min-h-[56px] sm:min-h-[64px] px-2 sm:px-3 pt-2 sm:pt-3 border-r border-black last:border-r-0 cursor-pointer transition-colors ${!isCurrentMonth ? 'bg-slate-50/60' : ''}`}
+                    className={`min-h-[56px] sm:min-h-[64px] px-2 sm:px-3 pt-2 sm:pt-3 border-r border-[#5C4A2E]/30 last:border-r-0 cursor-pointer transition-colors ${!isCurrentMonth ? 'bg-[#1C232E]/40' : ''}`}
                     onClick={() => {
                       if (onDayClick) {
                         onDayClick(ds);
@@ -676,28 +676,28 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
       {sel && (
         <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-3 sm:p-4" onClick={() => setSel(null)}>
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-xl sm:max-w-2xl p-5 sm:p-8 animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
+          <div className="relative bg-[#1C232E] rounded-2xl shadow-2xl border border-[#5C4A2E]/30 w-full max-w-xl sm:max-w-2xl p-5 sm:p-8 animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
             <div className="mb-6">
               <div className="flex justify-end gap-1 mb-3">
                 {sel.status === 'checked_in' && onCancelBooking && (
-                  <button onClick={handleCancel} disabled={!!loadingAction} className="p-1.5 hover:bg-rose-100 rounded-lg transition-all" title="Cancel Trip">
+                  <button onClick={handleCancel} disabled={!!loadingAction} className="p-1.5 hover:bg-[#722F37]/30 rounded-lg transition-all" title="Cancel Trip">
                     <svg className="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                   </button>
                 )}
-                <button onClick={() => setSel(null)} className="p-2 hover:bg-slate-100 rounded-lg transition-all">
+                <button onClick={() => setSel(null)} className="p-2 hover:bg-[#2A1518] rounded-lg transition-all">
                   <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
               <div className="flex items-start gap-4 mb-5">
                 <div className="w-6 h-6 rounded-lg flex-shrink-0 mt-1 shadow-sm" style={{ backgroundColor: color(sel, today, userRole).bg }} />
                 <div>
-                  <h3 className="text-2xl font-black text-slate-900 leading-none">{String(sel.guest_name)}</h3>
+                  <h3 className="text-2xl font-black text-[#EDE6D6] leading-none">{String(sel.guest_name)}</h3>
                   <div className="flex items-center gap-2 mt-2">
-                    <p className="text-sm font-black text-slate-600">
+                    <p className="text-sm font-black text-[#9C9384]">
                       {String((sel.number_of_adults || 0) + (sel.number_of_children || 0) || sel.guest_count)} Pax
                     </p>
-                    <span className="w-1 h-1 bg-slate-300 rounded-full" />
-                    <p className="text-sm font-bold text-slate-500">
+                    <span className="w-1 h-1 bg-[#5C4A2E]/50 rounded-full" />
+                    <p className="text-sm font-bold text-[#9C9384]">
                       {sel.check_in} – {sel.check_out}
                     </p>
                   </div>
@@ -707,25 +707,25 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
 
             {(userRole === 'Manager' || userRole === 'CEO') && (
                 <div className="col-span-2 space-y-6">
-                  <div className="flex flex-wrap gap-2 items-center border-b border-slate-100 pb-4">
+                  <div className="flex flex-wrap gap-2 items-center border-b border-[#5C4A2E]/30 pb-4">
                     {getTabs(sel).map((tab: any, idx: number) => (
                       <button 
                         key={idx}
                         onClick={() => setActiveTabIdx(idx)}
-                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all shadow-sm ${activeTabIdx === idx ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all shadow-sm border ${activeTabIdx === idx ? 'bg-[#0B6E4F] text-[#EDE6D6] border-[#0B6E4F]' : 'bg-[#1C232E]/50 text-[#9C9384] hover:text-[#EDE6D6] border-[#5C4A2E]/30'}`}
                       >
                         Tab {String(idx + 1)}
                       </button>
                     ))}
                     <button 
                       onClick={() => setActiveTabIdx(-1)}
-                      className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all shadow-sm ${activeTabIdx === -1 ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'}`}
+                      className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all shadow-sm border ${activeTabIdx === -1 ? 'bg-[#0B6E4F] text-[#C9A227] border-[#0B6E4F]' : 'bg-[#1C232E]/50 text-[#0B6E4F] hover:bg-[#0B6E4F]/20 border-[#0B6E4F]/30'}`}
                     >
                       {getTabs(sel).length > 0 ? 'Open Folio' : 'Current Tab'}
                     </button>
                   </div>
 
-                  <div className={`p-6 rounded-[2.5rem] border-2 transition-all ${activeTabIdx === -1 ? 'bg-white border-indigo-100 shadow-xl shadow-indigo-50' : 'bg-slate-50 border-slate-100 grayscale-[0.5]'}`}>
+                  <div className={`p-6 rounded-[2.5rem] border-2 transition-all ${activeTabIdx === -1 ? 'bg-[#1C232E] border-[#0B6E4F]/40 shadow-xl shadow-[#0B6E4F]/20' : 'bg-[#1C232E]/50 border-[#5C4A2E]/30 grayscale-[0.5]'}`}>>
                     {(() => {
                       const tabs = getTabs(sel);
                       const isHistory = activeTabIdx !== -1;
@@ -747,12 +747,12 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
 
                           <div className="space-y-4">
                             {(!isTab1Closed || activeTabIdx === 0) ? (
-                              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Primary Stay (Master Tab)</label>
+                              <div className="p-4 bg-[#1C232E]/50 rounded-2xl border border-[#5C4A2E]/30">
+                                <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest block mb-2">Primary Stay (Master Tab)</label>
                                 <div className="grid grid-cols-2 gap-3">
                                   <div className="opacity-75">
-                                    <p className="text-[9px] font-bold text-slate-400 uppercase">Pax & Base Price</p>
-                                    <p className="text-sm font-black text-slate-900">{String((sel.number_of_adults || 0) + (sel.number_of_children || 0) || 0)} Guests @ ${String(sel?.total_price || 0)}</p>
+                                    <p className="text-[9px] font-bold text-[#9C9384] uppercase">Pax & Base Price</p>
+                                    <p className="text-sm font-black text-[#EDE6D6]">{String((sel.number_of_adults || 0) + (sel.number_of_children || 0) || 0)} Guests @ ${String(sel?.total_price || 0)}</p>
                                   </div>
                                   <button 
                                     disabled={isTab1Closed}
@@ -762,7 +762,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                                         setIsEditing(true);
                                       }
                                     }}
-                                    className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${isTab1Closed ? 'bg-slate-100 text-slate-300 cursor-not-allowed' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'}`}
+                                    className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${isTab1Closed ? 'bg-[#1C232E]/30 text-[#9C9384]/40 cursor-not-allowed border border-[#5C4A2E]/10' : 'bg-[#0B6E4F]/10 text-[#0B6E4F] hover:bg-[#0B6E4F]/20 border border-[#0B6E4F]/30'}`}
                                   >
                                     {isTab1Closed ? 'Stay Locked' : 'Edit Base Stay'}
                                   </button>
@@ -771,93 +771,93 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                             ) : activeTabIdx === -1 && isTab1Closed ? (
                               <>
                                 {hasExtension && (
-                                  <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 animate-in fade-in slide-in-from-top-2">
-                                    <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest block mb-2">Stay Extension Fee</label>
+                                  <div className="p-4 bg-[#B8860B]/10 rounded-2xl border border-[#B8860B]/30 animate-in fade-in slide-in-from-top-2">
+                                    <label className="text-[10px] font-black text-[#B8860B] uppercase tracking-widest block mb-2">Stay Extension Fee</label>
                                     <div className="flex gap-3 items-center">
                                       <input 
                                         type="number"
                                         placeholder="Extra amount..."
                                         value={extFee}
                                         onChange={e => setExtFee(e.target.value)}
-                                        className="flex-1 px-4 py-2 bg-white border-2 border-amber-200 rounded-xl text-sm font-black text-amber-700 outline-none focus:border-amber-400"
+                                        className="flex-1 px-4 py-2 bg-[#1C232E] border-2 border-[#B8860B]/40 rounded-xl text-sm font-black text-[#B8860B] outline-none focus:border-[#B8860B]"
                                       />
                                       <button 
                                         onClick={applyExtension}
                                         disabled={loadingAction === 'applyExt'}
-                                        className="px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-black uppercase shadow-sm"
+                                        className="px-4 py-2 bg-[#B8860B] text-[#EDE6D6] hover:bg-[#B8860B]/80 rounded-xl text-xs font-black uppercase shadow-sm"
                                       >
                                         Apply
                                       </button>
                                     </div>
-                                    <p className="mt-2 text-[9px] text-amber-500 font-bold italic">* Added stay from {String(originalCheckout)} to {String(sel?.check_out)}</p>
+                                    <p className="mt-2 text-[9px] text-[#B8860B] font-bold italic">* Added stay from {String(originalCheckout)} to {String(sel?.check_out)}</p>
                                   </div>
                                 )}
                                 {hasReduction && (
-                                  <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 animate-in fade-in slide-in-from-top-2">
-                                    <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block mb-2">Stay Reduction (Discount)</label>
+                                  <div className="p-4 bg-[#0B6E4F]/10 rounded-2xl border border-[#0B6E4F]/30 animate-in fade-in slide-in-from-top-2">
+                                    <label className="text-[10px] font-black text-[#0B6E4F] uppercase tracking-widest block mb-2">Stay Reduction (Discount)</label>
                                     <div className="flex gap-3 items-center">
                                       <input 
                                         type="number"
                                         placeholder="Discount amount..."
                                         value={redFee}
                                         onChange={e => setRedFee(e.target.value)}
-                                        className="flex-1 px-4 py-2 bg-white border-2 border-emerald-200 rounded-xl text-sm font-black text-emerald-700 outline-none focus:border-emerald-400"
+                                        className="flex-1 px-4 py-2 bg-[#1C232E] border-2 border-[#0B6E4F]/40 rounded-xl text-sm font-black text-[#0B6E4F] outline-none focus:border-[#0B6E4F]"
                                       />
                                       <button 
                                         onClick={applyReduction}
                                         disabled={loadingAction === 'applyRed'}
-                                        className="px-4 py-2 bg-emerald-500 text-white rounded-xl text-xs font-black uppercase shadow-sm"
+                                        className="px-4 py-2 bg-[#0B6E4F] text-[#EDE6D6] hover:bg-[#0B6E4F]/80 rounded-xl text-xs font-black uppercase shadow-sm"
                                       >
                                         Apply
                                       </button>
                                     </div>
-                                    <p className="mt-2 text-[9px] text-emerald-500 font-bold italic">* Reduced stay from {String(originalCheckout)} to {String(sel?.check_out)}</p>
+                                    <p className="mt-2 text-[9px] text-[#0B6E4F] font-bold italic">* Reduced stay from {String(originalCheckout)} to {String(sel?.check_out)}</p>
                                   </div>
                                 )}
-                                <div className="mt-4 p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
-                                  <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Accommodation Status</p>
-                                  <p className="text-xs font-bold text-indigo-600">Primary stay settled in Tab 1. Current tab accommodation set to $0.</p>
+                                <div className="mt-4 p-4 bg-[#1C232E] rounded-2xl border border-[#5C4A2E]/30">
+                                  <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest mb-1">Accommodation Status</p>
+                                  <p className="text-xs font-bold text-[#EDE6D6]">Primary stay settled in Tab 1. Current tab accommodation set to $0.</p>
                                 </div>
                               </>
                             ) : null}
                           </div>
                              <div className="flex justify-between items-center">
-                               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Charges & Services</p>
+                               <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Charges & Services</p>
                                {!isClosed && (
-                                 <button onClick={() => setIsEditing(true)} className="text-[9px] font-black text-indigo-600 uppercase hover:underline">Add Items</button>
+                                 <button onClick={() => setIsEditing(true)} className="text-[9px] font-black text-[#0B6E4F] uppercase hover:text-[#0B6E4F]/80 hover:underline">Add Items</button>
                                )}
                              </div>
                              
                              <div className="space-y-2">
                                 {(isClosed ? (activeTab?.items?.drinks || []) : (sel?.drinks_tab || []))?.map((line: any, lidx: number) => (
-                                  <div key={lidx} className="flex justify-between text-xs font-bold text-slate-700">
+                                  <div key={lidx} className="flex justify-between text-xs font-bold text-[#EDE6D6]">
                                     <span>{String(line?.drink_name)} x{String(line?.quantity)}</span>
                                     <span>${String(line?.price * line?.quantity)}</span>
                                   </div>
                                 ))}
                                 {(isClosed ? (activeTab?.items?.extras || []) : (sel?.extra_services || []))?.map((line: any, lidx: number) => (
-                                  <div key={lidx} className="flex justify-between text-xs font-bold text-slate-700">
+                                  <div key={lidx} className="flex justify-between text-xs font-bold text-[#EDE6D6]">
                                     <span>{String(line?.name)}</span>
                                     <span>${String(line?.price)}</span>
                                   </div>
                                 ))}
                              </div>
 
-                          {/* Tab Footer (Pay & Close) */}
-                          <div className="pt-6 border-t border-slate-100 flex justify-between items-end">
-                            <div>
-                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tab Total</p>
-                              <p className="text-2xl font-black text-slate-900">${String(isClosed ? activeTab.total : (sel.total_price || 0))}</p>
-                            </div>
-                            {!isClosed && (
-                              <button 
-                                onClick={handleCheckOut} // Placeholder for Pay & Close
-                                className="px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs shadow-lg shadow-indigo-100 hover:scale-105 transition-all active:scale-95"
-                              >
-                                Pay & Close Tab
-                              </button>
-                            )}
-                          </div>
+                           {/* Tab Footer (Pay & Close) */}
+                           <div className="pt-6 border-t border-[#5C4A2E]/30 flex justify-between items-end">
+                             <div>
+                               <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest mb-1">Tab Total</p>
+                               <p className="text-2xl font-black text-[#EDE6D6]">${String(isClosed ? activeTab.total : (sel.total_price || 0))}</p>
+                             </div>
+                             {!isClosed && (
+                               <button 
+                                 onClick={handleCheckOut} // Placeholder for Pay & Close
+                                 className="px-6 py-3 bg-[#0B6E4F] text-[#C9A227] rounded-2xl font-black uppercase text-xs shadow-lg shadow-[#0B6E4F]/20 hover:scale-105 hover:bg-[#0B6E4F]/80 transition-all active:scale-95 border border-[#C9A227]/20"
+                               >
+                                 Pay & Close Tab
+                               </button>
+                             )}
+                           </div>
                         </div>
                       );
                     })()}
@@ -870,15 +870,15 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
               <div className="flex flex-col gap-3">
                 {isEditing ? (
                   <div className="flex gap-3">
-                    <button onClick={() => setIsEditing(false)} className="flex-1 min-h-[48px] py-3 text-sm bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all">Cancel</button>
-                    <button onClick={handleUpdate} className="flex-1 min-h-[48px] py-3 text-sm bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all">Save Changes</button>
+                    <button onClick={() => setIsEditing(false)} className="flex-1 min-h-[48px] py-3 text-sm bg-[#2A1518]/50 text-[#9C9384] border border-[#5C4A2E]/30 rounded-xl font-bold hover:bg-[#2A1518] transition-all">Cancel</button>
+                    <button onClick={handleUpdate} className="flex-1 min-h-[48px] py-3 text-sm bg-[#0B6E4F] text-[#EDE6D6] hover:bg-[#0B6E4F]/80 rounded-xl font-bold transition-all">Save Changes</button>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-3">
                     {/* Signature Pad Step for Check-in */}
                     {showSignatureStep && sel.status === 'confirmed' && sel.check_in === today && (
-                      <div className="p-4 sm:p-5 bg-slate-50 rounded-2xl border-2 border-slate-200 animate-in fade-in slide-in-from-bottom-2">
-                        <label className="text-xs sm:text-sm font-black text-slate-500 uppercase tracking-widest block mb-3">
+                      <div className="p-4 sm:p-5 bg-[#1C232E]/50 rounded-2xl border-2 border-[#5C4A2E]/30 animate-in fade-in slide-in-from-bottom-2">
+                        <label className="text-xs sm:text-sm font-black text-[#9C9384] uppercase tracking-widest block mb-3">
                           Guest Signature (Required)
                         </label>
                         <SignaturePad
@@ -890,7 +890,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                         <div className="flex gap-3 mt-4">
                           <button
                             onClick={() => { setShowSignatureStep(false); setSignatureData(null); }}
-                            className="flex-1 min-h-[48px] py-3 text-sm bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all"
+                            className="flex-1 min-h-[48px] py-3 text-sm bg-[#2A1518]/50 text-[#9C9384] border border-[#5C4A2E]/30 rounded-xl font-bold hover:bg-[#2A1518] transition-all"
                           >
                             Back
                           </button>
@@ -898,7 +898,9 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                             onClick={handleCheckIn}
                             disabled={!signatureData || !!loadingAction}
                             className={`flex-1 min-h-[48px] py-3 text-sm rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
-                              signatureData ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                              signatureData 
+                                ? 'bg-emerald-600 text-white hover:bg-emerald-700' 
+                                : 'bg-[#1C232E]/50 text-[#9C9384]/40 border border-[#5C4A2E]/10 cursor-not-allowed'
                             }`}
                           >
                             {loadingAction === 'checkin' ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'Confirm Check In'}
@@ -918,24 +920,24 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                         </button>
                       )}
                       {onCheckIn && sel.status === 'confirmed' && sel.check_in !== today && (
-                        <div className="flex-1 min-h-[48px] py-3 text-sm bg-amber-100 text-amber-700 rounded-xl font-bold text-center flex items-center justify-center">
+                        <div className="flex-1 min-h-[48px] py-3 text-sm bg-[#B8860B]/10 text-[#B8860B] border border-[#B8860B]/30 rounded-xl font-bold text-center flex items-center justify-center">
                           Upcoming Guest
                         </div>
                       )}
                       {onCheckOut && sel?.status === 'checked_in' && (
                         today === sel?.check_out ? (
-                          <button onClick={handleCheckOut} className="flex-1 min-h-[48px] py-3 text-sm bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
+                          <button onClick={handleCheckOut} className="flex-1 min-h-[48px] py-3 text-sm bg-[#722F37] text-[#EDE6D6] hover:bg-[#722F37]/80 rounded-xl font-bold transition-all flex items-center justify-center gap-2">
                             Check Out Now
                           </button>
                         ) : (
-                          <div className="flex-1 min-h-[48px] py-3 text-sm bg-indigo-50 text-indigo-600 rounded-xl font-bold text-center flex items-center justify-center gap-2 border-2 border-indigo-100">
-                             <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse" />
+                          <div className="flex-1 min-h-[48px] py-3 text-sm bg-[#0B6E4F]/10 text-[#0B6E4F] rounded-xl font-bold text-center flex items-center justify-center gap-2 border border-[#0B6E4F]/30">
+                             <div className="w-2 h-2 bg-[#0B6E4F] rounded-full animate-pulse" />
                              Active Stay
                           </div>
                         )
                       )}
                       {sel.status === 'completed' && (
-                        <div className="flex-1 min-h-[48px] py-3 text-sm bg-blue-500 text-white rounded-xl font-bold text-center flex items-center justify-center cursor-not-allowed">
+                        <div className="flex-1 min-h-[48px] py-3 text-sm bg-[#5C4A2E] text-[#EDE6D6] border border-[#5C4A2E]/50 rounded-xl font-bold text-center flex items-center justify-center cursor-not-allowed">
                           Successful Check Out
                         </div>
                       )}
@@ -946,7 +948,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                         <div className="flex-1 group relative">
                           <button
                             onClick={() => setIsEditing(true)}
-                            className="w-full min-h-[48px] py-3 text-sm bg-indigo-50 text-indigo-600 rounded-xl font-bold hover:bg-indigo-100 transition-all"
+                            className="w-full min-h-[48px] py-3 text-sm bg-[#0B6E4F]/10 text-[#0B6E4F] rounded-xl font-bold hover:bg-[#0B6E4F]/20 border border-[#0B6E4F]/30 transition-all"
                           >
                             Add Details
                           </button>
@@ -959,7 +961,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                             setEditRequestData(sel);
                             setShowEditRequestModal(true);
                           }}
-                          className="px-4 min-h-[48px] py-3 text-xs sm:text-sm bg-amber-50 text-amber-600 rounded-xl font-bold hover:bg-amber-100 transition-all"
+                          className="px-4 min-h-[48px] py-3 text-xs sm:text-sm bg-[#B8860B]/10 text-[#B8860B] rounded-xl font-bold hover:bg-[#B8860B]/20 border border-[#B8860B]/30 transition-all"
                         >
                           Request Change
                         </button>
@@ -975,7 +977,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                             setSel(null);
                           }}
                           disabled={!!loadingAction}
-                          className="flex-1 min-h-[48px] py-3 text-sm bg-emerald-50 text-emerald-600 rounded-xl font-bold hover:bg-emerald-100 transition-all"
+                          className="flex-1 min-h-[48px] py-3 text-sm bg-[#0B6E4F]/10 text-[#0B6E4F] rounded-xl font-bold hover:bg-[#0B6E4F]/20 border border-[#0B6E4F]/30 transition-all"
                         >
                           {loadingAction === 'restore' ? <div className="w-5 h-5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto" /> : 'Restore Booking'}
                         </button>
@@ -986,7 +988,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                           <button
                             onClick={handleCancel}
                             disabled={!!loadingAction || !canCancel(sel)}
-                            className={`w-full min-h-[48px] py-3 text-sm rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${canCancel(sel) ? 'bg-rose-50 text-rose-600 hover:bg-rose-100' : 'bg-slate-50 text-slate-300 cursor-not-allowed'}`}
+                            className={`w-full min-h-[48px] py-3 text-sm rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${canCancel(sel) ? 'bg-[#722F37]/20 text-[#722F37] hover:bg-[#722F37]/30' : 'bg-[#1C232E]/50 text-[#9C9384] cursor-not-allowed'}`}
                           >
                             {loadingAction === 'cancel' ? <div className="w-5 h-5 border-2 border-rose-600 border-t-transparent rounded-full animate-spin" /> : 'Cancel Trip'}
                           </button>
@@ -1036,68 +1038,68 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
       {showEditRequestModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" onClick={() => setShowEditRequestModal(false)}>
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-8 animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
+          <div className="relative bg-[#1C232E] rounded-2xl shadow-2xl border border-[#5C4A2E]/30 w-full max-w-2xl p-8 animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-black text-slate-800">Request Booking Edit</h2>
-              <button onClick={() => setShowEditRequestModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-all">
+              <h2 className="text-2xl font-black text-[#EDE6D6]">Request Booking Edit</h2>
+              <button onClick={() => setShowEditRequestModal(false)} className="p-2 hover:bg-[#2A1518] rounded-xl transition-all">
                 <svg className="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
 
             <div className="space-y-4">
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
-                <p className="text-sm text-amber-800 font-semibold">
+              <div className="bg-[#B8860B]/10 border border-[#B8860B]/30 rounded-xl p-4 mb-4">
+                <p className="text-sm text-[#B8860B] font-semibold">
                   This request will be sent to the CEO and the booking person for approval.
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Guest Name</label>
+                <label className="block text-sm font-bold text-[#9C9384] mb-2">Guest Name</label>
                 <input
                   type="text"
                   value={editRequestData.guest_name || ''}
                   onChange={e => setEditRequestData({ ...editRequestData, guest_name: e.target.value })}
-                  className="w-full px-4 py-3 text-base rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-3 bg-[#1C232E]/50 border border-[#5C4A2E]/30 rounded-xl text-base font-bold text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Check-in Date</label>
+                  <label className="block text-sm font-bold text-[#9C9384] mb-2">Check-in Date</label>
                   <input
                     type="date"
                     value={editRequestData.check_in || ''}
                     onChange={e => setEditRequestData({ ...editRequestData, check_in: e.target.value })}
-                    className="w-full px-4 py-3 text-base rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-4 py-3 bg-[#1C232E]/50 border border-[#5C4A2E]/30 rounded-xl text-base font-bold text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Check-out Date</label>
+                  <label className="block text-sm font-bold text-[#9C9384] mb-2">Check-out Date</label>
                   <input
                     type="date"
                     value={editRequestData.check_out || ''}
                     onChange={e => setEditRequestData({ ...editRequestData, check_out: e.target.value })}
-                    className="w-full px-4 py-3 text-base rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-4 py-3 bg-[#1C232E]/50 border border-[#5C4A2E]/30 rounded-xl text-base font-bold text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Number of Adults</label>
+                <label className="block text-sm font-bold text-[#9C9384] mb-2">Number of Adults</label>
                 <input
                   type="number"
                   value={editRequestData.number_of_adults || ''}
                   onChange={e => setEditRequestData({ ...editRequestData, number_of_adults: parseInt(e.target.value) })}
-                  className="w-full px-4 py-3 text-base rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-3 bg-[#1C232E]/50 border border-[#5C4A2E]/30 rounded-xl text-base font-bold text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Special Requests</label>
+                <label className="block text-sm font-bold text-[#9C9384] mb-2">Special Requests</label>
                 <textarea
                   value={editRequestData.special_requests || ''}
                   onChange={e => setEditRequestData({ ...editRequestData, special_requests: e.target.value })}
-                  className="w-full px-4 py-3 text-base rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-3 bg-[#1C232E]/50 border border-[#5C4A2E]/30 rounded-xl text-base font-bold text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all"
                   rows={3}
                 />
               </div>
@@ -1105,7 +1107,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
               <div className="flex gap-4 pt-4">
                 <button
                   onClick={() => setShowEditRequestModal(false)}
-                  className="flex-1 min-h-[48px] px-6 py-3 text-sm bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-all"
+                  className="flex-1 min-h-[48px] px-6 py-3 text-sm bg-[#2A1518]/50 text-[#9C9384] border border-[#5C4A2E]/30 rounded-xl font-bold hover:bg-[#2A1518] transition-all"
                 >
                   Cancel
                 </button>
@@ -1123,7 +1125,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                     }
                     setShowEditRequestModal(false);
                   }}
-                  className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all"
+                  className="flex-1 px-6 py-3 bg-[#0B6E4F] text-[#EDE6D6] rounded-xl font-bold hover:bg-[#0B6E4F]/80 transition-all"
                 >
                   Send Request
                 </button>
@@ -1137,10 +1139,10 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
       {showDrinksPopup && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4" onClick={() => setShowDrinksPopup(false)}>
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+          <div className="relative bg-[#1C232E] rounded-2xl shadow-2xl border border-[#5C4A2E]/30 w-full max-w-md p-6 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-black text-black">Add Drinks</h3>
-              <button onClick={() => setShowDrinksPopup(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-all">
+              <h3 className="text-xl font-black text-[#EDE6D6]">Add Drinks</h3>
+              <button onClick={() => setShowDrinksPopup(false)} className="p-2 hover:bg-[#2A1518] rounded-xl transition-all">
                 <svg className="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
@@ -1152,10 +1154,10 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                 { id: 3, name: 'Beer', original_price: 2, sold_price: 3, currency: 'USD' as const, available: true },
                 { id: 4, name: 'Juice', original_price: 1.5, sold_price: 2.5, currency: 'USD' as const, available: true },
               ].map(drink => (
-                <div key={drink.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                <div key={drink.id} className="flex items-center justify-between p-3 bg-[#1C232E]/50 rounded-lg">
                   <div>
-                    <p className="font-bold text-black">{drink.name}</p>
-                    <p className="text-xs text-black">${drink.sold_price} {drink.currency}</p>
+                    <p className="font-bold text-[#EDE6D6]">{drink.name}</p>
+                    <p className="text-xs text-[#9C9384]">${drink.sold_price} {drink.currency}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -1233,40 +1235,39 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
       {showExtraServicesPopup && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4" onClick={() => setShowExtraServicesPopup(false)}>
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+          <div className="relative bg-[#1C232E] rounded-2xl shadow-2xl border border-[#5C4A2E]/30 w-full max-w-md p-6 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-black text-black">Add Extra Service</h3>
-              <button onClick={() => setShowExtraServicesPopup(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-all">
+              <h3 className="text-xl font-black text-[#EDE6D6]">Add Extra Service</h3>
+              <button onClick={() => setShowExtraServicesPopup(false)} className="p-2 hover:bg-[#2A1518] rounded-xl transition-all">
                 <svg className="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
-            </div>
-            <div className="space-y-4">
+            </di            <div className="space-y-4">
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Service Name</label>
+                <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest block mb-1">Service Name</label>
                 <input
                   type="text"
                   value={newExtraService.name}
                   onChange={e => setNewExtraService({ ...newExtraService, name: e.target.value })}
                   placeholder="Service name"
-                  className="w-full px-4 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black"
+                  className="w-full px-4 py-2 bg-[#1C232E]/50 border-2 border-[#5C4A2E]/30 rounded-lg text-sm font-bold text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all"
                 />
               </div>
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Price</label>
+                <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest block mb-1">Price</label>
                 <input
                   type="number"
                   value={newExtraService.price}
                   onChange={e => setNewExtraService({ ...newExtraService, price: e.target.value })}
                   placeholder="Price"
-                  className="w-full px-4 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black"
+                  className="w-full px-4 py-2 bg-[#1C232E]/50 border-2 border-[#5C4A2E]/30 rounded-lg text-sm font-bold text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all"
                 />
               </div>
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Currency</label>
+                <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest block mb-1">Currency</label>
                 <select
                   value={newExtraService.currency}
                   onChange={e => setNewExtraService({ ...newExtraService, currency: e.target.value as 'UZS' | 'USD' | 'EUR' })}
-                  className="w-full px-4 py-2 border-2 border-slate-300 rounded-lg text-sm font-bold text-black"
+                  className="w-full px-4 py-2 bg-[#1C232E] border-2 border-[#5C4A2E]/30 rounded-lg text-sm font-bold text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all"
                 >
                   <option value="USD">USD</option>
                   <option value="UZS">UZS</option>
@@ -1280,7 +1281,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                   setShowExtraServicesPopup(false);
                   setNewExtraService({ name: '', price: '', currency: 'USD' });
                 }}
-                className="flex-1 py-3 bg-slate-100 text-black rounded-xl font-bold hover:bg-slate-200 transition-all"
+                className="flex-1 py-3 bg-[#2A1518]/50 text-[#9C9384] border border-[#5C4A2E]/30 rounded-xl font-bold hover:bg-[#2A1518] transition-all"
               >
                 Cancel
               </button>
@@ -1295,7 +1296,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                     setSel({ ...sel, extra_services: updatedServices });
                   }
                 }}
-                className="flex-1 py-3 bg-orange-600 text-white rounded-xl font-bold hover:bg-orange-700 transition-all"
+                className="flex-1 py-3 bg-[#B8860B] text-[#EDE6D6] rounded-xl font-bold hover:bg-[#B8860B]/80 transition-all"
               >
                 Add Service
               </button>
@@ -1308,10 +1309,10 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
       {selectedDay && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" onClick={() => setSelectedDay(null)}>
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+          <div className="relative bg-[#1C232E] rounded-2xl shadow-2xl border border-[#5C4A2E]/30 w-full max-w-md p-8 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-black text-slate-800">{new Date(selectedDay).toLocaleDateString()}</h2>
-              <button onClick={() => setSelectedDay(null)} className="p-2 hover:bg-slate-100 rounded-xl transition-all">
+              <h2 className="text-2xl font-black text-[#EDE6D6]">{new Date(selectedDay).toLocaleDateString()}</h2>
+              <button onClick={() => setSelectedDay(null)} className="p-2 hover:bg-[#2A1518] rounded-xl transition-all">
                 <svg className="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
@@ -1321,11 +1322,11 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
               if (dayBookings.length === 0) {
                 return (
                   <div className="text-center py-8">
-                    <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                    <div className="w-16 h-16 bg-[#1C232E]/50 border border-[#5C4A2E]/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-8 h-8 text-[#9C9384]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                     </div>
-                    <p className="text-lg font-bold text-slate-400">Empty</p>
-                    <p className="text-sm text-slate-500">No bookings for this day</p>
+                    <p className="text-lg font-bold text-[#9C9384]">Empty</p>
+                    <p className="text-sm text-[#9C9384]/70">No bookings for this day</p>
                   </div>
                 );
               }
@@ -1349,8 +1350,8 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                     >
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="font-bold text-slate-800">{booking.guest_name}</p>
-                          <p className="text-sm text-slate-500">{booking.check_in} → {booking.check_out}</p>
+                          <p className="font-bold text-[#EDE6D6]">{booking.guest_name}</p>
+                          <p className="text-sm text-[#9C9384]">{booking.check_in} → {booking.check_out}</p>
                         </div>
                         <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color(booking, today, userRole).bg }} />
                       </div>
@@ -1361,13 +1362,13 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
             })()}
 
             {userRole === 'Manager' && selectedDay >= today && onAddNewBooking && (
-              <div className="mt-6 pt-6 border-t border-slate-100">
+              <div className="mt-6 pt-6 border-t border-[#5C4A2E]/30">
                 <button
                   onClick={() => {
                     setSelectedDay(null);
                     onAddNewBooking(selectedDay);
                   }}
-                  className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-[#0B6E4F] text-[#EDE6D6] rounded-xl font-bold hover:bg-[#0B6E4F]/80 transition-all flex items-center justify-center gap-2"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                   Add New Booking
@@ -1382,17 +1383,17 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
       {showSettlementModal && sel && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4" onClick={() => setShowSettlementModal(false)}>
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+          <div className="relative bg-[#1C232E] rounded-2xl shadow-2xl border border-[#5C4A2E]/30 w-full max-w-md p-8 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-black text-slate-800">Settlement - Check-In</h2>
-              <button onClick={() => setShowSettlementModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-all">
+              <h2 className="text-2xl font-black text-[#EDE6D6]">Settlement - Check-In</h2>
+              <button onClick={() => setShowSettlementModal(false)} className="p-2 hover:bg-[#2A1518] rounded-xl transition-all">
                 <svg className="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
 
             <div className="mb-4">
-              <p className="text-sm font-bold text-slate-600">Guest: <span className="text-slate-900">{sel.guest_name}</span></p>
-              <p className="text-sm font-bold text-slate-600">Category: <span className="text-slate-900 capitalize">{(() => {
+              <p className="text-sm font-bold text-[#9C9384]">Guest: <span className="text-[#EDE6D6]">{sel.guest_name}</span></p>
+              <p className="text-sm font-bold text-[#9C9384]">Category: <span className="text-[#EDE6D6] capitalize">{(() => {
                 const meta = (() => {
                   try {
                     return sel.special_requests ? JSON.parse(sel.special_requests) : {};
@@ -1417,8 +1418,8 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
 
                 if (category === 'pool') {
                   return (
-                    <div className="bg-cyan-50 border-2 border-cyan-200 rounded-xl p-4 space-y-3">
-                      <label className="block text-sm font-black text-cyan-900 uppercase tracking-widest text-[10px]">Pool Entry Fee</label>
+                    <div className="bg-[#1C232E]/50 border-2 border-[#5C4A2E]/30 rounded-xl p-4 space-y-3">
+                      <label className="block text-sm font-black text-[#9C9384] uppercase tracking-widest text-[10px]">Pool Entry Fee</label>
                       <div className="flex gap-2">
                         <input
                           type="number"
@@ -1427,17 +1428,17 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                           value={categoryData.pool.amount || ''}
                           onChange={(e) => setCategoryData({ ...categoryData, pool: { ...categoryData.pool, amount: parseFloat(e.target.value) || 0 } })}
                           placeholder="Enter amount"
-                          className="flex-1 px-3 py-2 border-2 border-cyan-300 rounded-lg text-sm font-bold text-black focus:border-cyan-500"
+                          className="flex-1 px-3 py-2 bg-[#1C232E] border-2 border-[#5C4A2E]/30 rounded-lg text-sm font-bold text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all"
                         />
-                        <div className="px-3 py-2 bg-cyan-100 text-cyan-900 rounded-lg text-sm font-black">UZS</div>
+                        <div className="px-3 py-2 bg-[#1C232E]/30 text-[#9C9384] border border-[#5C4A2E]/30 rounded-lg text-sm font-black">UZS</div>
                       </div>
-                      <p className="text-[10px] font-bold text-cyan-600">Isolated Service Bucket: Room data will be purged on save.</p>
+                      <p className="text-[10px] font-bold text-[#B8860B]">Isolated Service Bucket: Room data will be purged on save.</p>
                     </div>
                   );
                 } else if (category === 'local') {
                   return (
-                    <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-4 space-y-3">
-                      <label className="block text-sm font-black text-emerald-900 uppercase tracking-widest text-[10px]">Local Guest Fee</label>
+                    <div className="bg-[#0B6E4F]/10 border-2 border-[#0B6E4F]/30 rounded-xl p-4 space-y-3">
+                      <label className="block text-sm font-black text-[#0B6E4F] uppercase tracking-widest text-[10px]">Local Guest Fee</label>
                       <div className="flex gap-2">
                         <input
                           type="number"
@@ -1446,9 +1447,9 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                           value={categoryData.local.amount || ''}
                           onChange={(e) => setCategoryData({ ...categoryData, local: { ...categoryData.local, amount: parseFloat(e.target.value) || 0 } })}
                           placeholder="Enter amount"
-                          className="flex-1 px-3 py-2 border-2 border-emerald-300 rounded-lg text-sm font-bold text-black focus:border-emerald-500"
+                          className="flex-1 px-3 py-2 bg-[#1C232E] border-2 border-[#5C4A2E]/30 rounded-lg text-sm font-bold text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all"
                         />
-                        <div className="px-3 py-2 bg-emerald-100 text-emerald-900 rounded-lg text-sm font-black">UZS</div>
+                        <div className="px-3 py-2 bg-[#0B6E4F]/20 text-[#0B6E4F] border border-[#0B6E4F]/30 rounded-lg text-sm font-black">UZS</div>
                       </div>
                     </div>
                   );
@@ -1456,8 +1457,8 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                   // International / Camper (Room-Based)
                   const isCamper = category === 'camper';
                   return (
-                    <div className={`${isCamper ? 'bg-amber-50 border-amber-200' : 'bg-indigo-50 border-indigo-200'} border-2 rounded-xl p-4 space-y-3`}>
-                      <label className={`block text-sm font-black ${isCamper ? 'text-amber-900' : 'text-indigo-900'} uppercase tracking-widest text-[10px]`}>Stay Price</label>
+                    <div className={`${isCamper ? 'bg-[#B8860B]/10 border-[#B8860B]/30' : 'bg-[#1C232E]/50 border-[#5C4A2E]/30'} border-2 rounded-xl p-4 space-y-3`}>
+                      <label className={`block text-sm font-black ${isCamper ? 'text-[#B8860B]' : 'text-[#EDE6D6]'} uppercase tracking-widest text-[10px]`}>Stay Price</label>
                       <div className="flex gap-2">
                         <input
                           type="number"
@@ -1466,12 +1467,12 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                           value={categoryData.international.stay_price || ''}
                           onChange={(e) => setCategoryData({ ...categoryData, international: { ...categoryData.international, stay_price: parseFloat(e.target.value) || 0 } })}
                           placeholder="Enter amount"
-                          className={`flex-1 px-3 py-2 border-2 ${isCamper ? 'border-amber-300 focus:border-amber-500' : 'border-indigo-300 focus:border-indigo-500'} rounded-lg text-sm font-bold text-black`}
+                          className={`flex-1 px-3 py-2 bg-[#1C232E] border-2 ${isCamper ? 'border-[#B8860B]/30 focus:border-[#B8860B]' : 'border-[#5C4A2E]/30 focus:border-[#0B6E4F]'} rounded-lg text-sm font-bold text-[#EDE6D6] outline-none transition-all`}
                         />
                         <select
                           value={settlementCurrency}
                           onChange={(e) => setSettlementCurrency(e.target.value as 'UZS' | 'USD' | 'EUR')}
-                          className={`px-3 py-2 border-2 ${isCamper ? 'border-amber-300 focus:border-amber-500' : 'border-indigo-300 focus:border-indigo-500'} rounded-lg text-sm font-bold text-black`}
+                          className={`px-3 py-2 bg-[#1C232E] border-2 ${isCamper ? 'border-[#B8860B]/30 focus:border-[#B8860B]' : 'border-[#5C4A2E]/30 focus:border-[#0B6E4F]'} rounded-lg text-sm font-bold text-[#EDE6D6] outline-none transition-all`}
                         >
                           <option value="UZS">UZS</option>
                           <option value="USD">USD</option>
@@ -1484,9 +1485,9 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                           id="cooking-class-settle"
                           checked={categoryData.international.cooking_class}
                           onChange={(e) => setCategoryData({ ...categoryData, international: { ...categoryData.international, cooking_class: e.target.checked } })}
-                          className={`w-4 h-4 ${isCamper ? 'text-amber-600 border-amber-300' : 'text-indigo-600 border-indigo-300'} rounded`}
+                          className={`w-4 h-4 rounded ${isCamper ? 'text-[#B8860B] border-[#B8860B]/40' : 'text-[#0B6E4F] border-[#5C4A2E]/40'}`}
                         />
-                        <label htmlFor="cooking-class-settle" className={`text-sm font-bold ${isCamper ? 'text-amber-900' : 'text-indigo-900'}`}>Cooking Class</label>
+                        <label htmlFor="cooking-class-settle" className={`text-sm font-bold ${isCamper ? 'text-[#B8860B]' : 'text-[#EDE6D6]'}`}>Cooking Class</label>
                       </div>
                     </div>
                   );
@@ -1497,7 +1498,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setShowSettlementModal(false)}
-                className="flex-1 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-all"
+                className="flex-1 py-3 bg-[#2A1518]/50 text-[#9C9384] border border-[#5C4A2E]/30 rounded-xl font-bold hover:bg-[#2A1518] transition-all"
               >
                 Cancel
               </button>
@@ -1553,11 +1554,11 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                   
 
                 }}
-                className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg transition-all"
+                className="flex-1 py-3 bg-[#0B6E4F] text-[#C9A227] hover:bg-[#0B6E4F]/80 rounded-xl font-bold hover:scale-105 active:scale-95 transition-all shadow-lg shadow-[#0B6E4F]/20"
               >
                 PAY & SETTLE
               </button>
-            </div>
+            </div></div>
           </div>
         </div>
       )}

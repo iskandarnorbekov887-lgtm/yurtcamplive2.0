@@ -470,33 +470,33 @@ function ManagerFinancials() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans">
-      <header className="bg-gradient-to-r from-emerald-800 to-teal-900 text-white shadow-2xl sticky top-0 z-50">
+    <div className="min-h-screen bg-[#0F1419] font-sans">
+      <header className="bg-gradient-to-r from-[#0B6E4F] to-[#0B6E4F] text-[#C9A227] shadow-2xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <a
               href="/manager"
-              className="p-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all shadow-lg"
+              className="p-3 bg-[#0B6E4F] text-[#C9A227] rounded-xl hover:bg-[#0B6E4F] transition-all shadow-lg"
             >
-              <svg className="w-8 h-8 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-8 h-8 text-[#C9A227]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
             </a>
-            <div className="p-2 bg-white/10 rounded-xl backdrop-blur-sm border border-white/20">
-              <svg className="w-8 h-8 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="p-2 bg-[#1C232E]/30 rounded-xl backdrop-blur-sm border border-[#5C4A2E]/30">
+              <svg className="w-8 h-8 text-[#C9A227]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
             <div>
-              <h1 className="text-2xl font-black tracking-tight">Financial Tracker</h1>
-              <p className="text-xs text-emerald-300 font-bold tracking-widest uppercase opacity-80">Manager Recording</p>
+              <h1 className="text-2xl font-black tracking-tight text-[#EDE6D6] font-heading">Financial Tracker</h1>
+              <p className="text-xs text-[#9C9384] font-bold tracking-widest uppercase opacity-80">Manager Recording</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
             <LanguageSwitcher variant="light" />
             <button
               onClick={signOut}
-              className="px-5 py-2.5 bg-rose-600/90 hover:bg-rose-600 rounded-xl text-xs font-black transition-all shadow-lg hover:shadow-rose-500/20 active:scale-95 flex items-center gap-2"
+              className="px-5 py-2.5 bg-[#722F37]/90 hover:bg-[#722F37] rounded-xl text-xs font-black transition-all shadow-lg hover:shadow-[#722F37]/20 active:scale-95 flex items-center gap-2"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -508,12 +508,12 @@ function ManagerFinancials() {
       </header>
 
       <main className="max-w-2xl mx-auto p-6">
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          <h2 className="text-2xl font-black text-slate-800 mb-6">Record Transaction</h2>
+        <div className="bg-[#1C232E] rounded-2xl shadow-xl border border-[#5C4A2E]/30 p-8">
+          <h2 className="text-2xl font-black text-[#EDE6D6] mb-6 font-heading">Record Transaction</h2>
           
           {message && (
             <div className={`mb-4 p-4 rounded-xl ${
-              message.includes('Error') ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'
+              message.includes('Error') ? 'bg-[#722F37]/20 text-[#722F37] border border-[#722F37]/40' : 'bg-[#0B6E4F]/20 text-[#0B6E4F] border border-[#0B6E4F]/40'
             }`}>
               {message}
             </div>
@@ -527,8 +527,8 @@ function ManagerFinancials() {
                 onClick={() => setType('expense')}
                 className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all ${
                   type === 'expense' 
-                    ? 'bg-rose-600 text-white shadow-lg shadow-rose-200' 
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    ? 'bg-[#722F37] text-[#C9A227] shadow-lg shadow-[#722F37]/30' 
+                    : 'bg-[#1C232E] text-[#9C9384] hover:bg-[#2A1518]'
                 }`}
               >
                 Expense
@@ -538,8 +538,8 @@ function ManagerFinancials() {
                 onClick={() => setType('income')}
                 className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all ${
                   type === 'income' 
-                    ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' 
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    ? 'bg-[#0B6E4F] text-[#C9A227] shadow-lg shadow-[#0B6E4F]/30' 
+                    : 'bg-[#1C232E] text-[#9C9384] hover:bg-[#2A1518]'
                 }`}
               >
                 Income
@@ -548,25 +548,25 @@ function ManagerFinancials() {
 
             {/* Date - automatically set */}
             <div>
-              <label className="block text-sm font-black text-slate-900 mb-2">Date</label>
+              <label className="block text-sm font-black text-[#EDE6D6] mb-2">Date</label>
               <input
                 type="date"
                 value={date}
                 disabled
-                className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl bg-slate-100 text-slate-900 cursor-not-allowed font-semibold"
+                className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl bg-[#1C232E] text-[#EDE6D6] cursor-not-allowed font-semibold"
               />
-              <p className="text-xs text-slate-700 mt-1 font-semibold">Automatically set to current date</p>
+              <p className="text-xs text-[#9C9384] mt-1 font-semibold">Automatically set to current date</p>
             </div>
 
             {/* Expense Form */}
             {type === 'expense' && (
               <>
                 <div>
-                  <label className="block text-sm font-black text-slate-900 mb-2">Category</label>
+                  <label className="block text-sm font-black text-[#EDE6D6] mb-2">Category</label>
                   <select
                     value={expenseCategory}
                     onChange={(e) => setExpenseCategory(e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all text-slate-900 font-semibold"
+                    className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#1C232E]"
                     required
                   >
                     <option value="">Select category</option>
@@ -590,7 +590,7 @@ function ManagerFinancials() {
                             setExpenseCurrencyAmounts(newPairs);
                           }}
                           placeholder="Amount"
-                          className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all text-slate-900 font-semibold"
+                          className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#1C232E]"
                         />
                       </div>
                       <div className="w-28">
@@ -601,7 +601,7 @@ function ManagerFinancials() {
                             newPairs[index].currency = e.target.value as 'USD' | 'EUR' | 'UZS';
                             setExpenseCurrencyAmounts(newPairs);
                           }}
-                          className="w-full px-3 py-3 border-2 border-slate-300 rounded-xl focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all text-slate-900 font-semibold text-sm"
+                          className="w-full px-3 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold text-sm bg-[#1C232E]"
                         >
                           <option value="USD">USD</option>
                           <option value="EUR">EUR</option>
@@ -615,7 +615,7 @@ function ManagerFinancials() {
                             const newPairs = expenseCurrencyAmounts.filter((_, i) => i !== index);
                             setExpenseCurrencyAmounts(newPairs);
                           }}
-                          className="px-3 py-3 bg-rose-100 text-rose-600 rounded-xl hover:bg-rose-200 transition-all font-bold"
+                          className="px-3 py-3 bg-[#722F37]/20 text-[#722F37] rounded-xl hover:bg-[#722F37]/30 transition-all font-bold"
                         >
                           ✕
                         </button>
@@ -627,7 +627,7 @@ function ManagerFinancials() {
                     onClick={() => {
                       setExpenseCurrencyAmounts([...expenseCurrencyAmounts, { currency: 'UZS', amount: '' }]);
                     }}
-                    className="w-full py-2 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition-all font-bold text-sm"
+                    className="w-full py-2 bg-[#0B6E4F]/20 text-[#0B6E4F] rounded-lg hover:bg-[#0B6E4F]/30 transition-all font-bold text-sm"
                   >
                     + Add Currency
                   </button>
@@ -635,12 +635,12 @@ function ManagerFinancials() {
 
                 {expenseCategory === 'workers income' && (
                   <div>
-                    <label className="block text-sm font-black text-slate-900 mb-2">Worker Name *</label>
+                    <label className="block text-sm font-black text-[#EDE6D6] mb-2">Worker Name *</label>
                     <div className="flex gap-2">
                       <select
                         value={selectedWorker}
                         onChange={(e) => setSelectedWorker(e.target.value)}
-                        className="flex-1 px-4 py-3 border-2 border-slate-300 rounded-xl focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all text-slate-900 font-semibold"
+                        className="flex-1 px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#1C232E]"
                         required
                       >
                         <option value="">Select worker</option>
@@ -656,7 +656,7 @@ function ManagerFinancials() {
                             setWorkerNames([...workerNames, newWorker.trim()]);
                           }
                         }}
-                        className="px-4 py-3 bg-emerald-100 text-emerald-700 rounded-xl hover:bg-emerald-200 transition-all font-bold"
+                        className="px-4 py-3 bg-[#0B6E4F]/20 text-[#0B6E4F] rounded-xl hover:bg-[#0B6E4F]/30 transition-all font-bold"
                       >
                         +
                       </button>
@@ -666,14 +666,14 @@ function ManagerFinancials() {
 
                 {expenseCategory === 'workers income' && (
                   <div>
-                    <label className="block text-sm font-black text-slate-900 mb-2">Worker Date Range (Optional)</label>
+                    <label className="block text-sm font-black text-[#EDE6D6] mb-2">Worker Date Range (Optional)</label>
                     <div className="flex gap-2">
                       <div className="flex-1">
                         <input
                           type="date"
                           value={workerDateFrom}
                           onChange={(e) => setWorkerDateFrom(e.target.value)}
-                          className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all text-slate-900 font-semibold"
+                          className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#1C232E]"
                           placeholder="From"
                         />
                       </div>
@@ -682,7 +682,7 @@ function ManagerFinancials() {
                           type="date"
                           value={workerDateTo}
                           onChange={(e) => setWorkerDateTo(e.target.value)}
-                          className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all text-slate-900 font-semibold"
+                          className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#1C232E]"
                           placeholder="To"
                         />
                       </div>
@@ -691,26 +691,26 @@ function ManagerFinancials() {
                 )}
 
                 <div>
-                  <label className="block text-sm font-black text-slate-900 mb-2">Description {expenseCategory === 'workers income' && !workerDateFrom && !workerDateTo ? '*' : '(Optional)'}</label>
+                  <label className="block text-sm font-black text-[#EDE6D6] mb-2">Description {expenseCategory === 'workers income' && !workerDateFrom && !workerDateTo ? '*' : '(Optional)'}</label>
                   <textarea
                     value={expenseDescription}
                     onChange={(e) => setExpenseDescription(e.target.value)}
                     placeholder="Describe the expense..."
                     rows={3}
-                    className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all resize-none text-slate-900"
+                    className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all resize-none text-[#EDE6D6] bg-[#1C232E]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-black text-slate-900 mb-2">Receipt Photo (Optional)</label>
+                  <label className="block text-sm font-black text-[#EDE6D6] mb-2">Receipt Photo (Optional)</label>
                   <input
                     type="file"
                     accept="image/*"
                     onChange={(e) => setExpenseReceipt(e.target.files?.[0] || null)}
-                    className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all text-slate-900"
+                    className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] bg-[#1C232E]"
                   />
                   {expenseReceipt && (
-                    <p className="text-sm text-emerald-700 mt-2 font-bold">✓ Selected: {expenseReceipt.name}</p>
+                    <p className="text-sm text-[#0B6E4F] mt-2 font-bold">✓ Selected: {expenseReceipt.name}</p>
                   )}
                 </div>
               </>
@@ -720,7 +720,7 @@ function ManagerFinancials() {
             {type === 'income' && (
               <>
                 <div>
-                  <label className="block text-sm font-black text-slate-900 mb-2">Guest Names *</label>
+                  <label className="block text-sm font-black text-[#EDE6D6] mb-2">Guest Names *</label>
                   <div className="space-y-2">
                     {incomeGuestNames.map((name, index) => (
                       <div key={index} className="flex gap-2">
@@ -729,7 +729,7 @@ function ManagerFinancials() {
                           value={name}
                           onChange={(e) => updateGuestName(index, e.target.value)}
                           placeholder={index === 0 ? "Enter guest name (required)" : `Guest ${index + 1} name`}
-                          className="flex-1 px-4 py-3 border-2 border-slate-300 rounded-xl focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all text-slate-900 font-semibold"
+                          className="flex-1 px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#1C232E]"
                           required={index === 0}
                         />
                         {incomeGuestNames.length > 1 && (
@@ -746,7 +746,7 @@ function ManagerFinancials() {
                     <button
                       type="button"
                       onClick={addGuestName}
-                      className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all font-bold"
+                      className="flex items-center gap-2 px-4 py-2 bg-[#0B6E4F] text-[#C9A227] rounded-xl hover:bg-[#0B6E4F] transition-all font-bold"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -1233,14 +1233,14 @@ function ManagerFinancials() {
                 {incomePaymentMethod !== 'already_paid' && (
                   <>
                     <div>
-                      <label className="block text-sm font-black text-slate-900 mb-2">Currency {(incomePaymentMethod === 'online' || incomePaymentMethod === 'partially_paid') ? '(Optional)' : '*'}</label>
+                      <label className="block text-sm font-black text-[#EDE6D6] mb-2">Currency {(incomePaymentMethod === 'online' || incomePaymentMethod === 'partially_paid') ? '(Optional)' : '*'}</label>
                       <select
                         value={incomeCurrency}
                         onChange={(e) => {
                           setIncomeCurrency(e.target.value as 'UZS' | 'USD' | 'EUR');
                           setIncomeExchangeRate(e.target.value === 'UZS' ? '1' : incomeExchangeRate);
                         }}
-                        className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all text-slate-900 font-semibold"
+                        className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#1C232E]"
                         required={incomePaymentMethod === 'cash'}
                       >
                         <option value="UZS">Uzbek Sum (UZS)</option>
@@ -1251,7 +1251,7 @@ function ManagerFinancials() {
 
                     {incomeCurrency !== 'UZS' && (
                       <div>
-                        <label className="block text-sm font-black text-slate-900 mb-2">Exchange Rate (to UZS)</label>
+                        <label className="block text-sm font-black text-[#EDE6D6] mb-2">Exchange Rate (to UZS)</label>
                         <div className="flex gap-2">
                           <input
                             type="number"
@@ -1259,12 +1259,12 @@ function ManagerFinancials() {
                             value={incomeExchangeRate}
                             onChange={(e) => setIncomeExchangeRate(e.target.value)}
                             placeholder={`1 ${incomeCurrency} = ? UZS`}
-                            className="flex-1 px-4 py-3 border-2 border-slate-300 rounded-xl focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all text-slate-900 font-semibold"
+                            className="flex-1 px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#1C232E]"
                           />
                           <button
                             type="button"
                             onClick={getTodayRate}
-                            className="px-4 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all font-bold whitespace-nowrap"
+                            className="px-4 py-3 bg-[#0B6E4F] text-[#C9A227] rounded-xl hover:bg-[#0B6E4F] transition-all font-bold whitespace-nowrap"
                           >
                             Get Today's Rate
                           </button>
@@ -1273,14 +1273,14 @@ function ManagerFinancials() {
                     )}
 
                     <div>
-                      <label className="block text-sm font-black text-slate-900 mb-2">Total Amount ({incomeCurrency}) {(incomePaymentMethod === 'online' || incomePaymentMethod === 'partially_paid') ? '(Optional)' : '*'}</label>
+                      <label className="block text-sm font-black text-[#EDE6D6] mb-2">Total Amount ({incomeCurrency}) {(incomePaymentMethod === 'online' || incomePaymentMethod === 'partially_paid') ? '(Optional)' : '*'}</label>
                       <input
                         type="number"
                         step="0.01"
                         value={incomeAmount}
                         onChange={(e) => setIncomeAmount(e.target.value)}
                         placeholder={`Enter amount in ${incomeCurrency}`}
-                        className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all text-slate-900 font-semibold"
+                        className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#1C232E]"
                         required={incomePaymentMethod === 'cash'}
                       />
                     </div>
@@ -1288,13 +1288,13 @@ function ManagerFinancials() {
                 )}
 
                 <div>
-                  <label className="block text-sm font-black text-slate-900 mb-2">Description {incomePaymentMethod === 'cash' ? '*' : '(Optional)'}</label>
+                  <label className="block text-sm font-black text-[#EDE6D6] mb-2">Description {incomePaymentMethod === 'cash' ? '*' : '(Optional)'}</label>
                   <textarea
                     value={incomeDescription}
                     onChange={(e) => setIncomeDescription(e.target.value)}
                     placeholder="Additional notes..."
                     rows={3}
-                    className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all text-slate-900 font-semibold"
+                    className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#1C232E]"
                     required={incomePaymentMethod === 'cash'}
                   />
                 </div>
@@ -1304,32 +1304,32 @@ function ManagerFinancials() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-widest hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-200"
+              className="w-full py-4 bg-[#0B6E4F] text-[#C9A227] rounded-xl font-black uppercase tracking-widest hover:bg-[#0B6E4F] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-[#0B6E4F]/30"
             >
               {submitting ? 'Saving...' : 'Save Record'}
             </button>
           </form>
 
           {/* Recent Expenses Section */}
-          <div className="mt-8 bg-white rounded-2xl shadow-xl p-8">
+          <div className="mt-8 bg-[#1C232E] rounded-2xl shadow-xl border border-[#5C4A2E]/30 p-8">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-2xl font-black text-slate-900">Recent Transactions (Last 3 Days)</h3>
+              <h3 className="text-2xl font-black text-[#EDE6D6] font-heading">Recent Transactions (Last 3 Days)</h3>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setCurrentDayOffset(Math.min(2, currentDayOffset + 1))}
-                  className="p-2 bg-slate-200 hover:bg-slate-300 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-2 bg-[#1C232E] hover:bg-[#2A1518] rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-[#5C4A2E]/30"
                   disabled={currentDayOffset >= 2}
                 >
-                  <svg className="w-5 h-5 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 text-[#9C9384]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7m0 0l7-7m-7 7h18" />
                   </svg>
                 </button>
                 <button
                   onClick={() => setCurrentDayOffset(Math.max(0, currentDayOffset - 1))}
-                  className="p-2 bg-slate-200 hover:bg-slate-300 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-2 bg-[#1C232E] hover:bg-[#2A1518] rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-[#5C4A2E]/30"
                   disabled={currentDayOffset <= 0}
                 >
-                  <svg className="w-5 h-5 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 text-[#9C9384]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </button>
@@ -1338,7 +1338,7 @@ function ManagerFinancials() {
             
             {loadingRecent ? (
               <div className="flex items-center justify-center py-8">
-                <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-8 h-8 border-4 border-[#0B6E4F] border-t-transparent rounded-full animate-spin"></div>
               </div>
             ) : (
               (() => {
@@ -1361,26 +1361,26 @@ function ManagerFinancials() {
                 else if (dateStr === dayBeforeYesterdayStr) dayLabel = 'Day Before Yesterday';
                 
                 return (
-                  <div key={dateStr} className="bg-slate-50 rounded-xl p-6 border-2 border-slate-300">
-                    <h4 className="font-black text-slate-900 mb-4">{dayLabel}</h4>
+                  <div key={dateStr} className="bg-[#1C232E] rounded-xl p-6 border-2 border-[#5C4A2E]/30">
+                    <h4 className="font-black text-[#EDE6D6] mb-4">{dayLabel}</h4>
                     
                     {dayFinances.length === 0 ? (
-                      <p className="text-slate-500 italic text-sm">No transactions</p>
+                      <p className="text-[#9C9384] italic text-sm">No transactions</p>
                     ) : (
                       <div className="space-y-3">
                         {dayFinances.map((item) => (
                           <div 
                             key={item.id} 
-                            className="bg-white rounded-lg p-4 border border-slate-200 cursor-pointer hover:border-indigo-300 hover:shadow-md transition-all"
+                            className="bg-[#0F1419] rounded-lg p-4 border border-[#5C4A2E]/30 cursor-pointer hover:border-[#0B6E4F] hover:shadow-md transition-all"
                             onClick={() => router.push(`/financials/detail/${item.id}`)}
                           >
                             <div className="flex justify-between items-start mb-2">
                               <div>
-                                <p className="font-black text-slate-900">{item.type === 'expense' ? item.category : (item.guest_name || 'Income')}</p>
-                                <p className="text-sm text-slate-700">{item.description}</p>
+                                <p className="font-black text-[#EDE6D6]">{item.type === 'expense' ? item.category : (item.guest_name || 'Income')}</p>
+                                <p className="text-sm text-[#9C9384]">{item.description}</p>
                               </div>
                               <div className="text-right">
-                                <p className={`font-black ${item.type === 'expense' ? 'text-rose-700' : 'text-emerald-700'}`}>
+                                <p className={`font-black ${item.type === 'expense' ? 'text-[#722F37]' : 'text-[#0B6E4F]'}`}>
                                   {item.original_amount.toLocaleString()} {item.currency || 'UZS'}
                                 </p>
                                 {item.receipt_url && (
@@ -1391,7 +1391,7 @@ function ManagerFinancials() {
                                       setZoomLevel(1);
                                       setReceiptViewerOpen(true);
                                     }}
-                                    className="text-xs text-blue-600 hover:underline font-bold mt-1"
+                                    className="text-xs text-[#0B6E4F] hover:underline font-bold mt-1"
                                   >
                                     View Receipt
                                   </button>
@@ -1414,17 +1414,17 @@ function ManagerFinancials() {
       {editModalOpen && editingExpense && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4" onClick={() => setEditModalOpen(false)}>
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-            <h3 className="text-xl font-black text-slate-900 mb-6">Edit {editingExpense.type === 'income' ? 'Income' : 'Expense'}</h3>
+          <div className="relative bg-[#1C232E] rounded-2xl shadow-2xl w-full max-w-md p-8 animate-in zoom-in-95 duration-200 border border-[#5C4A2E]/30" onClick={e => e.stopPropagation()}>
+            <h3 className="text-xl font-black text-[#EDE6D6] mb-6">Edit {editingExpense.type === 'income' ? 'Income' : 'Expense'}</h3>
             <form onSubmit={handleUpdateExpense} className="space-y-4">
               {editingExpense.type === 'expense' ? (
                 <>
                   <div>
-                    <label className="block text-sm font-black text-slate-900 mb-2">Category</label>
+                    <label className="block text-sm font-black text-[#9C9384] mb-2">Category</label>
                     <select
                       value={editingExpense.category}
                       onChange={(e) => setEditingExpense({ ...editingExpense, category: e.target.value })}
-                      className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl text-slate-900 font-semibold"
+                      className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl text-[#EDE6D6] font-semibold bg-[#1C232E]/50"
                       required
                     >
                       {expenseCategories.map((cat) => (
@@ -1519,32 +1519,32 @@ function ManagerFinancials() {
       {receiptViewerOpen && receiptUrl && (
         <div className="fixed inset-0 z-[400] flex items-center justify-center p-4" onClick={() => setReceiptViewerOpen(false)}>
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] animate-in zoom-in-95 duration-200 overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="p-4 bg-slate-900 text-white flex justify-between items-center">
+          <div className="relative bg-[#1C232E] rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] animate-in zoom-in-95 duration-200 overflow-hidden border border-[#5C4A2E]/30" onClick={e => e.stopPropagation()}>
+            <div className="p-4 bg-[#0F1419] text-[#EDE6D6] flex justify-between items-center border-b border-[#5C4A2E]/30">
               <h3 className="font-black">Receipt Viewer</h3>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setZoomLevel(Math.max(0.5, zoomLevel - 0.25))}
-                  className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded-lg font-bold transition-all"
+                  className="px-3 py-1 bg-[#1C232E] hover:bg-[#2A1518] rounded-lg font-bold transition-all border border-[#5C4A2E]/30"
                 >
                   Zoom Out
                 </button>
-                <span className="px-3 py-1 bg-slate-800 rounded-lg font-mono">{Math.round(zoomLevel * 100)}%</span>
+                <span className="px-3 py-1 bg-[#1C232E] rounded-lg font-mono text-[#9C9384] border border-[#5C4A2E]/30">{Math.round(zoomLevel * 100)}%</span>
                 <button
                   onClick={() => setZoomLevel(Math.min(3, zoomLevel + 0.25))}
-                  className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded-lg font-bold transition-all"
+                  className="px-3 py-1 bg-[#1C232E] hover:bg-[#2A1518] rounded-lg font-bold transition-all border border-[#5C4A2E]/30"
                 >
                   Zoom In
                 </button>
                 <button
                   onClick={() => setReceiptViewerOpen(false)}
-                  className="ml-4 px-3 py-1 bg-rose-600 hover:bg-rose-700 rounded-lg font-bold transition-all"
+                  className="ml-4 px-3 py-1 bg-[#722F37] hover:bg-[#722F37]/80 rounded-lg font-bold transition-all"
                 >
                   Close
                 </button>
               </div>
             </div>
-            <div className="p-4 bg-slate-100 overflow-auto max-h-[calc(90vh-60px)]">
+            <div className="p-4 bg-[#0F1419] overflow-auto max-h-[calc(90vh-60px)]">
               <div
                 className="inline-block transition-transform duration-200 origin-top-left"
                 style={{ transform: `scale(${zoomLevel})` }}
@@ -1554,7 +1554,7 @@ function ManagerFinancials() {
             </div>
           </div>
         </div>
-      )}
+      )}}
     </div>
   );
 }

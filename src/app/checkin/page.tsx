@@ -57,14 +57,7 @@ function CheckinPortal() {
     setBookings(prev => prev.map(b => b.id === id ? { ...b, status: 'checked_in' } : b));
     
     const payloadToSave = { status: 'checked_in' } as any;
-    delete payloadToSave.special_requests;
-    delete payloadToSave.number_of_people;
-    delete payloadToSave.lunch_count;
-    delete payloadToSave.dinner_count;
-    delete payloadToSave.guide_service;
-    delete payloadToSave.guide_names;
-    delete payloadToSave.guide_amount;
-    delete payloadToSave.last_edited_by_id;
+
     const { error } = await supabase.from('bookings').update(payloadToSave).eq('id', id);
     if (error) {
       console.error(error);
@@ -113,14 +106,7 @@ function CheckinPortal() {
     }]);
 
     const payloadToSave = { status: 'completed', payment_status: 'paid' } as any;
-    delete payloadToSave.special_requests;
-    delete payloadToSave.number_of_people;
-    delete payloadToSave.lunch_count;
-    delete payloadToSave.dinner_count;
-    delete payloadToSave.guide_service;
-    delete payloadToSave.guide_names;
-    delete payloadToSave.guide_amount;
-    delete payloadToSave.last_edited_by_id;
+
     const { error } = await supabase.from('bookings').update(payloadToSave).eq('id', id);
     if (error) fetchData();
   };
@@ -138,6 +124,7 @@ function CheckinPortal() {
     delete payloadToSave.guide_names;
     delete payloadToSave.guide_amount;
     delete payloadToSave.last_edited_by_id;
+    delete payloadToSave.days;
     const { error } = await supabase.from('bookings').update(payloadToSave).eq('id', id);
     if (error) fetchData();
   };

@@ -94,21 +94,21 @@ export default function ProcurementForm({ onSubmit, isLoading = false }: Procure
   };
 
   return (
-    <div className="space-y-6 p-6 bg-white rounded-lg shadow">
+    <div className="space-y-6 p-6 bg-[#1C232E] rounded-lg shadow border border-[#5C4A2E]/30">
       {/* Header */}
-      <div className="border-b pb-4">
-        <h2 className="text-2xl font-bold text-gray-900">New Procurement Request</h2>
-        <p className="text-gray-600 mt-1">Add items to request from the manager</p>
+      <div className="border-b border-[#5C4A2E]/30 pb-4">
+        <h2 className="text-2xl font-bold text-[#EDE6D6]">New Procurement Request</h2>
+        <p className="text-[#9C9384] mt-1">Add items to request from the manager</p>
       </div>
 
       {/* Error & Success Messages */}
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
+        <div className="p-4 bg-[#722F37]/10 border border-[#722F37]/30 rounded-lg text-[#722F37]">
           {error}
         </div>
       )}
       {success && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-800">
+        <div className="p-4 bg-[#0B6E4F]/10 border border-[#0B6E4F]/30 rounded-lg text-[#0B6E4F]">
           {success}
         </div>
       )}
@@ -116,10 +116,10 @@ export default function ProcurementForm({ onSubmit, isLoading = false }: Procure
       {/* Product Selection & Quantity Input */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="md:col-span-2">
-          <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Product Search</label>
+          <label className="block text-xs font-bold text-[#9C9384] uppercase tracking-widest mb-2">Product Search</label>
           <div className="relative">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9C9384]" size={14} />
               <input
                 type="text"
                 value={selectedProduct ? selectedProduct.name : searchQuery}
@@ -130,12 +130,12 @@ export default function ProcurementForm({ onSubmit, isLoading = false }: Procure
                 }}
                 onFocus={() => setIsDropdownOpen(true)}
                 placeholder="Search products..."
-                className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm text-zinc-950 placeholder:text-slate-300 focus:border-emerald-500 outline-none transition-all"
+                className="w-full pl-9 pr-4 py-2 bg-[#1C232E] border border-[#5C4A2E]/30 rounded-lg text-sm text-[#EDE6D6] placeholder:text-[#9C9384] focus:border-[#0B6E4F] outline-none transition-all"
               />
             </div>
             
             {isDropdownOpen && !selectedProduct && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+              <div className="absolute top-full left-0 right-0 mt-1 bg-[#1C232E] border border-[#5C4A2E]/30 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
                 {products
                   .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
                   .map(product => (
@@ -146,10 +146,10 @@ export default function ProcurementForm({ onSubmit, isLoading = false }: Procure
                         setSearchQuery('');
                         setIsDropdownOpen(false);
                       }}
-                      className="w-full px-4 py-2 text-left hover:bg-slate-50 text-sm text-zinc-950 transition-colors flex justify-between items-center"
+                      className="w-full px-4 py-2 text-left hover:bg-[#2A1518] text-sm text-[#EDE6D6] transition-colors flex justify-between items-center"
                     >
                       <span>{product.name}</span>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase">{product.unit}</span>
+                      <span className="text-[10px] font-bold text-[#9C9384] uppercase">{product.unit}</span>
                     </button>
                   ))}
               </div>
@@ -157,7 +157,7 @@ export default function ProcurementForm({ onSubmit, isLoading = false }: Procure
           </div>
         </div>
         <div>
-          <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Quantity</label>
+          <label className="block text-xs font-bold text-[#9C9384] uppercase tracking-widest mb-2">Quantity</label>
           <div className="flex gap-2">
             <input
               type="number"
@@ -166,11 +166,11 @@ export default function ProcurementForm({ onSubmit, isLoading = false }: Procure
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
               placeholder="0.00"
-              className="flex-1 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm text-zinc-950 font-data focus:border-emerald-500 outline-none transition-all disabled:opacity-50"
+              className="flex-1 px-4 py-2 bg-[#1C232E] border border-[#5C4A2E]/30 rounded-lg text-sm text-[#EDE6D6] font-data focus:border-[#0B6E4F] outline-none transition-all disabled:opacity-50"
               disabled={!selectedProduct}
             />
             {selectedProduct && (
-              <span className="flex items-center px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-400 uppercase">
+              <span className="flex items-center px-3 py-2 bg-[#1C232E]/50 border border-[#5C4A2E]/30 rounded-lg text-[10px] font-bold text-[#9C9384] uppercase">
                 {selectedProduct.unit}
               </span>
             )}
@@ -182,7 +182,7 @@ export default function ProcurementForm({ onSubmit, isLoading = false }: Procure
       <button
         onClick={addItem}
         disabled={!selectedProduct || !quantity || isLoading}
-        className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+        className="w-full md:w-auto px-6 py-2 bg-[#0B6E4F] text-[#C9A227] rounded-lg font-medium hover:bg-[#0B6E4F]/80 disabled:bg-[#1C232E]/50 disabled:text-[#9C9384] disabled:cursor-not-allowed transition border border-[#0B6E4F]/40"
       >
         + Add Item
       </button>
@@ -190,31 +190,31 @@ export default function ProcurementForm({ onSubmit, isLoading = false }: Procure
       {/* Items Table */}
       {items.length > 0 && (
         <>
-          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+          <div className="bg-[#1C232E] border border-[#5C4A2E]/30 rounded-lg overflow-hidden shadow-sm">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 border-b border-slate-200">
+              <thead className="bg-[#1C232E]/50 border-b border-[#5C4A2E]/30">
                 <tr>
-                  <th className="px-4 py-2 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Item</th>
-                  <th className="px-4 py-2 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Quantity</th>
-                  <th className="px-4 py-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Action</th>
+                  <th className="px-4 py-2 text-left text-[10px] font-bold text-[#9C9384] uppercase tracking-widest">Item</th>
+                  <th className="px-4 py-2 text-center text-[10px] font-bold text-[#9C9384] uppercase tracking-widest">Quantity</th>
+                  <th className="px-4 py-2 text-right text-[10px] font-bold text-[#9C9384] uppercase tracking-widest">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[#5C4A2E]/30">
                 {items.map((item) => {
                   const product = products.find(p => p.id === item.product_id);
                   return (
-                    <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
+                    <tr key={item.id} className="hover:bg-[#2A1518] transition-colors">
                       <td className="px-4 py-3">
-                        <p className="font-bold text-zinc-950">{product?.name || 'Unknown'}</p>
+                        <p className="font-bold text-[#EDE6D6]">{product?.name || 'Unknown'}</p>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className="font-data font-bold text-zinc-950">{item.requested_quantity}</span>
-                        <span className="ml-1 text-[9px] font-bold text-slate-400 uppercase">{item.requested_unit}</span>
+                        <span className="font-data font-bold text-[#EDE6D6]">{item.requested_quantity}</span>
+                        <span className="ml-1 text-[9px] font-bold text-[#9C9384] uppercase">{item.requested_unit}</span>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
                           onClick={() => removeItem(item.id)}
-                          className="p-1.5 text-slate-300 hover:text-rose-600 transition-colors"
+                          className="p-1.5 text-[#9C9384] hover:text-[#722F37] transition-colors"
                         >
                           <Trash2 size={14} />
                         </button>
@@ -227,8 +227,8 @@ export default function ProcurementForm({ onSubmit, isLoading = false }: Procure
           </div>
 
           {/* Summary */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <p className="text-gray-700">
+          <div className="bg-[#1C232E]/50 p-4 rounded-lg border border-[#5C4A2E]/30">
+            <p className="text-[#EDE6D6]">
               <span className="font-medium">Items to Request:</span> {items.length}
             </p>
           </div>
@@ -237,11 +237,11 @@ export default function ProcurementForm({ onSubmit, isLoading = false }: Procure
           <button
             onClick={handleSubmit}
             disabled={isLoading}
-            className="w-full px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+            className="w-full px-6 py-3 bg-[#0B6E4F] text-[#C9A227] rounded-lg font-medium hover:bg-[#0B6E4F]/80 disabled:bg-[#1C232E]/50 disabled:text-[#9C9384] disabled:cursor-not-allowed transition flex items-center justify-center gap-2 border border-[#0B6E4F]/40"
           >
             {isLoading ? (
               <>
-                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                <div className="animate-spin h-4 w-4 border-2 border-[#C9A227] border-t-transparent rounded-full" />
                 Submitting...
               </>
             ) : (

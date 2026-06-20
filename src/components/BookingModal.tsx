@@ -308,13 +308,13 @@ export function BookingModal(props: BookingModalProps) {
   };
 
   const statusColor = (s?: string) => ({
-    checked_in: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
-    confirmed: 'bg-amber-100 text-amber-700 border border-amber-200',
-    completed: 'bg-blue-100 text-blue-700 border border-blue-200',
-    cancelled: 'bg-red-100 text-red-700 border border-red-200',
-    pending: 'bg-slate-100 text-slate-600 border border-slate-200',
-    no_arrival: 'bg-gray-200 text-gray-600 border border-gray-300',
-  }[s ?? ''] ?? 'bg-slate-100 text-slate-500');
+    checked_in: 'bg-[#0B6E4F]/20 text-[#0B6E4F] border border-[#0B6E4F]/40',
+    confirmed: 'bg-[#B8860B]/20 text-[#B8860B] border border-[#B8860B]/40',
+    completed: 'bg-[#5C4A2E]/20 text-[#5C4A2E] border border-[#5C4A2E]/40',
+    cancelled: 'bg-[#722F37]/20 text-[#722F37] border border-[#722F37]/40',
+    pending: 'bg-[#1C232E]/20 text-[#9C9384] border border-[#5C4A2E]/30',
+    no_arrival: 'bg-[#1C232E]/20 text-[#9C9384] border border-[#5C4A2E]/30',
+  }[s ?? ''] ?? 'bg-[#1C232E]/20 text-[#9C9384]');
 
   const receiptRef = useRef<HTMLDivElement>(null);
 
@@ -432,23 +432,23 @@ export function BookingModal(props: BookingModalProps) {
       <div className="fixed inset-0 z-[100] flex items-center sm:items-start justify-center p-0 sm:p-4 sm:pt-16 pb-safe" onClick={() => setSelectedItem(null)}>
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
         <div className="relative bento-card sm:rounded-2xl shadow-2xl w-full sm:max-w-md h-full sm:h-auto sm:max-h-[85vh] overflow-y-auto pb-20 sm:pb-0" onClick={e => e.stopPropagation()}>
-          <div className="flex items-center justify-between px-5 py-4 border-b border-black sticky top-0 bg-white rounded-t-2xl z-10">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[#5C4A2E]/30 sticky top-0 bg-[#1C232E] rounded-t-2xl z-10">
+            <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">
               📅 Google Calendar Event
             </p>
-            <button onClick={() => setSelectedItem(null)} className="w-8 h-8 flex items-center justify-center edge-control rounded-xl transition-all text-black font-bold text-xl">×</button>
+            <button onClick={() => setSelectedItem(null)} className="w-8 h-8 flex items-center justify-center edge-control rounded-xl transition-all text-[#EDE6D6] font-bold text-xl">×</button>
           </div>
           <div className="p-5 space-y-4">
             <div>
-              <h2 className="text-xl font-black text-slate-900">{ev.summary || '(No title)'}</h2>
-              <p className="text-sm text-slate-500 mt-0.5 font-data">{ev.start} → {ev.end}</p>
+              <h2 className="text-xl font-black text-[#EDE6D6]">{ev.summary || '(No title)'}</h2>
+              <p className="text-sm text-[#9C9384] mt-0.5 font-data">{ev.start} → {ev.end}</p>
               {ev.description && (
-                <p className="text-xs text-slate-500 mt-2 whitespace-pre-wrap bg-slate-50 rounded-xl p-3 border border-slate-100">{ev.description}</p>
+                <p className="text-xs text-[#9C9384] mt-2 whitespace-pre-wrap bg-[#1C232E]/50 rounded-xl p-3 border border-[#5C4A2E]/30">{ev.description}</p>
               )}
             </div>
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-              <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 mb-2">Calendar Only — No Booking Yet</p>
-              <p className="text-xs text-amber-600">Create a booking from this event to manage check-in, services, and payments.</p>
+            <div className="bg-[#B8860B]/20 border border-[#B8860B]/40 rounded-xl p-4">
+              <p className="text-[10px] font-black uppercase tracking-widest text-[#B8860B] mb-2">Calendar Only — No Booking Yet</p>
+              <p className="text-xs text-[#B8860B]">Create a booking from this event to manage check-in, services, and payments.</p>
             </div>
             {props.handleCreateFromEvent && (
               <div className="flex flex-col gap-2">
@@ -463,14 +463,14 @@ export function BookingModal(props: BookingModalProps) {
                 <button
                   onClick={() => props.handleCreateFromEvent(false)}
                   disabled={loadingAction === 'creating'}
-                  className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2 transition-all disabled:opacity-60 border border-slate-300"
+                  className="w-full py-3 bg-[#1C232E] hover:bg-[#2A1518] text-[#9C9384] text-[11px] font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2 transition-all disabled:opacity-60 border border-[#5C4A2E]/30"
                 >
                   Create Booking Only
                 </button>
               </div>
             )}
             {actionMsg && (
-              <div className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold text-center animate-in fade-in">{actionMsg}</div>
+              <div className="bg-[#1C232E] text-[#EDE6D6] px-4 py-2 rounded-xl text-xs font-bold text-center animate-in fade-in border border-[#5C4A2E]/30">{actionMsg}</div>
             )}
           </div>
         </div>
@@ -486,30 +486,30 @@ export function BookingModal(props: BookingModalProps) {
       <div className="fixed inset-0 z-[100] flex items-center sm:items-start justify-center p-0 sm:p-4 sm:pt-16 pb-safe" onClick={() => setSelectedItem(null)}>
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
         <div className={"relative bento-card sm:rounded-2xl shadow-2xl w-full sm:max-w-md h-full sm:h-auto sm:max-h-[85vh] overflow-y-auto pb-20 sm:pb-0 " + (userRole === 'CEO' && sel?.source === 'System' ? 'border-4 border-blue-500' : '')} onClick={e => e.stopPropagation()}>
-          <div className="flex items-center justify-between px-5 py-4 border-b border-black sticky top-0 bg-white rounded-t-2xl z-10">
-            <p className="text-[10px] font-black uppercase tracking-widest hc-accent-sky">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[#5C4A2E]/30 sticky top-0 bg-[#1C232E] rounded-t-2xl z-10">
+            <p className="text-[10px] font-black uppercase tracking-widest text-[#0B6E4F]">
               Booking Details
             </p>
-            <button onClick={() => setSelectedItem(null)} className="w-8 h-8 flex items-center justify-center edge-control rounded-xl transition-all text-black font-bold text-xl">×</button>
+            <button onClick={() => setSelectedItem(null)} className="w-8 h-8 flex items-center justify-center edge-control rounded-xl transition-all text-[#EDE6D6] font-bold text-xl">×</button>
           </div>
 
           <div className="p-5 space-y-4">
             <div className="flex items-start justify-between">
               <div>
                 {typeInfo && (
-                  <div className="mb-2 px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-lg text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                  <div className="mb-2 px-2 py-0.5 bg-[#1C232E]/20 border border-[#5C4A2E]/30 rounded-lg text-[10px] font-black text-[#9C9384] uppercase tracking-widest flex items-center gap-1.5">
                     <span>{typeInfo.prefix}</span>
                     <span>{typeInfo.message}</span>
                   </div>
                 )}
-                <h2 className="text-xl font-black text-slate-900">{String(sel?.guest_name || "Guest")}</h2>
-                <p className="text-sm text-slate-500 mt-0.5">{String(sel?.check_in)} → {String(sel?.check_out)}{sel?.nights ? ` · ${String(sel?.nights)}n` : ''}{(sel?.guest_count || sel?.number_of_adults) ? ` · ${String(sel?.guest_count || sel?.number_of_adults)} pax` : ''}</p>
+                <h2 className="text-xl font-black text-[#EDE6D6]">{String(sel?.guest_name || "Guest")}</h2>
+                <p className="text-sm text-[#9C9384] mt-0.5">{String(sel?.check_in)} → {String(sel?.check_out)}{sel?.nights ? ` · ${String(sel?.nights)}n` : ''}{(sel?.guest_count || sel?.number_of_adults) ? ` · ${String(sel?.guest_count || sel?.number_of_adults)} pax` : ''}</p>
               </div>
               <div className="flex flex-col items-end gap-2">
                 {(sel?.notes || sel?.description) && (
                   <button 
                     onClick={() => setShowNotes(!showNotes)}
-                    className="text-[10px] font-black text-indigo-600 hover:text-indigo-700 flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100 transition-all active:scale-95"
+                    className="text-[10px] font-black text-[#0B6E4F] hover:text-[#0B6E4F] flex items-center gap-1 bg-[#0B6E4F]/10 px-2 py-1 rounded-lg border border-[#0B6E4F]/20 transition-all active:scale-95"
                   >
                     <svg className={`w-3 h-3 transition-transform ${showNotes ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -527,14 +527,14 @@ export function BookingModal(props: BookingModalProps) {
             </div>
 
             {showNotes && sel && (sel.notes || sel.description) && (
-              <div className="bg-amber-50 rounded-[20px] p-4 border border-amber-100 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="bg-[#B8860B]/20 rounded-[20px] p-4 border border-[#B8860B]/30 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="w-6 h-6 bg-amber-100 rounded-lg flex items-center justify-center text-amber-600">
+                  <div className="w-6 h-6 bg-[#B8860B]/30 rounded-lg flex items-center justify-center text-[#B8860B]">
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                   </div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">Booking & Stay Notes</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[#B8860B]">Booking & Stay Notes</p>
                 </div>
-                <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed font-medium">{String(sel.notes || sel.description)}</p>
+                <p className="text-sm text-[#EDE6D6] whitespace-pre-wrap leading-relaxed font-medium">{String(sel.notes || sel.description)}</p>
               </div>
             )}
 
@@ -553,31 +553,31 @@ export function BookingModal(props: BookingModalProps) {
                 
                 if (isPOS) {
                   return (
-                    <div className="bg-white border-2 border-slate-100 rounded-[32px] p-6 shadow-xl shadow-slate-100/50 space-y-4">
+                    <div className="bg-[#1C232E] border-2 border-[#5C4A2E]/30 rounded-[32px] p-6 shadow-xl shadow-[#5C4A2E]/20 space-y-4">
                       <div className="flex items-center gap-3 mb-2">
-                        <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600 shadow-md shadow-blue-100">
+                        <div className="w-12 h-12 bg-[#0B6E4F]/30 rounded-2xl flex items-center justify-center text-[#0B6E4F] shadow-md shadow-[#0B6E4F]/20">
                           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         </div>
                         <div>
-                          <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight leading-tight">Transaction Receipt</h3>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Instant Point of Sale Settlement</p>
+                          <h3 className="text-lg font-black text-[#EDE6D6] uppercase tracking-tight leading-tight">Transaction Receipt</h3>
+                          <p className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest">Instant Point of Sale Settlement</p>
                         </div>
                       </div>
                       
-                      <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex flex-col items-center justify-center gap-1 shadow-inner">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount Taken</p>
-                        <p className="text-3xl font-black text-slate-900 flex items-baseline gap-1 font-mono">
+                      <div className="bg-[#1C232E]/50 border border-[#5C4A2E]/30 rounded-2xl p-4 flex flex-col items-center justify-center gap-1 shadow-inner">
+                        <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Amount Taken</p>
+                        <p className="text-3xl font-black text-[#EDE6D6] flex items-baseline gap-1 font-mono">
                           {(sel.collected_amount || sel.total_price || 0).toLocaleString()} 
-                          <span className="text-lg text-slate-500 font-bold font-mono">{sel.collected_currency || 'UZS'}</span>
+                          <span className="text-lg text-[#9C9384] font-bold font-mono">{sel.collected_currency || 'UZS'}</span>
                         </p>
                       </div>
                       
-                      <div className="flex items-center justify-between px-2 text-sm font-bold text-slate-600 border-b border-slate-100 pb-2">
-                        <span className="uppercase tracking-widest text-[10px] text-slate-400">Guest Count:</span>
-                        <span className="text-slate-900 text-base">{sel.number_of_adults || sel.guest_count || 0} pax</span>
+                      <div className="flex items-center justify-between px-2 text-sm font-bold text-[#9C9384] border-b border-[#5C4A2E]/30 pb-2">
+                        <span className="uppercase tracking-widest text-[10px] text-[#9C9384]">Guest Count:</span>
+                        <span className="text-[#EDE6D6] text-base">{sel.number_of_adults || sel.guest_count || 0} pax</span>
                       </div>
                       
-                      <button className="w-full py-4 bg-slate-100 text-slate-400 font-black uppercase tracking-[0.2em] text-[11px] rounded-2xl cursor-not-allowed border border-slate-200">
+                      <button className="w-full py-4 bg-[#1C232E]/50 text-[#9C9384] font-black uppercase tracking-[0.2em] text-[11px] rounded-2xl cursor-not-allowed border border-[#5C4A2E]/30">
                         Closed Tab - Receipt Logged
                       </button>
                     </div>
@@ -585,14 +585,14 @@ export function BookingModal(props: BookingModalProps) {
                 }
 
                 return (
-                  <div className="bg-white border-2 border-slate-100 rounded-[32px] p-6 shadow-xl shadow-slate-100/50 space-y-4">
+                  <div className="bg-[#1C232E] border-2 border-[#5C4A2E]/30 rounded-[32px] p-6 shadow-xl shadow-[#5C4A2E]/20 space-y-4">
                     <div className="flex items-center gap-3 mb-2">
-                      <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 shadow-md shadow-emerald-100">
+                      <div className="w-12 h-12 bg-[#0B6E4F]/30 rounded-2xl flex items-center justify-center text-[#0B6E4F] shadow-md shadow-[#0B6E4F]/20">
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                       </div>
                       <div>
-                        <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight leading-tight">Successfully Checked Out</h3>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Guest Tab Closed & Settled</p>
+                        <h3 className="text-lg font-black text-[#EDE6D6] uppercase tracking-tight leading-tight">Successfully Checked Out</h3>
+                        <p className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest">Guest Tab Closed & Settled</p>
                       </div>
                     </div>
                   </div>
@@ -605,7 +605,7 @@ export function BookingModal(props: BookingModalProps) {
                     <div className="w-full">
                       <div className="flex items-center justify-between">
                         <div className="flex flex-col gap-1.5">
-                          <span className="px-4 py-2 bg-emerald-100 text-emerald-700 text-sm font-bold rounded-xl border border-emerald-200 flex items-center gap-2">
+                          <span className="px-4 py-2 bg-[#0B6E4F]/20 text-[#0B6E4F] text-sm font-bold rounded-xl border border-[#0B6E4F]/40 flex items-center gap-2">
                             ✓ Checked In
                           </span>
                         </div>
@@ -616,28 +616,28 @@ export function BookingModal(props: BookingModalProps) {
                             setEditCheckOut(sel.check_out); 
                             setDateAdjAmount(currentMeta.last_adjustment || '');
                           }}
-                          className="text-[10px] font-bold text-indigo-500 hover:text-indigo-700 underline underline-offset-2 decoration-indigo-200 transition-all">
+                          className="text-[10px] font-bold text-[#0B6E4F] hover:text-[#0B6E4F] underline underline-offset-2 decoration-[#0B6E4F]/20 transition-all">
                           Edit Dates
                         </button>
                       </div>
                     </div>
                   )}
                   {editingDates && (
-                    <div className="w-full bg-white border border-black p-4 space-y-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-                      <div className="flex items-center justify-between border-b border-black pb-2">
-                        <p className="text-[10px] font-black text-black uppercase tracking-[0.2em]">Bento Stay Editor</p>
+                    <div className="w-full bg-[#1C232E] border border-[#5C4A2E]/30 p-4 space-y-4 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)]">
+                      <div className="flex items-center justify-between border-b border-[#5C4A2E]/30 pb-2">
+                        <p className="text-[10px] font-black text-[#EDE6D6] uppercase tracking-[0.2em]">Bento Stay Editor</p>
                         {(sel.collected_amount || 0) > 0 && (
-                          <span className="text-[9px] font-black bg-sky-100 text-sky-700 px-2 py-0.5 border border-sky-300 uppercase">Financial Locked</span>
+                          <span className="text-[9px] font-black bg-[#0B6E4F]/20 text-[#0B6E4F] px-2 py-0.5 border border-[#0B6E4F]/40 uppercase">Financial Locked</span>
                         )}
                       </div>
-                      
-                      <div className="grid grid-cols-2 border border-black">
-                        <div className="p-3 border-r border-black bg-slate-50/50">
-                          <label className="text-[9px] font-black text-black uppercase tracking-widest mb-1 block">Inbound</label>
-                          <div className="hc-mono text-sm font-black text-slate-500 opacity-60">{String(editCheckIn)}</div>
+                       
+                      <div className="grid grid-cols-2 border border-[#5C4A2E]/30">
+                        <div className="p-3 border-r border-[#5C4A2E]/30 bg-[#1C232E]/50">
+                          <label className="text-[9px] font-black text-[#EDE6D6] uppercase tracking-widest mb-1 block">Inbound</label>
+                          <div className="hc-mono text-sm font-black text-[#9C9384] opacity-60">{String(editCheckIn)}</div>
                         </div>
-                        <div className="p-3 bg-white">
-                          <label className="text-[9px] font-black text-sky-600 uppercase tracking-widest mb-1 block">Outbound</label>
+                        <div className="p-3 bg-[#1C232E]">
+                          <label className="text-[9px] font-black text-[#0B6E4F] uppercase tracking-widest mb-1 block">Outbound</label>
                           <input
                             type="date"
                             value={String(editCheckOut)}
@@ -646,7 +646,7 @@ export function BookingModal(props: BookingModalProps) {
                               setEditCheckOut(v);
                               if (v === sel.check_out) setDateAdjAmount('');
                             }}
-                            className="w-full bg-white text-sm font-black text-black hc-mono focus:outline-none focus:ring-1 focus:ring-sky-500"
+                            className="w-full bg-[#1C232E] text-sm font-black text-[#EDE6D6] hc-mono focus:outline-none focus:ring-1 focus:ring-[#0B6E4F]"
                           />
                         </div>
                       </div>
@@ -806,10 +806,10 @@ export function BookingModal(props: BookingModalProps) {
 
 
               {(sel.status === 'checked_in' || sel.status === 'confirmed') && isStaff && (
-                <div className="bg-white border-2 border-slate-100 rounded-[32px] p-6 shadow-xl shadow-slate-100/50 mb-6">
+                <div className="bg-[#1C232E] border-2 border-[#5C4A2E]/30 rounded-[32px] p-6 shadow-xl shadow-[#5C4A2E]/20 mb-6">
                   <div className="flex justify-between items-center mb-6">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
+                      <div className="w-12 h-12 bg-[#0B6E4F] rounded-2xl flex items-center justify-center text-[#C9A227] shadow-lg shadow-[#0B6E4F]/20">
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
                       </div>
                       <div>
@@ -819,7 +819,7 @@ export function BookingModal(props: BookingModalProps) {
                     </div>
                     <button 
                       onClick={() => setShowServices(!showServices)} 
-                      className={`text-[10px] font-black px-5 py-2.5 rounded-xl border-2 transition-all active:scale-95 ${showServices ? 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100' : 'bg-indigo-600 text-white border-indigo-700 shadow-lg shadow-indigo-100 hover:bg-indigo-700'}`}
+                      className={`text-[10px] font-black px-5 py-2.5 rounded-xl border-2 transition-all active:scale-95 ${showServices ? 'bg-[#1C232E]/50 text-[#9C9384] border-[#5C4A2E]/30 hover:bg-[#2A1518]' : 'bg-[#0B6E4F] text-[#C9A227] border-[#0B6E4F]/40 shadow-lg shadow-[#0B6E4F]/20 hover:bg-[#0B6E4F]/80'}`}
                     >
                       {showServices ? 'HIDE OPTIONS' : 'START NEW ORDER'}
                     </button>
@@ -827,15 +827,15 @@ export function BookingModal(props: BookingModalProps) {
                   
                   {!showServices && (
                     <div 
-                      className="group relative flex items-center justify-center py-10 border-2 border-dashed border-slate-200 rounded-[24px] bg-slate-50/50 cursor-pointer hover:bg-white hover:border-indigo-300 transition-all duration-300 overflow-hidden" 
+                      className="group relative flex items-center justify-center py-10 border-2 border-dashed border-[#5C4A2E]/30 rounded-[24px] bg-[#1C232E]/50 cursor-pointer hover:bg-[#2A1518] hover:border-[#0B6E4F]/40 transition-all duration-300 overflow-hidden" 
                       onClick={() => setShowServices(true)}
                     >
-                      <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/0 to-indigo-50/50 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <div className="absolute inset-0 bg-gradient-to-br from-[#0B6E4F]/0 to-[#0B6E4F]/50 opacity-0 group-hover:opacity-100 transition-opacity" />
                       <div className="relative flex flex-col items-center">
-                        <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md mb-3 group-hover:scale-110 transition-transform">
-                          <span className="text-indigo-600 text-3xl font-light">+</span>
+                        <div className="w-10 h-10 bg-[#1C232E] rounded-full flex items-center justify-center shadow-md mb-3 group-hover:scale-110 transition-transform border border-[#5C4A2E]/30">
+                          <span className="text-[#0B6E4F] text-3xl font-light">+</span>
                         </div>
-                        <p className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] group-hover:text-indigo-600 transition-colors">Select Meals or Services</p>
+                        <p className="text-[11px] font-black text-[#9C9384] uppercase tracking-[0.2em] group-hover:text-[#0B6E4F] transition-colors">Select Meals or Services</p>
                       </div>
                     </div>
                   )}
@@ -851,9 +851,9 @@ export function BookingModal(props: BookingModalProps) {
                     const isShortened = editCheckOut < sel.check_out;
 
                     return (
-                      <div className="border border-black p-4 bg-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] space-y-4">
+                      <div className="border border-[#5C4A2E]/30 p-4 bg-[#1C232E] shadow-[2px_2px_0px_0px_rgba(92,74,46,0.3)] space-y-4">
                         <div className="flex justify-between items-center">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Stay Configuration</p>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Stay Configuration</p>
                           {isPrepaid && (
                             <span className="px-2 py-0.5 text-[8px] font-black bg-emerald-100 text-emerald-700 rounded uppercase border border-emerald-300">
                               ✓ Original Stay Prepaid
@@ -874,7 +874,7 @@ export function BookingModal(props: BookingModalProps) {
                                 setSvcAdults(val);
                                 if (onUpdateBooking) onUpdateBooking(sel.id, { number_of_adults: val });
                               }}
-                              className={`w-full px-3 py-2 border text-sm font-black focus:outline-none ${isTab1Closed ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed' : 'bg-slate-50 border-slate-200 text-black'}`}
+                              className={`w-full px-3 py-2 border text-sm font-black focus:outline-none ${isTab1Closed ? 'bg-[#1C232E]/50 border-[#5C4A2E]/30 text-[#9C9384] cursor-not-allowed' : 'bg-[#1C232E]/50 border-[#5C4A2E]/30 text-[#EDE6D6]'}`}
                             />
                           </div>
                           <div className="space-y-1.5">
@@ -888,7 +888,7 @@ export function BookingModal(props: BookingModalProps) {
                                 setSvcChildren(val);
                                 if (onUpdateBooking) onUpdateBooking(sel.id, { number_of_children: val });
                               }}
-                              className={`w-full px-3 py-2 border text-sm font-black focus:outline-none ${isTab1Closed ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed' : 'bg-slate-50 border-slate-200 text-black'}`}
+                              className={`w-full px-3 py-2 border text-sm font-black focus:outline-none ${isTab1Closed ? 'bg-[#1C232E]/50 border-[#5C4A2E]/30 text-[#9C9384] cursor-not-allowed' : 'bg-[#1C232E]/50 border-[#5C4A2E]/30 text-[#EDE6D6]'}`}
                             />
                           </div>
                         </div>
@@ -897,8 +897,8 @@ export function BookingModal(props: BookingModalProps) {
                           <div className="space-y-4">
                             {/* Condition A: Tab 1 Closed (Locked Mode) */}
                             <div className="space-y-1.5">
-                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Original Stay Price (Baseline)</label>
-                              <div className="px-3 py-2 bg-slate-100 border border-slate-200 text-sm font-mono text-slate-500 font-bold">
+                              <label className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Original Stay Price (Baseline)</label>
+                              <div className="px-3 py-2 bg-[#1C232E]/50 border border-[#5C4A2E]/30 text-sm font-mono text-[#9C9384] font-bold">
                                 ${String((sel.stay_price || sel.total_price || 0).toFixed(2))}
                               </div>
                             </div>
@@ -913,7 +913,7 @@ export function BookingModal(props: BookingModalProps) {
                                     value={svcDateAdjustment > 0 ? svcDateAdjustment : ''} 
                                     onChange={e => setSvcDateAdjustment(Math.abs(parseFloat(e.target.value) || 0))}
                                     placeholder="0.00"
-                                    className="w-full pl-8 pr-3 py-2 bg-indigo-50/50 border border-indigo-100 text-sm font-black font-mono focus:outline-none"
+                                    className="w-full pl-8 pr-3 py-2 bg-[#0B6E4F]/10 border border-[#0B6E4F]/30 text-sm font-black font-mono focus:outline-none"
                                   />
                                 </div>
                               </div>
@@ -936,7 +936,7 @@ export function BookingModal(props: BookingModalProps) {
                                     setSvcDateAdjustment(0);
                                     if (onUpdateBooking) onUpdateBooking(sel.id, { total_price: val, stay_price: val, amount: val });
                                   }}
-                                  className="w-full pl-7 pr-3 py-2 bg-slate-50 border border-slate-200 text-sm font-black text-black font-mono focus:outline-none"
+                                  className="w-full pl-7 pr-3 py-2 bg-[#1C232E]/50 border border-[#5C4A2E]/30 text-sm font-black text-[#EDE6D6] font-mono focus:outline-none"
                                   placeholder="0.00"
                                 />
                               </div>
@@ -948,10 +948,10 @@ export function BookingModal(props: BookingModalProps) {
                   })()}
 
                   {isRoomStay && (
-                    <div className="border border-slate-200 rounded-xl p-4 space-y-4 bg-white shadow-sm">
+                    <div className="border border-[#5C4A2E]/30 rounded-xl p-4 space-y-4 bg-[#1C232E] shadow-lg">
                       <div className="flex justify-between items-end mb-3">
                         <div className="space-y-1">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Kitchen Orders</p>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Kitchen Orders</p>
                         </div>
                       </div>
                       
@@ -971,9 +971,9 @@ export function BookingModal(props: BookingModalProps) {
                                   setShowMealRequestModal(true); 
                                 }}
                                 className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all flex flex-col items-center justify-center gap-1 border-2 ${
-                                  hasAcceptedLunch ? 'bg-emerald-500 border-emerald-400 text-white shadow-md active:scale-95' : 
-                                  isPending ? 'bg-orange-500 border-orange-400 text-white shadow-md active:scale-95' : 
-                                  'bg-white border-slate-100 text-slate-400 hover:border-indigo-200 hover:text-indigo-600 shadow-md active:scale-95'
+                                  hasAcceptedLunch ? 'bg-[#0B6E4F] border-[#0B6E4F]/80 text-[#C9A227] shadow-md active:scale-95' : 
+                                  isPending ? 'bg-[#C9A227] border-[#C9A227]/80 text-[#1C232E] shadow-md active:scale-95' : 
+                                  'bg-[#1C232E] border-[#5C4A2E]/30 text-[#9C9384] hover:border-[#0B6E4F] hover:text-[#0B6E4F] shadow-md active:scale-95'
                                 }`}>
                                 {isPending ? <span className="opacity-80">⏳ Sent — + Add More</span> :
                                  hasAcceptedLunch ? <span className="opacity-80">✓ Accepted — + Add More</span> :
@@ -999,9 +999,9 @@ export function BookingModal(props: BookingModalProps) {
                                   setShowMealRequestModal(true); 
                                 }}
                                 className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all flex flex-col items-center justify-center gap-1 border-2 ${
-                                  hasAcceptedDinner ? 'bg-emerald-500 border-emerald-400 text-white shadow-md active:scale-95' : 
-                                  isPending ? 'bg-orange-500 border-orange-400 text-white shadow-md active:scale-95' : 
-                                  'bg-white border-slate-100 text-slate-400 hover:border-indigo-200 hover:text-indigo-600 shadow-md active:scale-95'
+                                  hasAcceptedDinner ? 'bg-[#0B6E4F] border-[#0B6E4F]/80 text-[#C9A227] shadow-md active:scale-95' : 
+                                  isPending ? 'bg-[#C9A227] border-[#C9A227]/80 text-[#1C232E] shadow-md active:scale-95' : 
+                                  'bg-[#1C232E] border-[#5C4A2E]/30 text-[#9C9384] hover:border-[#0B6E4F] hover:text-[#0B6E4F] shadow-md active:scale-95'
                                 }`}>
                                 {isPending ? <span className="opacity-80">⏳ Sent — + Add More</span> :
                                  hasAcceptedDinner ? <span className="opacity-80">✓ Accepted — + Add More</span> :
@@ -1023,60 +1023,60 @@ export function BookingModal(props: BookingModalProps) {
                   {/* Meal Request Modal */}
                   {showMealRequestModal && (
                     <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowMealRequestModal(false)}>
-                      <div className="bg-white rounded-[32px] w-full max-w-sm p-8 shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                      <div className="bg-[#1C232E] rounded-[32px] w-full max-w-sm p-8 shadow-2xl animate-in zoom-in-95 duration-200 border border-[#5C4A2E]/30" onClick={e => e.stopPropagation()}>
                         <div className="flex justify-between items-center mb-6">
-                          <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Request {currentMealType}</h3>
-                          <button onClick={() => setShowMealRequestModal(false)} className="text-2xl font-bold text-slate-400">×</button>
+                          <h3 className="text-xl font-black text-[#EDE6D6] uppercase tracking-tight">Request {currentMealType}</h3>
+                          <button onClick={() => setShowMealRequestModal(false)} className="text-2xl font-bold text-[#9C9384] hover:text-[#EDE6D6] transition-colors">×</button>
                         </div>
                         
                         <div className="space-y-6">
                           <div className="flex items-center justify-center gap-6">
-                            <button type="button" onClick={() => setMealRequestAmount(Math.max(0, mealRequestAmount - 1))} className="w-16 h-16 rounded-3xl bg-slate-100 text-slate-600 text-2xl font-black hover:bg-slate-200 transition-all shadow-sm">－</button>
-                            <div className="text-5xl font-black text-slate-900 min-w-[60px] text-center">{mealRequestAmount}</div>
-                            <button type="button" onClick={() => setMealRequestAmount(mealRequestAmount + 1)} className="w-16 h-16 rounded-3xl bg-indigo-50 text-indigo-600 text-2xl font-black hover:bg-indigo-100 transition-all shadow-sm">＋</button>
+                            <button type="button" onClick={() => setMealRequestAmount(Math.max(0, mealRequestAmount - 1))} className="w-16 h-16 rounded-3xl bg-[#1C232E]/50 text-[#9C9384] text-2xl font-black hover:bg-[#2A1518] transition-all shadow-sm border border-[#5C4A2E]/30">－</button>
+                            <div className="text-5xl font-black text-[#EDE6D6] min-w-[60px] text-center">{mealRequestAmount}</div>
+                            <button type="button" onClick={() => setMealRequestAmount(mealRequestAmount + 1)} className="w-16 h-16 rounded-3xl bg-[#0B6E4F]/20 text-[#0B6E4F] text-2xl font-black hover:bg-[#0B6E4F]/30 transition-all shadow-sm border border-[#0B6E4F]/40">＋</button>
                           </div>
 
-                          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Include in Booking (Prepaid)</span>
+                          <div className="flex items-center justify-between p-4 bg-[#1C232E]/50 rounded-2xl border border-[#5C4A2E]/30">
+                            <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Include in Booking (Prepaid)</span>
                             <button 
                               type="button"
                               onClick={() => currentMealType === 'lunch' ? setIsLunchPrepaid(!isLunchPrepaid) : setIsDinnerPrepaid(!isDinnerPrepaid)}
-                              className={`w-12 h-6 rounded-full transition-all relative ${ (currentMealType === 'lunch' ? isLunchPrepaid : isDinnerPrepaid) ? 'bg-emerald-500' : 'bg-slate-300' }`}
+                              className={`w-12 h-6 rounded-full transition-all relative ${ (currentMealType === 'lunch' ? isLunchPrepaid : isDinnerPrepaid) ? 'bg-[#0B6E4F]' : 'bg-[#5C4A2E]' }`}
                             >
-                              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${ (currentMealType === 'lunch' ? isLunchPrepaid : isDinnerPrepaid) ? 'left-7' : 'left-1' }`} />
+                              <div className={`absolute top-1 w-4 h-4 bg-[#EDE6D6] rounded-full transition-all ${ (currentMealType === 'lunch' ? isLunchPrepaid : isDinnerPrepaid) ? 'left-7' : 'left-1' }`} />
                             </button>
                           </div>
 
                           <div className="space-y-3">
                             <div>
-                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Dietary Type</label>
+                              <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest block mb-2">Dietary Type</label>
                               <select
                                 value={mealRequestDietary}
                                 onChange={(e) => setMealRequestDietary(e.target.value as 'Normal' | 'Vegetarian')}
-                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-900 outline-none focus:border-indigo-500 transition-all"
+                                className="w-full px-4 py-3 bg-[#1C232E] border border-[#5C4A2E]/30 rounded-xl text-sm font-black text-[#EDE6D6] outline-none focus:border-[#0B6E4F] transition-all"
                               >
                                 <option value="Normal">Normal</option>
                                 <option value="Vegetarian">Vegetarian</option>
                               </select>
                             </div>
                             <div>
-                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Notes (Optional)</label>
+                              <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest block mb-2">Notes (Optional)</label>
                               <input
                                 type="text"
                                 value={mealRequestNotes}
                                 onChange={(e) => setMealRequestNotes(e.target.value)}
-                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-900 outline-none focus:border-indigo-500 transition-all"
+                                className="w-full px-4 py-3 bg-[#1C232E] border border-[#5C4A2E]/30 rounded-xl text-sm font-black text-[#EDE6D6] outline-none focus:border-[#0B6E4F] transition-all"
                                 placeholder="e.g., No peanuts, Extra spicy"
                               />
                             </div>
                           </div>
 
                           {(currentMealType === 'lunch' ? isLunchPrepaid : isDinnerPrepaid) && (
-                            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-center gap-3 animate-in fade-in slide-in-from-top-1">
-                              <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 shrink-0">
+                            <div className="bg-[#0B6E4F]/10 border border-[#0B6E4F]/30 rounded-2xl p-4 flex items-center gap-3 animate-in fade-in slide-in-from-top-1">
+                              <div className="w-8 h-8 bg-[#0B6E4F]/20 rounded-full flex items-center justify-center text-[#0B6E4F] shrink-0">
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                               </div>
-                              <p className="text-[11px] font-bold text-emerald-700 leading-tight">
+                              <p className="text-[11px] font-bold text-[#0B6E4F] leading-tight">
                                 This is a <span className="font-black uppercase">Prepaid</span> request. It will not increase the guest's debt on the tab.
                               </p>
                             </div>
@@ -1137,7 +1137,7 @@ export function BookingModal(props: BookingModalProps) {
                               flash('✓ Sent to Kitchen!');
                               setShowMealRequestModal(false);
                             }}
-                            className="w-full py-5 bg-indigo-600 text-white rounded-[24px] text-sm font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50"
+                            className="w-full py-5 bg-[#0B6E4F] text-[#C9A227] rounded-[24px] text-sm font-black uppercase tracking-[0.2em] shadow-xl shadow-[#0B6E4F]/30 hover:bg-[#0B6E4F]/80 transition-all active:scale-95 disabled:opacity-50"
                           >
                             Send to Kitchen
                           </button>
@@ -1147,9 +1147,9 @@ export function BookingModal(props: BookingModalProps) {
                   )}
 
                   {isRoomStay && (
-                    <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-white">
+                    <div className="border border-[#5C4A2E]/30 rounded-xl p-4 space-y-3 bg-[#1C232E]">
 
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Other Services</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Other Services</p>
                       <div className="grid grid-cols-1 gap-4">
                         <div className="space-y-2">
                           <div className="flex justify-between items-center">
@@ -1160,23 +1160,23 @@ export function BookingModal(props: BookingModalProps) {
                                   setSvcGuidePrice(pricing?.guide_price || 0); 
                                   setSvcGuideNames(['']); 
                                 } 
-                              }} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
+                              }} className="w-5 h-5 border-2 border-[#5C4A2E]/30 text-[#0B6E4F] rounded" />
                               <div className="flex flex-col">
-                                <span className="text-sm font-bold text-slate-900">Guide Service</span>
+                                <span className="text-sm font-bold text-[#EDE6D6]">Guide Service</span>
                                 {pricing?.guide_price && pricing.guide_price > 0 && (
-                                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">System Price: ${String(pricing.guide_price)} / guide</span>
+                                  <span className="text-[9px] font-bold text-[#9C9384] uppercase tracking-wider">System Price: ${String(pricing.guide_price)} / guide</span>
                                 )}
                               </div>
                             </label>
                             {svcGuide && (
                               <div className="flex items-center gap-2">
-                                <button type="button" onClick={() => setSvcGuidePrice(Math.max(0, svcGuidePrice - 5))} className="w-8 h-8 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-black text-sm transition-all shadow-sm">－</button>
+                                <button type="button" onClick={() => setSvcGuidePrice(Math.max(0, svcGuidePrice - 5))} className="w-8 h-8 flex items-center justify-center bg-[#1C232E]/50 hover:bg-[#2A1518] text-[#9C9384] rounded-xl font-black text-sm transition-all shadow-sm border border-[#5C4A2E]/30">－</button>
                                 <div className="relative">
-                                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px]">$</span>
+                                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[#9C9384] font-bold text-[10px]">$</span>
                                   <input type="number" value={String(svcGuidePrice)} onChange={e => setSvcGuidePrice(parseFloat(e.target.value) || 0)}
-                                    className="w-20 pl-5 pr-2 py-2 bg-white border-2 border-slate-200 rounded-xl text-base font-black text-black focus:border-indigo-500 outline-none text-center" />
+                                    className="w-20 pl-5 pr-2 py-2 bg-[#1C232E] border-2 border-[#5C4A2E]/30 rounded-xl text-base font-black text-[#EDE6D6] focus:border-[#0B6E4F] outline-none text-center" />
                                 </div>
-                                <button type="button" onClick={() => setSvcGuidePrice(svcGuidePrice + 5)} className="w-8 h-8 flex items-center justify-center bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl font-black text-sm transition-all shadow-sm">＋</button>
+                                <button type="button" onClick={() => setSvcGuidePrice(svcGuidePrice + 5)} className="w-8 h-8 flex items-center justify-center bg-[#0B6E4F]/20 hover:bg-[#0B6E4F]/30 text-[#0B6E4F] rounded-xl font-black text-sm transition-all shadow-sm border border-[#0B6E4F]/40">＋</button>
                               </div>
                             )}
                           </div>
@@ -1186,44 +1186,44 @@ export function BookingModal(props: BookingModalProps) {
                                 <div key={ni} className="flex gap-2">
                                   <input type="text" value={String(name || '')} onChange={e => { const next = [...svcGuideNames]; next[ni] = e.target.value; setSvcGuideNames(next); }}
                                     placeholder={`Guide ${ni + 1} name...`}
-                                    className={`flex-1 px-3 py-2 border-2 ${!String(name).trim() ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} />
+                                    className={`flex-1 px-3 py-2 border-2 ${!String(name).trim() ? 'border-[#722F37] bg-[#722F37]/10' : 'border-[#5C4A2E]/30 bg-[#1C232E]'} rounded-lg text-base font-bold text-[#EDE6D6] focus:border-[#0B6E4F] transition-all`} />
                                   {svcGuideNames.length > 1 && <button type="button" onClick={() => { setSvcGuideNames(svcGuideNames.filter((_: any, i: number) => i !== ni)); setSvcGuidePrice(Math.max(0, svcGuidePrice - 40)); }}
-                                    className="text-rose-500 hover:text-rose-600 font-black text-xl px-1">×</button>}
+                                    className="text-[#722F37] hover:text-[#722F37]/80 font-black text-xl px-1">×</button>}
                                 </div>
                               ))}
                               <button type="button" onClick={() => { setSvcGuideNames([...svcGuideNames, '']); setSvcGuidePrice(svcGuidePrice + 40); }}
-                                className="w-full py-1.5 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:border-indigo-300 hover:text-indigo-500 transition-all">+ Add Another Guide ($40)</button>
+                                className="w-full py-1.5 border-2 border-dashed border-[#5C4A2E]/30 rounded-xl text-[10px] font-black text-[#9C9384] uppercase tracking-widest hover:border-[#0B6E4F] hover:text-[#0B6E4F] transition-all">+ Add Another Guide ($40)</button>
                             </div>
                           )}
                         </div>
-                        <div className="space-y-2 pt-2 border-t border-slate-100">
+                        <div className="space-y-2 pt-2 border-t border-[#5C4A2E]/30">
                           <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" checked={svcTransport} onChange={e => setSvcTransport(e.target.checked)} className="w-5 h-5 border-2 border-slate-300 text-indigo-600 rounded" />
-                            <span className="text-sm font-bold text-slate-900">Transport</span>
+                            <input type="checkbox" checked={svcTransport} onChange={e => setSvcTransport(e.target.checked)} className="w-5 h-5 border-2 border-[#5C4A2E]/30 text-[#0B6E4F] rounded" />
+                            <span className="text-sm font-bold text-[#EDE6D6]">Transport</span>
                           </label>
                           {svcTransport && (
                             <div className="space-y-3">
                               {svcTransList.map((trans: any, ti: number) => (
-                                <div key={ti} className="p-3 border border-slate-100 rounded-xl bg-slate-50/50 space-y-2">
+                                <div key={ti} className="p-3 border border-[#5C4A2E]/30 rounded-xl bg-[#1C232E]/50 space-y-2">
                                   <div className="flex justify-between items-center">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Transfer {String(ti + 1)}</span>
-                                    {svcTransList.length > 1 && <button type="button" onClick={() => setSvcTransList(svcTransList.filter((_: any, i: number) => i !== ti))} className="text-rose-600 hover:text-rose-700 font-bold text-xs">✕ Remove</button>}
+                                    <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Transfer {String(ti + 1)}</span>
+                                    {svcTransList.length > 1 && <button type="button" onClick={() => setSvcTransList(svcTransList.filter((_: any, i: number) => i !== ti))} className="text-[#722F37] hover:text-[#722F37]/80 font-bold text-xs">✕ Remove</button>}
                                   </div>
                                   <input type="text" value={String(trans.name)} onChange={e => setSvcTransList(svcTransList.map((t: any, i: number) => i === ti ? { ...t, name: e.target.value } : t))} placeholder="Driver Name..."
-                                    className={`w-full px-3 py-2 border-2 ${!String(trans.name).trim() ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} />
+                                    className={`w-full px-3 py-2 border-2 ${!String(trans.name).trim() ? 'border-[#722F37] bg-[#722F37]/10' : 'border-[#5C4A2E]/30 bg-[#1C232E]'} rounded-lg text-base font-bold text-[#EDE6D6] focus:border-[#0B6E4F] transition-all`} />
                                   <div className="flex gap-2">
                                     <input type="text" value={String(trans.details)} onChange={e => setSvcTransList(svcTransList.map((t: any, i: number) => i === ti ? { ...t, details: e.target.value } : t))} placeholder="From/To..."
-                                      className={`flex-1 px-3 py-2 border-2 ${!String(trans.details).trim() ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} />
+                                      className={`flex-1 px-3 py-2 border-2 ${!String(trans.details).trim() ? 'border-[#722F37] bg-[#722F37]/10' : 'border-[#5C4A2E]/30 bg-[#1C232E]'} rounded-lg text-base font-bold text-[#EDE6D6] focus:border-[#0B6E4F] transition-all`} />
                                     <div className="flex items-center gap-1.5">
-                                      <span className="text-[10px] font-bold text-slate-400">$</span>
+                                      <span className="text-[10px] font-bold text-[#9C9384]">$</span>
                                       <input type="number" value={String(trans.price)} onChange={e => setSvcTransList(svcTransList.map((t: any, i: number) => i === ti ? { ...t, price: parseFloat(e.target.value) || 0 } : t))} placeholder="Price"
-                                        className={`w-20 px-3 py-2 border-2 ${trans.price <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'} rounded-lg text-base font-bold text-black focus:border-indigo-500 transition-all`} />
+                                        className={`w-20 px-3 py-2 border-2 ${trans.price <= 0 ? 'border-[#722F37] bg-[#722F37]/10' : 'border-[#5C4A2E]/30 bg-[#1C232E]'} rounded-lg text-base font-bold text-[#EDE6D6] focus:border-[#0B6E4F] transition-all`} />
                                     </div>
                                   </div>
                                 </div>
                               ))}
                               <button type="button" onClick={() => setSvcTransList([...svcTransList, { name: '', details: '', price: 0 }])}
-                                className="w-full py-1.5 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:border-indigo-300 hover:text-indigo-500 transition-all">+ Add Transfer</button>
+                                className="w-full py-1.5 border-2 border-dashed border-[#5C4A2E]/30 rounded-xl text-[10px] font-black text-[#9C9384] uppercase tracking-widest hover:border-[#0B6E4F] hover:text-[#0B6E4F] transition-all">+ Add Transfer</button>
                             </div>
                           )}
                         </div>
@@ -1234,18 +1234,18 @@ export function BookingModal(props: BookingModalProps) {
               )}
 
               {(canCheckOut || sel.status === 'checked_in') && isStaff && (
-                <div className="border border-slate-200 rounded-xl p-4 space-y-3">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Extra Services</p>
-                  <button onClick={() => setShowDrinks(!showDrinks)} className="text-sm font-bold text-indigo-600 hover:text-indigo-700">{showDrinks ? '− Hide Drinks' : '+ Add Drinks'}</button>
+                <div className="border border-[#5C4A2E]/30 rounded-xl p-4 space-y-3 bg-[#1C232E]">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Extra Services</p>
+                  <button onClick={() => setShowDrinks(!showDrinks)} className="text-sm font-bold text-[#0B6E4F] hover:text-[#0B6E4F]/80">{showDrinks ? '− Hide Drinks' : '+ Add Drinks'}</button>
                   {showDrinks && drinks.length > 0 && (
                     <div className="grid grid-cols-2 gap-2">
                       {drinks.map((d: any) => (
-                        <div key={d.id} className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2">
-                          <span className="text-xs text-black flex-1 truncate">{String(d.name)}</span>
+                        <div key={d.id} className="flex items-center gap-2 bg-[#1C232E]/50 rounded-lg px-3 py-2 border border-[#5C4A2E]/30">
+                          <span className="text-xs text-[#EDE6D6] flex-1 truncate">{String(d.name)}</span>
                           <div className="flex items-center gap-1">
-                            <button onClick={() => setSelectedDrinks({ ...selectedDrinks, [d.id]: Math.max(0, (selectedDrinks[d.id] || 0) - 1) })} className="w-5 h-5 rounded bg-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-300">−</button>
-                            <span className="w-5 text-center text-xs font-bold text-black">{String(selectedDrinks[d.id] || 0)}</span>
-                            <button onClick={() => setSelectedDrinks({ ...selectedDrinks, [d.id]: (selectedDrinks[d.id] || 0) + 1 })} className="w-5 h-5 rounded bg-indigo-100 text-indigo-700 text-xs font-bold hover:bg-indigo-200">+</button>
+                            <button onClick={() => setSelectedDrinks({ ...selectedDrinks, [d.id]: Math.max(0, (selectedDrinks[d.id] || 0) - 1) })} className="w-5 h-5 rounded bg-[#1C232E]/50 text-[#9C9384] text-xs font-bold hover:bg-[#2A1518] border border-[#5C4A2E]/30">−</button>
+                            <span className="w-5 text-center text-xs font-bold text-[#EDE6D6]">{String(selectedDrinks[d.id] || 0)}</span>
+                            <button onClick={() => setSelectedDrinks({ ...selectedDrinks, [d.id]: (selectedDrinks[d.id] || 0) + 1 })} className="w-5 h-5 rounded bg-[#0B6E4F]/20 text-[#0B6E4F] text-xs font-bold hover:bg-[#0B6E4F]/30 border border-[#0B6E4F]/40">+</button>
                           </div>
                         </div>
                       ))}
@@ -1253,20 +1253,20 @@ export function BookingModal(props: BookingModalProps) {
                   )}
                   <div className="flex gap-2">
                     <input type="text" value={String(newExtraName)} onChange={e => setNewExtraName(e.target.value)} placeholder="Service name"
-                      className="flex-1 px-3 py-2 text-base rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 text-black" />
+                      className="flex-1 px-3 py-2 text-base rounded-lg border border-[#5C4A2E]/30 bg-[#1C232E] focus:outline-none focus:ring-2 focus:ring-[#0B6E4F]/30 text-[#EDE6D6]" />
                     <input type="number" value={String(newExtraPrice)} onChange={e => setNewExtraPrice(e.target.value)} placeholder="Price"
-                      className="w-20 px-3 py-2 text-base rounded-lg border border-slate-200 focus:outline-none text-black" />
+                      className="w-20 px-3 py-2 text-base rounded-lg border border-[#5C4A2E]/30 bg-[#1C232E] focus:outline-none text-[#EDE6D6]" />
                     <button onClick={() => { if (!newExtraName.trim()) return; setExtraServices([...extraServices, { name: newExtraName.trim(), price: newExtraPrice, currency: 'USD' }]); setNewExtraName(''); setNewExtraPrice(''); }}
-                      className="px-3 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700">Add</button>
+                      className="px-3 py-2 bg-[#0B6E4F] text-[#C9A227] text-xs font-bold rounded-lg hover:bg-[#0B6E4F]/80 border border-[#0B6E4F]/40">Add</button>
                   </div>
                   {extraServices.length > 0 && (
                     <div className="space-y-1">
                       {extraServices.map((s: any, i: number) => (
-                        <div key={i} className="flex justify-between items-center text-xs bg-indigo-50 px-3 py-1.5 rounded-lg">
-                          <span className="text-black">{String(s.name)}</span>
+                        <div key={i} className="flex justify-between items-center text-xs bg-[#0B6E4F]/10 px-3 py-1.5 rounded-lg border border-[#0B6E4F]/20">
+                          <span className="text-[#EDE6D6]">{String(s.name)}</span>
                           <div className="flex items-center gap-2">
-                            <span className="font-bold text-indigo-700">{String(s.price)} {String(s.currency)}</span>
-                            <button onClick={() => setExtraServices(extraServices.filter((_: any, j: number) => j !== i))} className="text-red-400 hover:text-red-600 font-bold">×</button>
+                            <span className="font-bold text-[#0B6E4F]">{String(s.price)} {String(s.currency)}</span>
+                            <button onClick={() => setExtraServices(extraServices.filter((_: any, j: number) => j !== i))} className="text-[#722F37] hover:text-[#722F37]/80 font-bold">×</button>
                           </div>
                         </div>
                       ))}
@@ -1276,10 +1276,10 @@ export function BookingModal(props: BookingModalProps) {
               )}
 
               {isStaff && !isPOS && sel.status !== 'completed' && (
-                <div className="bg-indigo-600 rounded-2xl p-5 text-white shadow-xl shadow-indigo-200 animate-in fade-in zoom-in duration-500">
+                <div className="bg-[#0B6E4F] rounded-2xl p-5 text-[#C9A227] shadow-xl shadow-[#0B6E4F]/20 animate-in fade-in zoom-in duration-500 border border-[#0B6E4F]/40">
                   <div className="flex justify-between items-center mb-4">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Tab Summary</p>
-                    <svg className="w-5 h-5 text-indigo-300 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-[#C9A227]/80">Tab Summary</p>
+                    <svg className="w-5 h-5 text-[#C9A227]/60 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
                   </div>
                   
                   <div className="space-y-2">
@@ -1422,7 +1422,7 @@ export function BookingModal(props: BookingModalProps) {
                           </span>
                         )}
                         {sel.payment_status === 'paid' && (
-                          <span className="font-mono text-[9px] font-black uppercase tracking-widest border border-white px-2 py-0.5 bg-white text-indigo-600">
+                          <span className="font-mono text-[9px] font-black uppercase tracking-widest border border-[#5C4A2E]/30 px-2 py-0.5 bg-[#1C232E] text-[#0B6E4F]">
                             [ PAID - {svcPayList?.[0]?.method?.toUpperCase() || 'CASH'} ]
                           </span>
                         )}
@@ -1437,9 +1437,9 @@ export function BookingModal(props: BookingModalProps) {
 
               {isStaff && sel.status !== 'completed' && (
                   Math.abs(debtRemaining) > 0.01 && (
-                    <div className="bg-white border border-black p-6 space-y-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                    <div className="bg-[#1C232E] border border-[#5C4A2E]/30 p-6 space-y-4 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)]">
                       <div className="flex justify-between items-center">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Payment Collection</p>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Payment Collection</p>
                         {isBalanceMatched || (tPaidUsd >= debtRemaining - 1.00) ? (
                           <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200">
                             Paid
@@ -1456,9 +1456,9 @@ export function BookingModal(props: BookingModalProps) {
                           const currentRate = pay.currency === 'USD' ? 1 : (pay.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92));
                           
                           return (
-                            <div key={pi} className="space-y-3 p-4 bg-slate-50/50 rounded-2xl border border-slate-100 animate-in slide-in-from-top-2 duration-300">
+                            <div key={pi} className="space-y-3 p-4 bg-[#1C232E]/50 rounded-2xl border border-[#5C4A2E]/30 animate-in slide-in-from-top-2 duration-300">
                               <div className="flex justify-between items-center">
-                                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">Payment {String(pi + 1)}</label>
+                                <label className="text-[9px] font-black uppercase tracking-widest text-[#9C9384]">Payment {String(pi + 1)}</label>
                                 {svcPayList.length > 1 && (
                                   <button onClick={() => setSvcPayList(svcPayList.filter((_: any, i: number) => i !== pi))} className="text-[10px] font-bold text-rose-500 hover:text-rose-700">✕ Remove</button>
                                 )}
@@ -1491,7 +1491,7 @@ export function BookingModal(props: BookingModalProps) {
                                           return updates;
                                         }));
                                       }}
-                                    className="w-full px-4 py-3 bg-white border-2 border-slate-200 rounded-2xl text-base font-black text-black outline-none focus:border-indigo-500 transition-all shadow-sm"
+                                    className="w-full px-4 py-3 bg-[#1C232E] border-2 border-[#5C4A2E]/30 rounded-2xl text-base font-black text-[#EDE6D6] outline-none focus:border-[#0B6E4F] transition-all shadow-sm"
                                   >
                                     <option value="USD">USD ($)</option>
                                     <option value="UZS">UZS (Sum)</option>
@@ -1520,7 +1520,7 @@ export function BookingModal(props: BookingModalProps) {
                                           const val = parseFloat(e.target.value) || 0;
                                           setPricing({ ...pricing, [pay.currency === 'UZS' ? 'usd_to_uzs' : 'usd_to_eur']: val });
                                         }}
-                                        className="w-full pl-14 pr-3 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-base font-black text-black outline-none focus:border-indigo-500 shadow-sm"
+                                        className="w-full pl-14 pr-3 py-2.5 bg-[#1C232E] border-2 border-[#5C4A2E]/30 rounded-xl text-base font-black text-[#EDE6D6] outline-none focus:border-[#0B6E4F] shadow-sm"
                                       />
                                     </div>
                                   </div>
@@ -1535,8 +1535,8 @@ export function BookingModal(props: BookingModalProps) {
                                         onClick={() => setSvcPayList(svcPayList.map((p: any, i: number) => i === pi ? { ...p, method: m } : p))}
                                         className={`flex-1 py-3 rounded-2xl text-xs font-black uppercase tracking-tighter transition-all border-2 ${
                                           pay.method === m 
-                                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' 
-                                            : 'bg-white border-slate-200 text-slate-400 hover:border-indigo-100'
+                                            ? 'bg-[#0B6E4F] border-[#0B6E4F] text-[#C9A227] shadow-lg' 
+                                            : 'bg-[#1C232E] border-[#5C4A2E]/30 text-[#9C9384] hover:border-[#0B6E4F]'
                                         }`}
                                       >
                                         {String(m)}
@@ -1579,7 +1579,7 @@ export function BookingModal(props: BookingModalProps) {
                                         setSvcPayList(svcPayList.map((p: any, i: number) => i === pi ? { ...p, amount: e.target.value } : p));
                                       }}
                                       placeholder="0.00"
-                                      className={`w-full ${pay.currency === 'UZS' ? 'pl-11' : 'pl-8'} pr-4 py-4 bg-white border-2 border-slate-200 rounded-3xl text-xl font-black text-black focus:border-indigo-500 shadow-md`}
+                                      className={`w-full ${pay.currency === 'UZS' ? 'pl-11' : 'pl-8'} pr-4 py-4 bg-[#1C232E] border-2 border-[#5C4A2E]/30 rounded-3xl text-xl font-black text-[#EDE6D6] focus:border-[#0B6E4F] shadow-md`}
                                     />
                                   </div>
                                 </div>
@@ -1597,12 +1597,12 @@ export function BookingModal(props: BookingModalProps) {
                               method: 'Cash' 
                             }]);
                           }}
-                          className="w-full py-3 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:border-indigo-300 hover:text-indigo-500 transition-all bg-slate-50/30"
+                          className="w-full py-3 border-2 border-dashed border-[#5C4A2E]/30 rounded-2xl text-[10px] font-black text-[#9C9384] uppercase tracking-widest hover:border-[#0B6E4F] hover:text-[#0B6E4F] transition-all bg-[#1C232E]/30"
                         >
                           + Add Another Currency
                         </button>
 
-                        <div className="sticky bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-slate-100 -mx-4 -mb-4 rounded-b-[24px] z-30 flex flex-col gap-2">
+                        <div className="sticky bottom-0 left-0 right-0 p-4 bg-[#1C232E]/80 backdrop-blur-md border-t border-[#5C4A2E]/30 -mx-4 -mb-4 rounded-b-[24px] z-30 flex flex-col gap-2">
                           {!isBalanceMatched && (
                             <div className="flex items-center justify-between px-2">
                               <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest">
@@ -1644,7 +1644,7 @@ export function BookingModal(props: BookingModalProps) {
                               setShowFinalReceipt(true);
                             }}
                             disabled={loadingAction === 'checkout'}
-                            className={`w-full py-4 rounded-2xl font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 shadow-xl ${!isBalanceMatched ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' : 'bg-indigo-600 text-white hover:bg-indigo-700 hover:scale-[1.02] active:scale-95 shadow-indigo-100'}`}
+                            className={`w-full py-4 rounded-2xl font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 shadow-xl ${!isBalanceMatched ? 'bg-[#1C232E]/50 text-[#9C9384] cursor-not-allowed shadow-none' : 'bg-[#0B6E4F] text-[#C9A227] hover:bg-[#0B6E4F]/80 hover:scale-[1.02] active:scale-95 shadow-[#0B6E4F]/20'}`}
                           >
                             {loadingAction === 'checkout' ? 'Processing...' : 'Review & Pay Tab'}
                           </button>
@@ -1660,8 +1660,8 @@ export function BookingModal(props: BookingModalProps) {
                 const tabCount = receipts.length;
                 if (tabCount === 0 && gTotal <= 0.01 && (sel.collected_amount || 0) === 0) return null;
                 return (
-                  <div className="border border-slate-100 rounded-2xl p-4 bg-slate-50/50 space-y-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Guest Folio</p>
+                  <div className="border border-[#5C4A2E]/30 rounded-2xl p-4 bg-[#1C232E]/50 space-y-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Guest Folio</p>
                     <div className="flex flex-wrap gap-2">
                       {receipts.map((r: any, idx: number) => (
                         <button
@@ -1694,26 +1694,26 @@ export function BookingModal(props: BookingModalProps) {
 
               {showFinalReceipt && sel && (
                 <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
-                  <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowFinalReceipt(false)} />
-                  <div className="relative bg-white rounded-[32px] shadow-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+                  <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setShowFinalReceipt(false)} />
+                  <div className="relative bg-[#1C232E] rounded-[32px] shadow-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200 border border-[#5C4A2E]/30">
                     <div ref={receiptRef}>
-                      <div className="bg-[#6366f1] px-6 py-10 text-white text-center relative overflow-hidden">
+                      <div className="bg-[#0B6E4F] px-6 py-10 text-[#C9A227] text-center relative overflow-hidden">
                         <div className="absolute top-4 right-4 z-10">
-                          <button onClick={() => setShowFinalReceipt(false)} className="text-white/40 hover:text-white transition-all text-2xl font-bold">×</button>
+                          <button onClick={() => setShowFinalReceipt(false)} className="text-[#C9A227]/60 hover:text-[#C9A227] transition-all text-2xl font-bold">×</button>
                         </div>
                         
                         <div className="relative z-10 flex flex-col items-center">
-                          <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mb-4 backdrop-blur-sm border border-white/20">
+                          <div className="w-16 h-16 bg-[#1C232E]/20 rounded-full flex items-center justify-center mb-4 backdrop-blur-sm border border-[#5C4A2E]/30">
                             <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
                           </div>
                           
                           <h3 className="text-2xl font-black uppercase tracking-tight mb-2">Final Receipt</h3>
-                          <p className="text-[10px] font-black tracking-widest text-white/60 uppercase mb-4">Receipt #{selectedReceipt?.id || 'PENDING'}</p>
+                          <p className="text-[10px] font-black tracking-widest text-[#C9A227]/60 uppercase mb-4">Receipt #{selectedReceipt?.id || 'PENDING'}</p>
                           
                           {selectedReceipt && (
-                            <div className="bg-white/20 backdrop-blur-md border border-white/30 rounded-lg px-3 py-1.5 text-[9px] font-black uppercase tracking-widest">
+                            <div className="bg-[#1C232E]/20 backdrop-blur-md border border-[#5C4A2E]/30 rounded-lg px-3 py-1.5 text-[9px] font-black uppercase tracking-widest">
                               Settled: {new Date(selectedReceipt.settled_at || selectedReceipt.date || Date.now()).toLocaleString()}
                             </div>
                           )}
@@ -1722,15 +1722,15 @@ export function BookingModal(props: BookingModalProps) {
 
                     <div className="p-6 space-y-6">
                       <div className="space-y-4">
-                        <div className="pb-4 border-b border-slate-100">
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Guest</p>
-                          <p className="text-xl font-black text-slate-900 leading-tight">{String(sel.guest_name)}</p>
+                        <div className="pb-4 border-b border-[#5C4A2E]/30">
+                          <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest mb-1">Guest</p>
+                          <p className="text-xl font-black text-[#EDE6D6] leading-tight">{String(sel.guest_name)}</p>
                         </div>
                         <div className="flex justify-between items-center pt-2">
-                          <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Stay Period</span>
-                          <span className="text-base font-black text-slate-900 flex items-center gap-2">
+                          <span className="text-[11px] font-black text-[#9C9384] uppercase tracking-widest">Stay Period</span>
+                          <span className="text-base font-black text-[#EDE6D6] flex items-center gap-2">
                             {String(sel.check_in)}
-                            <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 text-[#9C9384]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                             </svg>
                             {String(sel.check_out)}
@@ -1847,10 +1847,10 @@ export function BookingModal(props: BookingModalProps) {
                                 {loadingAction === 'save' ? 'SAVING...' : 'SAVE CHOICES'}
                               </button>
                             </div>
-                            <div className="space-y-3 bg-slate-50/50 rounded-2xl p-4 border border-slate-100">
+                            <div className="space-y-3 bg-[#1C232E]/50 rounded-2xl p-4 border border-[#5C4A2E]/30">
                               {(svcAmount > 0 || (isPrepaid && (sel.collected_amount || 0) === 0)) && (
                                 <div className="flex justify-between items-center text-sm">
-                                  <span className="text-slate-600 font-bold">Stay Price</span>
+                                  <span className="text-[#9C9384] font-bold">Stay Price</span>
                                   {isPrepaid && (sel.collected_amount || 0) === 0 ? (
                                     <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">PREPAID</span>
                                   ) : (
@@ -1906,7 +1906,7 @@ export function BookingModal(props: BookingModalProps) {
                               }
                             }}
                             disabled={loadingAction === 'finalize' || !isBalanceMatched}
-                            className={`w-full py-4 rounded-2xl font-black uppercase text-[11px] tracking-widest transition-all shadow-lg active:scale-95 ${isBalanceMatched ? 'bg-emerald-500 text-white shadow-emerald-100 hover:bg-emerald-600' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
+                            className={`w-full py-4 rounded-2xl font-black uppercase text-[11px] tracking-widest transition-all shadow-lg active:scale-95 ${isBalanceMatched ? 'bg-[#0B6E4F] text-[#C9A227] shadow-[#0B6E4F]/30 hover:bg-[#0B6E4F]/80' : 'bg-[#1C232E]/50 text-[#9C9384] cursor-not-allowed'}`}
                           >
                             {loadingAction === 'finalize' ? 'PROCESSING...' : isBalanceMatched ? 'SETTLE & CLOSE TAB' : 'BALANCE MISMATCH'}
                           </button>
@@ -1919,7 +1919,7 @@ export function BookingModal(props: BookingModalProps) {
                     <button 
                       onClick={handleSaveAsImage}
                       disabled={loadingAction === 'exporting'}
-                      className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2"
+                      className="flex-1 py-4 bg-[#1C232E]/50 hover:bg-[#2A1518] text-[#9C9384] rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 border border-[#5C4A2E]/30"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                       {loadingAction === 'exporting' ? 'EXPORTING...' : 'Save Image'}
@@ -1947,10 +1947,10 @@ export function BookingModal(props: BookingModalProps) {
                   </div>
                   <div className="grid gap-2">
                     {getSettledReceiptsForSel().map((receipt: any, idx: number) => (
-                      <div key={idx} className={`p-4 border border-black group ${parseFloat(receipt.total_usd || 0) < 0 ? 'bg-rose-50 border-rose-200' : 'bg-white'}`}>
-                        <div className="flex justify-between items-start mb-2 border-b border-slate-100 pb-2">
+                      <div key={idx} className={`p-4 border border-[#5C4A2E]/30 group ${parseFloat(receipt.total_usd || 0) < 0 ? 'bg-[#722F37]/10 border-[#722F37]/30' : 'bg-[#1C232E]'}`}>
+                        <div className="flex justify-between items-start mb-2 border-b border-[#5C4A2E]/30 pb-2">
                           <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                            <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">
                               {parseFloat(receipt.total_usd || 0) < 0 ? 'Settled Refund' : `Tab #${idx + 1}`}
                             </span>
                             <span className="font-mono text-[10px] text-black font-black mt-0.5">{new Date(receipt.settled_at || new Date()).toLocaleString()}</span>
@@ -1969,19 +1969,19 @@ export function BookingModal(props: BookingModalProps) {
                         </div>
                         <div className="flex flex-wrap gap-2 mt-2">
                            {receipt.items?.accommodation > 0 && (
-                             <span className="text-[8px] font-mono font-black uppercase bg-slate-50 border border-slate-200 px-1.5 py-0.5 text-black">Stay: ${receipt.items.accommodation.toFixed(2)}</span>
+                             <span className="text-[8px] font-mono font-black uppercase bg-[#1C232E]/50 border border-[#5C4A2E]/30 px-1.5 py-0.5 text-[#EDE6D6]">Stay: ${receipt.items.accommodation.toFixed(2)}</span>
                            )}
                            {receipt.items?.meals?.lunch > 0 && (
-                             <span className="text-[8px] font-mono font-black uppercase bg-slate-50 border border-slate-200 px-1.5 py-0.5 text-black">Lunch x{receipt.items.meals.lunch}</span>
+                             <span className="text-[8px] font-mono font-black uppercase bg-[#1C232E]/50 border border-[#5C4A2E]/30 px-1.5 py-0.5 text-[#EDE6D6]">Lunch x{receipt.items.meals.lunch}</span>
                            )}
                            {receipt.items?.meals?.dinner > 0 && (
-                             <span className="text-[8px] font-mono font-black uppercase bg-slate-50 border border-slate-200 px-1.5 py-0.5 text-black">Dinner x{receipt.items.meals.dinner}</span>
+                             <span className="text-[8px] font-mono font-black uppercase bg-[#1C232E]/50 border border-[#5C4A2E]/30 px-1.5 py-0.5 text-[#EDE6D6]">Dinner x{receipt.items.meals.dinner}</span>
                            )}
                            {receipt.items?.drinks?.length > 0 && (
-                             <span className="text-[8px] font-mono font-black uppercase bg-slate-50 border border-slate-200 px-1.5 py-0.5 text-black">Drinks</span>
+                             <span className="text-[8px] font-mono font-black uppercase bg-[#1C232E]/50 border border-[#5C4A2E]/30 px-1.5 py-0.5 text-[#EDE6D6]">Drinks</span>
                            )}
                            {receipt.items?.extras?.length > 0 && (
-                             <span className="text-[8px] font-mono font-black uppercase bg-slate-50 border border-slate-200 px-1.5 py-0.5 text-black">Extras</span>
+                             <span className="text-[8px] font-mono font-black uppercase bg-[#1C232E]/50 border border-[#5C4A2E]/30 px-1.5 py-0.5 text-[#EDE6D6]">Extras</span>
                            )}
                         </div>
                       </div>
@@ -1996,10 +1996,10 @@ export function BookingModal(props: BookingModalProps) {
                   <div className="flex justify-between items-center mb-6">
                     <div>
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unified Guest Folio</p>
-                      <h3 className="text-xl font-black text-black uppercase tracking-tighter mt-1">Audit Manifest</h3>
+                      <h3 className="text-xl font-black text-[#EDE6D6] uppercase tracking-tighter mt-1">Audit Manifest</h3>
                     </div>
-                    <span className={`px-4 py-1.5 text-[10px] font-black uppercase border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] ${
-                      guestStatement.status === 'PAID' || guestStatement.status === 'PREPAID' ? 'bg-black text-white' : 'bg-white text-black animate-pulse'
+                    <span className={`px-4 py-1.5 text-[10px] font-black uppercase border-2 border-[#5C4A2E]/30 shadow-[2px_2px_0px_0px_rgba(92,74,46,0.3)] ${
+                      guestStatement.status === 'PAID' || guestStatement.status === 'PREPAID' ? 'bg-[#0B6E4F] text-[#C9A227]' : 'bg-[#1C232E] text-[#EDE6D6] animate-pulse'
                     }`}>
                       [ STATUS: {guestStatement.status} {guestStatement.status === 'OPEN TAB' ? `- $${guestStatement.remaining.toFixed(2)}` : ''} ]
                     </span>
@@ -2009,10 +2009,10 @@ export function BookingModal(props: BookingModalProps) {
                     {/* Line Items - Bento Style */}
                     <div className="grid gap-2">
                       {/* Accommodation */}
-                      <div className="flex justify-between items-center p-4 bg-white border border-black group">
+                      <div className="flex justify-between items-center p-4 bg-[#1C232E] border border-[#5C4A2E]/30 group">
                         <div className="flex flex-col">
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Service</span>
-                          <span className="text-xs font-black text-black uppercase">Accommodation / Stay Fee</span>
+                          <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Service</span>
+                          <span className="text-xs font-black text-[#EDE6D6] uppercase">Accommodation / Stay Fee</span>
                         </div>
                         <div className="text-right">
                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Amount</span>
@@ -2022,10 +2022,10 @@ export function BookingModal(props: BookingModalProps) {
 
                       {/* Meals */}
                       {guestStatement.mealItems.map((item: any, idx: number) => (
-                        <div key={idx} className="flex justify-between items-center p-4 bg-white border border-black">
+                        <div key={idx} className="flex justify-between items-center p-4 bg-[#1C232E] border border-[#5C4A2E]/30">
                           <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kitchen Request</span>
-                            <span className="text-xs font-black text-black uppercase">{item.name} · <span className="font-mono text-[9px]">{item.date}</span></span>
+                            <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Kitchen Request</span>
+                            <span className="text-xs font-black text-[#EDE6D6] uppercase">{item.name} · <span className="font-mono text-[9px]">{item.date}</span></span>
                           </div>
                           <div className="text-right">
                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
@@ -2038,10 +2038,10 @@ export function BookingModal(props: BookingModalProps) {
 
                       {/* Guide Service */}
                       {guestStatement.guideTotal > 0 && (
-                        <div className="flex justify-between items-center p-4 bg-white border border-black">
+                        <div className="flex justify-between items-center p-4 bg-[#1C232E] border border-[#5C4A2E]/30">
                           <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Guide Service</span>
-                            <span className="text-xs font-black text-black uppercase">{guestStatement.guideNames || 'Guide'}</span>
+                            <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Guide Service</span>
+                            <span className="text-xs font-black text-[#EDE6D6] uppercase">{guestStatement.guideNames || 'Guide'}</span>
                           </div>
                           <div className="text-right">
                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Amount</span>
@@ -2052,10 +2052,10 @@ export function BookingModal(props: BookingModalProps) {
 
                       {/* Transportation */}
                       {guestStatement.transportTotal > 0 && (
-                        <div className="flex justify-between items-center p-4 bg-white border border-black">
+                        <div className="flex justify-between items-center p-4 bg-[#1C232E] border border-[#5C4A2E]/30">
                           <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Transportation</span>
-                            <span className="text-xs font-black text-black uppercase max-w-[200px] truncate">{guestStatement.transportationDetails || 'Transport'}</span>
+                            <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Transportation</span>
+                            <span className="text-xs font-black text-[#EDE6D6] uppercase max-w-[200px] truncate">{guestStatement.transportationDetails || 'Transport'}</span>
                           </div>
                           <div className="text-right">
                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Amount</span>
@@ -2071,22 +2071,22 @@ export function BookingModal(props: BookingModalProps) {
                       </div>
 
                       {/* Reconciliation / Payments */}
-                      <div className="flex justify-between items-center p-4 bg-zinc-50 border border-black mt-4 border-dashed">
+                      <div className="flex justify-between items-center p-4 bg-[#0F1419] border border-[#5C4A2E]/30 mt-4 border-dashed">
                         <div className="flex flex-col">
-                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Reconciliation</span>
-                          <span className="text-xs font-black text-slate-900 uppercase">Settled Payments / Pre-Paid Credit</span>
+                          <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Reconciliation</span>
+                          <span className="text-xs font-black text-[#EDE6D6] uppercase">Settled Payments / Pre-Paid Credit</span>
                         </div>
                         <div className="text-right">
-                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Total Paid</span>
-                          <span className="font-mono text-sm font-black text-emerald-600">-${guestStatement.totalReconciled.toFixed(2)}</span>
+                          <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest block">Total Paid</span>
+                          <span className="font-mono text-sm font-black text-[#0B6E4F]">-${guestStatement.totalReconciled.toFixed(2)}</span>
                         </div>
                       </div>
 
                       {/* Final Balance */}
-                      <div className="flex justify-between items-center p-5 bg-white border-2 border-black mt-2 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-                        <span className="text-md font-black uppercase tracking-[0.1em]">Remaining Balance</span>
+                      <div className="flex justify-between items-center p-5 bg-[#1C232E] border-2 border-[#5C4A2E]/30 mt-2 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)]">
+                        <span className="text-md font-black uppercase tracking-[0.1em] text-[#EDE6D6]">Remaining Balance</span>
                         <div className="text-right">
-                          <p className={`text-2xl font-mono font-black ${guestStatement.status === 'OPEN TAB' ? 'text-rose-600' : 'text-emerald-600'}`}>
+                          <p className={`text-2xl font-mono font-black ${guestStatement.status === 'OPEN TAB' ? 'text-[#722F37]' : 'text-[#0B6E4F]'}`}>
                             {guestStatement.status === 'PREPAID' ? 'PREPAID' : `$${guestStatement.remaining.toFixed(2)}`}
                           </p>
                           {guestStatement.status === 'OPEN TAB' && (
@@ -2105,10 +2105,10 @@ export function BookingModal(props: BookingModalProps) {
       {valError && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setValError(null)} />
-          <div className="relative bg-white rounded-[32px] shadow-2xl w-full max-w-sm overflow-hidden p-8 space-y-6 text-center">
-            <h3 className="text-2xl font-black uppercase tracking-tight text-rose-500">Checkout Blocked</h3>
-            <p className="text-slate-600 text-sm font-medium leading-relaxed">{String(valError)}</p>
-            <button onClick={() => setValError(null)} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase hover:bg-slate-800 transition-all">I Understand</button>
+          <div className="relative bg-[#1C232E] rounded-[32px] shadow-2xl w-full max-w-sm overflow-hidden p-8 space-y-6 text-center border border-[#5C4A2E]/30">
+            <h3 className="text-2xl font-black uppercase tracking-tight text-[#722F37]">Checkout Blocked</h3>
+            <p className="text-[#9C9384] text-sm font-medium leading-relaxed">{String(valError)}</p>
+            <button onClick={() => setValError(null)} className="w-full py-4 bg-[#0B6E4F] text-[#C9A227] rounded-2xl font-black uppercase hover:bg-[#0B6E4F]/80 transition-all border border-[#0B6E4F]/40">I Understand</button>
           </div>
         </div>
       )}

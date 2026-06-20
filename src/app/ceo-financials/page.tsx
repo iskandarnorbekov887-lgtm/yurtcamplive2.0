@@ -150,42 +150,42 @@ function CEOFinancialCalendar() {
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-zinc-950">
-      <header className="bg-gradient-to-r from-emerald-800 via-emerald-700 to-emerald-800 text-white shadow-sm sticky top-0 z-50">
+    <div className="min-h-screen bg-[#0F1419] font-sans text-[#EDE6D6]">
+      <header className="bg-gradient-to-r from-[#0B6E4F] via-[#0B6E4F] to-[#0B6E4F] text-[#C9A227] shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <a
               href="/ceo"
-              className="p-2.5 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-all border border-white/20 backdrop-blur-sm"
+              className="p-2.5 bg-[#1C232E]/20 text-[#C9A227] rounded-lg hover:bg-[#1C232E]/30 transition-all border border-[#5C4A2E]/30 backdrop-blur-sm"
             >
-              <svg className="w-6 h-6 text-emerald-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-6 h-6 text-[#C9A227]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
             </a>
-            <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20">
-              <svg className="w-6 h-6 text-emerald-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="p-2 bg-[#1C232E]/20 rounded-lg backdrop-blur-sm border border-[#5C4A2E]/30">
+              <svg className="w-6 h-6 text-[#C9A227]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">Financial Calendar</h1>
-              <p className="text-[10px] text-emerald-300 font-bold tracking-widest uppercase opacity-80">Audit HUD</p>
+              <h1 className="text-xl font-bold tracking-tight text-[#EDE6D6]">Financial Calendar</h1>
+              <p className="text-[10px] text-[#9C9384] font-bold tracking-widest uppercase opacity-80">Audit HUD</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
             <button
               onClick={() => router.push('/ceo-financials/pricing')}
-              className="px-4 py-2 bg-white text-emerald-700 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm active:scale-95 flex items-center gap-2"
+              className="px-4 py-2 bg-[#C9A227] text-[#1C232E] rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-[#C9A227]/80 transition-all shadow-sm active:scale-95 flex items-center gap-2"
             >
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               Pricing
             </button>
-            <LanguageSwitcher variant="light" />
+            <LanguageSwitcher variant="dark" />
             <button
               onClick={signOut}
-              className="px-4 py-2 bg-rose-700 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-rose-800 transition-all shadow-sm active:scale-95 flex items-center gap-2"
+              className="px-4 py-2 bg-[#722F37] text-[#EDE6D6] rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-[#722F37]/80 transition-all shadow-sm active:scale-95 flex items-center gap-2"
             >
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -224,24 +224,24 @@ function CEOFinancialCalendar() {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-8">
+        <div className="bg-[#1C232E] rounded-lg border border-[#5C4A2E]/30 shadow-sm p-8">
           <div className="flex justify-between items-center mb-10">
             <button
               onClick={() => setCurrentDate(new Date(year, month - 1))}
-              className="p-2 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-all"
+              className="p-2 bg-[#1C232E]/50 border border-[#5C4A2E]/30 rounded-lg hover:bg-[#2A1518] transition-all"
             >
-              <svg className="w-5 h-5 text-zinc-950" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-[#EDE6D6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <h2 className="text-xl font-bold text-zinc-950 uppercase tracking-tight">
+            <h2 className="text-xl font-bold text-[#EDE6D6] uppercase tracking-tight">
               {monthNames[month]} {year}
             </h2>
             <button
               onClick={() => setCurrentDate(new Date(year, month + 1))}
-              className="p-2 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-all"
+              className="p-2 bg-[#1C232E]/50 border border-[#5C4A2E]/30 rounded-lg hover:bg-[#2A1518] transition-all"
             >
-              <svg className="w-5 h-5 text-zinc-950" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-[#EDE6D6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
@@ -249,7 +249,7 @@ function CEOFinancialCalendar() {
 
           <div className="grid grid-cols-7 gap-3 mb-3">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-              <div key={day} className="text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest py-2">
+              <div key={day} className="text-center text-[10px] font-bold text-[#9C9384] uppercase tracking-widest py-2">
                 {day}
               </div>
             ))}
@@ -257,7 +257,7 @@ function CEOFinancialCalendar() {
 
           <div className="grid grid-cols-7 gap-3">
             {Array.from({ length: firstDay }).map((_, i) => (
-              <div key={`empty-${i}`} className="min-h-[80px] bg-slate-50/30 rounded-lg border border-transparent" />
+              <div key={`empty-${i}`} className="min-h-[80px] bg-[#1C232E]/30 rounded-lg border border-transparent" />
             ))}
             {Array.from({ length: daysInMonth }).map((_, i) => {
               const day = i + 1;
@@ -270,13 +270,13 @@ function CEOFinancialCalendar() {
                   onClick={() => handleDayClick(day)}
                   className={`min-h-[90px] p-3 rounded-lg border transition-all flex flex-col justify-between group ${
                     isToday
-                      ? 'border-emerald-600 bg-emerald-50/50 shadow-sm'
-                      : 'border-slate-100 hover:border-emerald-500 hover:bg-slate-50'
+                      ? 'border-[#0B6E4F] bg-[#0B6E4F]/20 shadow-sm'
+                      : 'border-[#5C4A2E]/30 hover:border-[#0B6E4F] hover:bg-[#1C232E]/50'
                   }`}
                 >
-                  <span className={`text-xs font-bold ${isToday ? 'text-emerald-700' : 'text-zinc-950'}`}>{day}</span>
+                  <span className={`text-xs font-bold ${isToday ? 'text-[#0B6E4F]' : 'text-[#EDE6D6]'}`}>{day}</span>
                   {peopleCount > 0 && (
-                    <div className="text-[10px] font-data font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 self-end">
+                    <div className="text-[10px] font-data font-bold text-[#0B6E4F] bg-[#0B6E4F]/20 px-1.5 py-0.5 rounded border border-[#0B6E4F]/40 self-end">
                       {peopleCount}👤
                     </div>
                   )}
@@ -287,14 +287,14 @@ function CEOFinancialCalendar() {
         </div>
 
         {selectedDay && (
-          <div className="mt-8 bg-white rounded-lg border border-slate-200 shadow-sm p-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="flex justify-between items-center mb-8 pb-4 border-b border-slate-100">
-              <h3 className="text-sm font-bold text-zinc-950 uppercase tracking-widest">
+          <div className="mt-8 bg-[#1C232E] rounded-lg border border-[#5C4A2E]/30 shadow-sm p-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="flex justify-between items-center mb-8 pb-4 border-b border-[#5C4A2E]/30">
+              <h3 className="text-sm font-bold text-[#EDE6D6] uppercase tracking-widest">
                 {selectedDay.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
               </h3>
               <button
                 onClick={() => setSelectedDay(null)}
-                className="p-1.5 hover:bg-slate-50 rounded-md transition-all text-slate-400 hover:text-zinc-950"
+                className="p-1.5 hover:bg-[#2A1518] rounded-md transition-all text-[#9C9384] hover:text-[#EDE6D6]"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -304,15 +304,15 @@ function CEOFinancialCalendar() {
 
             {loading ? (
               <div className="flex items-center justify-center py-16">
-                <div className="w-8 h-8 border-2 border-emerald-700 border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-8 h-8 border-2 border-[#0B6E4F] border-t-transparent rounded-full animate-spin"></div>
               </div>
             ) : (
               <>
                 {/* Net Profit Summary */}
-                <div className="bg-slate-50 rounded-lg p-6 mb-8 border border-slate-200 shadow-sm flex items-center justify-between">
+                <div className="bg-[#1C232E]/50 rounded-lg p-6 mb-8 border border-[#5C4A2E]/30 shadow-sm flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Net Day Performance</p>
-                    <p className="text-4xl font-data font-bold text-zinc-950 tracking-tighter">
+                    <p className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest mb-1">Net Day Performance</p>
+                    <p className="text-4xl font-data font-bold text-[#EDE6D6] tracking-tighter">
                       {(() => {
                         const revenue = dayReceipts.reduce((sum, r) => sum + (r.total_usd || 0), 0);
                         const expenses = dayFinances.filter(f => f.type === 'expense').reduce((sum, f) => sum + f.amount_uzs, 0);
@@ -322,7 +322,7 @@ function CEOFinancialCalendar() {
                       })()}
                     </p>
                   </div>
-                  <div className={`p-4 rounded-full ${dayReceipts.length > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
+                  <div className={`p-4 rounded-full ${dayReceipts.length > 0 ? 'bg-[#0B6E4F]/20 text-[#0B6E4F]' : 'bg-[#1C232E]/30 text-[#9C9384]'}`}>
                     <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
                   </div>
                 </div>
@@ -330,24 +330,24 @@ function CEOFinancialCalendar() {
                 <div className="grid grid-cols-2 gap-6">
                   {/* Left: Guest Payments (Revenue) */}
                   <div>
-                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Live Revenue Pipeline</h4>
+                    <h4 className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest mb-4">Live Revenue Pipeline</h4>
                     <div className="space-y-4">
                       {dayReceipts.length > 0 ? dayReceipts.map((receipt) => (
-                        <div key={receipt.id} className="p-4 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition-all group">
+                        <div key={receipt.id} className="p-4 rounded-lg border border-[#5C4A2E]/30 bg-[#1C232E] hover:bg-[#1C232E]/50 transition-all group">
                           <div className="flex justify-between items-start mb-3">
-                            <p className="font-bold text-zinc-950 text-xs">Batch #{receipt.receipt_id}</p>
-                            <span className="text-[10px] font-data font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">${(receipt.total_usd || 0).toFixed(2)}</span>
+                            <p className="font-bold text-[#EDE6D6] text-xs">Batch #{receipt.receipt_id}</p>
+                            <span className="text-[10px] font-data font-bold text-[#0B6E4F] bg-[#0B6E4F]/20 px-2 py-0.5 rounded border border-[#0B6E4F]/40">${(receipt.total_usd || 0).toFixed(2)}</span>
                           </div>
                           {receipt.snapshot?.payments?.map((payment: any, idx: number) => (
-                            <div key={idx} className="flex justify-between items-center text-[10px] font-medium text-slate-500 mt-1">
+                            <div key={idx} className="flex justify-between items-center text-[10px] font-medium text-[#9C9384] mt-1">
                               <span>{payment.method}</span>
-                              <span className="font-data font-bold text-zinc-950">{payment.amount} {payment.currency}</span>
+                              <span className="font-data font-bold text-[#EDE6D6]">{payment.amount} {payment.currency}</span>
                             </div>
                           ))}
                         </div>
                       )) : (
-                        <div className="py-12 border-2 border-dashed border-slate-100 rounded-lg text-center">
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No Revenue Cycles</p>
+                        <div className="py-12 border-2 border-dashed border-[#5C4A2E]/30 rounded-lg text-center">
+                          <p className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest">No Revenue Cycles</p>
                         </div>
                       )}
                     </div>
@@ -355,7 +355,7 @@ function CEOFinancialCalendar() {
 
                   {/* Right: Expenses by Category */}
                   <div>
-                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Burn Expenditure</h4>
+                    <h4 className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest mb-4">Burn Expenditure</h4>
                     <div className="space-y-4">
                       {(() => {
                         const expensesByCategory = dayFinances
@@ -377,22 +377,22 @@ function CEOFinancialCalendar() {
                                 const expense = data.items[0];
                                 if (expense) handleFinanceClick(expense);
                               }}
-                              className="w-full p-4 rounded-lg border border-slate-200 bg-white hover:border-emerald-500 hover:bg-slate-50 transition-all text-left group"
+                              className="w-full p-4 rounded-lg border border-[#5C4A2E]/30 bg-[#1C232E] hover:border-[#0B6E4F] hover:bg-[#1C232E]/50 transition-all text-left group"
                             >
                               <div className="flex justify-between items-start">
                                 <div>
-                                  <p className="font-bold text-zinc-950 text-xs">{category}</p>
-                                  <p className="text-[10px] text-slate-400 font-medium uppercase mt-0.5">{data.count} line items</p>
+                                  <p className="font-bold text-[#EDE6D6] text-xs">{category}</p>
+                                  <p className="text-[10px] text-[#9C9384] font-medium uppercase mt-0.5">{data.count} line items</p>
                                 </div>
-                                <p className="font-data font-bold text-zinc-950 text-sm">
+                                <p className="font-data font-bold text-[#EDE6D6] text-sm">
                                   ${(data.total / 12500).toFixed(2)}
                                 </p>
                               </div>
                             </button>
                           ))
                         ) : (
-                          <div className="py-12 border-2 border-dashed border-slate-100 rounded-lg text-center">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Zero Burn Logged</p>
+                          <div className="py-12 border-2 border-dashed border-[#5C4A2E]/30 rounded-lg text-center">
+                            <p className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest">Zero Burn Logged</p>
                           </div>
                         );
                       })()}

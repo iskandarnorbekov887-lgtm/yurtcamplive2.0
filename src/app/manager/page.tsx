@@ -88,17 +88,17 @@ function ManagerPortal() {
   const checkedInCount = bookings.filter(b => b.status === 'checked_in').length;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50 text-zinc-950 font-sans">
+    <div className="flex h-screen overflow-hidden bg-[#0F1419] text-[#EDE6D6] font-sans">
       
       {/* ── Sidebar ── */}
       <motion.aside 
         initial={false}
         animate={{ width: isCollapsed ? 80 : 256 }}
-        className="hidden md:flex flex-col bg-white border-r border-slate-200 shadow-sm relative transition-all duration-300 ease-in-out"
+        className="hidden md:flex flex-col bg-[#1C232E] border-r border-[#5C4A2E]/30 shadow-lg relative transition-all duration-300 ease-in-out"
       >
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="absolute -right-3 top-20 w-6 h-6 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-400 hover:text-zinc-950 hover:border-emerald-500 transition-all z-50 shadow-sm"
+          className="absolute -right-3 top-20 w-6 h-6 bg-[#1C232E] border border-[#5C4A2E]/30 rounded-full flex items-center justify-center text-[#9C9384] hover:text-[#C9A227] hover:border-[#C9A227] transition-all z-50 shadow-lg"
         >
           <motion.div animate={{ rotate: isCollapsed ? 180 : 0 }}>
             <Calendar size={12} className="rotate-90" />
@@ -107,13 +107,13 @@ function ManagerPortal() {
 
         <div className="p-6">
           <div className="flex items-center gap-4 mb-8 overflow-hidden">
-            <div className="w-10 h-10 bg-emerald-50 rounded-xl flex-shrink-0 flex items-center justify-center border border-emerald-200">
-              <LayoutDashboard className="text-emerald-700" size={20} />
+            <div className="w-10 h-10 bg-[#0B6E4F]/20 rounded-xl flex-shrink-0 flex items-center justify-center border border-[#0B6E4F]/40">
+              <LayoutDashboard className="text-[#0B6E4F]" size={20} />
             </div>
             {!isCollapsed && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <h1 className="text-sm font-bold uppercase tracking-tight text-zinc-950 whitespace-nowrap">{t('portal.manager')}</h1>
-                <p className="text-[10px] text-slate-400 font-medium tracking-widest uppercase whitespace-nowrap">Operations HUD</p>
+                <h1 className="text-sm font-bold uppercase tracking-tight text-[#EDE6D6] whitespace-nowrap font-heading">{t('portal.manager')}</h1>
+                <p className="text-[10px] text-[#9C9384] font-medium tracking-widest uppercase whitespace-nowrap">Operations HUD</p>
               </motion.div>
             )}
           </div>
@@ -131,8 +131,8 @@ function ManagerPortal() {
                 title={isCollapsed ? item.label : undefined}
                 className={`w-full flex items-center gap-3 p-3 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
                   activeTab === item.id 
-                    ? 'bg-emerald-700 text-white shadow-sm' 
-                    : 'text-slate-500 hover:bg-slate-50 hover:text-zinc-950'
+                    ? 'bg-[#0B6E4F] text-[#C9A227] shadow-lg' 
+                    : 'text-[#9C9384] hover:bg-[#2A1518] hover:text-[#EDE6D6]'
                 } ${isCollapsed ? 'justify-center' : ''}`}
               >
                 <item.icon size={18} className="flex-shrink-0" />
@@ -146,9 +146,9 @@ function ManagerPortal() {
             {userRole === 'CEO' && (
               <a
                 href="/ceo"
-                className={`w-full flex items-center gap-3 p-3 rounded-lg text-xs font-black uppercase tracking-[0.2em] bg-zinc-950 text-white shadow-lg shadow-zinc-200 mt-4 hover:bg-zinc-800 transition-all border border-white/10 ${isCollapsed ? 'justify-center' : ''}`}
+                className={`w-full flex items-center gap-3 p-3 rounded-lg text-xs font-black uppercase tracking-[0.2em] bg-[#2A1518] text-[#C9A227] shadow-lg mt-4 hover:bg-[#3A1F22] transition-all border border-[#5C4A2E]/30 ${isCollapsed ? 'justify-center' : ''}`}
               >
-                <LayoutDashboard size={18} className="text-emerald-400 flex-shrink-0" />
+                <LayoutDashboard size={18} className="text-[#C9A227] flex-shrink-0" />
                 {!isCollapsed && (
                   <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="whitespace-nowrap text-[10px]">
                     CEO Executive
@@ -159,18 +159,18 @@ function ManagerPortal() {
           </nav>
         </div>
 
-        <div className={`mt-auto p-6 border-t border-slate-100 space-y-3 ${isCollapsed ? 'items-center flex flex-col' : ''}`}>
+        <div className={`mt-auto p-6 border-t border-[#5C4A2E]/30 space-y-3 ${isCollapsed ? 'items-center flex flex-col' : ''}`}>
            <a 
              href="/financials" 
              title={isCollapsed ? "Fiscal Recording" : undefined}
-             className={`block p-3 rounded-lg text-[10px] font-bold uppercase tracking-widest text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-all text-center ${isCollapsed ? 'w-full flex justify-center' : ''}`}
+             className={`block p-3 rounded-lg text-[10px] font-bold uppercase tracking-widest text-[#0B6E4F] bg-[#0B6E4F]/10 border border-[#0B6E4F]/30 hover:bg-[#0B6E4F]/20 transition-all text-center ${isCollapsed ? 'w-full flex justify-center' : ''}`}
            >
              {isCollapsed ? "💰" : "💰 Fiscal Recording"}
            </a>
            <button 
              onClick={signOut} 
              title={isCollapsed ? t('btn.logout') : undefined}
-             className={`w-full flex items-center justify-center gap-2 p-3 bg-slate-50 border border-slate-200 text-slate-500 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-all`}
+             className={`w-full flex items-center justify-center gap-2 p-3 bg-[#2A1518]/50 border border-[#5C4A2E]/30 text-[#9C9384] rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-[#2A1518] hover:text-[#EDE6D6] hover:border-[#C9A227] transition-all`}
            >
              <LogOut size={18} className="flex-shrink-0" />
              {!isCollapsed && <span className="whitespace-nowrap">{t('btn.logout')}</span>}
@@ -179,11 +179,11 @@ function ManagerPortal() {
       </motion.aside>
 
       {/* ── Main Content ── */}
-      <main className="flex-1 relative overflow-y-auto bg-slate-50">
+      <main className="flex-1 relative overflow-y-auto bg-[#0F1419]">
         
         {/* Top Bar */}
-        <div className="sticky top-0 z-30 px-8 py-4 flex justify-between items-center bg-white backdrop-blur-sm border-b border-black">
-          <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+        <div className="sticky top-0 z-30 px-8 py-4 flex justify-between items-center bg-[#1C232E] backdrop-blur-sm border-b border-[#5C4A2E]/30">
+          <div className="text-xs font-bold text-[#9C9384] uppercase tracking-widest">
             {activeTab === 'checkin' ? 'Guest Calendar' : activeTab === 'meals' ? 'Catering' : activeTab === 'procurement' ? 'Logistics' : 'Stores'}
           </div>
 
@@ -193,11 +193,11 @@ function ManagerPortal() {
             <div className="relative">
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="w-9 h-9 flex items-center justify-center rounded-lg bg-white border border-slate-200 hover:bg-slate-50 shadow-sm transition-all relative"
+                className="w-9 h-9 flex items-center justify-center rounded-lg bg-[#1C232E] border border-[#5C4A2E]/30 hover:bg-[#2A1518] shadow-lg transition-all relative"
               >
-                <Bell size={16} className="text-slate-400" />
+                <Bell size={16} className="text-[#9C9384]" />
                 {notifications.filter(n => !n.read).length > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#722F37] text-white text-[9px] font-bold rounded-full flex items-center justify-center">
                     {notifications.filter(n => !n.read).length}
                   </span>
                 )}
@@ -217,6 +217,7 @@ function ManagerPortal() {
                     delete payloadToSave.guide_names;
                     delete payloadToSave.guide_amount;
                     delete payloadToSave.last_edited_by_id;
+                    delete payloadToSave.days;
                     const { error } = await supabase.from('bookings').update(payloadToSave).eq('id', id);
                     if (error) console.error(error);
                     await fetchData();
@@ -239,7 +240,7 @@ function ManagerPortal() {
               transition={{ duration: 0.2, ease: "easeOut" }}
             >
               {activeTab === 'checkin' && (
-                <div className="bento-card p-6">
+                <div className="classic-card p-6">
                   <GoogleGuestAgenda
                     bookings={bookings}
                     userRole={userRole}
@@ -289,12 +290,12 @@ function ManagerPortal() {
                 <div className="space-y-8">
                    <div className="flex justify-between items-end">
                       <div>
-                        <h2 className="text-2xl font-bold text-zinc-950">Catering Orchestration</h2>
-                        <p className="text-xs text-slate-400 font-medium uppercase tracking-widest mt-1">Active Kitchen Protocols</p>
+                        <h2 className="text-2xl font-bold text-[#EDE6D6] font-heading">Catering Orchestration</h2>
+                        <p className="text-xs text-[#9C9384] font-medium uppercase tracking-widest mt-1">Active Kitchen Protocols</p>
                       </div>
-                      <div className="bg-white border border-slate-200 rounded-lg px-4 py-2 shadow-sm flex items-center gap-2">
-                        <span className="font-data text-lg text-zinc-950">{checkedInCount}</span>
-                        <span className="text-xs text-slate-400 font-medium">Guests In House</span>
+                      <div className="bg-[#1C232E] border border-[#5C4A2E]/30 rounded-lg px-4 py-2 shadow-lg flex items-center gap-2">
+                        <span className="font-data text-lg text-[#EDE6D6]">{checkedInCount}</span>
+                        <span className="text-xs text-[#9C9384] font-medium">Guests In House</span>
                       </div>
                    </div>
 
@@ -302,30 +303,30 @@ function ManagerPortal() {
                      {bookings.filter(b => b.status === 'checked_in' || b.status === 'confirmed').map(b => (
                        <div 
                          key={b.id} 
-                         className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-all group"
+                         className="bg-[#1C232E] border border-[#5C4A2E]/30 rounded-lg p-6 shadow-lg hover:shadow-xl transition-all group"
                        >
                          <div className="flex justify-between items-start mb-4">
-                           <div className="w-9 h-9 bg-emerald-50 rounded-lg flex items-center justify-center border border-emerald-200 text-emerald-700">
+                           <div className="w-9 h-9 bg-[#0B6E4F]/20 rounded-lg flex items-center justify-center border border-[#0B6E4F]/40 text-[#0B6E4F]">
                              <Utensils size={16} />
                            </div>
                            <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest ${
-                             b.status === 'checked_in' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-50 text-slate-400'
+                             b.status === 'checked_in' ? 'bg-[#0B6E4F]/20 text-[#0B6E4F]' : 'bg-[#2A1518]/20 text-[#9C9384]'
                            }`}>
                              {b.status === 'checked_in' ? 'LIVE' : b.status}
                            </span>
                          </div>
 
-                         <h3 className="text-sm font-bold text-zinc-950 mb-1 group-hover:text-emerald-700 transition-colors">{b.guest_name}</h3>
-                         <div className="flex items-center gap-1.5 text-slate-400 text-[10px] font-medium uppercase tracking-widest mb-4">
+                         <h3 className="text-sm font-bold text-[#EDE6D6] mb-1 group-hover:text-[#C9A227] transition-colors">{b.guest_name}</h3>
+                         <div className="flex items-center gap-1.5 text-[#9C9384] text-[10px] font-medium uppercase tracking-widest mb-4">
                            <Calendar size={10} />
-                           <span className="font-data text-zinc-950">{new Date(b.check_in).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                           <span className="font-data text-[#EDE6D6]">{new Date(b.check_in).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
                            <span>→</span>
-                           <span className="font-data text-zinc-950">{new Date(b.check_out).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                           <span className="font-data text-[#EDE6D6]">{new Date(b.check_out).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
                          </div>
 
                          <button
                            onClick={() => setSelectedMealBooking(b)}
-                           className="w-full py-2.5 bg-slate-50 border border-slate-200 text-zinc-950 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-700 hover:text-white hover:border-emerald-700 transition-all"
+                           className="w-full py-2.5 bg-[#1C232E] border border-[#5C4A2E]/30 text-[#EDE6D6] rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-[#0B6E4F] hover:text-[#C9A227] hover:border-[#0B6E4F] transition-all"
                          >
                            Manage Protocol
                          </button>

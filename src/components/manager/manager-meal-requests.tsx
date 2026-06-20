@@ -188,52 +188,52 @@ export function ManagerMealRequests({ booking, onClose, onSent }: ManagerMealReq
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-white border border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
+        className="bg-[#1C232E] border border-[#5C4A2E]/30 shadow-[12px_12px_0px_0px_rgba(92,74,46,0.3)] w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
       >
         {/* Header */}
-        <div className="p-8 border-b border-black bg-white">
+        <div className="p-8 border-b border-[#5C4A2E]/30 bg-[#1C232E]">
           <div className="flex justify-between items-start mb-6">
             <div>
               <div className="flex items-center gap-4 mb-1">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fiscal Kitchen Request</p>
+                <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Fiscal Kitchen Request</p>
                 {stats && (
-                  <div className="flex items-center gap-1 border border-black bg-white px-2 py-0.5 font-mono text-[9px] font-black">
-                    <span className="text-emerald-600">{stats.accepted} ACCEPTED</span>
-                    <span className="text-slate-300">/</span>
-                    <span className="text-indigo-600">{stats.served} SERVED</span>
+                  <div className="flex items-center gap-1 border border-[#5C4A2E]/30 bg-[#1C232E] px-2 py-0.5 font-mono text-[9px] font-black">
+                    <span className="text-[#0B6E4F]">{stats.accepted} ACCEPTED</span>
+                    <span className="text-[#9C9384]">/</span>
+                    <span className="text-[#C9A227]">{stats.served} SERVED</span>
                   </div>
                 )}
               </div>
-              <h2 className="text-3xl font-black text-black uppercase tracking-tighter">
+              <h2 className="text-3xl font-black text-[#EDE6D6] uppercase tracking-tighter">
                 {booking.guest_name}
               </h2>
             </div>
             <button
               onClick={onClose}
-              className="w-10 h-10 border border-black flex items-center justify-center hover:bg-zinc-50 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+              className="w-10 h-10 border border-[#5C4A2E]/30 flex items-center justify-center hover:bg-[#2A1518] transition-all shadow-[2px_2px_0px_0px_rgba(92,74,46,0.3)] text-[#EDE6D6]"
             >
               <X size={20} />
             </button>
           </div>
           
           <div className="flex justify-between items-center">
-             <div className="text-xs font-mono font-black bg-zinc-50 border border-black px-3 py-1.5">
+             <div className="text-xs font-mono font-black bg-[#1C232E]/50 border border-[#5C4A2E]/30 px-3 py-1.5 text-[#EDE6D6]">
                {booking.check_in} → {booking.check_out}
              </div>
-             
+              
              {/* REAL-TIME STATUS COUNTER */}
              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-2">Confirmed:</span>
-                <div className="bg-black text-white px-4 py-1.5 border border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex gap-4">
+                <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest mr-2">Confirmed:</span>
+                <div className="bg-[#0B6E4F] text-[#C9A227] px-4 py-1.5 border border-[#0B6E4F]/40 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)] flex gap-4">
                    <div className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#C9A227] animate-pulse" />
                       <span className="text-[11px] font-mono font-black uppercase tracking-widest">
                          {(stats as any)?.lunch || 0} LUNCH
                       </span>
                    </div>
-                   <div className="w-px h-3 bg-white/20 self-center" />
+                   <div className="w-px h-3 bg-[#C9A227]/20 self-center" />
                    <div className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#C9A227] animate-pulse" />
                       <span className="text-[11px] font-mono font-black uppercase tracking-widest">
                          {(stats as any)?.dinner || 0} DINNER
                       </span>
@@ -244,35 +244,35 @@ export function ManagerMealRequests({ booking, onClose, onSent }: ManagerMealReq
         </div>
 
         {/* Content */}
-        <div className="p-8 space-y-6 overflow-y-auto flex-1 bg-zinc-50/20">
+        <div className="p-8 space-y-6 overflow-y-auto flex-1 bg-[#1C232E]/20">
           {loading ? (
             <div className="py-20 text-center">
-              <div className="w-12 h-12 border-2 border-black border-t-zinc-200 rounded-full animate-spin mx-auto mb-6" />
-              <p className="font-black text-xs uppercase tracking-widest">Generating Manifest...</p>
+              <div className="w-12 h-12 border-2 border-[#5C4A2E]/30 border-t-[#9C9384] rounded-full animate-spin mx-auto mb-6" />
+              <p className="font-black text-xs uppercase tracking-widest text-[#EDE6D6]">Generating Manifest...</p>
             </div>
           ) : (
             <div className="grid gap-4">
               {mealDrafts.map((draft, idx) => (
                 <div
                   key={`${booking.id}-${draft.meal_date}-${draft.meal_type}`}
-                  className={`bg-white border border-black p-5 flex items-center gap-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] ${
+                  className={`bg-[#1C232E] border border-[#5C4A2E]/30 p-5 flex items-center gap-6 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)] ${
                     draft.sent ? 'opacity-40 grayscale' : ''
                   }`}
                 >
-                  <div className="w-28 border-r border-black/10 pr-6 shrink-0">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-1">{draft.meal_type}</span>
-                    <p className="text-sm font-mono font-black text-black">{draft.meal_date}</p>
+                  <div className="w-28 border-r border-[#5C4A2E]/30 pr-6 shrink-0">
+                    <span className="text-[9px] font-black text-[#9C9384] uppercase tracking-[0.2em] block mb-1">{draft.meal_type}</span>
+                    <p className="text-sm font-mono font-black text-[#EDE6D6]">{draft.meal_date}</p>
                   </div>
 
                   {draft.sent ? (
                     <div className="flex-1 flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                         <div className="w-5 h-5 bg-black border border-black flex items-center justify-center">
-                            <CheckCircle2 size={12} className="text-white" />
+                         <div className="w-5 h-5 bg-[#0B6E4F] border border-[#0B6E4F]/40 flex items-center justify-center">
+                            <CheckCircle2 size={12} className="text-[#C9A227]" />
                          </div>
-                         <span className="text-[10px] font-black text-black uppercase tracking-widest">Manifest Sent</span>
+                         <span className="text-[10px] font-black text-[#EDE6D6] uppercase tracking-widest">Manifest Sent</span>
                       </div>
-                      <span className="text-[10px] font-mono font-black text-slate-400">
+                      <span className="text-[10px] font-mono font-black text-[#9C9384]">
                         {draft.adult_qty}A · {draft.child_qty}K
                       </span>
                     </div>
@@ -289,7 +289,7 @@ export function ManagerMealRequests({ booking, onClose, onSent }: ManagerMealReq
                               next[idx].adult_qty = parseInt(e.target.value) || 0;
                               setMealDrafts(next);
                             }}
-                            className="w-full px-3 py-2 bg-white border border-black text-xs font-mono font-black text-black outline-none focus:bg-zinc-50"
+                            className="w-full px-3 py-2 bg-[#1C232E] border border-[#5C4A2E]/30 text-xs font-mono font-black text-[#EDE6D6] outline-none focus:bg-[#2A1518]"
                             placeholder="A"
                           />
                         </div>
@@ -303,7 +303,7 @@ export function ManagerMealRequests({ booking, onClose, onSent }: ManagerMealReq
                               next[idx].child_qty = parseInt(e.target.value) || 0;
                               setMealDrafts(next);
                             }}
-                            className="w-full px-3 py-2 bg-white border border-black text-xs font-mono font-black text-black outline-none focus:bg-zinc-50"
+                            className="w-full px-3 py-2 bg-[#1C232E] border border-[#5C4A2E]/30 text-xs font-mono font-black text-[#EDE6D6] outline-none focus:bg-[#2A1518]"
                             placeholder="K"
                           />
                         </div>
@@ -315,7 +315,7 @@ export function ManagerMealRequests({ booking, onClose, onSent }: ManagerMealReq
                               next[idx].dietary_type = e.target.value as 'Normal' | 'Vegetarian';
                               setMealDrafts(next);
                             }}
-                            className="w-full px-3 py-2 bg-white border border-black text-[10px] font-black text-black outline-none appearance-none"
+                            className="w-full px-3 py-2 bg-[#1C232E] border border-[#5C4A2E]/30 text-[10px] font-black text-[#EDE6D6] outline-none appearance-none"
                           >
                             <option value="Normal">STD</option>
                             <option value="Vegetarian">VEG</option>
@@ -330,14 +330,14 @@ export function ManagerMealRequests({ booking, onClose, onSent }: ManagerMealReq
                               next[idx].notes = e.target.value;
                               setMealDrafts(next);
                             }}
-                            className="w-full px-3 py-2 bg-white border border-black text-[10px] font-black text-black outline-none"
+                            className="w-full px-3 py-2 bg-[#1C232E] border border-[#5C4A2E]/30 text-[10px] font-black text-[#EDE6D6] outline-none"
                             placeholder="Notes (e.g., No peanuts)"
                           />
                         </div>
                       </div>
                       <button
                         onClick={() => handleSendOne(idx)}
-                        className="px-6 py-2 bg-black text-white text-[10px] font-black uppercase tracking-widest border border-black hover:bg-zinc-800 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]"
+                        className="px-6 py-2 bg-[#0B6E4F] text-[#C9A227] text-[10px] font-black uppercase tracking-widest border border-[#0B6E4F]/40 hover:bg-[#0B6E4F]/80 transition-all shadow-[2px_2px_0px_0px_rgba(92,74,46,0.3)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]"
                       >
                         Transmit
                       </button>
@@ -350,14 +350,14 @@ export function ManagerMealRequests({ booking, onClose, onSent }: ManagerMealReq
         </div>
 
         {/* Footer */}
-        <div className="p-8 border-t border-black bg-white flex gap-4">
+        <div className="p-8 border-t border-[#5C4A2E]/30 bg-[#1C232E] flex gap-4">
           <button
             onClick={handleSendAll}
             disabled={mealDrafts.every((d) => d.sent)}
-            className={`flex-1 py-4 font-black uppercase tracking-[0.2em] text-xs transition-all flex items-center justify-center gap-3 border border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px] ${
+            className={`flex-1 py-4 font-black uppercase tracking-[0.2em] text-xs transition-all flex items-center justify-center gap-3 border border-[#5C4A2E]/30 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px] ${
               mealDrafts.every((d) => d.sent)
-                ? 'bg-zinc-100 text-slate-400 cursor-not-allowed border-zinc-200 shadow-none'
-                : 'bg-black text-white hover:bg-zinc-800'
+                ? 'bg-[#1C232E]/50 text-[#9C9384] cursor-not-allowed border-[#5C4A2E]/20 shadow-none'
+                : 'bg-[#0B6E4F] text-[#C9A227] hover:bg-[#0B6E4F]/80'
             }`}
           >
             <Send size={16} />
@@ -365,7 +365,7 @@ export function ManagerMealRequests({ booking, onClose, onSent }: ManagerMealReq
           </button>
           <button
             onClick={onClose}
-            className="px-10 py-4 bg-white text-black border border-black font-black uppercase tracking-[0.2em] text-xs hover:bg-zinc-50 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]"
+            className="px-10 py-4 bg-[#1C232E] text-[#EDE6D6] border border-[#5C4A2E]/30 font-black uppercase tracking-[0.2em] text-xs hover:bg-[#2A1518] transition-all shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]"
           >
             Close
           </button>

@@ -173,6 +173,7 @@ function CookPortal() {
       delete payloadToSave.guide_names;
       delete payloadToSave.guide_amount;
       delete payloadToSave.last_edited_by_id;
+      delete payloadToSave.days;
       await supabase.from('bookings').update(payloadToSave).eq('id', selectedBooking.id);
       
       setSelectedBooking({ ...selectedBooking, drinks_tab: nextTab });
@@ -187,18 +188,18 @@ function CookPortal() {
   const pendingCount = queueMeals.filter(m => (m.status || '').toLowerCase() === 'pending').length;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50 text-zinc-950 font-sans">
+    <div className="flex h-screen overflow-hidden bg-[#0F1419] text-[#EDE6D6] font-sans">
       
       {/* ── Sidebar ── */}
-      <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-200 shadow-sm">
+      <aside className="hidden md:flex flex-col w-64 bg-[#1C232E] border-r border-[#5C4A2E]/30 shadow-sm">
         <div className="p-6">
           <div className="flex items-center gap-4 mb-8">
-            <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center border border-emerald-200">
-              <ChefHat className="text-emerald-700" size={20} />
+            <div className="w-10 h-10 bg-[#0B6E4F]/20 rounded-xl flex items-center justify-center border border-[#0B6E4F]/30">
+              <ChefHat className="text-[#0B6E4F]" size={20} />
             </div>
             <div>
-              <h1 className="text-sm font-bold uppercase tracking-tight text-zinc-950">{t('portal.cook')}</h1>
-              <p className="text-[10px] text-slate-400 font-medium tracking-widest uppercase">Kitchen Command</p>
+              <h1 className="text-sm font-bold uppercase tracking-tight text-[#EDE6D6]">{t('portal.cook')}</h1>
+              <p className="text-[10px] text-[#9C9384] font-medium tracking-widest uppercase">Kitchen Command</p>
             </div>
           </div>
 
@@ -215,8 +216,8 @@ function CookPortal() {
                 onClick={() => setActiveTab(item.id as any)}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
                   activeTab === item.id 
-                    ? 'bg-emerald-700 text-white shadow-sm' 
-                    : 'text-slate-500 hover:bg-slate-50 hover:text-zinc-950'
+                    ? 'bg-[#0B6E4F] text-[#C9A227] shadow-sm' 
+                    : 'text-[#9C9384] hover:bg-[#2A1518] hover:text-[#EDE6D6]'
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -233,10 +234,10 @@ function CookPortal() {
           </nav>
         </div>
 
-        <div className="mt-auto p-6 border-t border-slate-100">
+        <div className="mt-auto p-6 border-t border-[#5C4A2E]/30">
            <button 
              onClick={signOut} 
-             className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-slate-50 border border-slate-200 text-slate-500 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-all"
+             className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#2A1518]/50 border border-[#5C4A2E]/30 text-[#9C9384] rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-[#722F37]/20 hover:text-[#722F37] hover:border-[#722F37]/30 transition-all"
            >
              <LogOut size={12} />
              {t('btn.logout')}
@@ -245,17 +246,17 @@ function CookPortal() {
       </aside>
 
       {/* ── Main Content ── */}
-      <main className="flex-1 relative overflow-y-auto bg-slate-50">
+      <main className="flex-1 relative overflow-y-auto bg-[#0F1419]">
         
         {/* Top Bar */}
-        <div className="sticky top-0 z-30 px-8 py-4 flex justify-between items-center bg-white/80 backdrop-blur-sm border-b border-slate-100">
-          <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+        <div className="sticky top-0 z-30 px-8 py-4 flex justify-between items-center bg-[#1C232E]/80 backdrop-blur-sm border-b border-[#5C4A2E]/30">
+          <div className="text-xs font-bold text-[#9C9384] uppercase tracking-widest">
             {activeTab === 'orders' ? 'Kitchen Queue' : activeTab === 'procurement' ? 'Supply Requests' : activeTab === 'usage' ? 'Weighing Station' : activeTab === 'inventory' ? 'Stores' : 'Calendar'}
           </div>
           <div className="flex items-center gap-3">
-            <LanguageSwitcher variant="light" />
-            <div className="w-9 h-9 flex items-center justify-center rounded-lg bg-white border border-slate-200 shadow-sm">
-               <Zap className={pendingCount > 0 ? "text-rose-500 animate-pulse" : "text-emerald-700"} size={16} />
+            <LanguageSwitcher variant="dark" />
+            <div className="w-9 h-9 flex items-center justify-center rounded-lg bg-[#1C232E] border border-[#5C4A2E]/30 shadow-sm">
+               <Zap className={pendingCount > 0 ? "text-[#722F37] animate-pulse" : "text-[#0B6E4F]"} size={16} />
             </div>
           </div>
         </div>
@@ -274,32 +275,32 @@ function CookPortal() {
                   {/* Header */}
                   <div className="flex justify-between items-end">
                     <div>
-                      <h2 className="text-2xl font-bold text-zinc-950">Kitchen Queue</h2>
-                      <p className="text-xs text-slate-400 font-medium uppercase tracking-widest mt-1">Live Production Line</p>
+                      <h2 className="text-2xl font-bold text-[#EDE6D6]">Kitchen Queue</h2>
+                      <p className="text-xs text-[#9C9384] font-medium uppercase tracking-widest mt-1">Live Production Line</p>
                     </div>
-                    <div className="bg-white border border-slate-200 rounded-lg px-4 py-2 shadow-sm">
-                      <span className="font-data text-sm text-zinc-950">{today}</span>
+                    <div className="bg-[#1C232E] border border-[#5C4A2E]/30 rounded-lg px-4 py-2 shadow-sm">
+                      <span className="font-data text-sm text-[#EDE6D6]">{today}</span>
                     </div>
                   </div>
 
                   {/* Pending Alert */}
                   {pendingCount > 0 && (
-                    <div className="bg-white border border-rose-200 p-6 rounded-lg shadow-sm flex items-center gap-6">
-                      <div className="w-12 h-12 bg-rose-50 rounded-lg flex items-center justify-center border border-rose-200">
-                        <Bell className="text-rose-600 animate-bounce" size={24} />
+                    <div className="bg-[#1C232E] border border-[#722F37]/40 p-6 rounded-lg shadow-sm flex items-center gap-6">
+                      <div className="w-12 h-12 bg-[#722F37]/20 rounded-lg flex items-center justify-center border border-[#722F37]/40">
+                        <Bell className="text-[#722F37] animate-bounce" size={24} />
                       </div>
                       <div>
-                        <p className="text-xs font-bold text-rose-500 uppercase tracking-widest mb-0.5">Critical Kitchen Alert</p>
-                        <p className="text-lg font-bold text-zinc-950"><span className="font-data text-2xl">{pendingCount}</span> Orders Awaiting Approval</p>
+                        <p className="text-xs font-bold text-[#722F37] uppercase tracking-widest mb-0.5">Critical Kitchen Alert</p>
+                        <p className="text-lg font-bold text-[#EDE6D6]"><span className="font-data text-2xl">{pendingCount}</span> Orders Awaiting Approval</p>
                       </div>
                     </div>
                   )}
 
                   {/* Order Cards */}
                   {queueMeals.length === 0 ? (
-                    <div className="bg-white border border-slate-200 rounded-lg p-16 text-center shadow-sm">
-                      <Utensils className="mx-auto mb-4 text-slate-300" size={48} />
-                      <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400">No Meals in Queue</h3>
+                    <div className="bg-[#1C232E] border border-[#5C4A2E]/30 rounded-lg p-16 text-center shadow-sm">
+                      <Utensils className="mx-auto mb-4 text-[#9C9384]" size={48} />
+                      <h3 className="text-sm font-bold uppercase tracking-widest text-[#9C9384]">No Meals in Queue</h3>
                     </div>
                   ) : (
                     <div className="space-y-8">
@@ -322,28 +323,28 @@ function CookPortal() {
                                 return (
                                   <div 
                                     key={meal.order_id || meal.id} 
-                                    className="bg-[#FFFFFF] border border-black p-6 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex flex-col"
+                                    className="bg-[#1C232E] border border-[#5C4A2E]/30 p-6 shadow-[2px_2px_0px_0px_rgba(92,74,46,0.3)] transition-all hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)] flex flex-col"
                                   >
-                                    <div className="flex justify-between items-start mb-4 border-b border-black pb-2">
-                                      <div className="font-mono text-[10px] font-black text-black uppercase tracking-tighter bg-zinc-50 border border-black/10 px-2 py-1 rounded shadow-inner">
+                                    <div className="flex justify-between items-start mb-4 border-b border-[#5C4A2E]/30 pb-2">
+                                      <div className="font-mono text-[10px] font-black text-[#EDE6D6] uppercase tracking-tighter bg-[#1C232E]/50 border border-[#5C4A2E]/20 px-2 py-1 rounded shadow-inner">
                                          BID: {meal.booking_id} <br/>
                                          OID: {meal.order_id || 'LEGACY'}
                                       </div>
-                                      <span className={`px-2 py-0.5 border border-black text-[9px] font-black uppercase tracking-widest ${
-                                        isPending ? 'bg-amber-400 text-black' : 'bg-emerald-500 text-white'
+                                      <span className={`px-2 py-0.5 border border-[#5C4A2E]/30 text-[9px] font-black uppercase tracking-widest ${
+                                        isPending ? 'bg-[#B8860B] text-[#1C232E]' : 'bg-[#0B6E4F] text-[#C9A227]'
                                       }`}>
                                         {meal.status}
                                       </span>
                                     </div>
 
                                     <div className="flex-1 flex flex-col justify-center items-center py-6">
-                                       <p className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-[0.2em]">
+                                       <p className="text-[10px] font-black text-[#9C9384] uppercase mb-2 tracking-[0.2em]">
                                           {guest?.guest_name || 'GUEST'}
                                        </p>
-                                       <h3 className="text-2xl font-black text-black uppercase tracking-widest border-y border-black py-2 w-full text-center">
+                                       <h3 className="text-2xl font-black text-[#EDE6D6] uppercase tracking-widest border-y border-[#5C4A2E]/30 py-2 w-full text-center">
                                           {meal.meal_type}
                                        </h3>
-                                       <p className="text-[10px] font-black text-slate-400 uppercase mt-2 tracking-[0.3em]">
+                                       <p className="text-[10px] font-black text-[#9C9384] uppercase mt-2 tracking-[0.3em]">
                                           {meal.dietary_type}
                                        </p>
 
@@ -367,7 +368,7 @@ function CookPortal() {
                                     ) : (
                                       <button 
                                         onClick={() => handleMarkServed(meal)} 
-                                        className="w-full py-2.5 bg-white text-black text-[10px] font-black uppercase tracking-[0.2em] hover:bg-zinc-50 transition-all border border-black active:translate-x-[1px] active:translate-y-[1px] font-mono"
+                                        className="w-full py-2.5 bg-[#1C232E] text-[#EDE6D6] text-[10px] font-black uppercase tracking-[0.2em] hover:bg-[#2A1518] transition-all border border-[#5C4A2E]/30 active:translate-x-[1px] active:translate-y-[1px] font-mono"
                                       >
                                         Mark Served {meal.order_id && `[${meal.order_id}]`}
                                       </button>
@@ -386,8 +387,8 @@ function CookPortal() {
 
               {activeTab === 'schedule' && (
                 <div className="space-y-6">
-                  <h2 className="text-2xl font-bold text-zinc-950">Guest Schedule</h2>
-                  <div className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm">
+                  <h2 className="text-2xl font-bold text-[#EDE6D6]">Guest Schedule</h2>
+                  <div className="bg-[#1C232E] border border-[#5C4A2E]/30 rounded-lg p-6 shadow-sm">
                     <PrivateCalendarView bookings={bookings} onSelectBooking={(b) => setSelectedBooking(b)} />
                   </div>
                 </div>
@@ -397,7 +398,7 @@ function CookPortal() {
               {activeTab === 'usage' && <CookUsage />}
               {activeTab === 'inventory' && (
                 <div className="space-y-6">
-                  <h2 className="text-2xl font-bold text-zinc-950">Stores Inventory</h2>
+                  <h2 className="text-2xl font-bold text-[#EDE6D6]">Stores Inventory</h2>
                   <InventoryDashboard />
                 </div>
               )}
@@ -411,13 +412,13 @@ function CookPortal() {
         {selectedBooking && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-8">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedBooking(null)} className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.95, y: 12 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 12 }} className="relative w-full max-w-lg bg-white rounded-xl p-8 border border-slate-200 shadow-xl">
+            <motion.div initial={{ scale: 0.95, y: 12 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 12 }} className="relative w-full max-w-lg bg-[#1C232E] rounded-xl p-8 border border-[#5C4A2E]/30 shadow-xl">
               <div className="flex justify-between items-start mb-6">
                  <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Guest Profile (Restricted)</p>
-                    <h2 className="text-xl font-bold text-zinc-950">{selectedBooking.guest_name}</h2>
+                    <p className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest mb-1">Guest Profile (Restricted)</p>
+                    <h2 className="text-xl font-bold text-[#EDE6D6]">{selectedBooking.guest_name}</h2>
                  </div>
-                 <button onClick={() => setSelectedBooking(null)} className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-all text-lg text-slate-400">×</button>
+                 <button onClick={() => setSelectedBooking(null)} className="w-8 h-8 bg-[#2A1518]/50 rounded-lg flex items-center justify-center hover:bg-[#2A1518] transition-all text-lg text-[#9C9384]">×</button>
               </div>
               
               <div className="space-y-6">
@@ -426,7 +427,7 @@ function CookPortal() {
                     const order = mealRequests.find((m) => m.booking_id === selectedBooking.id && (m.meal_type || '').toLowerCase() === meal);
                     const isConfirmed = order?.status === 'Accepted' || order?.status === 'Served';
                     return (
-                      <div key={meal} className={`p-4 rounded-lg border transition-all ${isConfirmed ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>
+                      <div key={meal} className={`p-4 rounded-lg border transition-all ${isConfirmed ? 'bg-[#0B6E4F]/20 border-[#0B6E4F]/40 text-[#0B6E4F]' : 'bg-[#1C232E]/50 border-[#5C4A2E]/30 text-[#9C9384]'}`}>
                          <div className="flex items-center gap-2 mb-1">
                             <span className="text-lg">{meal === 'lunch' ? '🍱' : '🌙'}</span>
                             <span className="text-xs font-bold uppercase tracking-tight">{meal}</span>
@@ -439,8 +440,8 @@ function CookPortal() {
 
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Beverage Tab</p>
-                    <button onClick={() => setShowDrinkSelector(!showDrinkSelector)} className="px-3 py-1.5 bg-slate-50 rounded-lg text-[10px] font-bold uppercase hover:bg-slate-100 transition-all border border-slate-200 text-slate-500">
+                    <p className="text-xs font-bold text-[#9C9384] uppercase tracking-widest">Beverage Tab</p>
+                    <button onClick={() => setShowDrinkSelector(!showDrinkSelector)} className="px-3 py-1.5 bg-[#1C232E]/50 rounded-lg text-[10px] font-bold uppercase hover:bg-[#2A1518] transition-all border border-[#5C4A2E]/30 text-[#9C9384]">
                       {showDrinkSelector ? 'Close' : '+ Log Drink'}
                     </button>
                   </div>
@@ -448,33 +449,33 @@ function CookPortal() {
                   {showDrinkSelector ? (
                     <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
                       {drinks.map(d => (
-                        <button key={d.id} onClick={() => handleAddDrink(d)} className="p-3 bg-white hover:bg-sky-50 border border-slate-200 hover:border-sky-300 rounded-lg text-left transition-all group">
-                          <p className="text-xs font-bold text-zinc-950 group-hover:text-sky-700 transition-colors">{d.name}</p>
-                          <p className="text-[10px] text-slate-400 font-data mt-0.5">{d.sold_price} UZS</p>
+                        <button key={d.id} onClick={() => handleAddDrink(d)} className="p-3 bg-[#1C232E] hover:bg-[#0B6E4F]/20 border border-[#5C4A2E]/30 hover:border-[#0B6E4F]/40 rounded-lg text-left transition-all group">
+                          <p className="text-xs font-bold text-[#EDE6D6] group-hover:text-[#0B6E4F] transition-colors">{d.name}</p>
+                          <p className="text-[10px] text-[#9C9384] font-data mt-0.5">{d.sold_price} UZS</p>
                         </button>
                       ))}
                     </div>
                   ) : (
-                    <div className="bg-slate-50 rounded-lg p-4 border border-slate-100">
+                    <div className="bg-[#1C232E]/50 rounded-lg p-4 border border-[#5C4A2E]/30">
                       {selectedBooking.drinks_tab && (selectedBooking.drinks_tab as any[]).length > 0 ? (
                         <div className="space-y-2">
                           {(selectedBooking.drinks_tab as any[]).map((item: any, i: number) => (
                             <div key={i} className="flex justify-between items-center text-sm">
-                              <span className="text-slate-600">{item.drink_name}</span>
-                              <span className="font-data text-zinc-950">x{item.quantity}</span>
+                              <span className="text-[#EDE6D6]">{item.drink_name}</span>
+                              <span className="font-data text-[#EDE6D6]">x{item.quantity}</span>
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-300 text-center">No drinks logged</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-[#9C9384] text-center">No drinks logged</p>
                       )}
                     </div>
                   )}
                 </div>
 
-                <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                   <Bell className="text-amber-500 shrink-0" size={16} />
-                   <p className="text-[10px] text-amber-700 font-medium leading-relaxed">
+                <div className="flex items-start gap-3 p-4 bg-[#B8860B]/10 border border-[#B8860B]/30 rounded-lg">
+                   <Bell className="text-[#B8860B] shrink-0" size={16} />
+                   <p className="text-[10px] text-[#B8860B] font-medium leading-relaxed">
                       Logistics Lockdown: Sensitive financial data is hidden. You can only manage meals and log beverages.
                    </p>
                 </div>
