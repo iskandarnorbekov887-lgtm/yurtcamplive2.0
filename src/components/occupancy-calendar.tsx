@@ -1241,7 +1241,8 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
               <button onClick={() => setShowExtraServicesPopup(false)} className="p-2 hover:bg-[#2A1518] rounded-xl transition-all">
                 <svg className="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
-            </di            <div className="space-y-4">
+            </div>
+            <div className="space-y-4">
               <div>
                 <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest block mb-1">Service Name</label>
                 <input

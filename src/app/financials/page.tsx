@@ -1554,7 +1554,7 @@ function ManagerFinancials() {
             </div>
           </div>
         </div>
-      )}}
+      )}
     </div>
   );
 }

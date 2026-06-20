@@ -196,16 +196,16 @@ body {
 }
 
 /* Improve visibility of small edge/modal action buttons (close, toggles) */
-.fixed.inset-0 .relative.bg-white button.w-8.h-8,
-.fixed.inset-0 .relative.bg-white .w-8.h-8 {
+.fixed.inset-0 .relative.\[bg-\#1C232E\] button.w-8.h-8,
+.fixed.inset-0 .relative.\[bg-\#1C232E\] .w-8.h-8 {
   background: var(--color-dark-slate);
   color: var(--color-warm-ivory);
   border: 1px solid rgba(92, 74, 46, 0.3);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
   transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
 }
-.fixed.inset-0 .relative.bg-white button.w-8.h-8:hover,
-.fixed.inset-0 .relative.bg-white .w-8.h-8:hover {
+.fixed.inset-0 .relative.\[bg-\#1C232E\] button.w-8.h-8:hover,
+.fixed.inset-0 .relative.\[bg-\#1C232E\] .w-8.h-8:hover {
   transform: translateY(-1px);
   background: var(--color-deep-burgundy);
 }

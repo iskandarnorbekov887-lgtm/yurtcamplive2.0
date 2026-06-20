@@ -24,10 +24,10 @@ export default function Home() {
   }, [user, loading, router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+    <div className="min-h-screen flex items-center justify-center bg-[#0F1419]">
       <div className="flex flex-col items-center gap-4">
-        <div className="w-12 h-12 border-4 border-emerald-700 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-zinc-950 font-medium animate-pulse">Redirecting to your workspace...</p>
+        <div className="w-12 h-12 border-4 border-[#0B6E4F] border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-[#EDE6D6] font-medium animate-pulse">Redirecting to your workspace...</p>
       </div>
     </div>
   );

@@ -67,28 +67,28 @@ function CEODeletedRecords() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen bg-[#0F1419] flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-[#0B6E4F] border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans">
-      <header className="bg-gradient-to-r from-indigo-800 to-purple-900 text-white shadow-2xl sticky top-0 z-50">
+    <div className="min-h-screen bg-[#0F1419] font-sans">
+      <header className="bg-gradient-to-r from-[#0B6E4F] to-[#0B6E4F]/80 text-[#C9A227] shadow-2xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.back()}
-              className="p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-lg"
+              className="p-3 bg-[#0B6E4F] text-[#C9A227] rounded-xl hover:bg-[#0B6E4F]/80 transition-all shadow-lg border border-[#0B6E4F]/40"
             >
-              <svg className="w-8 h-8 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-8 h-8 text-[#C9A227]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
             </button>
             <div>
-              <h1 className="text-2xl font-black tracking-tight">Deleted Records</h1>
-              <p className="text-xs text-indigo-300 font-bold tracking-widest uppercase opacity-80">CEO View</p>
+              <h1 className="text-2xl font-black tracking-tight text-[#EDE6D6]">Deleted Records</h1>
+              <p className="text-xs text-[#C9A227]/80 font-bold tracking-widest uppercase opacity-80">CEO View</p>
             </div>
           </div>
           <button
@@ -105,38 +105,38 @@ function CEODeletedRecords() {
 
       <main className="max-w-7xl mx-auto p-6">
         {message && (
-          <div className={`mb-4 p-4 rounded-xl ${message.includes('Error') ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
+          <div className={`mb-4 p-4 rounded-xl ${message.includes('Error') ? 'bg-[#722F37]/10 text-[#722F37] border border-[#722F37]/30' : 'bg-[#0B6E4F]/10 text-[#0B6E4F] border border-[#0B6E4F]/30'}`}>
             {message}
           </div>
         )}
 
         {deletedRecords.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
-            <p className="text-slate-600 font-semibold">No deleted records found.</p>
+          <div className="bg-[#1C232E] rounded-2xl shadow-xl p-8 text-center border border-[#5C4A2E]/30">
+            <p className="text-[#9C9384] font-semibold">No deleted records found.</p>
           </div>
         ) : (
           <div className="space-y-4">
             {deletedRecords.map((record) => (
-              <div key={record.id} className="bg-white rounded-2xl shadow-xl p-6">
+              <div key={record.id} className="bg-[#1C232E] rounded-2xl shadow-xl p-6 border border-[#5C4A2E]/30">
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${record.type === 'income' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${record.type === 'income' ? 'bg-[#0B6E4F]/20 text-[#0B6E4F]' : 'bg-[#722F37]/20 text-[#722F37]'}`}>
                         {record.type === 'income' ? 'Income' : 'Expense'}
                       </span>
-                      <span className="text-xs text-slate-500">{record.date}</span>
+                      <span className="text-xs text-[#9C9384]">{record.date}</span>
                     </div>
-                    <h3 className="text-lg font-black text-slate-900">
+                    <h3 className="text-lg font-black text-[#EDE6D6]">
                       {record.type === 'expense' ? record.category : (record.guest_name || 'Income')}
                     </h3>
-                    <p className="text-sm text-slate-600 mt-1">{record.description || 'No description'}</p>
+                    <p className="text-sm text-[#9C9384] mt-1">{record.description || 'No description'}</p>
                     {(record as any).delete_reason && (
-                      <div className="mt-2 p-2 bg-amber-50 rounded-lg border border-amber-200">
-                        <p className="text-xs font-bold text-amber-800">Reason for deletion:</p>
-                        <p className="text-sm text-amber-700">{(record as any).delete_reason}</p>
+                      <div className="mt-2 p-2 bg-[#C9A227]/10 rounded-lg border border-[#C9A227]/30">
+                        <p className="text-xs font-bold text-[#C9A227]">Reason for deletion:</p>
+                        <p className="text-sm text-[#C9A227]/80">{(record as any).delete_reason}</p>
                       </div>
                     )}
-                    <p className={`text-lg font-bold mt-2 ${record.type === 'expense' ? 'text-rose-700' : 'text-emerald-700'}`}>
+                    <p className={`text-lg font-bold mt-2 ${record.type === 'expense' ? 'text-[#722F37]' : 'text-[#0B6E4F]'}`}>
                       {record.original_amount.toLocaleString()} {record.currency || 'UZS'}
                     </p>
                   </div>

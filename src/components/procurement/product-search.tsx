@@ -134,7 +134,7 @@ export function ProductSearch({ products, onSelect, onAddNew, placeholder = 'Sea
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
-          className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-zinc-950 placeholder:text-slate-300 focus:border-emerald-500 outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+          className="w-full pl-11 pr-4 py-3 bg-[#1C232E] border border-[#5C4A2E]/30 rounded-lg text-sm font-medium text-[#EDE6D6] placeholder:text-[#9C9384] focus:border-[#0B6E4F] outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           autoComplete="off"
         />
       </div>
@@ -142,23 +142,23 @@ export function ProductSearch({ products, onSelect, onAddNew, placeholder = 'Sea
       {isOpen && (filtered.length > 0 || showAddNew) && (
         <div
           ref={dropdownRef}
-          className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg border border-slate-200 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200"
+          className="absolute top-full left-0 right-0 mt-2 bg-[#1C232E] rounded-lg shadow-lg border border-[#5C4A2E]/30 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200"
         >
           {filtered.map((product, i) => (
             <button
               key={product.id}
               onClick={() => handleSelect(product)}
               className={`w-full text-left px-4 py-3 flex items-center justify-between transition-all ${
-                i === highlightIndex ? 'bg-emerald-50 border-l-2 border-l-emerald-500' : 'hover:bg-slate-50 border-l-2 border-l-transparent'
+                i === highlightIndex ? 'bg-[#0B6E4F]/10 border-l-2 border-l-[#0B6E4F]' : 'hover:bg-[#2A1518] border-l-2 border-l-transparent'
               }`}
             >
               <div>
-                <p className="font-bold text-zinc-950 text-sm">{product.item_name}</p>
-                <p className="text-[10px] text-slate-400 font-medium">
+                <p className="font-bold text-[#EDE6D6] text-sm">{product.item_name}</p>
+                <p className="text-[10px] text-[#9C9384] font-medium">
                   {unitLabel[product.use_unit] || product.use_unit} · Stock: <span className="font-data">{product.current_stock}</span> {product.use_unit}
                 </p>
               </div>
-              <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-[#9C9384] bg-[#1C232E]/50 px-2 py-0.5 rounded border border-[#5C4A2E]/30">
                 {product.use_unit}
               </span>
             </button>
@@ -167,12 +167,12 @@ export function ProductSearch({ products, onSelect, onAddNew, placeholder = 'Sea
           {showAddNew && (
             <button
               onClick={handleAddNew}
-              className="w-full text-left px-4 py-3.5 bg-emerald-50/30 hover:bg-emerald-50 transition-all border-t border-slate-100 flex items-center gap-3"
+              className="w-full text-left px-4 py-3.5 bg-[#0B6E4F]/10 hover:bg-[#0B6E4F]/20 transition-all border-t border-[#5C4A2E]/30 flex items-center gap-3"
             >
-              <div className="w-8 h-8 bg-emerald-100 rounded-md flex items-center justify-center text-emerald-700 font-bold text-lg">+</div>
+              <div className="w-8 h-8 bg-[#0B6E4F]/20 rounded-md flex items-center justify-center text-[#0B6E4F] font-bold text-lg">+</div>
               <div>
-                <p className="font-bold text-emerald-700 text-xs uppercase tracking-widest">Add New Item</p>
-                <p className="text-[10px] text-emerald-600/60 font-medium">"{query}" not found — create it</p>
+                <p className="font-bold text-[#0B6E4F] text-xs uppercase tracking-widest">Add New Item</p>
+                <p className="text-[10px] text-[#0B6E4F]/60 font-medium">"{query}" not found — create it</p>
               </div>
             </button>
           )}

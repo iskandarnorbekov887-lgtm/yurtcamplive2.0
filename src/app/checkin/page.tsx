@@ -130,27 +130,27 @@ function CheckinPortal() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans">
-      <header className="bg-gradient-to-r from-indigo-700 to-purple-800 text-white shadow-2xl sticky top-0 z-50 backdrop-blur-md bg-opacity-95">
+    <div className="min-h-screen bg-[#0F1419] font-sans">
+      <header className="bg-gradient-to-r from-[#0B6E4F] to-[#0B6E4F]/80 text-[#C9A227] shadow-2xl sticky top-0 z-50 backdrop-blur-md bg-opacity-95">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm border border-white/20">
-              <svg className="w-10 h-10 text-indigo-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            <div className="p-2.5 bg-[#1C232E]/10 rounded-xl backdrop-blur-sm border border-[#5C4A2E]/30">
+              <svg className="w-10 h-10 text-[#C9A227]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Check-in & Check-out</h1>
-              <p className="text-xs text-indigo-200 font-bold tracking-widest uppercase opacity-80 mt-1">
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-[#EDE6D6]">Check-in & Check-out</h1>
+              <p className="text-xs text-[#C9A227]/80 font-bold tracking-widest uppercase opacity-80 mt-1">
                 {userRole} Portal
               </p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="bg-white/15 border border-white/30 rounded-xl px-3 py-2 backdrop-blur-sm">
+            <div className="bg-[#1C232E]/15 border border-[#5C4A2E]/30 rounded-xl px-3 py-2 backdrop-blur-sm">
               <LanguageSwitcher variant="light" />
             </div>
             <button
               onClick={signOut}
-              className="px-5 py-3 bg-rose-600/90 hover:bg-rose-600 rounded-xl text-sm font-black transition-all shadow-lg hover:shadow-rose-500/20 active:scale-95 flex items-center gap-2 min-h-[48px]"
+              className="px-5 py-3 bg-[#722F37]/90 hover:bg-[#722F37] rounded-xl text-sm font-black transition-all shadow-lg hover:shadow-[#722F37]/20 active:scale-95 flex items-center gap-2 min-h-[48px]"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
               {t('btn.logout')}
