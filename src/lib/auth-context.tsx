@@ -49,11 +49,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           lastUserId.current = newSession.user.id;
 
           try {
-            const { data: profile, error: profileErr } = await supabase
+            const { data, error: profileErr } = await supabase
               .from('profiles')
               .select('*')
               .eq('id', newSession.user.id)
-              .single();
+              .limit(1);
+            
+            const profile = Array.isArray(data) ? data[0] : data;
 
             if (profileErr) {
               console.error('Profile fetch failed:', profileErr.message);
@@ -79,8 +81,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setUser(userProfile);
               } else {
                 console.warn('AuthContext: User is authenticated but NO profile found in "profiles" table.');
-                // We can't do much here without a role, but we must stop loading
-                setUser(null);
+                // DO NOT set to null, which would cause an infinite redirect loop to /login.
+                // Instead, provide a partial state with an UNKNOWN role so they go to /unauthorized 
+                // or stay logged in instead of looping.
+                setUser({
+                  id: newSession.user.id,
+                  email: newSession.user.email || '',
+                  full_name: newSession.user.user_metadata?.full_name || '',
+                  role: 'UNKNOWN' as any
+                });
               }
             }
           } catch (err: any) {
@@ -110,6 +119,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // 2. Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event: any, newSession: any) => {
+        console.log("Auth Event Triggered:", event); // Check if it fires at all
+        if (newSession) {
+          console.log("Session detected, checking profile...");
+          // If it freezes here, your issue is the database query to public.profiles
+        }
+        setLoading(false); // Safety release
+
         if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'USER_UPDATED') {
           handleSession(newSession);
         } else if (event === 'SIGNED_OUT') {

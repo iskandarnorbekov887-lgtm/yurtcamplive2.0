@@ -153,13 +153,13 @@ function CEODashboard() {
 
   const handleUpdateBooking = async (id: number, updates: Partial<Booking>) => {
     const payloadToSave = { ...updates, last_edited_by: currentUserId || '', last_edited_by_role: userRole, last_edited_at: new Date().toISOString() } as any;
-    delete payloadToSave.special_requests;
-    delete payloadToSave.number_of_people;
-    delete payloadToSave.lunch_count;
-    delete payloadToSave.dinner_count;
-    delete payloadToSave.guide_service;
-    delete payloadToSave.guide_names;
-    delete payloadToSave.guide_amount;
+    delete payloadToSave.meta;
+
+
+
+
+
+
     delete payloadToSave.last_edited_by_id;
     delete payloadToSave.days;
     await supabase.from('bookings').update(payloadToSave).eq('id', id);
@@ -168,13 +168,13 @@ function CEODashboard() {
 
   const handleCancelBooking = async (id: number) => {
     const payloadToSave = { status: 'cancelled' } as any;
-    delete payloadToSave.special_requests;
-    delete payloadToSave.number_of_people;
-    delete payloadToSave.lunch_count;
-    delete payloadToSave.dinner_count;
-    delete payloadToSave.guide_service;
-    delete payloadToSave.guide_names;
-    delete payloadToSave.guide_amount;
+    delete payloadToSave.meta;
+
+
+
+
+
+
     delete payloadToSave.last_edited_by_id;
     delete payloadToSave.days;
     await supabase.from('bookings').update(payloadToSave).eq('id', id);
@@ -183,13 +183,13 @@ function CEODashboard() {
 
   const handleCheckIn = async (id: number) => {
     const payloadToSave = { status: 'checked_in' } as any;
-    delete payloadToSave.special_requests;
-    delete payloadToSave.number_of_people;
-    delete payloadToSave.lunch_count;
-    delete payloadToSave.dinner_count;
-    delete payloadToSave.guide_service;
-    delete payloadToSave.guide_names;
-    delete payloadToSave.guide_amount;
+    delete payloadToSave.meta;
+
+
+
+
+
+
     delete payloadToSave.last_edited_by_id;
     delete payloadToSave.days;
     await supabase.from('bookings').update(payloadToSave).eq('id', id);
@@ -202,7 +202,7 @@ function CEODashboard() {
     if (!booking) return;
 
     // Create camp_finances record from booking data
-    const amountValue = booking.amount || booking.total_price || 0;
+    const amountValue = booking.total_price || 0;
     const rateValue = booking.exchange_rate || 1;
     const amountUZS = booking.currency === 'UZS' ? amountValue : amountValue * rateValue;
 
@@ -236,13 +236,13 @@ function CEODashboard() {
 
     // Then mark booking as completed
     const payloadToSave = { status: 'completed' } as any;
-    delete payloadToSave.special_requests;
-    delete payloadToSave.number_of_people;
-    delete payloadToSave.lunch_count;
-    delete payloadToSave.dinner_count;
-    delete payloadToSave.guide_service;
-    delete payloadToSave.guide_names;
-    delete payloadToSave.guide_amount;
+    delete payloadToSave.meta;
+
+
+
+
+
+
     delete payloadToSave.last_edited_by_id;
     delete payloadToSave.days;
     await supabase.from('bookings').update(payloadToSave).eq('id', id);
@@ -252,9 +252,15 @@ function CEODashboard() {
   const handleAddUser = async () => {
     setLoadingUser(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      
       const response = await fetch('/api/users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify(newUser)
       });
       const data = await response.json();
@@ -276,9 +282,15 @@ function CEODashboard() {
     if (!editingUser) return;
     setLoadingUser(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
       const response = await fetch('/api/users', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           id: editingUser.id,
           fullName: editingUser.full_name,
@@ -303,8 +315,14 @@ function CEODashboard() {
   const handleDeleteUser = async (id: string) => {
     if (!confirm('Are you sure you want to delete this user?')) return;
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
       const response = await fetch(`/api/users?id=${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
       });
       const data = await response.json();
       if (data.error) {
@@ -571,6 +589,14 @@ function CEODashboard() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             Pricing Settings
           </button>
+          {/* Team Settings — navigates to its own CEO-only page */}
+          <a
+            href="/ceo/team-settings"
+            className="px-6 py-2.5 rounded-lg font-bold capitalize transition-all text-xs flex items-center gap-2 text-[#9C9384] hover:text-[#EDE6D6] hover:bg-[#2A1518]"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+            Team Settings
+          </a>
         </div>
 
         {activeTab === 'checkin' && (

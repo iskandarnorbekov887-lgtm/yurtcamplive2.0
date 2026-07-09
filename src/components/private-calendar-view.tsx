@@ -95,7 +95,7 @@ export function PrivateCalendarView({ bookings, calendarEvents, onSelectBooking,
         if (endCol < startCol) endCol = startCol;
         let category: 'international' | 'local' | 'pool' | 'camper' | '' = '';
         try {
-          const meta = typeof b.special_requests === 'string' ? JSON.parse(b.special_requests || '{}') : (b.special_requests || {});
+          const meta = (b.meta || {});
           category = meta.guest_category || '';
         } catch {}
         bars.push({

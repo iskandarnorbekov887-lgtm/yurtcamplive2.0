@@ -43,7 +43,7 @@ BEGIN
     NEW.id,
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email),
-    'Manager' -- Default role for new signups
+    COALESCE(NEW.raw_user_meta_data->>'role', 'CEO')
   );
   RETURN NEW;
 END;

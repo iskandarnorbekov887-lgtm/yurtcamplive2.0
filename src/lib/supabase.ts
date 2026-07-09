@@ -28,8 +28,7 @@ export interface Booking {
   check_in: string;
   check_out: string;
   total_price: number;
-  stay_price?: number;
-  special_requests?: any;
+  meta?: any;
   number_of_adults?: number;
   number_of_children?: number;
   payment_status: string;
@@ -58,34 +57,11 @@ export interface Booking {
   last_edited_by: string;
   last_edited_by_role: string;
   created_at: string;
-  cooking_class?: boolean; // Database column for cooking class
-  cooking_class_amount?: string | null;
-  laundry_price?: string | null;
-  laundry_currency?: 'UZS' | 'USD' | null;
-  guest_count?: number;
   nights?: string;
-  has_guide?: boolean;
-  guide_service?: boolean;
-  guide_names?: string | null;
-  guide_amount?: string | null;
-  has_transportation?: boolean;
-  transportation_details?: string | null;
-  lunch?: boolean;
-  lunch_count?: number;
-  lunch_dietary?: string;
-  dinner?: boolean;
-  dinner_count?: number;
-  dinner_dietary?: string;
-  drinks?: boolean;
-  drinks_count?: number;
-  laundry?: boolean;
   payment_method?: 'in_camp' | 'all_paid' | 'partially_paid' | null;
   payment_note?: string | null;
   currency?: 'UZS' | 'USD' | 'EUR';
   exchange_rate?: number;
-  amount?: number;
-  description?: string;
-  drinks_tab?: Array<{ drink_id: number; drink_name: string; quantity: number; price: number; currency: 'UZS' | 'USD' | 'EUR' }>;
   extra_services?: Array<{ name: string; price: number; currency: 'UZS' | 'USD' | 'EUR' }>;
   collected_amount?: number;
   collected_currency?: 'UZS' | 'USD' | 'EUR';
@@ -95,6 +71,8 @@ export interface Booking {
   dinner_prepaid?: boolean;
   /** Joined meal_requests from the normalized table (not a DB column) */
   meal_requests?: MealRequest[];
+  /** Joined booking_services from the normalized table (not a DB column) */
+  booking_services?: any[];
 }
 
 export interface Tab {
@@ -270,4 +248,15 @@ export interface InventoryLedger {
   reason?: string;
   created_at: string;
   created_by?: string;
+}
+
+export interface PendingItemRequest {
+  id: string;
+  requested_name: string;
+  requested_by: string;
+  status: 'pending' | 'approved' | 'rejected';
+  approved_item_id: string | null;
+  reviewer_notes: string | null;
+  created_at: string;
+  resolved_at: string | null;
 }

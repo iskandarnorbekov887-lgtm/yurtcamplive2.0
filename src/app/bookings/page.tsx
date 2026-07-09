@@ -68,13 +68,13 @@ function BookingPortal() {
 
   const handleUpdateBooking = async (id: number, updates: Partial<Booking>) => {
     const payloadToSave = { ...updates, last_edited_by: currentUserId || '', last_edited_at: new Date().toISOString() } as any;
-    delete payloadToSave.special_requests;
-    delete payloadToSave.number_of_people;
-    delete payloadToSave.lunch_count;
-    delete payloadToSave.dinner_count;
-    delete payloadToSave.guide_service;
-    delete payloadToSave.guide_names;
-    delete payloadToSave.guide_amount;
+    delete payloadToSave.meta;
+
+
+
+
+
+
     delete payloadToSave.last_edited_by_id;
     delete payloadToSave.days;
     await supabase.from('bookings').update(payloadToSave).eq('id', id);

@@ -146,9 +146,7 @@ export function BookingModal(props: BookingModalProps) {
     if (!sel) return null;
     let category = '';
     try {
-      const meta = typeof sel.special_requests === 'string' 
-        ? JSON.parse(sel.special_requests || '{}') 
-        : (sel.special_requests || {});
+      const meta = (sel.meta || {});
       category = meta.guest_category || '';
     } catch {}
 
@@ -163,15 +161,12 @@ export function BookingModal(props: BookingModalProps) {
     if (!sel) return {};
     let meta: any = {};
     try {
-      const parsed = typeof sel.special_requests === 'string'
-        ? JSON.parse(sel.special_requests || '{}')
-        : (sel.special_requests || {});
-      meta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
+      meta = Array.isArray(sel.meta) ? { days: sel.meta } : (sel.meta || {});
     } catch (err) {
       console.error('Metadata parse error:', err);
     }
     return meta;
-  }, [sel?.special_requests]);
+  }, [sel?.meta]);
 
   const guestStatement = useMemo(() => {
     if (!sel) return null;
@@ -197,16 +192,17 @@ export function BookingModal(props: BookingModalProps) {
     
     const mealsTotal = mealItems.reduce((s: number, i: any) => s + i.total, 0);
     
-    // Guide service from booking data
-    const guideTotal = sel.has_guide ? (parseFloat(sel.guide_amount || '0') || (pricing?.guide_price || 40)) : 0;
-    const guideNames = sel.guide_names || '';
+    // Guide service from component state
+    const guideTotal = svcGuide ? svcGuidePrice : 0;
+    const guideNamesJoined = svcGuideNames.join(', ');
     
-    // Transportation from booking data
-    const transportTotal = sel.has_transportation ? 
-      (sel.transportation_details || '').split('\n').reduce((sum: number, line: string) => {
-        const match = line.match(/Price: \$(\d+(?:\.\d+)?)/);
-        return sum + (match ? parseFloat(match[1]) || 0 : 0);
-      }, 0) : 0;
+    // Transportation from component state
+    const transportTotal = svcTransport ? svcTransList.reduce((sum: number, t: any) => sum + (t.price || 0), 0) : 0;
+    const transportationDetailsString = svcTransport 
+      ? svcTransList.filter((t: any) => t.name || t.details || t.price)
+          .map((t: any) => `${t.name} | ${t.details} | Price: $${t.price}`)
+          .join('\n')
+      : '';
     
     const grandTotal = accommodation + mealsTotal + guideTotal + transportTotal;
     
@@ -223,15 +219,15 @@ export function BookingModal(props: BookingModalProps) {
       mealItems,
       mealsTotal,
       guideTotal,
-      guideNames,
+      guideNames: guideNamesJoined,
       transportTotal,
-      transportationDetails: sel.transportation_details || '',
+      transportationDetails: transportationDetailsString,
       grandTotal,
       totalReconciled,
       remaining,
       status
     };
-  }, [sel, pricing, isPrepaid]);
+  }, [sel, pricing, isPrepaid, svcGuide, svcGuidePrice, svcGuideNames, svcTransport, svcTransList]);
 
   const isPOS = currentMeta.guest_category === 'local' || currentMeta.guest_category === 'pool';
 
@@ -254,11 +250,12 @@ export function BookingModal(props: BookingModalProps) {
     if (!sel || !onUpdateBooking) return;
     setLoadingAction('save');
     try {
+      const category = currentMeta.guest_category || 'international';
+
+      // 1. Prepare the standard fields
       const data: any = {
         number_of_adults: svcAdults,
         number_of_children: svcChildren,
-        amount: svcAmount,
-        stay_price: svcAmount,
         is_prepaid: isPrepaid,
         lunch: svcLunch,
         lunch_count: svcLunchCount,
@@ -269,14 +266,19 @@ export function BookingModal(props: BookingModalProps) {
         has_guide: svcGuide,
         has_transportation: svcTransport,
         extra_services: extraServices,
+        guest_category: category,
+        
+        // 2. Map all numeric data to the single 'amount' column
+        amount: svcAmount, 
       };
 
-      // If prepaid, add the amount to collected_amount so balance starts at zero
+      // 3. Keep payment logic synchronized
       if (isPrepaid && svcAmount > 0) {
         data.collected_amount = (sel.collected_amount || 0) + svcAmount;
         data.collected_currency = 'USD';
       }
 
+      // 4. Drinks Tab
       const dTab = Object.entries(selectedDrinks).map(([id, qty]) => {
         const d = (drinks || []).find(dr => dr.id === Number(id));
         return { 
@@ -289,7 +291,7 @@ export function BookingModal(props: BookingModalProps) {
       });
       data.drinks_tab = dTab;
 
-      // Manual Protection Rule: Flag office bookings as manually updated
+      // 5. Manual Protection Rule
       if (sel.google_event_id || sel.source === 'System' || sel.source === 'office') {
         data.is_manually_updated = true;
       }
@@ -660,15 +662,7 @@ export function BookingModal(props: BookingModalProps) {
                               const settledReceipts = getSettledReceiptsForSel ? getSettledReceiptsForSel() : [];
                               const isTab1Closed = settledReceipts.length > 0 || (sel.collected_amount || 0) > 0;
                               
-                              let currentMeta: any = {};
-                              try {
-                                const parsed = typeof sel.special_requests === 'string'
-                                  ? JSON.parse(sel.special_requests || '{}')
-                                  : (sel.special_requests || {});
-                                currentMeta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
-                              } catch {
-                                currentMeta = {};
-                              }
+                              const currentMeta: any = Array.isArray(sel.meta) ? { days: sel.meta } : (sel.meta || {});
 
                               const updates: any = { 
                                 check_in: editCheckIn,
@@ -680,12 +674,12 @@ export function BookingModal(props: BookingModalProps) {
                               // collected_amount will be updated in finalizeTab when the refund is physically given/settled
 
                               // Save metadata change history natively
-                              updates.special_requests = JSON.stringify({ 
+                              updates.meta = { 
                                 ...currentMeta, 
                                 is_manual_dates: true, 
                                 days: dayEntries,
                                 last_adjustment: svcDateAdjustment
-                              });
+                              };
 
                               if (onUpdateBooking) await onUpdateBooking(sel.id, updates);
 
@@ -899,7 +893,7 @@ export function BookingModal(props: BookingModalProps) {
                             <div className="space-y-1.5">
                               <label className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Original Stay Price (Baseline)</label>
                               <div className="px-3 py-2 bg-[#1C232E]/50 border border-[#5C4A2E]/30 text-sm font-mono text-[#9C9384] font-bold">
-                                ${String((sel.stay_price || sel.total_price || 0).toFixed(2))}
+                                ${String((sel.total_price || 0).toFixed(2))}
                               </div>
                             </div>
 
@@ -934,7 +928,7 @@ export function BookingModal(props: BookingModalProps) {
                                     const val = parseFloat(e.target.value) || 0;
                                     setSvcAmount(val);
                                     setSvcDateAdjustment(0);
-                                    if (onUpdateBooking) onUpdateBooking(sel.id, { total_price: val, stay_price: val, amount: val });
+                                    if (onUpdateBooking) onUpdateBooking(sel.id, { total_price: val });
                                   }}
                                   className="w-full pl-7 pr-3 py-2 bg-[#1C232E]/50 border border-[#5C4A2E]/30 text-sm font-black text-[#EDE6D6] font-mono focus:outline-none"
                                   placeholder="0.00"
@@ -1088,13 +1082,11 @@ export function BookingModal(props: BookingModalProps) {
                               // 1. Fetch latest metadata first to prevent overwriting other fields (like settled_receipts)
                               const { data: latest } = await supabase
                                 .from('bookings')
-                                .select('special_requests')
+                                .select('meta')
                                 .eq('id', sel.id)
                                 .single();
 
-                              const latestMeta = latest?.special_requests
-                                ? (typeof latest.special_requests === 'string' ? JSON.parse(latest.special_requests) : latest.special_requests)
-                                : {};
+                              const latestMeta = latest?.meta || {};
 
                               // 3. Insert into normalized meal_requests table so Cook dashboard sees it
                               const todayStr = new Date().toISOString().split('T')[0];
@@ -1284,15 +1276,7 @@ export function BookingModal(props: BookingModalProps) {
                   
                   <div className="space-y-2">
                     {(svcAmount > 0 || (isPrepaid && (sel.collected_amount || 0) === 0)) && (() => {
-                      let currentMeta: any = {};
-                      try {
-                        const parsed = typeof sel.special_requests === 'string'
-                          ? JSON.parse(sel.special_requests || '{}')
-                          : (sel.special_requests || {});
-                        currentMeta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
-                      } catch {
-                        currentMeta = {};
-                      }
+                      const currentMeta: any = Array.isArray(sel.meta) ? { days: sel.meta } : (sel.meta || {});
                       const lastAdjustment = parseFloat(currentMeta.last_adjustment) || 0;
                       const isExtended = lastAdjustment > 0;
 

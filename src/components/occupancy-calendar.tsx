@@ -28,7 +28,7 @@ function dateToStr(d: Date) {
 function getDisplayId(booking: Booking): string {
   const currentMeta = (() => {
     try {
-      return booking.special_requests ? JSON.parse(booking.special_requests) : {};
+      return booking.meta || {};
     } catch {
       return {};
     }
@@ -102,9 +102,7 @@ function getBookingStatus(b: Booking, today: string): 'checked-in' | 'checked-ou
 
 function isPoolVisitor(b: Booking): boolean {
   try {
-    const meta = typeof b.special_requests === 'string' 
-      ? JSON.parse(b.special_requests || '{}') 
-      : (b.special_requests || {});
+    const meta = (b.meta || {});
     return meta.is_pool_visitor === true || meta.guest_category === 'pool';
   } catch {
     return false;
@@ -113,9 +111,7 @@ function isPoolVisitor(b: Booking): boolean {
 
 function isLocalGuest(b: Booking): boolean {
   try {
-    const meta = typeof b.special_requests === 'string' 
-      ? JSON.parse(b.special_requests || '{}') 
-      : (b.special_requests || {});
+    const meta = (b.meta || {});
     return meta.is_local_guest === true || meta.guest_category === 'local';
   } catch {
     return false;
@@ -173,13 +169,12 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
   const [showExtraServicesPopup, setShowExtraServicesPopup] = useState(false);
   const [showSettlementModal, setShowSettlementModal] = useState(false);
   const [categoryData, setCategoryData] = useState({
-    international: { stay_price: 0, cooking_class: false },
+    international: { stay_price: 0 },
     local: { amount: 0, type: 'day' },
     pool: { amount: 0 }
   });
   const [settlementAmount, setSettlementAmount] = useState('');
   const [settlementCurrency, setSettlementCurrency] = useState<'UZS' | 'USD' | 'EUR'>('UZS');
-  const [settlementCookingClass, setSettlementCookingClass] = useState(false);
   const [drinks, setDrinks] = useState<Array<{ id: number; name: string; original_price: number; sold_price: number; currency: 'UZS' | 'USD' | 'EUR'; available: boolean }>>([]);
   const [selectedDrinks, setSelectedDrinks] = useState<Array<{ drink_id: number; drink_name: string; quantity: number; price: number; currency: 'UZS' | 'USD' | 'EUR' }>>([]);
   const [newExtraService, setNewExtraService] = useState({ name: '', price: '', currency: 'USD' as 'UZS' | 'USD' | 'EUR' });
@@ -197,11 +192,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
     if (!sel || !onUpdateBooking) return;
     const amount = parseFloat(extFee) || 0;
     
-    let currentMeta: any = {};
-    try {
-      const parsed = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
-      currentMeta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
-    } catch { currentMeta = {}; }
+    const currentMeta = Array.isArray(sel.meta) ? { days: sel.meta } : (sel.meta || {});
     
     const prevAdj = parseFloat(currentMeta.last_adjustment) || 0;
     const newTotal = (sel.total_price || 0) - prevAdj + amount;
@@ -227,13 +218,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
         total_price: raw.total_price,
         currency: raw.currency,
         payment_status: 'paid',
-        status: raw.status || 'checked_in',
-        cooking_class: false,
-        guide_service: false,
-        lunch: false,
-        dinner: false,
-        has_transportation: false,
-        amount: raw.total_price // Isolated cash amount
+        status: raw.status || 'checked_in'
       };
     }
     if (category === 'local') {
@@ -241,9 +226,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
         total_price: raw.total_price,
         currency: raw.currency,
         payment_status: 'paid',
-        status: raw.status || 'checked_in',
-        cooking_class: false,
-        amount: raw.total_price
+        status: raw.status || 'checked_in'
       };
     }
     // International / Camper (Room-Based Flow)
@@ -251,9 +234,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
       total_price: raw.total_price,
       currency: raw.currency,
       payment_status: raw.payment_status || 'Unpaid',
-      status: raw.status || 'checked_in',
-      cooking_class: raw.cooking_class,
-      is_room_stay: true // Ensure it stays as a room stay
+      status: raw.status || 'checked_in'
     };
   };
 
@@ -261,11 +242,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
     if (!sel || !onUpdateBooking) return;
     const amount = parseFloat(redFee) || 0;
 
-    let currentMeta: any = {};
-    try {
-      const parsed = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
-      currentMeta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
-    } catch { currentMeta = {}; }
+    const currentMeta = Array.isArray(sel.meta) ? { days: sel.meta } : (sel.meta || {});
 
     const prevAdj = parseFloat(currentMeta.last_reduction) || 0; // Using separate field for reduction?
     const newTotal = Math.max(0, (sel.total_price || 0) + prevAdj - amount);
@@ -287,18 +264,14 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
 
   const getTabs = (booking: Booking | null) => {
     if (!booking) return [];
-    let currentMeta: any = {};
-    try {
-      const parsed = typeof booking.special_requests === 'string' ? JSON.parse(booking.special_requests || '{}') : (booking.special_requests || {});
-      currentMeta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
-      const receipts = currentMeta.settled_receipts || [];
-      // Sort by settled_at date so oldest tab is first
-      return receipts.sort((a: any, b: any) => {
-        const dateA = new Date(a.settled_at || a.date).getTime();
-        const dateB = new Date(b.settled_at || b.date).getTime();
-        return dateA - dateB;
-      });
-    } catch { return []; }
+    const currentMeta = Array.isArray(booking.meta) ? { days: booking.meta } : (booking.meta || {});
+    const receipts = currentMeta.settled_receipts || [];
+    // Sort by settled_at date so oldest tab is first
+    return receipts.sort((a: any, b: any) => {
+      const dateA = new Date(a.settled_at || a.date).getTime();
+      const dateB = new Date(b.settled_at || b.date).getTime();
+      return dateA - dateB;
+    });
   };
 
   const getBookingsForDay = (dayStr: string) => {
@@ -311,16 +284,9 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
       setSignatureData(null);
       setShowSignatureStep(false);
       originalCheckoutRef.current = sel.check_out || '';
-      let currentMeta: any = {};
-      try {
-        const parsed = typeof sel.special_requests === 'string' ? JSON.parse(sel.special_requests || '{}') : (sel.special_requests || {});
-        currentMeta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
-        setExtFee(currentMeta.last_adjustment ? String(currentMeta.last_adjustment) : '');
-        setRedFee(currentMeta.last_reduction ? String(currentMeta.last_reduction) : '');
-      } catch {
-        setExtFee('');
-        setRedFee('');
-      }
+      const currentMeta = Array.isArray(sel.meta) ? { days: sel.meta } : (sel.meta || {});
+      setExtFee(currentMeta.last_adjustment ? String(currentMeta.last_adjustment) : '');
+      setRedFee(currentMeta.last_reduction ? String(currentMeta.last_reduction) : '');
     }
   }, [sel]);
 
@@ -355,13 +321,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
     if (!sel) return;
 
     // Check if this is a manager-created booking
-    const currentMeta = (() => {
-      try {
-        return sel.special_requests ? JSON.parse(sel.special_requests) : {};
-      } catch {
-        return {};
-      }
-    })();
+    const currentMeta = sel.meta || {};
 
     // For manager bookings, open settlement modal
     if (currentMeta.is_system_only) {
@@ -409,16 +369,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
   const handleUpdate = async () => {
     if (!sel || !onUpdateBooking) return;
 
-    let currentMeta: any = {}; 
-    try {
-      const parsed = typeof sel.special_requests === 'string'
-        ? JSON.parse(sel.special_requests || '{}')
-        : (sel.special_requests || {});
-      currentMeta = Array.isArray(parsed) ? { days: parsed } : (parsed || {});
-    } catch (err) {
-      console.error('Metadata parse error:', err);
-      currentMeta = {};
-    }
+    const currentMeta = Array.isArray(sel.meta) ? { days: sel.meta } : (sel.meta || {});
 
     const updates: Partial<Booking> = {
       ...editData,
@@ -579,13 +530,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                     now.getHours() >= 12;
 
                   // Check if this is a manager-created booking
-                  const currentMeta = (() => {
-                    try {
-                      return ev.booking.special_requests ? JSON.parse(ev.booking.special_requests) : {};
-                    } catch {
-                      return {};
-                    }
-                  })();
+                    return ev.booking.meta || {};
                   const isManagerBooking = currentMeta.is_system_only;
                   const displayId = getDisplayId(ev.booking);
 
@@ -1095,10 +1040,10 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-[#9C9384] mb-2">Special Requests</label>
+                <label className="block text-sm font-bold text-[#9C9384] mb-2">Notes</label>
                 <textarea
-                  value={editRequestData.special_requests || ''}
-                  onChange={e => setEditRequestData({ ...editRequestData, special_requests: e.target.value })}
+                  value={editRequestData.notes || ''}
+                  onChange={e => setEditRequestData({ ...editRequestData, notes: e.target.value })}
                   className="w-full px-4 py-3 bg-[#1C232E]/50 border border-[#5C4A2E]/30 rounded-xl text-base font-bold text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all"
                   rows={3}
                 />
@@ -1397,7 +1342,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
               <p className="text-sm font-bold text-[#9C9384]">Category: <span className="text-[#EDE6D6] capitalize">{(() => {
                 const meta = (() => {
                   try {
-                    return sel.special_requests ? JSON.parse(sel.special_requests) : {};
+                    return sel.meta || {};
                   } catch {
                     return {};
                   }
@@ -1410,7 +1355,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
               {(() => {
                 const meta = (() => {
                   try {
-                    return sel.special_requests ? JSON.parse(sel.special_requests) : {};
+                    return sel.meta || {};
                   } catch {
                     return {};
                   }
@@ -1480,16 +1425,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                           <option value="EUR">EUR</option>
                         </select>
                       </div>
-                      <div className="flex items-center gap-2 mt-2">
-                        <input
-                          type="checkbox"
-                          id="cooking-class-settle"
-                          checked={categoryData.international.cooking_class}
-                          onChange={(e) => setCategoryData({ ...categoryData, international: { ...categoryData.international, cooking_class: e.target.checked } })}
-                          className={`w-4 h-4 rounded ${isCamper ? 'text-[#B8860B] border-[#B8860B]/40' : 'text-[#0B6E4F] border-[#5C4A2E]/40'}`}
-                        />
-                        <label htmlFor="cooking-class-settle" className={`text-sm font-bold ${isCamper ? 'text-[#B8860B]' : 'text-[#EDE6D6]'}`}>Cooking Class</label>
-                      </div>
+
                     </div>
                   );
                 }
@@ -1508,17 +1444,10 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                   if (!sel || !onCheckIn) return;
                   
                   // Get guest category
-                  const meta = (() => {
-                    try {
-                      return sel.special_requests ? JSON.parse(sel.special_requests) : {};
-                    } catch {
-                      return {};
-                    }
-                  })();
+                  const meta = sel.meta || {};
                   const category = meta.guest_category || 'international';
 
                   let amountValue = 0;
-                  let cookingClassValue = false;
 
                   if (category === 'pool') {
                     amountValue = categoryData.pool.amount;
@@ -1526,7 +1455,6 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                     amountValue = categoryData.local.amount;
                   } else {
                     amountValue = categoryData.international.stay_price;
-                    cookingClassValue = categoryData.international.cooking_class;
                   }
 
                   if (amountValue <= 0 && category !== 'international') {
@@ -1538,8 +1466,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                   const rawPayload = {
                     total_price: amountValue,
                     currency: (category === 'pool' || category === 'local') ? 'UZS' : settlementCurrency,
-                    status: 'checked_in',
-                    cooking_class: cookingClassValue
+                    status: 'checked_in'
                   };
                   
                   const cleanedPayload = cleanPayloadByCategory(category, rawPayload);

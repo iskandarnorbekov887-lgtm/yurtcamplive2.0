@@ -56,7 +56,17 @@ export async function POST(request: NextRequest) {
     const isDayVisit = guest_category === 'pool' || (guest_category === 'local' && local_stay_type === 'day');
     const finalCheckOut = check_out || (isDayVisit ? check_in : check_in);
 
-    // Build special_requests metadata
+    let team_id = null;
+    if (created_by) {
+      try {
+        const { data: profile } = await supabase.from('profiles').select('team_id').eq('id', created_by).single();
+        if (profile) team_id = profile.team_id;
+      } catch (e) {
+        console.error('Could not fetch team_id', e);
+      }
+    }
+
+    // Build metadata
     const meta: Record<string, any> = {
       is_system_only,
       is_manual_dates,
@@ -72,22 +82,20 @@ export async function POST(request: NextRequest) {
       check_in,
       check_out: finalCheckOut,
       number_of_adults,
-      guest_count: number_of_adults,
       status: isFinancial ? 'completed' : 'checked_in',
       source: is_system_only ? 'System' : 'manual',
       total_price: isFinancial ? amount : 0,
       payment_status: isFinancial ? 'paid' : 'Unpaid',
       currency,
-      amount,
       exchange_rate: currency === 'UZS' ? 1 : (currency === 'USD' ? 1 : await fetchUsdToEur()),
       created_by,
+      team_id,
       approved_by_manager: true,
       notes,
       is_manual_dates: meta.is_manual_dates,
       guest_category: meta.guest_category,
       local_stay_type: meta.local_stay_type,
-      is_pool_visitor: meta.is_pool_visitor,
-      is_room_stay: meta.is_room_stay,
+      meta,
     };
 
     // Purge room-related fields for Local/Pool/Financials
@@ -108,14 +116,20 @@ export async function POST(request: NextRequest) {
 
     // If financial (Local/Pool), record receipt
     if (isFinancial && booking) {
-      await supabase.from('booking_receipts').insert([{
-        booking_id: booking.id,
-        amount,
-        currency,
-        settled_at: check_in,
-        created_by,
-        note: guest_category === 'pool' ? 'Instant Pool Payment' : `Local ${local_stay_type} payment`,
-      }]);
+      try {
+        await supabase.from('booking_receipts').insert([{
+          booking_id: booking.id,
+          receipt_id: `RCP-${booking.id}-${Date.now()}`,
+          amount,
+          currency,
+          total_usd: amount / 12500, // Safe generic fallback for USD equivalent
+          settled_at: check_in,
+          created_by,
+          snapshot: { note: guest_category === 'pool' ? 'Instant Pool Payment' : `Local ${local_stay_type} payment` },
+        }]);
+      } catch (e) {
+        console.error('Failed to create booking receipt:', e);
+      }
     }
 
     return NextResponse.json({ booking }, { status: 201 });

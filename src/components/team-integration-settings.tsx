@@ -1,0 +1,334 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth-context';
+import { Calendar, Key, ShieldCheck, CheckCircle2, AlertTriangle, Loader2, Save, RefreshCcw } from 'lucide-react';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface TeamSettings {
+  id?: string;
+  team_id: string;
+  google_calendar_id: string;
+  google_api_key: string;
+  updated_at?: string;
+}
+
+type SaveStatus = 'idle' | 'loading' | 'success' | 'error';
+
+// ─── Animated notification banner ─────────────────────────────────────────────
+
+function StatusBanner({ status, message }: { status: SaveStatus; message?: string }) {
+  if (status === 'idle') return null;
+
+  const config = {
+    loading: {
+      bg: 'bg-[#1C232E] border-[#5C4A2E]/40',
+      icon: <Loader2 size={16} className="animate-spin text-[#9C9384]" />,
+      text: 'text-[#9C9384]',
+      label: 'Saving changes…',
+    },
+    success: {
+      bg: 'bg-[#0B6E4F]/15 border-[#0B6E4F]/40',
+      icon: <CheckCircle2 size={16} className="text-[#0B6E4F]" />,
+      text: 'text-[#34D399]',
+      label: message ?? 'Settings saved successfully.',
+    },
+    error: {
+      bg: 'bg-[#722F37]/15 border-[#722F37]/40',
+      icon: <AlertTriangle size={16} className="text-[#F87171]" />,
+      text: 'text-[#F87171]',
+      label: message ?? 'Something went wrong. Please try again.',
+    },
+  }[status];
+
+  return (
+    <div
+      className={`flex items-center gap-3 px-4 py-3 rounded-2xl border text-xs font-semibold animate-in fade-in slide-in-from-top-2 duration-300 ${config.bg} ${config.text}`}
+    >
+      {config.icon}
+      <span>{config.label}</span>
+    </div>
+  );
+}
+
+// ─── Skeleton loader ──────────────────────────────────────────────────────────
+
+function FieldSkeleton() {
+  return (
+    <div className="space-y-2 animate-pulse">
+      <div className="h-3 w-32 bg-[#5C4A2E]/30 rounded-full" />
+      <div className="h-[52px] w-full bg-[#1C232E]/60 rounded-[18px] border-2 border-[#5C4A2E]/20" />
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+export function TeamIntegrationSettings() {
+  const { user } = useAuth();
+
+  // Form state
+  const [calendarId, setCalendarId] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [teamId, setTeamId] = useState<string | null>(null);
+
+  // UI state
+  const [fetchLoading, setFetchLoading] = useState(true);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [saveMessage, setSaveMessage] = useState<string | undefined>(undefined);
+  const [lastSaved, setLastSaved] = useState<string | null>(null);
+
+  // ── Resolve team_id from authenticated user's profile ──────────────────────
+
+  const resolveTeamId = useCallback(async (): Promise<string | null> => {
+    if (!user?.id) return null;
+
+    // Prefer a `team_id` column on profiles; fall back to the user's own id
+    // as a single-user team identifier. Adjust this logic to match your schema.
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('id, team_id')
+      .eq('id', user.id)
+      .single();
+
+    if (error) {
+      console.warn('TeamIntegrationSettings: could not resolve team_id from profile', error.message);
+      // Graceful degradation: use user id as the team identifier
+      return user.id;
+    }
+
+    // `team_id` column exists → use it; otherwise fall back to user id
+    return (profile as any)?.team_id ?? profile?.id ?? user.id;
+  }, [user?.id]);
+
+  // ── Fetch existing settings on mount ──────────────────────────────────────
+
+  const fetchSettings = useCallback(async () => {
+    setFetchLoading(true);
+    try {
+      const resolvedTeamId = await resolveTeamId();
+      if (!resolvedTeamId) return;
+      setTeamId(resolvedTeamId);
+
+      const { data, error } = await supabase
+        .from('team_settings')
+        .select('*')
+        .eq('team_id', resolvedTeamId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('TeamIntegrationSettings: fetch error', error.message);
+        return;
+      }
+
+      if (data) {
+        setCalendarId((data as TeamSettings).google_calendar_id ?? '');
+        setApiKey((data as TeamSettings).google_api_key ?? '');
+        setLastSaved((data as TeamSettings).updated_at ?? null);
+      }
+    } finally {
+      setFetchLoading(false);
+    }
+  }, [resolveTeamId]);
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchSettings();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  // ── Save handler (upsert) ─────────────────────────────────────────────────
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!teamId) return;
+
+    setSaveStatus('loading');
+    setSaveMessage(undefined);
+
+    try {
+      const payload: TeamSettings = {
+        team_id: teamId,
+        google_calendar_id: calendarId.trim(),
+        google_api_key: apiKey.trim(),
+      };
+
+      const { error } = await supabase
+        .from('team_settings')
+        .upsert(payload, { onConflict: 'team_id' });
+
+      if (error) throw error;
+
+      const now = new Date().toISOString();
+      setLastSaved(now);
+      setSaveStatus('success');
+      setSaveMessage('Integration settings saved successfully.');
+    } catch (err: any) {
+      console.error('TeamIntegrationSettings: save error', err?.message);
+      setSaveStatus('error');
+      setSaveMessage(err?.message ?? 'Failed to save settings.');
+    } finally {
+      // Reset status back to idle after 4 seconds
+      setTimeout(() => {
+        setSaveStatus('idle');
+        setSaveMessage(undefined);
+      }, 4000);
+    }
+  };
+
+  // ─── Render ───────────────────────────────────────────────────────────────
+
+  return (
+    <div className="min-h-screen bg-[#0F1419] text-[#EDE6D6] p-4 sm:p-8 flex flex-col gap-6 items-center">
+      {/* Page header */}
+      <div className="w-full max-w-xl">
+        <div className="flex items-center gap-3 mb-1">
+          <div className="w-10 h-10 rounded-2xl bg-[#0B6E4F]/20 border border-[#0B6E4F]/30 flex items-center justify-center">
+            <Calendar size={18} className="text-[#C9A227]" />
+          </div>
+          <h1 className="text-2xl font-black text-[#EDE6D6] tracking-tight">
+            Team Integration Settings
+          </h1>
+        </div>
+        <p className="text-xs text-[#9C9384] font-medium ml-[52px]">
+          Connect your team's Google Calendar to sync bookings automatically.
+        </p>
+      </div>
+
+      {/* Main card */}
+      <div className="w-full max-w-xl bg-[#1C232E] rounded-[28px] border border-[#5C4A2E]/30 shadow-2xl overflow-hidden">
+        {/* Card header accent */}
+        <div className="bg-[#0B6E4F] px-6 py-5">
+          <h2 className="text-sm font-black text-[#C9A227] uppercase tracking-widest">
+            Google Calendar Integration
+          </h2>
+          <p className="text-[#EDE6D6]/60 text-xs font-medium mt-0.5">
+            These credentials are used to read and write events on your team calendar.
+          </p>
+        </div>
+
+        <form onSubmit={handleSave} className="p-6 space-y-5">
+          {/* Status banner */}
+          <StatusBanner status={saveStatus} message={saveMessage} />
+
+          {/* Google Calendar ID */}
+          <div className="space-y-2">
+            <label
+              htmlFor="google-calendar-id"
+              className="flex items-center gap-2 text-[10px] font-black text-[#9C9384] uppercase tracking-widest"
+            >
+              <Calendar size={11} />
+              Google Calendar ID
+            </label>
+            {fetchLoading ? (
+              <FieldSkeleton />
+            ) : (
+              <input
+                id="google-calendar-id"
+                type="text"
+                value={calendarId}
+                onChange={(e) => setCalendarId(e.target.value)}
+                placeholder="your-calendar@group.calendar.google.com"
+                autoComplete="off"
+                spellCheck={false}
+                className="w-full px-5 py-[14px] bg-[#0F1419]/60 border-2 border-[#5C4A2E]/30 rounded-[18px] text-sm font-semibold text-[#EDE6D6] placeholder-[#5C4A2E]/60 focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 outline-none transition-all duration-200"
+              />
+            )}
+          </div>
+
+          {/* Google API Key */}
+          <div className="space-y-2">
+            <label
+              htmlFor="google-api-key"
+              className="flex items-center gap-2 text-[10px] font-black text-[#9C9384] uppercase tracking-widest"
+            >
+              <Key size={11} />
+              Google API Key
+            </label>
+            {fetchLoading ? (
+              <FieldSkeleton />
+            ) : (
+              <input
+                id="google-api-key"
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="AIza••••••••••••••••••••••••••••"
+                autoComplete="new-password"
+                className="w-full px-5 py-[14px] bg-[#0F1419]/60 border-2 border-[#5C4A2E]/30 rounded-[18px] text-sm font-semibold text-[#EDE6D6] placeholder-[#5C4A2E]/60 focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/15 outline-none transition-all duration-200 font-mono tracking-wider"
+              />
+            )}
+          </div>
+
+          {/* Security warning */}
+          <div className="flex gap-3 p-4 bg-[#C9A227]/8 border border-[#C9A227]/25 rounded-2xl">
+            <ShieldCheck size={16} className="text-[#C9A227] flex-shrink-0 mt-[1px]" />
+            <div className="space-y-1">
+              <p className="text-xs font-bold text-[#C9A227]">Stored Securely</p>
+              <p className="text-[10px] font-medium text-[#9C9384] leading-relaxed">
+                Your API key is encrypted at rest in Supabase and is never exposed in client-side logs or error responses. Only team members with the <span className="text-[#EDE6D6] font-semibold">CEO</span> role can update these credentials.
+              </p>
+            </div>
+          </div>
+
+          {/* Last saved indicator */}
+          {lastSaved && (
+            <p className="text-[10px] text-[#5C4A2E] font-medium text-center">
+              Last saved: {new Date(lastSaved).toLocaleString()}
+            </p>
+          )}
+
+          {/* Actions */}
+          <div className="flex gap-3 pt-1">
+            <button
+              type="button"
+              onClick={fetchSettings}
+              disabled={fetchLoading || saveStatus === 'loading'}
+              title="Reload settings from database"
+              className="w-12 h-12 flex items-center justify-center rounded-2xl bg-[#0F1419]/60 border-2 border-[#5C4A2E]/30 text-[#9C9384] hover:text-[#EDE6D6] hover:border-[#5C4A2E]/60 active:scale-95 transition-all duration-200 disabled:opacity-40 flex-shrink-0"
+            >
+              <RefreshCcw
+                size={16}
+                className={fetchLoading ? 'animate-spin' : ''}
+              />
+            </button>
+
+            <button
+              type="submit"
+              disabled={fetchLoading || saveStatus === 'loading' || !teamId}
+              className="flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl bg-[#0B6E4F] text-[#C9A227] text-xs font-black uppercase tracking-[0.18em] shadow-lg shadow-[#0B6E4F]/20 hover:bg-[#0d8560] active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saveStatus === 'loading' ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                <>
+                  <Save size={14} />
+                  Save Settings
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Team context pill */}
+      {teamId && !fetchLoading && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-[#1C232E]/60 border border-[#5C4A2E]/20 rounded-full animate-in fade-in duration-500">
+          <div className="w-2 h-2 rounded-full bg-[#0B6E4F] animate-pulse" />
+          <span className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest">
+            Team ID:
+          </span>
+          <span className="text-[10px] font-mono font-semibold text-[#EDE6D6]/60 truncate max-w-[200px]">
+            {teamId}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}

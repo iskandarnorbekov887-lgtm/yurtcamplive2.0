@@ -30,15 +30,7 @@ export async function PATCH(
       ...bookingFields
     } = body;
 
-    // Merge metadata if special_requests is an object
-    let meta: Record<string, any> = {};
-    if (bookingFields.special_requests) {
-      try {
-        meta = typeof bookingFields.special_requests === 'string'
-          ? JSON.parse(bookingFields.special_requests)
-          : bookingFields.special_requests;
-      } catch { /* ignore */ }
-    }
+
 
     // Fetch existing booking for price recalculation context
     let existing: any = null;
@@ -53,7 +45,7 @@ export async function PATCH(
       const pricing = pricingRow || { lunch_price: 10, dinner_price: 10, guide_price: 40 };
 
       const isPrepaid = bookingFields.is_prepaid ?? existing.is_prepaid ?? false;
-      const accAmount = bookingFields.amount ?? existing.amount ?? 0;
+      const accAmount = existing.total_price ?? 0;
 
       const sTotal =
         (services?.lunch && !services.lunch.prepaid ? (services.lunch.count || 0) * (pricing.lunch_price || 10) : 0) +
@@ -76,36 +68,74 @@ export async function PATCH(
 
       bookingFields.total_price = Math.max(0, (isPrepaid ? 0 : accAmount) + sTotal + dTotal + eTotal - discount);
 
-      // Persist services to dedicated columns
-      if (services?.lunch !== undefined) {
-        bookingFields.lunch = services.lunch.enabled ?? services.lunch;
-        bookingFields.lunch_count = services.lunch.count || 0;
+      // Persist services to normalized tables (not booking columns)
+      if (services?.lunch !== undefined && services.lunch.enabled) {
+        await supabase.from('meal_requests').insert({
+          booking_id: bookingId,
+          meal_date: new Date().toISOString().split('T')[0],
+          meal_type: 'Lunch',
+          adult_qty: services.lunch.count || 0,
+          child_qty: 0,
+          dietary_type: 'Normal',
+          status: 'Pending',
+        });
       }
-      if (services?.dinner !== undefined) {
-        bookingFields.dinner = services.dinner.enabled ?? services.dinner;
-        bookingFields.dinner_count = services.dinner.count || 0;
+      if (services?.dinner !== undefined && services.dinner.enabled) {
+        await supabase.from('meal_requests').insert({
+          booking_id: bookingId,
+          meal_date: new Date().toISOString().split('T')[0],
+          meal_type: 'Dinner',
+          adult_qty: services.dinner.count || 0,
+          child_qty: 0,
+          dietary_type: 'Normal',
+          status: 'Pending',
+        });
       }
-      if (services?.guide !== undefined) {
-        bookingFields.guide_service = services.guide.enabled ?? !!services.guide;
-        bookingFields.guide_amount = String(services.guide.price || 0);
+      if (services?.guide !== undefined && services.guide.enabled) {
+        await supabase.from('booking_services').insert({
+          booking_id: bookingId,
+          service_type: 'guide',
+          unit_price: services.guide.price || 0,
+          quantity: 1,
+          currency: 'USD',
+          details: { names: services.guide.names || '' },
+        });
       }
-      if (services?.transport !== undefined) {
-        bookingFields.has_transportation = services.transport.enabled ?? !!services.transport;
-        bookingFields.transportation_details = (services.transport.entries || [])
-          .filter((t: any) => t.name?.trim() || t.details?.trim())
-          .map((t: any) => `${t.name.trim()} | ${t.details.trim()} | Price: $${t.price || 0}`)
-          .join('\n') || null;
+      if (services?.transport !== undefined && services.transport.enabled) {
+        for (const entry of (services.transport.entries || [])) {
+          if (entry.name?.trim() || entry.details?.trim()) {
+            await supabase.from('booking_services').insert({
+              booking_id: bookingId,
+              service_type: 'transportation',
+              unit_price: entry.price || 0,
+              quantity: 1,
+              currency: 'USD',
+              details: { name: entry.name, destination: entry.details },
+            });
+          }
+        }
       }
-      if (services?.cooking !== undefined) {
-        bookingFields.cooking_class = services.cooking.enabled ?? !!services.cooking;
-        bookingFields.cooking_class_amount = String(services.cooking.price || 0);
+      if (services?.laundry !== undefined && services.laundry.enabled) {
+        await supabase.from('booking_services').insert({
+          booking_id: bookingId,
+          service_type: 'laundry',
+          unit_price: services.laundry.price || 0,
+          quantity: 1,
+          currency: 'USD',
+          details: {},
+        });
       }
-      if (services?.laundry !== undefined) {
-        bookingFields.laundry = services.laundry.enabled ?? !!services.laundry;
-        bookingFields.laundry_price = String(services.laundry.price || 0);
-      }
-      if (drinks !== undefined) {
-        bookingFields.drinks_tab = drinks;
+      if (drinks !== undefined && drinks.length > 0) {
+        for (const d of drinks) {
+          await supabase.from('booking_services').insert({
+            booking_id: bookingId,
+            service_type: 'drinks',
+            unit_price: d.price || 0,
+            quantity: d.quantity || 1,
+            currency: d.currency || 'USD',
+            details: { drink_id: d.drink_id, drink_name: d.drink_name },
+          });
+        }
       }
       if (extra_services !== undefined) {
         bookingFields.extra_services = extra_services.map((s: any) => ({
@@ -122,10 +152,7 @@ export async function PATCH(
       bookingFields.last_edited_at = new Date().toISOString();
     }
 
-    // Re-stringify special_requests if it's an object
-    if (typeof bookingFields.special_requests === 'object' && bookingFields.special_requests !== null) {
-      bookingFields.special_requests = JSON.stringify(bookingFields.special_requests);
-    }
+
 
     const { data, error } = await supabase
       .from('bookings')

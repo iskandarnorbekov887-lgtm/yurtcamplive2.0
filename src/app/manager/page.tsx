@@ -209,13 +209,13 @@ function ManagerPortal() {
                   bookings={bookings}
                   onUpdateBooking={async (id, data) => {
                     const payloadToSave = { ...data } as any;
-                    delete payloadToSave.special_requests;
-                    delete payloadToSave.number_of_people;
-                    delete payloadToSave.lunch_count;
-                    delete payloadToSave.dinner_count;
-                    delete payloadToSave.guide_service;
-                    delete payloadToSave.guide_names;
-                    delete payloadToSave.guide_amount;
+                    delete payloadToSave.meta;
+
+
+
+
+
+
                     delete payloadToSave.last_edited_by_id;
                     delete payloadToSave.days;
                     const { error } = await supabase.from('bookings').update(payloadToSave).eq('id', id);
@@ -257,13 +257,13 @@ function ManagerPortal() {
                     }}
                     onUpdateBooking={async (id, data) => {
                       const payloadToSave = { ...data } as any;
-                      delete payloadToSave.special_requests;
-                      delete payloadToSave.number_of_people;
-                      delete payloadToSave.lunch_count;
-                      delete payloadToSave.dinner_count;
-                      delete payloadToSave.guide_service;
-                      delete payloadToSave.guide_names;
-                      delete payloadToSave.guide_amount;
+                      delete payloadToSave.meta;
+
+
+
+
+
+
                       delete payloadToSave.last_edited_by_id;
                       const { error } = await supabase.from('bookings').update(payloadToSave).eq('id', id);
                       if (error) {

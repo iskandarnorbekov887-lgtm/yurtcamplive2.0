@@ -73,38 +73,39 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
       const finalCategory = isRoomStay && isCamper ? 'camper' : mainCategory;
       const price = isFinancial ? parseFloat(amountUZS) || 0 : 0;
       
+      let teamId = null;
+      if (currentUserId) {
+        try {
+          const { data: profile } = await supabase.from('profiles').select('team_id').eq('id', currentUserId).single();
+          if (profile) teamId = profile.team_id;
+        } catch (e) {
+          console.error('Could not fetch team_id', e);
+        }
+      }
+
       const payload: any = {
         guest_name: guestName.trim(),
         check_in: checkIn,
         check_out: checkOut || checkIn,
         number_of_adults: guestCount,
-        guest_count: guestCount,
         status: isFinancial ? 'completed' : 'checked_in', // Local (Day/Night) and Pool are instant-completed
         source: 'manual',
         total_price: price, // Unified Financial Fix
         payment_status: isFinancial ? 'paid' : 'Unpaid',
         currency: 'UZS',
-        amount: price,
         exchange_rate: 1,
         created_by: currentUserId,
         approved_by_manager: true,
         is_manual_dates: true,
         guest_category: finalCategory,
         local_stay_type: mainCategory === 'local' ? localType : null,
-        is_pool_visitor: mainCategory === 'pool',
-        is_room_stay: isRoomStay
+        team_id: teamId,
+        meta: {
+          is_pool_visitor: mainCategory === 'pool',
+          is_room_stay: isRoomStay,
+          is_system_only: true
+        }
       };
-
-      // Absolute Data Isolation: Purge room-related fields for Local/Pool/Financials
-      if (!isRoomStay) {
-        payload.cooking_class = false;
-        payload.guide_service = false;
-        payload.lunch = false;
-        payload.dinner = false;
-        payload.has_transportation = false;
-        payload.laundry = false;
-        payload.total_accommodation_price = 0;
-      }
 
       if (isFinancial) {
         payload.collected_amount = price;
@@ -116,14 +117,20 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
 
       // If financial, record receipt
       if (isFinancial && bookingData) {
-        await supabase.from('booking_receipts').insert([{
-          booking_id: bookingData.id,
-          amount: price,
-          currency: 'UZS',
-          settled_at: checkIn,
-          created_by: currentUserId,
-          note: mainCategory === 'pool' ? 'Instant Pool Payment' : `Local ${localType} payment`
-        }]);
+        try {
+          await supabase.from('booking_receipts').insert([{
+            booking_id: bookingData.id,
+            receipt_id: `RCP-${bookingData.id}-${Date.now()}`,
+            amount: price,
+            currency: 'UZS',
+            total_usd: price / 12500, // Safe generic fallback for USD equivalent
+            settled_at: checkIn,
+            created_by: currentUserId,
+            snapshot: { note: mainCategory === 'pool' ? 'Instant Pool Payment' : `Local ${localType} payment` }
+          }]);
+        } catch (e) {
+          console.error('Failed to create booking receipt:', e);
+        }
       }
 
       // Refresh cache

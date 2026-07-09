@@ -264,6 +264,30 @@ export function GoogleGuestAgenda({
         };
       });
       setActiveMeals(synced);
+
+      const { data: dbServices } = await supabase
+        .from('booking_services')
+        .select('*')
+        .eq('booking_id', sel.id);
+        
+      if (dbServices) {
+        const guides = dbServices.filter((s: any) => s.service_type === 'guide');
+        if (guides.length > 0) {
+          setSvcGuide(true);
+          setSvcGuidePrice(guides[0].unit_price || pricing.guide_price);
+          setSvcGuideNames(guides[0].details?.names ? guides[0].details.names.split(', ') : ['']);
+        }
+        
+        const transports = dbServices.filter((s: any) => s.service_type === 'transportation');
+        if (transports.length > 0) {
+          setSvcTransport(true);
+          setSvcTransList(transports.map((t: any) => ({
+            name: t.details?.name || '',
+            details: t.details?.destination || '',
+            price: t.unit_price || 0
+          })));
+        }
+      }
     };
 
     syncKitchen();
@@ -459,9 +483,7 @@ export function GoogleGuestAgenda({
         isSystemOnly = true;
       } else {
         try {
-          const meta = typeof booking.special_requests === 'string' 
-            ? JSON.parse(booking.special_requests || '{}') 
-            : (booking.special_requests || {});
+          const meta = (booking.meta || {});
           if (meta.is_system_only) isSystemOnly = true;
         } catch {}
       }
@@ -613,9 +635,9 @@ export function GoogleGuestAgenda({
 
       const hasSettled = (b.collected_amount || 0) > 0;
 
-      // ── Stay Price: Use stay_price (baseline) or total_price from DB ──
-      const stayPrice = b.stay_price || b.total_price || 0;
-      setSvcAmount(hasSettled ? stayPrice : stayPrice);
+      // ── Stay Price: Use total_price from DB ──
+      const stayPrice = b.total_price || 0;
+      setSvcAmount(stayPrice);
       setSvcDiscount(0);
 
       // ── Prepaid flags from DB columns ──
@@ -623,25 +645,12 @@ export function GoogleGuestAgenda({
       setIsLunchPrepaid(b.payment_note?.includes('Lunch') || false);
       setIsDinnerPrepaid(b.payment_note?.includes('Dinner') || false);
       
-      // ── Services from DB columns ──
-      setSvcGuide(b.guide_service ?? false);
-      setSvcGuideNames(b.guide_names ? b.guide_names.split(', ') : ['']);
-      setSvcGuidePrice(parseFloat(b.guide_amount || '0') || pricing.guide_price);
-      setSvcTransport(b.has_transportation ?? false);
-      
-      const details = b.transportation_details || '';
-      if (details.includes(' | Price: $')) {
-        const lines = details.split('\n');
-        const list = lines.map(line => {
-          const namePart = line.split(' | ')[0] || '';
-          const detailPart = line.split(' | ')[1] || '';
-          const pricePart = line.split(' | Price: $')[1] || '0';
-          return { name: namePart, details: detailPart, price: parseFloat(pricePart) || 0 };
-        });
-        setSvcTransList(list);
-      } else {
-        setSvcTransList([{ name: '', details: '', price: 0 }]);
-      }
+      // ── Services will be fetched via useEffect syncData ──
+      setSvcGuide(false);
+      setSvcGuideNames(['']);
+      setSvcGuidePrice(pricing.guide_price);
+      setSvcTransport(false);
+      setSvcTransList([{ name: '', details: '', price: 0 }]);
 
       // ── Payment line defaults ──
       let defaultCurrency: 'UZS' | 'USD' | 'EUR' = 'USD';
@@ -650,8 +659,7 @@ export function GoogleGuestAgenda({
 
       // Calculate initial total for payment line
       const initialGTotal = Math.max(0, 
-        (b.payment_status === 'Prepaid' || b.is_prepaid ? 0 : stayPrice) + 
-        (b.guide_service ? (parseFloat(b.guide_amount || '0') || pricing.guide_price) : 0)
+        (b.payment_status === 'Prepaid' || b.is_prepaid ? 0 : stayPrice)
       );
 
       setSvcPayList([{ 
@@ -688,13 +696,11 @@ export function GoogleGuestAgenda({
       try {
         const { data: latest } = await supabase
           .from('bookings')
-          .select('special_requests')
+          .select('meta')
           .eq('id', sel.id)
           .single();
           
-        const latestMeta = latest?.special_requests 
-          ? (typeof latest.special_requests === 'string' ? JSON.parse(latest.special_requests) : latest.special_requests)
-          : {};
+        const latestMeta = latest?.meta || {};
 
         const updatedMeta = { 
           ...latestMeta, 
@@ -747,21 +753,11 @@ export function GoogleGuestAgenda({
     try {
       await onCheckIn(sel.id);
 
-      // Double-Sync: Scan meal_requests from DB and sync flat columns for UI display
+      // Sync flat columns removed, no longer needed
       try {
-        const { data: dbMeals } = await supabase
-          .from('meal_requests')
-          .select('*')
-          .eq('booking_id', sel.id);
-
-        const flatUpdates: any = {
-          has_lunch: (dbMeals || []).some((m: any) => m.meal_type.toLowerCase() === 'lunch' && (m.adult_qty || 0) > 0),
-          has_dinner: (dbMeals || []).some((m: any) => m.meal_type.toLowerCase() === 'dinner' && (m.adult_qty || 0) > 0),
-          has_guide: sel.draft?.svcGuide || false,
-        };
-        if (onUpdateBooking) await onUpdateBooking(sel.id, flatUpdates);
+        if (onUpdateBooking) await onUpdateBooking(sel.id, {});
       } catch (syncErr) {
-        console.error('Double-sync during check-in failed:', syncErr);
+        console.error('Update during check-in failed:', syncErr);
       }
 
       flash('✓ Guest checked in.');
@@ -876,42 +872,18 @@ export function GoogleGuestAgenda({
           .in('id', mealIds);
       }
 
-      // ── STEP 7: Update booking row with clean columns ──
-      const isCurrentlyPrepaid = isPrepaid || sel.payment_status === 'Prepaid';
-      const finalAdjustment = parseFloat(String(svcDateAdjustment)) || 0;
-      const newCollectedAmount = (sel.collected_amount || 0) + totalPaidUsd;
-
       const updates = {
         collected_amount: Math.max(0, newCollectedAmount),
         number_of_adults: svcAdults,
         number_of_children: svcChildren,
         total_price: hasSettled ? ((sel.total_price || 0) + finalAdjustment) : (svcAmount + finalAdjustment),
-        stay_price: hasSettled ? (sel.stay_price || sel.total_price) : svcAmount,
         payment_status: isCurrentlyPrepaid ? 'Prepaid' : 'Paid',
         payment_method: svcPayList.length > 0 ? svcPayList[svcPayList.length - 1].method : 'Cash',
-        is_prepaid: isCurrentlyPrepaid,
-        has_lunch: svcLunch,
-        has_dinner: svcDinner,
-        has_guide: svcGuide,
-        has_transportation: svcTransport,
-        transportation_details: svcTransport 
-          ? svcTransList.filter(t => t.name.trim() || t.details.trim() || t.price > 0)
-              .map(t => `${t.name.trim()} | ${t.details.trim()} | Price: $${t.price}`)
-              .join('\n') || null
-          : null,
+        is_prepaid: isCurrentlyPrepaid
       };
       
       if (onUpdateBooking) {
         const payloadToSave = { ...updates } as any;
-        delete payloadToSave.special_requests;
-        delete payloadToSave.number_of_people;
-        delete payloadToSave.lunch_count;
-        delete payloadToSave.dinner_count;
-        delete payloadToSave.guide_service;
-        delete payloadToSave.guide_names;
-        delete payloadToSave.guide_amount;
-        delete payloadToSave.last_edited_by_id;
-        delete payloadToSave.days;
         await onUpdateBooking(sel.id, payloadToSave);
       }
 
@@ -972,22 +944,38 @@ export function GoogleGuestAgenda({
 
       const isTab1Closed = (getSettledReceiptsForSel ? getSettledReceiptsForSel() : []).length > 0 || (sel.collected_amount || 0) > 0;
 
+      // Manually insert services since booking columns are removed
+      if (svcLunch) {
+        await supabase.from('meal_requests').insert({
+          booking_id: sel.id, meal_date: today, meal_type: 'Lunch', adult_qty: svcLunchCount, child_qty: 0, status: 'Pending'
+        });
+      }
+      if (svcDinner) {
+        await supabase.from('meal_requests').insert({
+          booking_id: sel.id, meal_date: today, meal_type: 'Dinner', adult_qty: svcDinnerCount, child_qty: 0, status: 'Pending'
+        });
+      }
+      if (svcGuide) {
+        await supabase.from('booking_services').insert({
+          booking_id: sel.id, service_type: 'guide', unit_price: svcGuidePrice, quantity: 1, currency: 'USD',
+          details: { names: svcGuideNames.join(', ') }
+        });
+      }
+      if (svcTransport) {
+        for (const t of svcTransList) {
+          if (t.name.trim() || t.details.trim() || t.price > 0) {
+            await supabase.from('booking_services').insert({
+              booking_id: sel.id, service_type: 'transportation', unit_price: t.price || 0, quantity: 1, currency: 'USD',
+              details: { name: t.name, destination: t.details }
+            });
+          }
+        }
+      }
+
       const updates: Partial<Booking> = {
-        lunch: svcLunch,
-        lunch_count: svcLunch ? svcLunchCount : 0,
-        dinner: svcDinner,
-        dinner_count: svcDinner ? svcDinnerCount : 0,
-        has_guide: svcGuide,
-        has_transportation: svcTransport,
-        transportation_details: svcTransport 
-        ? svcTransList.filter(t => t.name.trim() || t.details.trim() || t.price > 0)
-            .map(t => `${t.name.trim()} | ${t.details.trim()} | Price: $${t.price}`)
-            .join('\n') || null
-        : null,
         total_price: isTab1Closed 
           ? ((sel.total_price || 0) + svcDateAdjustment)
           : (svcAmount + svcDateAdjustment + sTotal + dTotal + eTotal - svcDiscount),
-        last_adjustment: String(svcDateAdjustment)
       };
       await onUpdateBooking(sel.id, updates);
       flash('✓ Services updated.');

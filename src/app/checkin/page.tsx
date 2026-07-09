@@ -73,7 +73,7 @@ function CheckinPortal() {
     const { data: booking } = await supabase.from('bookings').select('*').eq('id', id).single();
     if (!booking) return;
 
-    const amountValue = booking.amount || booking.total_price || 0;
+    const amountValue = booking.total_price || 0;
     const rateValue = booking.exchange_rate || 1;
     const amountUZS = booking.currency === 'UZS' ? amountValue : amountValue * rateValue;
 
@@ -116,13 +116,13 @@ function CheckinPortal() {
     setBookings(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
     
     const payloadToSave = { ...updates, last_edited_by: currentUserId || '', last_edited_at: new Date().toISOString() } as any;
-    delete payloadToSave.special_requests;
-    delete payloadToSave.number_of_people;
-    delete payloadToSave.lunch_count;
-    delete payloadToSave.dinner_count;
-    delete payloadToSave.guide_service;
-    delete payloadToSave.guide_names;
-    delete payloadToSave.guide_amount;
+    delete payloadToSave.meta;
+
+
+
+
+
+
     delete payloadToSave.last_edited_by_id;
     delete payloadToSave.days;
     const { error } = await supabase.from('bookings').update(payloadToSave).eq('id', id);
