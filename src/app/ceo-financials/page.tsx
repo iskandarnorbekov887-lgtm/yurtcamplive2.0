@@ -47,6 +47,15 @@ function CEOFinancialCalendar() {
     }
   };
 
+  type CheckedInBookingRow = {
+    check_in: string;
+    check_out: string;
+    status: string;
+    number_of_adults: number | null;
+    number_of_children: number | null;
+    guest_count: number | null;
+  };
+
   const fetchCheckedInCounts = async () => {
     const start = new Date(year, month, 1).toISOString();
     const end = new Date(year, month + 1, 0).toISOString();
@@ -61,7 +70,7 @@ function CEOFinancialCalendar() {
 
       if (data) {
         const counts: Record<string, number> = {};
-        (data as Booking[]).forEach((booking: Booking) => {
+        (data as CheckedInBookingRow[]).forEach((booking) => {
           const checkIn = booking.check_in;
           const checkOut = booking.check_out;
           const people = (booking.number_of_adults || 0) + (booking.number_of_children || 0) || booking.guest_count || 1;
