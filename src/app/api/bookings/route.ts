@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../_supabase';
+import { createClient } from '@/utils/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,14 +57,28 @@ export async function POST(request: NextRequest) {
     const isDayVisit = guest_category === 'pool' || (guest_category === 'local' && local_stay_type === 'day');
     const finalCheckOut = check_out || (isDayVisit ? check_in : check_in);
 
+    const supabaseServer = await createClient();
+    const { data: { user } } = await supabaseServer.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     let team_id = null;
-    if (created_by) {
-      try {
-        const { data: profile } = await supabase.from('profiles').select('team_id').eq('id', created_by).single();
-        if (profile) team_id = profile.team_id;
-      } catch (e) {
-        console.error('Could not fetch team_id', e);
+    try {
+      const { data: profile } = await supabaseServer.from('profiles').select('team_id, account_status').eq('id', user.id).single();
+      if (profile) {
+        // Check if account is banned
+        if (profile.account_status === 'banned') {
+          return NextResponse.json({ error: 'This account has been deactivated. Contact your administrator.' }, { status: 403 });
+        }
+        team_id = profile.team_id;
       }
+    } catch (e) {
+      console.error('Could not fetch team_id', e);
+    }
+
+    if (!team_id) {
+      return NextResponse.json({ error: 'User does not belong to a team' }, { status: 403 });
     }
 
     // Build metadata

@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { formatSpace } from '@/utils/calendar-logic';
 import { UnifiedFolio } from '@/components/manager/UnifiedFolio';
+import { LockedBookingPanel } from '@/components/LockedBookingPanel';
 import * as htmlToImage from 'html-to-image';
 
 interface BookingModalProps {
@@ -10,6 +11,7 @@ interface BookingModalProps {
   setSelectedItem: (item: any) => void;
   userRole: string;
   currentUserId: string;
+  teamId?: string;
   pricing: any;
   setPricing: (p: any) => void;
   loadingAction: string;
@@ -117,7 +119,7 @@ interface BookingModalProps {
 
 export function BookingModal(props: BookingModalProps) {
   const {
-    selectedItem, setSelectedItem, userRole, currentUserId, pricing, setPricing,
+    selectedItem, setSelectedItem, userRole, currentUserId, teamId, pricing, setPricing,
     loadingAction, setLoadingAction, actionMsg, flash,
     onRefresh, onUpdateBooking, onCheckIn, onCheckOut, onCancelBooking,
     svcAdults, setSvcAdults,
@@ -139,8 +141,31 @@ export function BookingModal(props: BookingModalProps) {
     dayEntries, finalizeTab, activeMeals
   } = props;
 
+  console.trace('BookingModal render, svcAdults:', svcAdults);
+
   const isStaff = userRole === 'Manager' || userRole === 'CEO';
   const sel = selectedItem?.booking;
+
+  const [localAdults, setLocalAdults] = useState<number | null>(null);
+  const [localChildren, setLocalChildren] = useState<number | null>(null);
+  const [loadingGuestCounts, setLoadingGuestCounts] = useState(false);
+
+  useEffect(() => {
+    if (sel?.id) {
+      setLoadingGuestCounts(true);
+      supabase.from('bookings')
+        .select('number_of_adults, number_of_children')
+        .eq('id', sel.id)
+        .single()
+        .then(({ data, error }) => {
+          if (!error && data) {
+            setLocalAdults(data.number_of_adults);
+            setLocalChildren(data.number_of_children);
+          }
+          setLoadingGuestCounts(false);
+        });
+    }
+  }, [sel?.id]);
 
   const getBookingTypeInfo = () => {
     if (!sel) return null;
@@ -156,6 +181,68 @@ export function BookingModal(props: BookingModalProps) {
   };
 
   const typeInfo = getBookingTypeInfo();
+
+  // Build receipt items array for both settled and pending receipts
+  const receiptItems = useMemo(() => {
+    if (selectedReceipt) {
+      const items: any[] = [];
+      if ((selectedReceipt.items?.accommodation || 0) > 0 || selectedReceipt.items?.isPrepaid) {
+        items.push({ name: 'Accommodation', description: `${sel.number_of_adults || 1} adult${(sel.number_of_adults || 1) > 1 ? 's' : ''}${sel.number_of_children ? `, ${sel.number_of_children} child${sel.number_of_children > 1 ? 'ren' : ''}` : ''}`, price: selectedReceipt.items?.isPrepaid ? 0 : (selectedReceipt.items.accommodation || 0), isPrepaid: selectedReceipt.items?.isPrepaid, paid: true });
+      }
+      const meals = selectedReceipt.items?.meals || {};
+      Object.entries(meals).forEach(([type, count]: [string, any]) => {
+        if (type.startsWith('is') || !count) return;
+        const isMealPrepaid = type === 'lunch' ? meals.isLunchPrepaid : meals.isDinnerPrepaid;
+        const price = type === 'lunch' ? (pricing?.lunch_price || 10) : (pricing?.dinner_price || 10);
+        items.push({ name: type.charAt(0).toUpperCase() + type.slice(1), description: `×${count}`, price: isMealPrepaid ? 0 : (count * price), isPrepaid: isMealPrepaid, paid: true });
+      });
+      const svcs = selectedReceipt.items?.services || {};
+      Object.entries(svcs).forEach(([name, price]: [string, any]) => {
+        if (!price) return;
+        items.push({ name: name.charAt(0).toUpperCase() + name.slice(1), description: '', price: price, isPrepaid: false, paid: true });
+      });
+      if (selectedReceipt.items?.stay_adjustment > 0) {
+        items.push({ name: 'Stay Extension Fee', description: '', price: selectedReceipt.items.stay_adjustment, isPrepaid: false, paid: true });
+      }
+      if (selectedReceipt.items?.drinks?.length > 0) {
+        const drinksTotal = selectedReceipt.items.drinks.reduce((s: number, d: any) => s + (d.price * d.qty), 0);
+        items.push({ name: 'Drinks', description: `${selectedReceipt.items.drinks.length} item${selectedReceipt.items.drinks.length > 1 ? 's' : ''}`, price: drinksTotal, isPrepaid: false, paid: true });
+      }
+      return items;
+    } else {
+      const items: any[] = [];
+      if (svcAmount > 0 || (isPrepaid && (sel.collected_amount || 0) === 0)) {
+        items.push({ name: 'Accommodation', description: `${localAdults || sel.number_of_adults || 1} adult${(localAdults || sel.number_of_adults || 1) > 1 ? 's' : ''}${(localChildren || sel.number_of_children) ? `, ${localChildren || sel.number_of_children} child${(localChildren || sel.number_of_children) > 1 ? 'ren' : ''}` : ''}`, price: isPrepaid && (sel.collected_amount || 0) === 0 ? 0 : svcAmount, isPrepaid: isPrepaid && (sel.collected_amount || 0) === 0, paid: isPrepaid && (sel.collected_amount || 0) === 0 });
+      }
+      if (svcLunch && svcLunchCount > 0) {
+        items.push({ name: 'Lunch', description: `×${svcLunchCount}`, price: isLunchPrepaid ? 0 : (svcLunchCount * (pricing?.lunch_price || 10)), isPrepaid: isLunchPrepaid, paid: isLunchPrepaid });
+      }
+      if (svcDinner && svcDinnerCount > 0) {
+        items.push({ name: 'Dinner', description: `×${svcDinnerCount}`, price: isDinnerPrepaid ? 0 : (svcDinnerCount * (pricing?.dinner_price || 10)), isPrepaid: isDinnerPrepaid, paid: isDinnerPrepaid });
+      }
+      if (svcGuide) {
+        items.push({ name: 'Guide Service', description: svcGuideNames.filter((n: string) => n).join(', ') || '1 guide', price: svcGuidePrice, isPrepaid: false, paid: false });
+      }
+      if (svcTransport) {
+        const transportTotal = svcTransList.reduce((s: number, t: any) => s + (t.price || 0), 0);
+        items.push({ name: 'Transport', description: svcTransList.filter((t: any) => t.name).map((t: any) => t.name).join(', ') || 'Custom', price: transportTotal, isPrepaid: false, paid: false });
+      }
+      extraServices.forEach((svc: any) => {
+        items.push({ name: svc.name, description: '', price: svc.price, isPrepaid: false, paid: false });
+      });
+      if (svcDiscount > 0) {
+        items.push({ name: 'Discount', description: '', price: -svcDiscount, isPrepaid: false, paid: false });
+      }
+      const dTotal_calc = Object.entries(selectedDrinks || {}).reduce((sum: number, [id, qty]: [string, any]) => {
+        const drink = drinks.find((d: any) => d.id === parseInt(id));
+        return sum + (drink ? (drink.sold_price || drink.original_price || 0) * qty : 0);
+      }, 0);
+      if (dTotal_calc > 0) {
+        items.push({ name: 'Drinks', description: `${Object.values(selectedDrinks || {}).reduce((s: number, q: any) => s + q, 0)} item${Object.values(selectedDrinks || {}).reduce((s: number, q: any) => s + q, 0) > 1 ? 's' : ''}`, price: dTotal_calc, isPrepaid: false, paid: false });
+      }
+      return items;
+    }
+  }, [selectedReceipt, sel, pricing, svcAmount, isPrepaid, svcLunch, svcLunchCount, isLunchPrepaid, svcDinner, svcDinnerCount, isDinnerPrepaid, svcGuide, svcGuidePrice, svcGuideNames, svcTransport, svcTransList, extraServices, svcDiscount, localAdults, localChildren, selectedDrinks, drinks]);
 
   const currentMeta = useMemo(() => {
     if (!sel) return {};
@@ -314,8 +401,8 @@ export function BookingModal(props: BookingModalProps) {
     confirmed: 'bg-[#B8860B]/20 text-[#B8860B] border border-[#B8860B]/40',
     completed: 'bg-[#5C4A2E]/20 text-[#5C4A2E] border border-[#5C4A2E]/40',
     cancelled: 'bg-[#722F37]/20 text-[#722F37] border border-[#722F37]/40',
-    pending: 'bg-[#1C232E]/20 text-[#9C9384] border border-[#5C4A2E]/30',
-    no_arrival: 'bg-[#1C232E]/20 text-[#9C9384] border border-[#5C4A2E]/30',
+    pending: 'bg-[#1C232E]/20 text-[#9C9384] border border-[#2A2F36]',
+    no_arrival: 'bg-[#1C232E]/20 text-[#9C9384] border border-[#2A2F36]',
   }[s ?? ''] ?? 'bg-[#1C232E]/20 text-[#9C9384]');
 
   const receiptRef = useRef<HTMLDivElement>(null);
@@ -434,7 +521,7 @@ export function BookingModal(props: BookingModalProps) {
       <div className="fixed inset-0 z-[100] flex items-center sm:items-start justify-center p-0 sm:p-4 sm:pt-16 pb-safe" onClick={() => setSelectedItem(null)}>
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
         <div className="relative bento-card sm:rounded-2xl shadow-2xl w-full sm:max-w-md h-full sm:h-auto sm:max-h-[85vh] overflow-y-auto pb-20 sm:pb-0" onClick={e => e.stopPropagation()}>
-          <div className="flex items-center justify-between px-5 py-4 border-b border-[#5C4A2E]/30 sticky top-0 bg-[#1C232E] rounded-t-2xl z-10">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[#2A2F36] sticky top-0 bg-[#1C232E] rounded-t-2xl z-10">
             <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">
               📅 Google Calendar Event
             </p>
@@ -445,7 +532,7 @@ export function BookingModal(props: BookingModalProps) {
               <h2 className="text-xl font-black text-[#EDE6D6]">{ev.summary || '(No title)'}</h2>
               <p className="text-sm text-[#9C9384] mt-0.5 font-data">{ev.start} → {ev.end}</p>
               {ev.description && (
-                <p className="text-xs text-[#9C9384] mt-2 whitespace-pre-wrap bg-[#1C232E]/50 rounded-xl p-3 border border-[#5C4A2E]/30">{ev.description}</p>
+                <p className="text-xs text-[#9C9384] mt-2 whitespace-pre-wrap bg-[#1C232E]/50 rounded-xl p-3 border border-[#2A2F36]">{ev.description}</p>
               )}
             </div>
             <div className="bg-[#B8860B]/20 border border-[#B8860B]/40 rounded-xl p-4">
@@ -465,14 +552,14 @@ export function BookingModal(props: BookingModalProps) {
                 <button
                   onClick={() => props.handleCreateFromEvent(false)}
                   disabled={loadingAction === 'creating'}
-                  className="w-full py-3 bg-[#1C232E] hover:bg-[#2A1518] text-[#9C9384] text-[11px] font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2 transition-all disabled:opacity-60 border border-[#5C4A2E]/30"
+                  className="w-full py-3 bg-[#1C232E] hover:bg-[#2A1518] text-[#9C9384] text-[11px] font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2 transition-all disabled:opacity-60 border border-[#2A2F36]"
                 >
                   Create Booking Only
                 </button>
               </div>
             )}
             {actionMsg && (
-              <div className="bg-[#1C232E] text-[#EDE6D6] px-4 py-2 rounded-xl text-xs font-bold text-center animate-in fade-in border border-[#5C4A2E]/30">{actionMsg}</div>
+              <div className="bg-[#1C232E] text-[#EDE6D6] px-4 py-2 rounded-xl text-xs font-bold text-center animate-in fade-in border border-[#2A2F36]">{actionMsg}</div>
             )}
           </div>
         </div>
@@ -488,7 +575,7 @@ export function BookingModal(props: BookingModalProps) {
       <div className="fixed inset-0 z-[100] flex items-center sm:items-start justify-center p-0 sm:p-4 sm:pt-16 pb-safe" onClick={() => setSelectedItem(null)}>
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
         <div className={"relative bento-card sm:rounded-2xl shadow-2xl w-full sm:max-w-md h-full sm:h-auto sm:max-h-[85vh] overflow-y-auto pb-20 sm:pb-0 " + (userRole === 'CEO' && sel?.source === 'System' ? 'border-4 border-blue-500' : '')} onClick={e => e.stopPropagation()}>
-          <div className="flex items-center justify-between px-5 py-4 border-b border-[#5C4A2E]/30 sticky top-0 bg-[#1C232E] rounded-t-2xl z-10">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[#2A2F36] sticky top-0 bg-[#1C232E] rounded-t-2xl z-10">
             <p className="text-[10px] font-black uppercase tracking-widest text-[#0B6E4F]">
               Booking Details
             </p>
@@ -499,7 +586,7 @@ export function BookingModal(props: BookingModalProps) {
             <div className="flex items-start justify-between">
               <div>
                 {typeInfo && (
-                  <div className="mb-2 px-2 py-0.5 bg-[#1C232E]/20 border border-[#5C4A2E]/30 rounded-lg text-[10px] font-black text-[#9C9384] uppercase tracking-widest flex items-center gap-1.5">
+                  <div className="mb-2 px-2 py-0.5 bg-[#1C232E]/20 border border-[#2A2F36] rounded-lg text-[10px] font-black text-[#9C9384] uppercase tracking-widest flex items-center gap-1.5">
                     <span>{typeInfo.prefix}</span>
                     <span>{typeInfo.message}</span>
                   </div>
@@ -555,7 +642,7 @@ export function BookingModal(props: BookingModalProps) {
                 
                 if (isPOS) {
                   return (
-                    <div className="bg-[#1C232E] border-2 border-[#5C4A2E]/30 rounded-[32px] p-6 shadow-xl shadow-[#5C4A2E]/20 space-y-4">
+                    <div className="bg-[#1C232E] border-2 border-[#2A2F36] rounded-[32px] p-6 shadow-xl shadow-[#5C4A2E]/20 space-y-4">
                       <div className="flex items-center gap-3 mb-2">
                         <div className="w-12 h-12 bg-[#0B6E4F]/30 rounded-2xl flex items-center justify-center text-[#0B6E4F] shadow-md shadow-[#0B6E4F]/20">
                           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -565,8 +652,19 @@ export function BookingModal(props: BookingModalProps) {
                           <p className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest">Instant Point of Sale Settlement</p>
                         </div>
                       </div>
+                      {/* Summary Cards */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-[#0B6E4F]/10 border border-[#0B6E4F]/30 rounded-2xl p-4">
+                          <p className="text-[9px] font-black text-[#0B6E4F] uppercase tracking-widest mb-2">Paid</p>
+                          <p className="text-xl font-black text-[#0B6E4F]">${String((sel.collected_amount || 0).toFixed(2))}</p>
+                        </div>
+                        <div className="bg-[#BA7517]/10 border border-[#BA7517]/30 rounded-2xl p-4">
+                          <p className="text-[9px] font-black text-[#BA7517] uppercase tracking-widest mb-2">Unpaid</p>
+                          <p className="text-xl font-black text-[#BA7517]">${String(Math.max(0, gTotal - (sel.collected_amount || 0)).toFixed(2))}</p>
+                        </div>
+                      </div>
                       
-                      <div className="bg-[#1C232E]/50 border border-[#5C4A2E]/30 rounded-2xl p-4 flex flex-col items-center justify-center gap-1 shadow-inner">
+                      <div className="bg-[#1C232E]/50 border border-[#2A2F36] rounded-2xl p-4 flex flex-col items-center justify-center gap-1 shadow-inner">
                         <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Amount Taken</p>
                         <p className="text-3xl font-black text-[#EDE6D6] flex items-baseline gap-1 font-mono">
                           {(sel.collected_amount || sel.total_price || 0).toLocaleString()} 
@@ -574,12 +672,12 @@ export function BookingModal(props: BookingModalProps) {
                         </p>
                       </div>
                       
-                      <div className="flex items-center justify-between px-2 text-sm font-bold text-[#9C9384] border-b border-[#5C4A2E]/30 pb-2">
+                      <div className="flex items-center justify-between px-2 text-sm font-bold text-[#9C9384] border-b border-[#2A2F36] pb-2">
                         <span className="uppercase tracking-widest text-[10px] text-[#9C9384]">Guest Count:</span>
                         <span className="text-[#EDE6D6] text-base">{sel.number_of_adults || sel.guest_count || 0} pax</span>
                       </div>
                       
-                      <button className="w-full py-4 bg-[#1C232E]/50 text-[#9C9384] font-black uppercase tracking-[0.2em] text-[11px] rounded-2xl cursor-not-allowed border border-[#5C4A2E]/30">
+                      <button className="w-full py-4 bg-[#1C232E]/50 text-[#9C9384] font-black uppercase tracking-[0.2em] text-[11px] rounded-2xl cursor-not-allowed border border-[#2A2F36]">
                         Closed Tab - Receipt Logged
                       </button>
                     </div>
@@ -587,7 +685,7 @@ export function BookingModal(props: BookingModalProps) {
                 }
 
                 return (
-                  <div className="bg-[#1C232E] border-2 border-[#5C4A2E]/30 rounded-[32px] p-6 shadow-xl shadow-[#5C4A2E]/20 space-y-4">
+                  <div className="bg-[#1C232E] border-2 border-[#2A2F36] rounded-[32px] p-6 shadow-xl shadow-[#5C4A2E]/20 space-y-4">
                     <div className="flex items-center gap-3 mb-2">
                       <div className="w-12 h-12 bg-[#0B6E4F]/30 rounded-2xl flex items-center justify-center text-[#0B6E4F] shadow-md shadow-[#0B6E4F]/20">
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
@@ -611,30 +709,39 @@ export function BookingModal(props: BookingModalProps) {
                             ✓ Checked In
                           </span>
                         </div>
-                        <button
-                          onClick={() => { 
-                            setEditingDates(true); 
-                            setEditCheckIn(sel.check_in); 
-                            setEditCheckOut(sel.check_out); 
-                            setDateAdjAmount(currentMeta.last_adjustment || '');
-                          }}
-                          className="text-[10px] font-bold text-[#0B6E4F] hover:text-[#0B6E4F] underline underline-offset-2 decoration-[#0B6E4F]/20 transition-all">
-                          Edit Dates
-                        </button>
+                        {/* Gate "Edit Dates" behind lock when booking is paid */}
+                        {sel.payment_status === 'paid' ? (
+                          <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#C9A227]">
+                            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                            </svg>
+                            Dates locked — use Extend Stay or Request Edit
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => { 
+                              setEditingDates(true); 
+                              setEditCheckIn(sel.check_in); 
+                              setEditCheckOut(sel.check_out); 
+                              setDateAdjAmount(currentMeta.last_adjustment || '');
+                            }}
+                            className="text-[10px] font-bold text-[#0B6E4F] hover:text-[#0B6E4F] underline underline-offset-2 decoration-[#0B6E4F]/20 transition-all">Edit Dates
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}
                   {editingDates && (
-                    <div className="w-full bg-[#1C232E] border border-[#5C4A2E]/30 p-4 space-y-4 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)]">
-                      <div className="flex items-center justify-between border-b border-[#5C4A2E]/30 pb-2">
+                    <div className="w-full bg-[#1C232E] border border-[#2A2F36] p-4 space-y-4 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)]">
+                      <div className="flex items-center justify-between border-b border-[#2A2F36] pb-2">
                         <p className="text-[10px] font-black text-[#EDE6D6] uppercase tracking-[0.2em]">Bento Stay Editor</p>
                         {(sel.collected_amount || 0) > 0 && (
                           <span className="text-[9px] font-black bg-[#0B6E4F]/20 text-[#0B6E4F] px-2 py-0.5 border border-[#0B6E4F]/40 uppercase">Financial Locked</span>
                         )}
                       </div>
                        
-                      <div className="grid grid-cols-2 border border-[#5C4A2E]/30">
-                        <div className="p-3 border-r border-[#5C4A2E]/30 bg-[#1C232E]/50">
+                      <div className="grid grid-cols-2 border border-[#2A2F36]">
+                        <div className="p-3 border-r border-[#2A2F36] bg-[#1C232E]/50">
                           <label className="text-[9px] font-black text-[#EDE6D6] uppercase tracking-widest mb-1 block">Inbound</label>
                           <div className="hc-mono text-sm font-black text-[#9C9384] opacity-60">{String(editCheckIn)}</div>
                         </div>
@@ -800,7 +907,7 @@ export function BookingModal(props: BookingModalProps) {
 
 
               {(sel.status === 'checked_in' || sel.status === 'confirmed') && isStaff && (
-                <div className="bg-[#1C232E] border-2 border-[#5C4A2E]/30 rounded-[32px] p-6 shadow-xl shadow-[#5C4A2E]/20 mb-6">
+                <div className="bg-[#1C232E] border-2 border-[#2A2F36] rounded-[32px] p-6 shadow-xl shadow-[#5C4A2E]/20 mb-6">
                   <div className="flex justify-between items-center mb-6">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 bg-[#0B6E4F] rounded-2xl flex items-center justify-center text-[#C9A227] shadow-lg shadow-[#0B6E4F]/20">
@@ -813,7 +920,7 @@ export function BookingModal(props: BookingModalProps) {
                     </div>
                     <button 
                       onClick={() => setShowServices(!showServices)} 
-                      className={`text-[10px] font-black px-5 py-2.5 rounded-xl border-2 transition-all active:scale-95 ${showServices ? 'bg-[#1C232E]/50 text-[#9C9384] border-[#5C4A2E]/30 hover:bg-[#2A1518]' : 'bg-[#0B6E4F] text-[#C9A227] border-[#0B6E4F]/40 shadow-lg shadow-[#0B6E4F]/20 hover:bg-[#0B6E4F]/80'}`}
+                      className={`text-[10px] font-black px-5 py-2.5 rounded-xl border-2 transition-all active:scale-95 ${showServices ? 'bg-[#1C232E]/50 text-[#9C9384] border-[#2A2F36] hover:bg-[#2A1518]' : 'bg-[#0B6E4F] text-[#C9A227] border-[#0B6E4F]/40 shadow-lg shadow-[#0B6E4F]/20 hover:bg-[#0B6E4F]/80'}`}
                     >
                       {showServices ? 'HIDE OPTIONS' : 'START NEW ORDER'}
                     </button>
@@ -821,12 +928,12 @@ export function BookingModal(props: BookingModalProps) {
                   
                   {!showServices && (
                     <div 
-                      className="group relative flex items-center justify-center py-10 border-2 border-dashed border-[#5C4A2E]/30 rounded-[24px] bg-[#1C232E]/50 cursor-pointer hover:bg-[#2A1518] hover:border-[#0B6E4F]/40 transition-all duration-300 overflow-hidden" 
+                      className="group relative flex items-center justify-center py-10 border-2 border-dashed border-[#2A2F36] rounded-[24px] bg-[#1C232E]/50 cursor-pointer hover:bg-[#2A1518] hover:border-[#0B6E4F]/40 transition-all duration-300 overflow-hidden" 
                       onClick={() => setShowServices(true)}
                     >
                       <div className="absolute inset-0 bg-gradient-to-br from-[#0B6E4F]/0 to-[#0B6E4F]/50 opacity-0 group-hover:opacity-100 transition-opacity" />
                       <div className="relative flex flex-col items-center">
-                        <div className="w-10 h-10 bg-[#1C232E] rounded-full flex items-center justify-center shadow-md mb-3 group-hover:scale-110 transition-transform border border-[#5C4A2E]/30">
+                        <div className="w-10 h-10 bg-[#1C232E] rounded-full flex items-center justify-center shadow-md mb-3 group-hover:scale-110 transition-transform border border-[#2A2F36]">
                           <span className="text-[#0B6E4F] text-3xl font-light">+</span>
                         </div>
                         <p className="text-[11px] font-black text-[#9C9384] uppercase tracking-[0.2em] group-hover:text-[#0B6E4F] transition-colors">Select Meals or Services</p>
@@ -839,13 +946,25 @@ export function BookingModal(props: BookingModalProps) {
               {showServices && (sel.status === 'checked_in' || sel.status === 'confirmed') && isStaff && (
                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300 mt-4">
                   {isRoomStay && sel?.guest_category !== 'pool' && (() => {
+                    // ── LOCKED BOOKING: show read-only panel when payment_status === 'paid' ──
+                    if (sel.payment_status === 'paid') {
+                      return (
+                        <LockedBookingPanel
+                          booking={sel}
+                          currentUserId={currentUserId}
+                          onRefresh={onRefresh || (() => {})}
+                        />
+                      );
+                    }
+
+                    // ── NORMAL editable Stay Configuration ──────────────────────────────────
                     const isTab1Closed = getSettledReceiptsForSel().length > 0 || (sel.collected_amount || 0) > 0;
                     const isDatesChanged = editCheckOut !== sel.check_out;
                     const isExtended = editCheckOut > sel.check_out;
                     const isShortened = editCheckOut < sel.check_out;
 
                     return (
-                      <div className="border border-[#5C4A2E]/30 p-4 bg-[#1C232E] shadow-[2px_2px_0px_0px_rgba(92,74,46,0.3)] space-y-4">
+                      <div className="border border-[#2A2F36] p-4 bg-[#1C232E] shadow-[2px_2px_0px_0px_rgba(92,74,46,0.3)] space-y-4">
                         <div className="flex justify-between items-center">
                           <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Stay Configuration</p>
                           {isPrepaid && (
@@ -859,30 +978,30 @@ export function BookingModal(props: BookingModalProps) {
                         <div className="grid grid-cols-2 gap-4 pb-4 border-b border-slate-100">
                           <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Adults *</label>
-                            <input 
-                              type="number" 
-                              value={svcAdults ?? ''} 
+                            <input
+                              type="number"
+                              value={loadingGuestCounts ? '...' : (localAdults ?? '')}
                               disabled={isTab1Closed}
                               onChange={e => {
                                 const val = parseInt(e.target.value) || 0;
                                 setSvcAdults(val);
-                                if (onUpdateBooking) onUpdateBooking(sel.id, { number_of_adults: val });
+                                setLocalAdults(val);
                               }}
-                              className={`w-full px-3 py-2 border text-sm font-black focus:outline-none ${isTab1Closed ? 'bg-[#1C232E]/50 border-[#5C4A2E]/30 text-[#9C9384] cursor-not-allowed' : 'bg-[#1C232E]/50 border-[#5C4A2E]/30 text-[#EDE6D6]'}`}
+                              className={`w-full px-3 py-2 border text-sm font-black focus:outline-none ${isTab1Closed ? 'bg-[#1C232E]/50 border-[#2A2F36] text-[#9C9384] cursor-not-allowed' : 'bg-[#1C232E]/50 border-[#2A2F36] text-[#EDE6D6]'}`}
                             />
                           </div>
                           <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Children</label>
                             <input 
                               type="number" 
-                              value={svcChildren ?? ''} 
+                              value={loadingGuestCounts ? '...' : (localChildren ?? '')} 
                               disabled={isTab1Closed}
                               onChange={e => {
                                 const val = parseInt(e.target.value) || 0;
                                 setSvcChildren(val);
-                                if (onUpdateBooking) onUpdateBooking(sel.id, { number_of_children: val });
+                                setLocalChildren(val);
                               }}
-                              className={`w-full px-3 py-2 border text-sm font-black focus:outline-none ${isTab1Closed ? 'bg-[#1C232E]/50 border-[#5C4A2E]/30 text-[#9C9384] cursor-not-allowed' : 'bg-[#1C232E]/50 border-[#5C4A2E]/30 text-[#EDE6D6]'}`}
+                              className={`w-full px-3 py-2 border text-sm font-black focus:outline-none ${isTab1Closed ? 'bg-[#1C232E]/50 border-[#2A2F36] text-[#9C9384] cursor-not-allowed' : 'bg-[#1C232E]/50 border-[#2A2F36] text-[#EDE6D6]'}`}
                             />
                           </div>
                         </div>
@@ -892,7 +1011,7 @@ export function BookingModal(props: BookingModalProps) {
                             {/* Condition A: Tab 1 Closed (Locked Mode) */}
                             <div className="space-y-1.5">
                               <label className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Original Stay Price (Baseline)</label>
-                              <div className="px-3 py-2 bg-[#1C232E]/50 border border-[#5C4A2E]/30 text-sm font-mono text-[#9C9384] font-bold">
+                              <div className="px-3 py-2 bg-[#1C232E]/50 border border-[#2A2F36] text-sm font-mono text-[#9C9384] font-bold">
                                 ${String((sel.total_price || 0).toFixed(2))}
                               </div>
                             </div>
@@ -928,9 +1047,8 @@ export function BookingModal(props: BookingModalProps) {
                                     const val = parseFloat(e.target.value) || 0;
                                     setSvcAmount(val);
                                     setSvcDateAdjustment(0);
-                                    if (onUpdateBooking) onUpdateBooking(sel.id, { total_price: val });
                                   }}
-                                  className="w-full pl-7 pr-3 py-2 bg-[#1C232E]/50 border border-[#5C4A2E]/30 text-sm font-black text-[#EDE6D6] font-mono focus:outline-none"
+                                  className="w-full pl-7 pr-3 py-2 bg-[#1C232E]/50 border border-[#2A2F36] text-sm font-black text-[#EDE6D6] font-mono focus:outline-none"
                                   placeholder="0.00"
                                 />
                               </div>
@@ -942,7 +1060,7 @@ export function BookingModal(props: BookingModalProps) {
                   })()}
 
                   {isRoomStay && (
-                    <div className="border border-[#5C4A2E]/30 rounded-xl p-4 space-y-4 bg-[#1C232E] shadow-lg">
+                    <div className="border border-[#2A2F36] rounded-xl p-4 space-y-4 bg-[#1C232E] shadow-lg">
                       <div className="flex justify-between items-end mb-3">
                         <div className="space-y-1">
                           <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Kitchen Orders</p>
@@ -967,7 +1085,7 @@ export function BookingModal(props: BookingModalProps) {
                                 className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all flex flex-col items-center justify-center gap-1 border-2 ${
                                   hasAcceptedLunch ? 'bg-[#0B6E4F] border-[#0B6E4F]/80 text-[#C9A227] shadow-md active:scale-95' : 
                                   isPending ? 'bg-[#C9A227] border-[#C9A227]/80 text-[#1C232E] shadow-md active:scale-95' : 
-                                  'bg-[#1C232E] border-[#5C4A2E]/30 text-[#9C9384] hover:border-[#0B6E4F] hover:text-[#0B6E4F] shadow-md active:scale-95'
+                                  'bg-[#1C232E] border-[#2A2F36] text-[#9C9384] hover:border-[#0B6E4F] hover:text-[#0B6E4F] shadow-md active:scale-95'
                                 }`}>
                                 {isPending ? <span className="opacity-80">⏳ Sent — + Add More</span> :
                                  hasAcceptedLunch ? <span className="opacity-80">✓ Accepted — + Add More</span> :
@@ -995,7 +1113,7 @@ export function BookingModal(props: BookingModalProps) {
                                 className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all flex flex-col items-center justify-center gap-1 border-2 ${
                                   hasAcceptedDinner ? 'bg-[#0B6E4F] border-[#0B6E4F]/80 text-[#C9A227] shadow-md active:scale-95' : 
                                   isPending ? 'bg-[#C9A227] border-[#C9A227]/80 text-[#1C232E] shadow-md active:scale-95' : 
-                                  'bg-[#1C232E] border-[#5C4A2E]/30 text-[#9C9384] hover:border-[#0B6E4F] hover:text-[#0B6E4F] shadow-md active:scale-95'
+                                  'bg-[#1C232E] border-[#2A2F36] text-[#9C9384] hover:border-[#0B6E4F] hover:text-[#0B6E4F] shadow-md active:scale-95'
                                 }`}>
                                 {isPending ? <span className="opacity-80">⏳ Sent — + Add More</span> :
                                  hasAcceptedDinner ? <span className="opacity-80">✓ Accepted — + Add More</span> :
@@ -1017,7 +1135,7 @@ export function BookingModal(props: BookingModalProps) {
                   {/* Meal Request Modal */}
                   {showMealRequestModal && (
                     <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowMealRequestModal(false)}>
-                      <div className="bg-[#1C232E] rounded-[32px] w-full max-w-sm p-8 shadow-2xl animate-in zoom-in-95 duration-200 border border-[#5C4A2E]/30" onClick={e => e.stopPropagation()}>
+                      <div className="bg-[#1C232E] rounded-[32px] w-full max-w-sm p-8 shadow-2xl animate-in zoom-in-95 duration-200 border border-[#2A2F36]" onClick={e => e.stopPropagation()}>
                         <div className="flex justify-between items-center mb-6">
                           <h3 className="text-xl font-black text-[#EDE6D6] uppercase tracking-tight">Request {currentMealType}</h3>
                           <button onClick={() => setShowMealRequestModal(false)} className="text-2xl font-bold text-[#9C9384] hover:text-[#EDE6D6] transition-colors">×</button>
@@ -1025,12 +1143,12 @@ export function BookingModal(props: BookingModalProps) {
                         
                         <div className="space-y-6">
                           <div className="flex items-center justify-center gap-6">
-                            <button type="button" onClick={() => setMealRequestAmount(Math.max(0, mealRequestAmount - 1))} className="w-16 h-16 rounded-3xl bg-[#1C232E]/50 text-[#9C9384] text-2xl font-black hover:bg-[#2A1518] transition-all shadow-sm border border-[#5C4A2E]/30">－</button>
+                            <button type="button" onClick={() => setMealRequestAmount(Math.max(0, mealRequestAmount - 1))} className="w-16 h-16 rounded-3xl bg-[#1C232E]/50 text-[#9C9384] text-2xl font-black hover:bg-[#2A1518] transition-all shadow-sm border border-[#2A2F36]">－</button>
                             <div className="text-5xl font-black text-[#EDE6D6] min-w-[60px] text-center">{mealRequestAmount}</div>
                             <button type="button" onClick={() => setMealRequestAmount(mealRequestAmount + 1)} className="w-16 h-16 rounded-3xl bg-[#0B6E4F]/20 text-[#0B6E4F] text-2xl font-black hover:bg-[#0B6E4F]/30 transition-all shadow-sm border border-[#0B6E4F]/40">＋</button>
                           </div>
 
-                          <div className="flex items-center justify-between p-4 bg-[#1C232E]/50 rounded-2xl border border-[#5C4A2E]/30">
+                          <div className="flex items-center justify-between p-4 bg-[#1C232E]/50 rounded-2xl border border-[#2A2F36]">
                             <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Include in Booking (Prepaid)</span>
                             <button 
                               type="button"
@@ -1047,7 +1165,7 @@ export function BookingModal(props: BookingModalProps) {
                               <select
                                 value={mealRequestDietary}
                                 onChange={(e) => setMealRequestDietary(e.target.value as 'Normal' | 'Vegetarian')}
-                                className="w-full px-4 py-3 bg-[#1C232E] border border-[#5C4A2E]/30 rounded-xl text-sm font-black text-[#EDE6D6] outline-none focus:border-[#0B6E4F] transition-all"
+                                className="w-full px-4 py-3 bg-[#1C232E] border border-[#2A2F36] rounded-xl text-sm font-black text-[#EDE6D6] outline-none focus:border-[#0B6E4F] transition-all"
                               >
                                 <option value="Normal">Normal</option>
                                 <option value="Vegetarian">Vegetarian</option>
@@ -1059,7 +1177,7 @@ export function BookingModal(props: BookingModalProps) {
                                 type="text"
                                 value={mealRequestNotes}
                                 onChange={(e) => setMealRequestNotes(e.target.value)}
-                                className="w-full px-4 py-3 bg-[#1C232E] border border-[#5C4A2E]/30 rounded-xl text-sm font-black text-[#EDE6D6] outline-none focus:border-[#0B6E4F] transition-all"
+                                className="w-full px-4 py-3 bg-[#1C232E] border border-[#2A2F36] rounded-xl text-sm font-black text-[#EDE6D6] outline-none focus:border-[#0B6E4F] transition-all"
                                 placeholder="e.g., No peanuts, Extra spicy"
                               />
                             </div>
@@ -1101,6 +1219,7 @@ export function BookingModal(props: BookingModalProps) {
                                 dietary_type: mealRequestDietary,
                                 notes: mealRequestNotes,
                                 status: 'Pending',
+                                team_id: teamId,
                               };
                               console.log('Inserting into meal_requests:', mealRow);
                               const { data: insertedMeal, error: mealErr } = await supabase.from('meal_requests').insert(mealRow).select().single();
@@ -1139,7 +1258,7 @@ export function BookingModal(props: BookingModalProps) {
                   )}
 
                   {isRoomStay && (
-                    <div className="border border-[#5C4A2E]/30 rounded-xl p-4 space-y-3 bg-[#1C232E]">
+                    <div className="border border-[#2A2F36] rounded-xl p-4 space-y-3 bg-[#1C232E]">
 
                       <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Other Services</p>
                       <div className="grid grid-cols-1 gap-4">
@@ -1152,7 +1271,7 @@ export function BookingModal(props: BookingModalProps) {
                                   setSvcGuidePrice(pricing?.guide_price || 0); 
                                   setSvcGuideNames(['']); 
                                 } 
-                              }} className="w-5 h-5 border-2 border-[#5C4A2E]/30 text-[#0B6E4F] rounded" />
+                              }} className="w-5 h-5 border-2 border-[#2A2F36] text-[#0B6E4F] rounded" />
                               <div className="flex flex-col">
                                 <span className="text-sm font-bold text-[#EDE6D6]">Guide Service</span>
                                 {pricing?.guide_price && pricing.guide_price > 0 && (
@@ -1162,11 +1281,11 @@ export function BookingModal(props: BookingModalProps) {
                             </label>
                             {svcGuide && (
                               <div className="flex items-center gap-2">
-                                <button type="button" onClick={() => setSvcGuidePrice(Math.max(0, svcGuidePrice - 5))} className="w-8 h-8 flex items-center justify-center bg-[#1C232E]/50 hover:bg-[#2A1518] text-[#9C9384] rounded-xl font-black text-sm transition-all shadow-sm border border-[#5C4A2E]/30">－</button>
+                                <button type="button" onClick={() => setSvcGuidePrice(Math.max(0, svcGuidePrice - 5))} className="w-8 h-8 flex items-center justify-center bg-[#1C232E]/50 hover:bg-[#2A1518] text-[#9C9384] rounded-xl font-black text-sm transition-all shadow-sm border border-[#2A2F36]">－</button>
                                 <div className="relative">
                                   <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[#9C9384] font-bold text-[10px]">$</span>
                                   <input type="number" value={String(svcGuidePrice)} onChange={e => setSvcGuidePrice(parseFloat(e.target.value) || 0)}
-                                    className="w-20 pl-5 pr-2 py-2 bg-[#1C232E] border-2 border-[#5C4A2E]/30 rounded-xl text-base font-black text-[#EDE6D6] focus:border-[#0B6E4F] outline-none text-center" />
+                                    className="w-20 pl-5 pr-2 py-2 bg-[#1C232E] border-2 border-[#2A2F36] rounded-xl text-base font-black text-[#EDE6D6] focus:border-[#0B6E4F] outline-none text-center" />
                                 </div>
                                 <button type="button" onClick={() => setSvcGuidePrice(svcGuidePrice + 5)} className="w-8 h-8 flex items-center justify-center bg-[#0B6E4F]/20 hover:bg-[#0B6E4F]/30 text-[#0B6E4F] rounded-xl font-black text-sm transition-all shadow-sm border border-[#0B6E4F]/40">＋</button>
                               </div>
@@ -1178,44 +1297,44 @@ export function BookingModal(props: BookingModalProps) {
                                 <div key={ni} className="flex gap-2">
                                   <input type="text" value={String(name || '')} onChange={e => { const next = [...svcGuideNames]; next[ni] = e.target.value; setSvcGuideNames(next); }}
                                     placeholder={`Guide ${ni + 1} name...`}
-                                    className={`flex-1 px-3 py-2 border-2 ${!String(name).trim() ? 'border-[#722F37] bg-[#722F37]/10' : 'border-[#5C4A2E]/30 bg-[#1C232E]'} rounded-lg text-base font-bold text-[#EDE6D6] focus:border-[#0B6E4F] transition-all`} />
+                                    className={`flex-1 px-3 py-2 border-2 ${!String(name).trim() ? 'border-[#722F37] bg-[#722F37]/10' : 'border-[#2A2F36] bg-[#1C232E]'} rounded-lg text-base font-bold text-[#EDE6D6] focus:border-[#0B6E4F] transition-all`} />
                                   {svcGuideNames.length > 1 && <button type="button" onClick={() => { setSvcGuideNames(svcGuideNames.filter((_: any, i: number) => i !== ni)); setSvcGuidePrice(Math.max(0, svcGuidePrice - 40)); }}
                                     className="text-[#722F37] hover:text-[#722F37]/80 font-black text-xl px-1">×</button>}
                                 </div>
                               ))}
                               <button type="button" onClick={() => { setSvcGuideNames([...svcGuideNames, '']); setSvcGuidePrice(svcGuidePrice + 40); }}
-                                className="w-full py-1.5 border-2 border-dashed border-[#5C4A2E]/30 rounded-xl text-[10px] font-black text-[#9C9384] uppercase tracking-widest hover:border-[#0B6E4F] hover:text-[#0B6E4F] transition-all">+ Add Another Guide ($40)</button>
+                                className="w-full py-1.5 border-2 border-dashed border-[#2A2F36] rounded-xl text-[10px] font-black text-[#9C9384] uppercase tracking-widest hover:border-[#0B6E4F] hover:text-[#0B6E4F] transition-all">+ Add Another Guide ($40)</button>
                             </div>
                           )}
                         </div>
-                        <div className="space-y-2 pt-2 border-t border-[#5C4A2E]/30">
+                        <div className="space-y-2 pt-2 border-t border-[#2A2F36]">
                           <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" checked={svcTransport} onChange={e => setSvcTransport(e.target.checked)} className="w-5 h-5 border-2 border-[#5C4A2E]/30 text-[#0B6E4F] rounded" />
+                            <input type="checkbox" checked={svcTransport} onChange={e => setSvcTransport(e.target.checked)} className="w-5 h-5 border-2 border-[#2A2F36] text-[#0B6E4F] rounded" />
                             <span className="text-sm font-bold text-[#EDE6D6]">Transport</span>
                           </label>
                           {svcTransport && (
                             <div className="space-y-3">
                               {svcTransList.map((trans: any, ti: number) => (
-                                <div key={ti} className="p-3 border border-[#5C4A2E]/30 rounded-xl bg-[#1C232E]/50 space-y-2">
+                                <div key={ti} className="p-3 border border-[#2A2F36] rounded-xl bg-[#1C232E]/50 space-y-2">
                                   <div className="flex justify-between items-center">
                                     <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Transfer {String(ti + 1)}</span>
                                     {svcTransList.length > 1 && <button type="button" onClick={() => setSvcTransList(svcTransList.filter((_: any, i: number) => i !== ti))} className="text-[#722F37] hover:text-[#722F37]/80 font-bold text-xs">✕ Remove</button>}
                                   </div>
                                   <input type="text" value={String(trans.name)} onChange={e => setSvcTransList(svcTransList.map((t: any, i: number) => i === ti ? { ...t, name: e.target.value } : t))} placeholder="Driver Name..."
-                                    className={`w-full px-3 py-2 border-2 ${!String(trans.name).trim() ? 'border-[#722F37] bg-[#722F37]/10' : 'border-[#5C4A2E]/30 bg-[#1C232E]'} rounded-lg text-base font-bold text-[#EDE6D6] focus:border-[#0B6E4F] transition-all`} />
+                                    className={`w-full px-3 py-2 border-2 ${!String(trans.name).trim() ? 'border-[#722F37] bg-[#722F37]/10' : 'border-[#2A2F36] bg-[#1C232E]'} rounded-lg text-base font-bold text-[#EDE6D6] focus:border-[#0B6E4F] transition-all`} />
                                   <div className="flex gap-2">
                                     <input type="text" value={String(trans.details)} onChange={e => setSvcTransList(svcTransList.map((t: any, i: number) => i === ti ? { ...t, details: e.target.value } : t))} placeholder="From/To..."
-                                      className={`flex-1 px-3 py-2 border-2 ${!String(trans.details).trim() ? 'border-[#722F37] bg-[#722F37]/10' : 'border-[#5C4A2E]/30 bg-[#1C232E]'} rounded-lg text-base font-bold text-[#EDE6D6] focus:border-[#0B6E4F] transition-all`} />
+                                      className={`flex-1 px-3 py-2 border-2 ${!String(trans.details).trim() ? 'border-[#722F37] bg-[#722F37]/10' : 'border-[#2A2F36] bg-[#1C232E]'} rounded-lg text-base font-bold text-[#EDE6D6] focus:border-[#0B6E4F] transition-all`} />
                                     <div className="flex items-center gap-1.5">
                                       <span className="text-[10px] font-bold text-[#9C9384]">$</span>
                                       <input type="number" value={String(trans.price)} onChange={e => setSvcTransList(svcTransList.map((t: any, i: number) => i === ti ? { ...t, price: parseFloat(e.target.value) || 0 } : t))} placeholder="Price"
-                                        className={`w-20 px-3 py-2 border-2 ${trans.price <= 0 ? 'border-[#722F37] bg-[#722F37]/10' : 'border-[#5C4A2E]/30 bg-[#1C232E]'} rounded-lg text-base font-bold text-[#EDE6D6] focus:border-[#0B6E4F] transition-all`} />
+                                        className={`w-20 px-3 py-2 border-2 ${trans.price <= 0 ? 'border-[#722F37] bg-[#722F37]/10' : 'border-[#2A2F36] bg-[#1C232E]'} rounded-lg text-base font-bold text-[#EDE6D6] focus:border-[#0B6E4F] transition-all`} />
                                     </div>
                                   </div>
                                 </div>
                               ))}
                               <button type="button" onClick={() => setSvcTransList([...svcTransList, { name: '', details: '', price: 0 }])}
-                                className="w-full py-1.5 border-2 border-dashed border-[#5C4A2E]/30 rounded-xl text-[10px] font-black text-[#9C9384] uppercase tracking-widest hover:border-[#0B6E4F] hover:text-[#0B6E4F] transition-all">+ Add Transfer</button>
+                                className="w-full py-1.5 border-2 border-dashed border-[#2A2F36] rounded-xl text-[10px] font-black text-[#9C9384] uppercase tracking-widest hover:border-[#0B6E4F] hover:text-[#0B6E4F] transition-all">+ Add Transfer</button>
                             </div>
                           )}
                         </div>
@@ -1226,16 +1345,16 @@ export function BookingModal(props: BookingModalProps) {
               )}
 
               {(canCheckOut || sel.status === 'checked_in') && isStaff && (
-                <div className="border border-[#5C4A2E]/30 rounded-xl p-4 space-y-3 bg-[#1C232E]">
+                <div className="border border-[#2A2F36] rounded-xl p-4 space-y-3 bg-[#1C232E]">
                   <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Extra Services</p>
                   <button onClick={() => setShowDrinks(!showDrinks)} className="text-sm font-bold text-[#0B6E4F] hover:text-[#0B6E4F]/80">{showDrinks ? '− Hide Drinks' : '+ Add Drinks'}</button>
                   {showDrinks && drinks.length > 0 && (
                     <div className="grid grid-cols-2 gap-2">
                       {drinks.map((d: any) => (
-                        <div key={d.id} className="flex items-center gap-2 bg-[#1C232E]/50 rounded-lg px-3 py-2 border border-[#5C4A2E]/30">
+                        <div key={d.id} className="flex items-center gap-2 bg-[#1C232E]/50 rounded-lg px-3 py-2 border border-[#2A2F36]">
                           <span className="text-xs text-[#EDE6D6] flex-1 truncate">{String(d.name)}</span>
                           <div className="flex items-center gap-1">
-                            <button onClick={() => setSelectedDrinks({ ...selectedDrinks, [d.id]: Math.max(0, (selectedDrinks[d.id] || 0) - 1) })} className="w-5 h-5 rounded bg-[#1C232E]/50 text-[#9C9384] text-xs font-bold hover:bg-[#2A1518] border border-[#5C4A2E]/30">−</button>
+                            <button onClick={() => setSelectedDrinks({ ...selectedDrinks, [d.id]: Math.max(0, (selectedDrinks[d.id] || 0) - 1) })} className="w-5 h-5 rounded bg-[#1C232E]/50 text-[#9C9384] text-xs font-bold hover:bg-[#2A1518] border border-[#2A2F36]">−</button>
                             <span className="w-5 text-center text-xs font-bold text-[#EDE6D6]">{String(selectedDrinks[d.id] || 0)}</span>
                             <button onClick={() => setSelectedDrinks({ ...selectedDrinks, [d.id]: (selectedDrinks[d.id] || 0) + 1 })} className="w-5 h-5 rounded bg-[#0B6E4F]/20 text-[#0B6E4F] text-xs font-bold hover:bg-[#0B6E4F]/30 border border-[#0B6E4F]/40">+</button>
                           </div>
@@ -1245,9 +1364,9 @@ export function BookingModal(props: BookingModalProps) {
                   )}
                   <div className="flex gap-2">
                     <input type="text" value={String(newExtraName)} onChange={e => setNewExtraName(e.target.value)} placeholder="Service name"
-                      className="flex-1 px-3 py-2 text-base rounded-lg border border-[#5C4A2E]/30 bg-[#1C232E] focus:outline-none focus:ring-2 focus:ring-[#0B6E4F]/30 text-[#EDE6D6]" />
+                      className="flex-1 px-3 py-2 text-base rounded-lg border border-[#2A2F36] bg-[#1C232E] focus:outline-none focus:ring-2 focus:ring-[#0B6E4F]/30 text-[#EDE6D6]" />
                     <input type="number" value={String(newExtraPrice)} onChange={e => setNewExtraPrice(e.target.value)} placeholder="Price"
-                      className="w-20 px-3 py-2 text-base rounded-lg border border-[#5C4A2E]/30 bg-[#1C232E] focus:outline-none text-[#EDE6D6]" />
+                      className="w-20 px-3 py-2 text-base rounded-lg border border-[#2A2F36] bg-[#1C232E] focus:outline-none text-[#EDE6D6]" />
                     <button onClick={() => { if (!newExtraName.trim()) return; setExtraServices([...extraServices, { name: newExtraName.trim(), price: newExtraPrice, currency: 'USD' }]); setNewExtraName(''); setNewExtraPrice(''); }}
                       className="px-3 py-2 bg-[#0B6E4F] text-[#C9A227] text-xs font-bold rounded-lg hover:bg-[#0B6E4F]/80 border border-[#0B6E4F]/40">Add</button>
                   </div>
@@ -1406,7 +1525,7 @@ export function BookingModal(props: BookingModalProps) {
                           </span>
                         )}
                         {sel.payment_status === 'paid' && (
-                          <span className="font-mono text-[9px] font-black uppercase tracking-widest border border-[#5C4A2E]/30 px-2 py-0.5 bg-[#1C232E] text-[#0B6E4F]">
+                          <span className="font-mono text-[9px] font-black uppercase tracking-widest border border-[#2A2F36] px-2 py-0.5 bg-[#1C232E] text-[#0B6E4F]">
                             [ PAID - {svcPayList?.[0]?.method?.toUpperCase() || 'CASH'} ]
                           </span>
                         )}
@@ -1421,7 +1540,7 @@ export function BookingModal(props: BookingModalProps) {
 
               {isStaff && sel.status !== 'completed' && (
                   Math.abs(debtRemaining) > 0.01 && (
-                    <div className="bg-[#1C232E] border border-[#5C4A2E]/30 p-6 space-y-4 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)]">
+                    <div className="bg-[#1C232E] border border-[#2A2F36] p-6 space-y-4 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)]">
                       <div className="flex justify-between items-center">
                         <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Payment Collection</p>
                         {isBalanceMatched || (tPaidUsd >= debtRemaining - 1.00) ? (
@@ -1440,7 +1559,7 @@ export function BookingModal(props: BookingModalProps) {
                           const currentRate = pay.currency === 'USD' ? 1 : (pay.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92));
                           
                           return (
-                            <div key={pi} className="space-y-3 p-4 bg-[#1C232E]/50 rounded-2xl border border-[#5C4A2E]/30 animate-in slide-in-from-top-2 duration-300">
+                            <div key={pi} className="space-y-3 p-4 bg-[#1C232E]/50 rounded-2xl border border-[#2A2F36] animate-in slide-in-from-top-2 duration-300">
                               <div className="flex justify-between items-center">
                                 <label className="text-[9px] font-black uppercase tracking-widest text-[#9C9384]">Payment {String(pi + 1)}</label>
                                 {svcPayList.length > 1 && (
@@ -1475,7 +1594,7 @@ export function BookingModal(props: BookingModalProps) {
                                           return updates;
                                         }));
                                       }}
-                                    className="w-full px-4 py-3 bg-[#1C232E] border-2 border-[#5C4A2E]/30 rounded-2xl text-base font-black text-[#EDE6D6] outline-none focus:border-[#0B6E4F] transition-all shadow-sm"
+                                    className="w-full px-4 py-3 bg-[#1C232E] border-2 border-[#2A2F36] rounded-2xl text-base font-black text-[#EDE6D6] outline-none focus:border-[#0B6E4F] transition-all shadow-sm"
                                   >
                                     <option value="USD">USD ($)</option>
                                     <option value="UZS">UZS (Sum)</option>
@@ -1504,7 +1623,7 @@ export function BookingModal(props: BookingModalProps) {
                                           const val = parseFloat(e.target.value) || 0;
                                           setPricing({ ...pricing, [pay.currency === 'UZS' ? 'usd_to_uzs' : 'usd_to_eur']: val });
                                         }}
-                                        className="w-full pl-14 pr-3 py-2.5 bg-[#1C232E] border-2 border-[#5C4A2E]/30 rounded-xl text-base font-black text-[#EDE6D6] outline-none focus:border-[#0B6E4F] shadow-sm"
+                                        className="w-full pl-14 pr-3 py-2.5 bg-[#1C232E] border-2 border-[#2A2F36] rounded-xl text-base font-black text-[#EDE6D6] outline-none focus:border-[#0B6E4F] shadow-sm"
                                       />
                                     </div>
                                   </div>
@@ -1520,7 +1639,7 @@ export function BookingModal(props: BookingModalProps) {
                                         className={`flex-1 py-3 rounded-2xl text-xs font-black uppercase tracking-tighter transition-all border-2 ${
                                           pay.method === m 
                                             ? 'bg-[#0B6E4F] border-[#0B6E4F] text-[#C9A227] shadow-lg' 
-                                            : 'bg-[#1C232E] border-[#5C4A2E]/30 text-[#9C9384] hover:border-[#0B6E4F]'
+                                            : 'bg-[#1C232E] border-[#2A2F36] text-[#9C9384] hover:border-[#0B6E4F]'
                                         }`}
                                       >
                                         {String(m)}
@@ -1563,7 +1682,7 @@ export function BookingModal(props: BookingModalProps) {
                                         setSvcPayList(svcPayList.map((p: any, i: number) => i === pi ? { ...p, amount: e.target.value } : p));
                                       }}
                                       placeholder="0.00"
-                                      className={`w-full ${pay.currency === 'UZS' ? 'pl-11' : 'pl-8'} pr-4 py-4 bg-[#1C232E] border-2 border-[#5C4A2E]/30 rounded-3xl text-xl font-black text-[#EDE6D6] focus:border-[#0B6E4F] shadow-md`}
+                                      className={`w-full ${pay.currency === 'UZS' ? 'pl-11' : 'pl-8'} pr-4 py-4 bg-[#1C232E] border-2 border-[#2A2F36] rounded-3xl text-xl font-black text-[#EDE6D6] focus:border-[#0B6E4F] shadow-md`}
                                     />
                                   </div>
                                 </div>
@@ -1581,12 +1700,12 @@ export function BookingModal(props: BookingModalProps) {
                               method: 'Cash' 
                             }]);
                           }}
-                          className="w-full py-3 border-2 border-dashed border-[#5C4A2E]/30 rounded-2xl text-[10px] font-black text-[#9C9384] uppercase tracking-widest hover:border-[#0B6E4F] hover:text-[#0B6E4F] transition-all bg-[#1C232E]/30"
+                          className="w-full py-3 border-2 border-dashed border-[#2A2F36] rounded-2xl text-[10px] font-black text-[#9C9384] uppercase tracking-widest hover:border-[#0B6E4F] hover:text-[#0B6E4F] transition-all bg-[#1C232E]/30"
                         >
                           + Add Another Currency
                         </button>
 
-                        <div className="sticky bottom-0 left-0 right-0 p-4 bg-[#1C232E]/80 backdrop-blur-md border-t border-[#5C4A2E]/30 -mx-4 -mb-4 rounded-b-[24px] z-30 flex flex-col gap-2">
+                        <div className="sticky bottom-0 left-0 right-0 p-4 bg-[#1C232E]/80 backdrop-blur-md border-t border-[#2A2F36] -mx-4 -mb-4 rounded-b-[24px] z-30 flex flex-col gap-2">
                           {!isBalanceMatched && (
                             <div className="flex items-center justify-between px-2">
                               <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest">
@@ -1644,7 +1763,7 @@ export function BookingModal(props: BookingModalProps) {
                 const tabCount = receipts.length;
                 if (tabCount === 0 && gTotal <= 0.01 && (sel.collected_amount || 0) === 0) return null;
                 return (
-                  <div className="border border-[#5C4A2E]/30 rounded-2xl p-4 bg-[#1C232E]/50 space-y-3">
+                  <div className="border border-[#2A2F36] rounded-2xl p-4 bg-[#1C232E]/50 space-y-3">
                     <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Guest Folio</p>
                     <div className="flex flex-wrap gap-2">
                       {receipts.map((r: any, idx: number) => (
@@ -1679,7 +1798,7 @@ export function BookingModal(props: BookingModalProps) {
               {showFinalReceipt && sel && (
                 <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
                   <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setShowFinalReceipt(false)} />
-                  <div className="relative bg-[#1C232E] rounded-[32px] shadow-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200 border border-[#5C4A2E]/30">
+                  <div className="relative bg-[#1C232E] rounded-[32px] shadow-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200 border border-[#2A2F36]">
                     <div ref={receiptRef}>
                       <div className="bg-[#0B6E4F] px-6 py-10 text-[#C9A227] text-center relative overflow-hidden">
                         <div className="absolute top-4 right-4 z-10">
@@ -1687,17 +1806,17 @@ export function BookingModal(props: BookingModalProps) {
                         </div>
                         
                         <div className="relative z-10 flex flex-col items-center">
-                          <div className="w-16 h-16 bg-[#1C232E]/20 rounded-full flex items-center justify-center mb-4 backdrop-blur-sm border border-[#5C4A2E]/30">
+                          <div className="w-16 h-16 bg-[#1C232E]/20 rounded-full flex items-center justify-center mb-4 backdrop-blur-sm border border-[#2A2F36]">
                             <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
                           </div>
                           
                           <h3 className="text-2xl font-black uppercase tracking-tight mb-2">Final Receipt</h3>
-                          <p className="text-[10px] font-black tracking-widest text-[#C9A227]/60 uppercase mb-4">Receipt #{selectedReceipt?.id || 'PENDING'}</p>
+                          
                           
                           {selectedReceipt && (
-                            <div className="bg-[#1C232E]/20 backdrop-blur-md border border-[#5C4A2E]/30 rounded-lg px-3 py-1.5 text-[9px] font-black uppercase tracking-widest">
+                            <div className="bg-[#1C232E]/20 backdrop-blur-md border border-[#2A2F36] rounded-lg px-3 py-1.5 text-[9px] font-black uppercase tracking-widest">
                               Settled: {new Date(selectedReceipt.settled_at || selectedReceipt.date || Date.now()).toLocaleString()}
                             </div>
                           )}
@@ -1706,7 +1825,7 @@ export function BookingModal(props: BookingModalProps) {
 
                     <div className="p-6 space-y-6">
                       <div className="space-y-4">
-                        <div className="pb-4 border-b border-[#5C4A2E]/30">
+                        <div className="pb-4 border-b border-[#2A2F36]">
                           <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest mb-1">Guest</p>
                           <p className="text-xl font-black text-[#EDE6D6] leading-tight">{String(sel.guest_name)}</p>
                         </div>
@@ -1831,7 +1950,7 @@ export function BookingModal(props: BookingModalProps) {
                                 {loadingAction === 'save' ? 'SAVING...' : 'SAVE CHOICES'}
                               </button>
                             </div>
-                            <div className="space-y-3 bg-[#1C232E]/50 rounded-2xl p-4 border border-[#5C4A2E]/30">
+                            <div className="space-y-3 bg-[#1C232E]/50 rounded-2xl p-4 border border-[#2A2F36]">
                               {(svcAmount > 0 || (isPrepaid && (sel.collected_amount || 0) === 0)) && (
                                 <div className="flex justify-between items-center text-sm">
                                   <span className="text-[#9C9384] font-bold">Stay Price</span>
@@ -1903,7 +2022,7 @@ export function BookingModal(props: BookingModalProps) {
                     <button 
                       onClick={handleSaveAsImage}
                       disabled={loadingAction === 'exporting'}
-                      className="flex-1 py-4 bg-[#1C232E]/50 hover:bg-[#2A1518] text-[#9C9384] rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 border border-[#5C4A2E]/30"
+                      className="flex-1 py-4 bg-[#1C232E]/50 hover:bg-[#2A1518] text-[#9C9384] rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 border border-[#2A2F36]"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                       {loadingAction === 'exporting' ? 'EXPORTING...' : 'Save Image'}
@@ -1931,8 +2050,8 @@ export function BookingModal(props: BookingModalProps) {
                   </div>
                   <div className="grid gap-2">
                     {getSettledReceiptsForSel().map((receipt: any, idx: number) => (
-                      <div key={idx} className={`p-4 border border-[#5C4A2E]/30 group ${parseFloat(receipt.total_usd || 0) < 0 ? 'bg-[#722F37]/10 border-[#722F37]/30' : 'bg-[#1C232E]'}`}>
-                        <div className="flex justify-between items-start mb-2 border-b border-[#5C4A2E]/30 pb-2">
+                      <div key={idx} className={`p-4 border border-[#2A2F36] group ${parseFloat(receipt.total_usd || 0) < 0 ? 'bg-[#722F37]/10 border-[#722F37]/30' : 'bg-[#1C232E]'}`}>
+                        <div className="flex justify-between items-start mb-2 border-b border-[#2A2F36] pb-2">
                           <div className="flex flex-col">
                             <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">
                               {parseFloat(receipt.total_usd || 0) < 0 ? 'Settled Refund' : `Tab #${idx + 1}`}
@@ -1953,19 +2072,19 @@ export function BookingModal(props: BookingModalProps) {
                         </div>
                         <div className="flex flex-wrap gap-2 mt-2">
                            {receipt.items?.accommodation > 0 && (
-                             <span className="text-[8px] font-mono font-black uppercase bg-[#1C232E]/50 border border-[#5C4A2E]/30 px-1.5 py-0.5 text-[#EDE6D6]">Stay: ${receipt.items.accommodation.toFixed(2)}</span>
+                             <span className="text-[8px] font-mono font-black uppercase bg-[#1C232E]/50 border border-[#2A2F36] px-1.5 py-0.5 text-[#EDE6D6]">Stay: ${receipt.items.accommodation.toFixed(2)}</span>
                            )}
                            {receipt.items?.meals?.lunch > 0 && (
-                             <span className="text-[8px] font-mono font-black uppercase bg-[#1C232E]/50 border border-[#5C4A2E]/30 px-1.5 py-0.5 text-[#EDE6D6]">Lunch x{receipt.items.meals.lunch}</span>
+                             <span className="text-[8px] font-mono font-black uppercase bg-[#1C232E]/50 border border-[#2A2F36] px-1.5 py-0.5 text-[#EDE6D6]">Lunch x{receipt.items.meals.lunch}</span>
                            )}
                            {receipt.items?.meals?.dinner > 0 && (
-                             <span className="text-[8px] font-mono font-black uppercase bg-[#1C232E]/50 border border-[#5C4A2E]/30 px-1.5 py-0.5 text-[#EDE6D6]">Dinner x{receipt.items.meals.dinner}</span>
+                             <span className="text-[8px] font-mono font-black uppercase bg-[#1C232E]/50 border border-[#2A2F36] px-1.5 py-0.5 text-[#EDE6D6]">Dinner x{receipt.items.meals.dinner}</span>
                            )}
                            {receipt.items?.drinks?.length > 0 && (
-                             <span className="text-[8px] font-mono font-black uppercase bg-[#1C232E]/50 border border-[#5C4A2E]/30 px-1.5 py-0.5 text-[#EDE6D6]">Drinks</span>
+                             <span className="text-[8px] font-mono font-black uppercase bg-[#1C232E]/50 border border-[#2A2F36] px-1.5 py-0.5 text-[#EDE6D6]">Drinks</span>
                            )}
                            {receipt.items?.extras?.length > 0 && (
-                             <span className="text-[8px] font-mono font-black uppercase bg-[#1C232E]/50 border border-[#5C4A2E]/30 px-1.5 py-0.5 text-[#EDE6D6]">Extras</span>
+                             <span className="text-[8px] font-mono font-black uppercase bg-[#1C232E]/50 border border-[#2A2F36] px-1.5 py-0.5 text-[#EDE6D6]">Extras</span>
                            )}
                         </div>
                       </div>
@@ -1982,7 +2101,7 @@ export function BookingModal(props: BookingModalProps) {
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unified Guest Folio</p>
                       <h3 className="text-xl font-black text-[#EDE6D6] uppercase tracking-tighter mt-1">Audit Manifest</h3>
                     </div>
-                    <span className={`px-4 py-1.5 text-[10px] font-black uppercase border-2 border-[#5C4A2E]/30 shadow-[2px_2px_0px_0px_rgba(92,74,46,0.3)] ${
+                    <span className={`px-4 py-1.5 text-[10px] font-black uppercase border-2 border-[#2A2F36] shadow-[2px_2px_0px_0px_rgba(92,74,46,0.3)] ${
                       guestStatement.status === 'PAID' || guestStatement.status === 'PREPAID' ? 'bg-[#0B6E4F] text-[#C9A227]' : 'bg-[#1C232E] text-[#EDE6D6] animate-pulse'
                     }`}>
                       [ STATUS: {guestStatement.status} {guestStatement.status === 'OPEN TAB' ? `- $${guestStatement.remaining.toFixed(2)}` : ''} ]
@@ -1993,7 +2112,7 @@ export function BookingModal(props: BookingModalProps) {
                     {/* Line Items - Bento Style */}
                     <div className="grid gap-2">
                       {/* Accommodation */}
-                      <div className="flex justify-between items-center p-4 bg-[#1C232E] border border-[#5C4A2E]/30 group">
+                      <div className="flex justify-between items-center p-4 bg-[#1C232E] border border-[#2A2F36] group">
                         <div className="flex flex-col">
                           <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Service</span>
                           <span className="text-xs font-black text-[#EDE6D6] uppercase">Accommodation / Stay Fee</span>
@@ -2006,7 +2125,7 @@ export function BookingModal(props: BookingModalProps) {
 
                       {/* Meals */}
                       {guestStatement.mealItems.map((item: any, idx: number) => (
-                        <div key={idx} className="flex justify-between items-center p-4 bg-[#1C232E] border border-[#5C4A2E]/30">
+                        <div key={idx} className="flex justify-between items-center p-4 bg-[#1C232E] border border-[#2A2F36]">
                           <div className="flex flex-col">
                             <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Kitchen Request</span>
                             <span className="text-xs font-black text-[#EDE6D6] uppercase">{item.name} · <span className="font-mono text-[9px]">{item.date}</span></span>
@@ -2022,7 +2141,7 @@ export function BookingModal(props: BookingModalProps) {
 
                       {/* Guide Service */}
                       {guestStatement.guideTotal > 0 && (
-                        <div className="flex justify-between items-center p-4 bg-[#1C232E] border border-[#5C4A2E]/30">
+                        <div className="flex justify-between items-center p-4 bg-[#1C232E] border border-[#2A2F36]">
                           <div className="flex flex-col">
                             <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Guide Service</span>
                             <span className="text-xs font-black text-[#EDE6D6] uppercase">{guestStatement.guideNames || 'Guide'}</span>
@@ -2036,7 +2155,7 @@ export function BookingModal(props: BookingModalProps) {
 
                       {/* Transportation */}
                       {guestStatement.transportTotal > 0 && (
-                        <div className="flex justify-between items-center p-4 bg-[#1C232E] border border-[#5C4A2E]/30">
+                        <div className="flex justify-between items-center p-4 bg-[#1C232E] border border-[#2A2F36]">
                           <div className="flex flex-col">
                             <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Transportation</span>
                             <span className="text-xs font-black text-[#EDE6D6] uppercase max-w-[200px] truncate">{guestStatement.transportationDetails || 'Transport'}</span>
@@ -2055,7 +2174,7 @@ export function BookingModal(props: BookingModalProps) {
                       </div>
 
                       {/* Reconciliation / Payments */}
-                      <div className="flex justify-between items-center p-4 bg-[#0F1419] border border-[#5C4A2E]/30 mt-4 border-dashed">
+                      <div className="flex justify-between items-center p-4 bg-[#0F1419] border border-[#2A2F36] mt-4 border-dashed">
                         <div className="flex flex-col">
                           <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Reconciliation</span>
                           <span className="text-xs font-black text-[#EDE6D6] uppercase">Settled Payments / Pre-Paid Credit</span>
@@ -2067,7 +2186,7 @@ export function BookingModal(props: BookingModalProps) {
                       </div>
 
                       {/* Final Balance */}
-                      <div className="flex justify-between items-center p-5 bg-[#1C232E] border-2 border-[#5C4A2E]/30 mt-2 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)]">
+                      <div className="flex justify-between items-center p-5 bg-[#1C232E] border-2 border-[#2A2F36] mt-2 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)]">
                         <span className="text-md font-black uppercase tracking-[0.1em] text-[#EDE6D6]">Remaining Balance</span>
                         <div className="text-right">
                           <p className={`text-2xl font-mono font-black ${guestStatement.status === 'OPEN TAB' ? 'text-[#722F37]' : 'text-[#0B6E4F]'}`}>
@@ -2089,7 +2208,7 @@ export function BookingModal(props: BookingModalProps) {
       {valError && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setValError(null)} />
-          <div className="relative bg-[#1C232E] rounded-[32px] shadow-2xl w-full max-w-sm overflow-hidden p-8 space-y-6 text-center border border-[#5C4A2E]/30">
+          <div className="relative bg-[#1C232E] rounded-[32px] shadow-2xl w-full max-w-sm overflow-hidden p-8 space-y-6 text-center border border-[#2A2F36]">
             <h3 className="text-2xl font-black uppercase tracking-tight text-[#722F37]">Checkout Blocked</h3>
             <p className="text-[#9C9384] text-sm font-medium leading-relaxed">{String(valError)}</p>
             <button onClick={() => setValError(null)} className="w-full py-4 bg-[#0B6E4F] text-[#C9A227] rounded-2xl font-black uppercase hover:bg-[#0B6E4F]/80 transition-all border border-[#0B6E4F]/40">I Understand</button>
@@ -2099,3 +2218,6 @@ export function BookingModal(props: BookingModalProps) {
     </>
   );
 }
+
+
+

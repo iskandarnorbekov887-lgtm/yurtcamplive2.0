@@ -103,6 +103,7 @@ function CheckinPortal() {
       laundry_currency: booking.laundry_currency,
       payment_method: booking.payment_method,
       created_by: booking.created_by_role || 'System',
+      team_id: user?.team_id,
     }]);
 
     const payloadToSave = { status: 'completed', payment_status: 'paid' } as any;

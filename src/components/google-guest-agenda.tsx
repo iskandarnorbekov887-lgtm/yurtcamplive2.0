@@ -68,6 +68,7 @@ interface Props {
   bookings: Booking[];
   userRole?: UserRole;
   currentUserId?: string;
+  teamId?: string;
   onCheckIn?: (id: number) => Promise<void> | void;
   onCheckOut?: (id: number) => Promise<void> | void;
   onUpdateBooking?: (id: number, data: Partial<Booking>) => Promise<void> | void;
@@ -78,7 +79,7 @@ interface Props {
 
 
 export function GoogleGuestAgenda({
-  bookings, userRole, currentUserId, onCheckIn, onCheckOut, onUpdateBooking, onCancelBooking, onAddNewBooking, onRefresh,
+  bookings, userRole, currentUserId, teamId, onCheckIn, onCheckOut, onUpdateBooking, onCancelBooking, onAddNewBooking, onRefresh,
 }: Props) {
   const [selectedItem, setSelectedItem] = useState<ListItem | null>(null);
   const sel = selectedItem?.booking ?? null;
@@ -543,6 +544,7 @@ export function GoogleGuestAgenda({
         payment_status: 'Unpaid',
         approved_by_manager: true,
         created_by: String(currentUserId),
+        team_id: teamId,
         notes: sanitizeNotes(ev.description),
       };
 
@@ -609,7 +611,6 @@ export function GoogleGuestAgenda({
       let existingDays: DayEntry[] = [];
       let guestCategory = b.guest_category || '';
 
-      // ── CRITICAL: Read directly from database columns (never from draft) ──
       setSvcAdults(b.number_of_adults || b.guest_count || 1);
       setSvcChildren(b.number_of_children || 0);
       setSvcDateAdjustment(0); // Adjustments are per-session, not persisted
@@ -710,7 +711,7 @@ export function GoogleGuestAgenda({
 
         await supabase.from('bookings')
           .update({ 
-            draft 
+            meta: updatedMeta
           })
           .eq('id', sel.id);
       } catch (err) {
@@ -947,12 +948,12 @@ export function GoogleGuestAgenda({
       // Manually insert services since booking columns are removed
       if (svcLunch) {
         await supabase.from('meal_requests').insert({
-          booking_id: sel.id, meal_date: today, meal_type: 'Lunch', adult_qty: svcLunchCount, child_qty: 0, status: 'Pending'
+          booking_id: sel.id, meal_date: today, meal_type: 'Lunch', adult_qty: svcLunchCount, child_qty: 0, status: 'Pending', team_id: teamId
         });
       }
       if (svcDinner) {
         await supabase.from('meal_requests').insert({
-          booking_id: sel.id, meal_date: today, meal_type: 'Dinner', adult_qty: svcDinnerCount, child_qty: 0, status: 'Pending'
+          booking_id: sel.id, meal_date: today, meal_type: 'Dinner', adult_qty: svcDinnerCount, child_qty: 0, status: 'Pending', team_id: teamId
         });
       }
       if (svcGuide) {
@@ -1175,6 +1176,7 @@ export function GoogleGuestAgenda({
         setSelectedItem={setSelectedItem}
         userRole={String(userRole || 'Manager')}
         currentUserId={String(currentUserId)}
+        teamId={teamId}
         pricing={pricing}
         setPricing={setPricing}
         loadingAction={loadingAction}

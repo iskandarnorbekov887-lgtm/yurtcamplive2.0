@@ -17,6 +17,7 @@ const fetchSentRequests = async () => {
 };
 
 export function ManagerProcurement() {
+  const { user } = useAuth();
   const { data: requestsData } = useSWR('procurement_manager', fetchSentRequests);
   const requests = requestsData || [];
   const [fiscalInputs, setFiscalInputs] = useState<Record<string, { amount: number; currency: 'UZS' | 'USD' | 'EUR'; rate: number }>>({});
@@ -82,7 +83,8 @@ export function ManagerProcurement() {
       exchange_rate: fiscal.rate,
       reference_id: requestId,
       description: `Supply Batch #${requestId.slice(0, 8)} finalized`,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      team_id: user?.team_id
     }]);
     
     mutate('procurement_manager');

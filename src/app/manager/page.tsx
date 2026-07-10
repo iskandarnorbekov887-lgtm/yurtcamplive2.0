@@ -245,6 +245,7 @@ function ManagerPortal() {
                     bookings={bookings}
                     userRole={userRole}
                     currentUserId={currentUserId}
+                    teamId={user?.team_id}
                     onCheckIn={async (id) => {
                       const { error } = await supabase.from('bookings').update({ status: 'checked_in' }).eq('id', id);
                       if (error) console.error(error);
@@ -348,6 +349,7 @@ function ManagerPortal() {
         booking={selectedMealBooking}
         onClose={() => setSelectedMealBooking(null)}
         onSent={fetchData}
+        teamId={user?.team_id}
       />
 
       <ManagerIncomeForm

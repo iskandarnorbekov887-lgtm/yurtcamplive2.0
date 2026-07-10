@@ -211,6 +211,7 @@ function ManagerFinancials() {
             laundry_price: null,
             laundry_currency: null,
             payment_method: null,
+            team_id: user?.team_id,
           });
           if (insertError) throw insertError;
         }
@@ -251,6 +252,7 @@ function ManagerFinancials() {
           laundry_price: incomeLaundryPrice,
           laundry_currency: incomeLaundryCurrency,
           payment_method: incomePaymentMethod,
+          team_id: user?.team_id,
         });
         if (insertError) throw insertError;
       }
@@ -436,6 +438,7 @@ function ManagerFinancials() {
           .from('profiles')
           .select('id')
           .eq('role', 'CEO')
+          .eq('team_id', user?.team_id)
           .single();
 
         if (ceoData) {
@@ -447,6 +450,7 @@ function ManagerFinancials() {
           
           await supabase.from('notifications').insert({
             user_id: ceoData.id,
+            team_id: user?.team_id,
             type: notificationType,
             title: title,
             message: message,

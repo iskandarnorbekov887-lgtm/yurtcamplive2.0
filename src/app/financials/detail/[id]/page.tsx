@@ -74,6 +74,7 @@ function ManagerFinancialDetail() {
           .from('profiles')
           .select('id')
           .eq('role', 'CEO')
+          .eq('team_id', user?.team_id)
           .single();
 
         if (ceoData) {
@@ -85,6 +86,7 @@ function ManagerFinancialDetail() {
           
           await supabase.from('notifications').insert({
             user_id: ceoData.id,
+            team_id: user?.team_id,
             type: notificationType,
             title: title,
             message: message,
@@ -128,6 +130,7 @@ function ManagerFinancialDetail() {
         .from('profiles')
         .select('id')
         .eq('role', 'CEO')
+        .eq('team_id', user?.team_id)
         .single();
 
       if (ceoData) {
@@ -138,6 +141,7 @@ function ManagerFinancialDetail() {
         
         await supabase.from('notifications').insert({
           user_id: ceoData.id,
+          team_id: user?.team_id,
           type: 'delete_request',
           title: title,
           message: message,

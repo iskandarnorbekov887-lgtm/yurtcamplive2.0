@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../../_supabase';
+import { createClient } from '@/utils/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,16 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabaseServer = await createClient();
+    const { data: { user } } = await supabaseServer.auth.getUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { data: profile } = await supabaseServer.from('profiles').select('team_id, account_status').eq('id', user.id).single();
+    if (!profile?.team_id) return NextResponse.json({ error: 'User does not belong to a team' }, { status: 403 });
+    if (profile.account_status === 'banned') {
+      return NextResponse.json({ error: 'This account has been deactivated. Contact your administrator.' }, { status: 403 });
+    }
+    const teamId = profile.team_id;
+
     const { id } = await params;
     const bookingId = parseInt(id, 10);
     if (isNaN(bookingId)) {
@@ -78,6 +89,7 @@ export async function PATCH(
           child_qty: 0,
           dietary_type: 'Normal',
           status: 'Pending',
+          team_id: teamId,
         });
       }
       if (services?.dinner !== undefined && services.dinner.enabled) {
@@ -89,6 +101,7 @@ export async function PATCH(
           child_qty: 0,
           dietary_type: 'Normal',
           status: 'Pending',
+          team_id: teamId,
         });
       }
       if (services?.guide !== undefined && services.guide.enabled) {
@@ -158,11 +171,12 @@ export async function PATCH(
       .from('bookings')
       .update(bookingFields)
       .eq('id', bookingId)
+      .eq('team_id', teamId)
       .select()
       .single();
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error || !data) {
+      return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
     }
 
     return NextResponse.json({ booking: data });
@@ -180,6 +194,16 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabaseServer = await createClient();
+    const { data: { user } } = await supabaseServer.auth.getUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { data: profile } = await supabaseServer.from('profiles').select('team_id, account_status').eq('id', user.id).single();
+    if (!profile?.team_id) return NextResponse.json({ error: 'User does not belong to a team' }, { status: 403 });
+    if (profile.account_status === 'banned') {
+      return NextResponse.json({ error: 'This account has been deactivated. Contact your administrator.' }, { status: 403 });
+    }
+    const teamId = profile.team_id;
+
     const { id } = await params;
     const bookingId = parseInt(id, 10);
     if (isNaN(bookingId)) {
@@ -190,10 +214,11 @@ export async function GET(
       .from('bookings')
       .select('*, meal_requests(*)')
       .eq('id', bookingId)
+      .eq('team_id', teamId)
       .single();
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error || !data) {
+      return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
     }
 
     return NextResponse.json({ booking: data });

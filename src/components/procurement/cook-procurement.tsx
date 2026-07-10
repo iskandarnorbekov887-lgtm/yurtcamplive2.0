@@ -30,7 +30,7 @@ export function CookProcurement() {
   const handleCreateRequest = async () => {
     const { data: newReq } = await supabase
       .from('procurement_requests')
-      .insert([{ status: 'draft', total_cost: 0, created_by: user?.id }])
+      .insert([{ status: 'draft', total_cost: 0, created_by: user?.id, team_id: user?.team_id }])
       .select()
       .single();
     mutate('procurement_drafts');
@@ -43,7 +43,8 @@ export function CookProcurement() {
       requested_qty: 1,
       actual_received_qty: 0,
       unit_price: 0,
-      item_status: 'pending'
+      item_status: 'pending',
+      team_id: user?.team_id
     }]);
     mutate('procurement_drafts');
   };

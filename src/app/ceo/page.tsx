@@ -2,13 +2,15 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { ProtectedRoute } from '@/components/protected-route';
-import { supabase, type Booking, type Profile, type Finance, type Notification } from '@/lib/supabase';
+import { supabase, type Booking, type Profile, type Finance, type Notification, type BookingEditRequest } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
+import { useImpersonation } from '@/lib/impersonation-context';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { GoogleGuestAgenda } from '@/components/google-guest-agenda';
 import { ManagerIncomeForm } from '@/components/manager-income-form';
 import { ManagerMealRequests } from '@/components/manager/manager-meal-requests';
+import { EditApprovalQueue } from '@/components/EditApprovalQueue';
 import type { UserRole } from '@/lib/supabase';
 
 // Force dynamic rendering to avoid SSR issues with auth
@@ -24,14 +26,16 @@ export default function CEOPage() {
 
 function CEODashboard() {
   const { user, session, signOut } = useAuth();
+  const { startImpersonating } = useImpersonation();
   console.log('Current User Role:', user?.role);
   const currentUserId = user?.id;
   const userRole = user?.role as UserRole;
   const { t } = useLanguage();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [staff, setStaff] = useState<Profile[]>([]);
-  const [activeTab, setActiveTab] = useState<'checkin' | 'team' | 'financials' | 'pricing' | 'meals'>('checkin');
+  const [activeTab, setActiveTab] = useState<'checkin' | 'team' | 'financials' | 'pricing' | 'meals' | 'approvals'>('checkin');
   const [loading, setLoading] = useState(true);
+  const [pendingEditCount, setPendingEditCount] = useState(0);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAllNotifications, setShowAllNotifications] = useState(false);
@@ -100,14 +104,18 @@ function CEODashboard() {
 
     try {
       console.log('🔄 Dashboard: Fetching data...');
-      const [bookingsData, staffData, notificationsData] = await Promise.all([
+      const [bookingsData, staffData, notificationsData, pendingEditsData] = await Promise.all([
         supabase.from('bookings').select('*, meal_requests(*)').order('check_in', { ascending: false }),
         supabase.from('profiles').select('*'),
         supabase
           .from('notifications')
           .select('*')
           .eq('user_id', currentUserId || '00000000-0000-0000-0000-000000000000')
-          .order('created_at', { ascending: false })
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('booking_edit_requests')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'pending'),
       ]);
 
       // Check for 403 Forbidden errors
@@ -137,6 +145,7 @@ function CEODashboard() {
       setBookings(deDuplicate(bookingsData.data || []));
       setStaff(staffData.data || []);
       setNotifications((notificationsData.data || []).slice(0, 10) || []);
+      setPendingEditCount((pendingEditsData as any)?.count ?? 0);
     } catch (error: any) {
       console.error('Dashboard Fetch error:', error);
       if (error?.code === '42501') {
@@ -232,6 +241,7 @@ function CEODashboard() {
       laundry_currency: booking.laundry_currency,
       payment_method: booking.payment_method,
       created_by: booking.created_by_role || 'System',
+      team_id: user?.team_id,
     }]);
 
     // Then mark booking as completed
@@ -332,6 +342,36 @@ function CEODashboard() {
       }
     } catch (error) {
       alert('Failed to delete user');
+    }
+  };
+
+  const handleToggleBan = async (member: Profile) => {
+    const isBanning = member.account_status !== 'banned';
+    const action = isBanning ? 'ban' : 'unban';
+    
+    // Check if this is the last CEO
+    if (isBanning && member.role === 'CEO') {
+      const ceoCount = staff.filter(s => s.role === 'CEO' && s.account_status !== 'banned').length;
+      if (ceoCount <= 1) {
+        alert('Cannot ban the last CEO on the team. This would lock everyone out of CEO functions.');
+        return;
+      }
+    }
+
+    if (!confirm(`Are you sure you want to ${action} ${member.full_name || member.email}?${isBanning ? ' They will lose access immediately.' : ''}`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ account_status: isBanning ? 'banned' : 'active' })
+        .eq('id', member.id);
+
+      if (error) throw error;
+      fetchData();
+    } catch (error: any) {
+      alert(`Failed to ${action} user: ${error.message}`);
     }
   };
 
@@ -443,6 +483,7 @@ function CEODashboard() {
                                       .from('profiles')
                                       .select('id')
                                       .eq('role', 'Manager')
+                                      .eq('team_id', user?.team_id)
                                       .single();
                                     
                                     if (record) {
@@ -494,6 +535,7 @@ function CEODashboard() {
                                     if (managerData) {
                                       await supabase.from('notifications').insert({
                                         user_id: managerData.id,
+                                        team_id: user?.team_id,
                                         type: 'delete_approved',
                                         title: 'Delete Request Approved',
                                         message: `Your delete request has been approved by the CEO.`,
@@ -519,6 +561,7 @@ function CEODashboard() {
                                     .from('profiles')
                                     .select('id')
                                     .eq('role', 'Manager')
+                                    .eq('team_id', user?.team_id)
                                     .single();
                                   
                                   // Update notification status to denied
@@ -528,6 +571,7 @@ function CEODashboard() {
                                   if (managerData) {
                                     await supabase.from('notifications').insert({
                                       user_id: managerData.id,
+                                      team_id: user?.team_id,
                                       type: 'delete_denied',
                                       title: 'Delete Request Denied',
                                       message: `Your delete request has been denied by the CEO.`,
@@ -589,6 +633,22 @@ function CEODashboard() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             Pricing Settings
           </button>
+          {/* Edit Approvals tab — shows pending count badge */}
+          <button
+            key="approvals"
+            onClick={() => setActiveTab('approvals')}
+            className={`px-6 py-2.5 rounded-lg font-bold capitalize transition-all text-xs flex items-center gap-2 ${
+              activeTab === 'approvals' ? 'bg-[#722F37] text-[#EDE6D6] shadow-lg' : 'text-[#9C9384] hover:text-[#EDE6D6] hover:bg-[#2A1518]'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            Edit Approvals
+            {pendingEditCount > 0 && (
+              <span className="ml-1 w-5 h-5 bg-[#722F37] text-white text-[9px] font-black rounded-full flex items-center justify-center border border-[#EDE6D6]/20">
+                {pendingEditCount}
+              </span>
+            )}
+          </button>
           {/* Team Settings — navigates to its own CEO-only page */}
           <a
             href="/ceo/team-settings"
@@ -605,6 +665,7 @@ function CEODashboard() {
               bookings={bookings}
               userRole={userRole}
               currentUserId={currentUserId}
+              teamId={user?.team_id}
               onCancelBooking={handleCancelBooking}
               onCheckIn={handleCheckIn}
               onCheckOut={handleCheckOut}
@@ -614,6 +675,14 @@ function CEODashboard() {
                 setShowAddBookingModal(true);
               }}
               onRefresh={fetchData}
+            />
+          </div>
+        )}
+        {activeTab === 'approvals' && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <EditApprovalQueue
+              currentUserId={currentUserId || ''}
+              onRefresh={() => { fetchData(); }}
             />
           </div>
         )}
@@ -659,13 +728,29 @@ function CEODashboard() {
                   </thead>
                   <tbody className="divide-y divide-[#5C4A2E]/20">
                     {staff.map((member) => (
-                      <tr key={member.id} className="hover:bg-[#2A1518] transition-colors group">
+                      <tr 
+                        key={member.id} 
+                        className={`hover:bg-[#2A1518] transition-colors group ${
+                          member.account_status === 'banned' ? 'opacity-50 bg-[#1C232E]/30' : ''
+                        }`}
+                      >
                         <td className="px-8 py-5">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg bg-[#0B6E4F]/20 flex items-center justify-center text-[#0B6E4F] font-bold border border-[#0B6E4F]/40">
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold border ${
+                              member.account_status === 'banned' 
+                                ? 'bg-[#5C4A2E]/20 text-[#5C4A2E] border-[#5C4A2E]/30' 
+                                : 'bg-[#0B6E4F]/20 text-[#0B6E4F] border-[#0B6E4F]/40'
+                            }`}>
                               {member.full_name?.charAt(0) || 'N'}
                             </div>
-                            <span className="font-bold text-[#EDE6D6]">{member.full_name || 'N/A'}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-[#EDE6D6]">{member.full_name || 'N/A'}</span>
+                              {member.account_status === 'banned' && (
+                                <span className="px-2 py-0.5 bg-[#722F37] text-white text-[8px] font-black uppercase tracking-widest rounded">
+                                  BANNED
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </td>
                         <td className="px-8 py-5 font-medium text-[#9C9384]">{member.email}</td>
@@ -691,6 +776,36 @@ function CEODashboard() {
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                             </button>
+                            {member.id !== currentUserId && member.account_status !== 'banned' && (
+                              <button
+                                onClick={() => startImpersonating({
+                                  id: member.id,
+                                  role: member.role,
+                                  full_name: member.full_name || member.email
+                                })}
+                                className="p-2 bg-[#C9A227]/20 text-[#C9A227] rounded-lg hover:bg-[#C9A227]/30 transition-all"
+                                title="Assume Position"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                              </button>
+                            )}
+                            {member.id !== currentUserId && (
+                              <button
+                                onClick={() => handleToggleBan(member)}
+                                className={`p-2 rounded-lg transition-all ${
+                                  member.account_status === 'banned'
+                                    ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                                    : 'bg-rose-50 text-rose-600 hover:bg-rose-100'
+                                }`}
+                                title={member.account_status === 'banned' ? 'Unban' : 'Ban'}
+                              >
+                                {member.account_status === 'banned' ? (
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                ) : (
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                                )}
+                              </button>
+                            )}
                             {member.id !== currentUserId && (
                               <button
                                 onClick={() => handleDeleteUser(member.id)}
@@ -875,6 +990,7 @@ function CEODashboard() {
         booking={selectedMealBooking}
         onClose={() => setSelectedMealBooking(null)}
         onSent={fetchData}
+        teamId={user?.team_id}
       />
 
       <ManagerIncomeForm

@@ -21,6 +21,7 @@ interface ManagerMealRequestsProps {
   booking: Booking | null;
   onClose: () => void;
   onSent: () => void;
+  teamId?: string;
 }
 
 function normalizeDate(d: string | Date | null) {
@@ -43,7 +44,7 @@ const fetchMealStats = async (bookingId: number) => {
   return stats;
 };
 
-export function ManagerMealRequests({ booking, onClose, onSent }: ManagerMealRequestsProps) {
+export function ManagerMealRequests({ booking, onClose, onSent, teamId }: ManagerMealRequestsProps) {
   const [mealDrafts, setMealDrafts] = useState<MealDraft[]>([]);
   const [loading, setLoading] = useState(false);
   const [sentVersion, setSentVersion] = useState(0);
@@ -147,6 +148,7 @@ export function ManagerMealRequests({ booking, onClose, onSent }: ManagerMealReq
       dietary_type: draft.dietary_type,
       notes: draft.notes,
       status: 'Pending',
+      team_id: teamId,
     };
 
     const { error } = await supabase.from('meal_requests').insert(row);
@@ -171,6 +173,7 @@ export function ManagerMealRequests({ booking, onClose, onSent }: ManagerMealReq
       dietary_type: d.dietary_type,
       notes: d.notes,
       status: 'Pending',
+      team_id: teamId,
     }));
 
     const { error } = await supabase.from('meal_requests').insert(rows);

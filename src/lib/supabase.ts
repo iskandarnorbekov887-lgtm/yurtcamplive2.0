@@ -20,6 +20,8 @@ export interface Profile {
   email: string;
   role: UserRole;
   full_name: string;
+  team_id?: string;
+  account_status?: 'active' | 'banned';
 }
 
 export interface Booking {
@@ -28,6 +30,7 @@ export interface Booking {
   check_in: string;
   check_out: string;
   total_price: number;
+  team_id?: string;
   meta?: any;
   number_of_adults?: number;
   number_of_children?: number;
@@ -250,6 +253,40 @@ export interface InventoryLedger {
   reason?: string;
   created_at: string;
   created_by?: string;
+}
+
+// ─── Locked Booking ──────────────────────────────────────────
+
+export interface BookingEditRequest {
+  id: string;
+  booking_id: number;
+  team_id: string;
+  requested_by: string;
+  field_name: string;
+  current_value: string | null;
+  requested_value: string | null;
+  reason: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewed_by: string | null;
+  created_at: string;
+  reviewed_at: string | null;
+  /** Joined: requester profile */
+  profiles?: { full_name: string } | null;
+  /** Joined: booking */
+  bookings?: { guest_name: string } | null;
+}
+
+export interface BookingExtension {
+  id: string;
+  booking_id: number;
+  team_id: string;
+  added_by: string;
+  days_added: number;
+  amount_added: number;
+  new_check_out: string;
+  created_at: string;
+  /** Joined: adder profile */
+  profiles?: { full_name: string } | null;
 }
 
 export interface PendingItemRequest {

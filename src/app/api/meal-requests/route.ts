@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../_supabase';
+import { createClient } from '@/utils/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,6 +21,16 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(request: NextRequest) {
   try {
+    const supabaseServer = await createClient();
+    const { data: { user } } = await supabaseServer.auth.getUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { data: profile } = await supabaseServer.from('profiles').select('team_id, account_status').eq('id', user.id).single();
+    if (!profile?.team_id) return NextResponse.json({ error: 'User does not belong to a team' }, { status: 403 });
+    if (profile.account_status === 'banned') {
+      return NextResponse.json({ error: 'This account has been deactivated. Contact your administrator.' }, { status: 403 });
+    }
+    const teamId = profile.team_id;
+
     const body = await request.json();
     const { booking_id, meals } = body;
 
@@ -67,6 +78,7 @@ export async function POST(request: NextRequest) {
           dietary_type: m.dietary_type ?? 'Normal',
           status: 'Pending',
           notes: m.notes || null,
+          team_id: teamId,
         };
       });
 

@@ -74,16 +74,6 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
       const isDayVisit = mainCategory === 'pool' || (mainCategory === 'local' && localType === 'day');
       const finalCategory = isRoomStay && isCamper ? 'camper' : mainCategory;
       const price = isFinancial ? parseFloat(amountUZS) || 0 : 0;
-      
-      let teamId = null;
-      if (currentUserId) {
-        try {
-          const { data: profile } = await supabase.from('profiles').select('team_id').eq('id', currentUserId).single();
-          if (profile) teamId = profile.team_id;
-        } catch (e) {
-          console.error('Could not fetch team_id', e);
-        }
-      }
 
       const payload: any = {
         guest_name: guestName.trim(),
@@ -102,7 +92,7 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
         is_manual_dates: true,
         guest_category: finalCategory,
         local_stay_type: mainCategory === 'local' ? localType : null,
-        team_id: teamId,
+        team_id: user?.team_id,
         meta: {
           is_pool_visitor: mainCategory === 'pool',
           is_room_stay: isRoomStay,

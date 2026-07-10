@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { useImpersonation } from '@/lib/impersonation-context';
 import type { UserRole } from '@/lib/supabase';
 
 interface ProtectedRouteProps {
@@ -12,6 +13,7 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
+  const { impersonating } = useImpersonation();
   const [mounted, setMounted] = useState(false);
   const [gracePeriod, setGracePeriod] = useState(true);
   const router = useRouter();
@@ -30,11 +32,19 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     if (!user) {
       console.warn('🛡️ ProtectedRoute: Session check failed after grace period. Redirecting to /login');
       router.push('/login');
-    } else if (!allowedRoles.includes(user.role)) {
-      console.warn(`🛡️ ProtectedRoute: Access Denied. Role ${user.role} unauthorized.`);
-      router.push('/unauthorized');
+    } else if (user.account_status === 'banned') {
+      console.warn('🛡️ ProtectedRoute: Account is banned. Redirecting to /login');
+      router.push('/login');
+    } else {
+      // Check role access - if real role already satisfies, allow regardless of impersonation state
+      // Only use impersonated role when user is intentionally viewing as a different role
+      const effectiveRole = allowedRoles.includes(user.role) ? user.role : (impersonating?.role || user.role);
+      if (!allowedRoles.includes(effectiveRole)) {
+        console.warn(`🛡️ ProtectedRoute: Access Denied. Role ${effectiveRole} unauthorized.`);
+        router.push('/unauthorized');
+      }
     }
-  }, [user, loading, mounted, gracePeriod, router, allowedRoles]);
+  }, [user, loading, mounted, gracePeriod, router, allowedRoles, impersonating]);
 
   // 2. UI: While loading or unmounted or in grace period, show the HUD
   if (!mounted || loading || (gracePeriod && !user)) {
@@ -53,7 +63,13 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     );
   }
 
-  if (!user || !allowedRoles.includes(user.role)) {
+  if (!user) {
+    return null;
+  }
+  // Check role access - if real role already satisfies, allow regardless of impersonation state
+  // Only use impersonated role when user is intentionally viewing as a different role
+  const effectiveRole = allowedRoles.includes(user.role) ? user.role : (impersonating?.role || user.role);
+  if (!allowedRoles.includes(effectiveRole)) {
     return null;
   }
 

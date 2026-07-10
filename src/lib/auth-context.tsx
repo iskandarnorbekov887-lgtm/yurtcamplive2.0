@@ -63,6 +63,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             if (mounted) {
               if (profile) {
+                // Check if account is banned
+                if (profile.account_status === 'banned') {
+                  console.error('Account is banned:', profile.email);
+                  await supabase.auth.signOut();
+                  setUser(null);
+                  setSession(null);
+                  lastUserId.current = null;
+                  setAuthError('This account has been deactivated. Contact your administrator.');
+                  router.push('/login');
+                  return;
+                }
+
                 const userProfile = { ...profile };
                 // Strictly preserve the role from the profiles table — no silent fallback to Manager
                 const rawRole = (userProfile.role || '').toString().trim();
@@ -166,6 +178,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setSession(null);
     lastUserId.current = null;
+    localStorage.removeItem('impersonation_state'); // Clear impersonation on logout
     router.push('/login');
   };
 

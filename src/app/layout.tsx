@@ -4,8 +4,10 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
+import { ImpersonationProvider } from "@/lib/impersonation-context";
 import { LanguageProvider } from "@/lib/language-context";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/react";
 
@@ -38,7 +40,10 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-[#0F1419] relative" suppressHydrationWarning>
         <LanguageProvider>
           <AuthProvider>
-            {children}
+            <ImpersonationProvider>
+              <ImpersonationBanner />
+              {children}
+            </ImpersonationProvider>
           </AuthProvider>
         </LanguageProvider>
         <SpeedInsights />
