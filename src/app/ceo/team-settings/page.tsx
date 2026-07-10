@@ -165,8 +165,9 @@ function TeamSettingsContent() {
 
   // Form fields
   const [calendarId, setCalendarId] = useState('');
-  const [apiKey, setApiKey] = useState('');
-  const [showApiKey, setShowApiKey] = useState(false);
+  const [serviceAccountEmail, setServiceAccountEmail] = useState('');
+  const [privateKey, setPrivateKey] = useState('');
+  const [showPrivateKey, setShowPrivateKey] = useState(false);
 
   // Resolved team_id (falls back to user.id if no team_id column exists)
   const [teamId, setTeamId] = useState<string | null>(null);
@@ -214,7 +215,7 @@ function TeamSettingsContent() {
 
       const { data, error } = await supabase
         .from('team_settings')
-        .select('google_calendar_id, google_api_key, updated_at')
+        .select('google_calendar_id, google_service_account_email, google_private_key, updated_at')
         .eq('team_id', resolved)
         .maybeSingle();
 
@@ -230,7 +231,8 @@ function TeamSettingsContent() {
 
       if (data) {
         setCalendarId((data as any).google_calendar_id ?? '');
-        setApiKey((data as any).google_api_key ?? '');
+        setServiceAccountEmail((data as any).google_service_account_email ?? '');
+        setPrivateKey((data as any).google_private_key ?? '');
         setLastSaved((data as any).updated_at ?? null);
       }
     } finally {
@@ -252,8 +254,8 @@ function TeamSettingsContent() {
       showAlert({ kind: 'warning', title: 'Validation', message: 'Google Calendar ID is required.' });
       return;
     }
-    if (!apiKey.trim()) {
-      showAlert({ kind: 'warning', title: 'Validation', message: 'Google API Key is required.' });
+    if (!serviceAccountEmail.trim() || !privateKey.trim()) {
+      showAlert({ kind: 'warning', title: 'Validation', message: 'Service Account credentials are required.' });
       return;
     }
 
@@ -265,12 +267,15 @@ function TeamSettingsContent() {
         {
           team_id: teamId,
           google_calendar_id: calendarId.trim(),
-          google_api_key: apiKey.trim(),
+          google_service_account_email: serviceAccountEmail.trim(),
+          google_private_key: privateKey.trim(),
         },
         { onConflict: 'team_id' },
       );
 
       if (error) throw error;
+
+      fetch('/api/calendar/invalidate-cache', { method: 'POST' }).catch(() => {});
 
       const now = new Date().toISOString();
       setLastSaved(now);
@@ -310,21 +315,12 @@ function TeamSettingsContent() {
         throw new Error('Your session has expired. Please sign in again.');
       }
 
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      if (!supabaseUrl) throw new Error('Supabase URL is not configured.');
-
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/verify-google-calendar`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          // The function resolves team_id server-side from the JWT — no body needed.
-          body: JSON.stringify({}),
+      const response = await fetch('/api/calendar/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-      );
+      });
 
       const payload = await response.json().catch(() => ({}));
 
@@ -440,14 +436,14 @@ function TeamSettingsContent() {
               </p>
             </div>
 
-            {/* ── Google API Key ─────────────────────────────────────────────── */}
+            {/* ── Service Account Email ─────────────────────────────────────────────── */}
             <div className="space-y-2">
               <label
-                htmlFor="api-key"
+                htmlFor="service-account-email"
                 className="flex items-center gap-2 text-[10px] font-black text-[#9C9384] uppercase tracking-widest"
               >
                 <Key size={11} />
-                Google API Key
+                Service Account Email
                 <span className="text-[#722F37] font-black">*</span>
               </label>
               {fetchLoading ? (
@@ -455,27 +451,53 @@ function TeamSettingsContent() {
               ) : (
                 <div className="relative">
                   <input
-                    id="api-key"
-                    type={showApiKey ? 'text' : 'password'}
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="AIza••••••••••••••••••••••••••••••••••"
+                    id="service-account-email"
+                    type="text"
+                    value={serviceAccountEmail}
+                    onChange={(e) => setServiceAccountEmail(e.target.value)}
+                    placeholder="service-account@project.iam.gserviceaccount.com"
+                    autoComplete="off"
+                    className="w-full px-5 py-[15px] bg-[#0F1419]/70 border-2 border-[#5C4A2E]/30 rounded-[18px] text-sm font-semibold text-[#EDE6D6] placeholder-[#5C4A2E]/50 focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/15 outline-none transition-all duration-200 font-mono tracking-wider"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* ── Private Key ─────────────────────────────────────────────── */}
+            <div className="space-y-2">
+              <label
+                htmlFor="private-key"
+                className="flex items-center gap-2 text-[10px] font-black text-[#9C9384] uppercase tracking-widest"
+              >
+                <Key size={11} />
+                Private Key
+                <span className="text-[#722F37] font-black">*</span>
+              </label>
+              {fetchLoading ? (
+                <SkeletonField />
+              ) : (
+                <div className="relative">
+                  <textarea
+                    id="private-key"
+                    value={privateKey}
+                    onChange={(e) => setPrivateKey(e.target.value)}
+                    placeholder={"-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----"}
                     autoComplete="new-password"
-                    className="w-full pl-5 pr-14 py-[15px] bg-[#0F1419]/70 border-2 border-[#5C4A2E]/30 rounded-[18px] text-sm font-semibold text-[#EDE6D6] placeholder-[#5C4A2E]/50 focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/15 outline-none transition-all duration-200 font-mono tracking-wider"
+                    className={`w-full ${showPrivateKey ? 'h-48' : 'h-14 truncate'} pl-5 pr-14 py-[15px] bg-[#0F1419]/70 border-2 border-[#5C4A2E]/30 rounded-[18px] text-sm font-semibold text-[#EDE6D6] placeholder-[#5C4A2E]/50 focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/15 outline-none transition-all duration-200 font-mono tracking-wider resize-none`}
                   />
                   {/* Reveal/hide toggle */}
                   <button
                     type="button"
-                    onClick={() => setShowApiKey((v) => !v)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[#5C4A2E] hover:text-[#9C9384] transition-colors"
-                    aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
+                    onClick={() => setShowPrivateKey((v) => !v)}
+                    className="absolute right-4 top-[15px] text-[#5C4A2E] hover:text-[#9C9384] transition-colors"
+                    aria-label={showPrivateKey ? 'Hide Private Key' : 'Show Private Key'}
                   >
-                    {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                    {showPrivateKey ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
               )}
               <p className="text-[10px] text-[#5C4A2E] font-medium px-1">
-                Generate this in Google Cloud Console → APIs &amp; Services → Credentials.
+                Generate this in Google Cloud Console → IAM &amp; Admin → Service Accounts → Keys (JSON format).
               </p>
             </div>
 
@@ -519,7 +541,7 @@ function TeamSettingsContent() {
                 id="test-connection-btn"
                 type="button"
                 onClick={handleTestConnection}
-                disabled={fetchLoading || saving || connectionStatus === 'testing' || !calendarId.trim() || !apiKey.trim()}
+                disabled={fetchLoading || saving || connectionStatus === 'testing' || !calendarId.trim() || !serviceAccountEmail.trim() || !privateKey.trim()}
                 className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-[#C9A227]/15 border-2 border-[#C9A227]/30 text-[#C9A227] text-xs font-black uppercase tracking-[0.15em] hover:bg-[#C9A227]/25 active:scale-[0.98] transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {connectionStatus === 'testing' ? (
@@ -556,9 +578,9 @@ function TeamSettingsContent() {
             {[
               { step: '1', text: 'Go to console.cloud.google.com and create a project (or select an existing one).' },
               { step: '2', text: 'Enable the Google Calendar API for that project.' },
-              { step: '3', text: 'Create an API Key under APIs & Services → Credentials. Restrict it to the Calendar API for security.' },
-              { step: '4', text: 'In Google Calendar, open your calendar\'s Settings, scroll to "Integrate calendar", and copy the Calendar ID.' },
-              { step: '5', text: 'Paste both values above and click Save. Then use Test Connection to verify.' },
+              { step: '3', text: 'Create a Service Account under IAM & Admin → Service Accounts, and download a JSON key.' },
+              { step: '4', text: 'In Google Calendar, open your calendar\'s Settings, scroll to "Share with specific people or groups", and add the Service Account email with "Make changes to events" permissions. Also copy the Calendar ID.' },
+              { step: '5', text: 'Paste the Calendar ID, Service Account Email, and Private Key (from the JSON file) above and click Save. Then use Test Connection to verify.' },
             ].map(({ step, text }) => (
               <li key={step} className="flex gap-3 items-start">
                 <span className="w-6 h-6 rounded-full bg-[#0B6E4F]/20 border border-[#0B6E4F]/30 text-[#0B6E4F] text-[10px] font-black flex items-center justify-center flex-shrink-0 mt-0.5">

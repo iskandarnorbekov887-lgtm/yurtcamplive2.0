@@ -686,8 +686,8 @@ export function BookingModal(props: BookingModalProps) {
                               // Sync straight to Google Calendar
                               if (sel.google_event_id) {
                                 try {
-                                  await fetch('/api/calendar/update-event', {
-                                    method: 'POST',
+                                  await fetch('/api/calendar/events', {
+                                    method: 'PATCH',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({
                                       eventId: sel.google_event_id,

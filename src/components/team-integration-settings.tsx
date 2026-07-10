@@ -11,7 +11,8 @@ interface TeamSettings {
   id?: string;
   team_id: string;
   google_calendar_id: string;
-  google_api_key: string;
+  google_service_account_email: string;
+  google_private_key: string;
   updated_at?: string;
 }
 
@@ -71,7 +72,8 @@ export function TeamIntegrationSettings() {
 
   // Form state
   const [calendarId, setCalendarId] = useState('');
-  const [apiKey, setApiKey] = useState('');
+  const [serviceAccountEmail, setServiceAccountEmail] = useState('');
+  const [privateKey, setPrivateKey] = useState('');
   const [teamId, setTeamId] = useState<string | null>(null);
 
   // UI state
@@ -125,7 +127,8 @@ export function TeamIntegrationSettings() {
 
       if (data) {
         setCalendarId((data as TeamSettings).google_calendar_id ?? '');
-        setApiKey((data as TeamSettings).google_api_key ?? '');
+        setServiceAccountEmail((data as TeamSettings).google_service_account_email ?? '');
+        setPrivateKey((data as TeamSettings).google_private_key ?? '');
         setLastSaved((data as TeamSettings).updated_at ?? null);
       }
     } finally {
@@ -153,7 +156,8 @@ export function TeamIntegrationSettings() {
       const payload: TeamSettings = {
         team_id: teamId,
         google_calendar_id: calendarId.trim(),
-        google_api_key: apiKey.trim(),
+        google_service_account_email: serviceAccountEmail.trim(),
+        google_private_key: privateKey.trim(),
       };
 
       const { error } = await supabase
@@ -161,6 +165,8 @@ export function TeamIntegrationSettings() {
         .upsert(payload, { onConflict: 'team_id' });
 
       if (error) throw error;
+
+      fetch('/api/calendar/invalidate-cache', { method: 'POST' }).catch(() => {});
 
       const now = new Date().toISOString();
       setLastSaved(now);
@@ -239,26 +245,49 @@ export function TeamIntegrationSettings() {
             )}
           </div>
 
-          {/* Google API Key */}
+          {/* Google Service Account Email */}
           <div className="space-y-2">
             <label
-              htmlFor="google-api-key"
+              htmlFor="service-account-email"
               className="flex items-center gap-2 text-[10px] font-black text-[#9C9384] uppercase tracking-widest"
             >
               <Key size={11} />
-              Google API Key
+              Service Account Email
             </label>
             {fetchLoading ? (
               <FieldSkeleton />
             ) : (
               <input
-                id="google-api-key"
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="AIza••••••••••••••••••••••••••••"
-                autoComplete="new-password"
+                id="service-account-email"
+                type="text"
+                value={serviceAccountEmail}
+                onChange={(e) => setServiceAccountEmail(e.target.value)}
+                placeholder="service-account@project.iam.gserviceaccount.com"
+                autoComplete="off"
                 className="w-full px-5 py-[14px] bg-[#0F1419]/60 border-2 border-[#5C4A2E]/30 rounded-[18px] text-sm font-semibold text-[#EDE6D6] placeholder-[#5C4A2E]/60 focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/15 outline-none transition-all duration-200 font-mono tracking-wider"
+              />
+            )}
+          </div>
+
+          {/* Google Private Key */}
+          <div className="space-y-2">
+            <label
+              htmlFor="private-key"
+              className="flex items-center gap-2 text-[10px] font-black text-[#9C9384] uppercase tracking-widest"
+            >
+              <Key size={11} />
+              Private Key
+            </label>
+            {fetchLoading ? (
+              <FieldSkeleton />
+            ) : (
+              <textarea
+                id="private-key"
+                value={privateKey}
+                onChange={(e) => setPrivateKey(e.target.value)}
+                placeholder={"-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----"}
+                autoComplete="new-password"
+                className="w-full h-32 px-5 py-[14px] bg-[#0F1419]/60 border-2 border-[#5C4A2E]/30 rounded-[18px] text-sm font-semibold text-[#EDE6D6] placeholder-[#5C4A2E]/60 focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/15 outline-none transition-all duration-200 font-mono tracking-wider resize-none"
               />
             )}
           </div>

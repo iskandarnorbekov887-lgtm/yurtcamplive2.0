@@ -1,25 +1,44 @@
 import { auth, calendar } from '@googleapis/calendar';
+import { supabase as supabaseAdmin } from '@/app/api/_supabase';
 
-// Defer initialization to avoid top-level crashes if env vars are missing
-let calendarClient: any = null;
+// Cache client instances by teamId to avoid re-initializing GoogleAuth repeatedly
+const clientCache = new Map<string, { calClient: any; calendarId: string }>();
 
-function getCalendarClient() {
-  if (calendarClient) return calendarClient;
+export function invalidateCalendarCache(teamId: string) {
+  clientCache.delete(teamId);
+}
 
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  let key = process.env.GOOGLE_PRIVATE_KEY;
+export function invalidateAllCalendarCache() {
+  clientCache.clear();
+}
+
+async function getCalendarClient(teamId: string) {
+  if (clientCache.has(teamId)) return clientCache.get(teamId)!;
+
+  // 1. Query team_settings securely via the service role client
+  const { data: settings, error } = await supabaseAdmin
+    .from('team_settings')
+    .select('google_service_account_email, google_private_key, google_calendar_id')
+    .eq('team_id', teamId)
+    .single();
+
+  if (error || !settings) {
+    throw new Error('Google Calendar not configured for this team');
+  }
+
+  const email = settings.google_service_account_email;
+  let key = settings.google_private_key;
+  const calendarId = settings.google_calendar_id;
 
   if (key) {
     key = key.replace(/\\n/g, '\n');
-    // Handle double quotes if they were included in the env value
     if (key.startsWith('"') && key.endsWith('"')) {
       key = key.slice(1, -1).replace(/\\n/g, '\n');
     }
   }
 
-  if (!email || !key) {
-    console.warn('Google Calendar credentials missing.');
-    throw new Error('Google Calendar credentials missing in environment.');
+  if (!email || !key || !calendarId) {
+    throw new Error('Google Calendar not configured for this team');
   }
 
   const authClient = new auth.GoogleAuth({
@@ -30,16 +49,17 @@ function getCalendarClient() {
     scopes: ['https://www.googleapis.com/auth/calendar'],
   });
 
-  calendarClient = calendar({ version: 'v3', auth: authClient });
-  return calendarClient;
+  const calClient = calendar({ version: 'v3', auth: authClient });
+  const result = { calClient, calendarId };
+  
+  clientCache.set(teamId, result);
+  return result;
 }
 
-export async function listEvents(timeMin?: string, timeMax?: string) {
-  const calendarId = process.env.GOOGLE_CALENDAR_ID;
-  if (!calendarId) throw new Error('GOOGLE_CALENDAR_ID is missing');
+export async function listEvents(teamId: string, timeMin?: string, timeMax?: string) {
+  const { calClient, calendarId } = await getCalendarClient(teamId);
 
-  const calendar = getCalendarClient();
-  const res = await calendar.events.list({
+  const res = await calClient.events.list({
     calendarId,
     timeMin: timeMin || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString(),
     timeMax: timeMax || new Date(new Date().getFullYear(), new Date().getMonth() + 2, 0).toISOString(),
@@ -49,30 +69,27 @@ export async function listEvents(timeMin?: string, timeMax?: string) {
   return res.data.items || [];
 }
 
-export async function updateEvent(eventId: string, updates: { start: string; end: string; summary?: string; description?: string }) {
-  const calendarId = process.env.GOOGLE_CALENDAR_ID;
-  if (!calendarId) throw new Error('GOOGLE_CALENDAR_ID is missing');
+export async function updateEvent(teamId: string, eventId: string, updates: { start?: string; end?: string; summary?: string; description?: string }) {
+  const { calClient, calendarId } = await getCalendarClient(teamId);
 
-  const calendar = getCalendarClient();
-  const res = await calendar.events.patch({
+  const requestBody: any = {};
+  if (updates.summary !== undefined) requestBody.summary = updates.summary;
+  if (updates.description !== undefined) requestBody.description = updates.description;
+  if (updates.start !== undefined) requestBody.start = { date: updates.start, dateTime: null };
+  if (updates.end !== undefined) requestBody.end = { date: updates.end, dateTime: null };
+
+  const res = await calClient.events.patch({
     calendarId,
     eventId,
-    requestBody: {
-      summary: updates.summary,
-      description: updates.description,
-      start: { date: updates.start, dateTime: null },
-      end: { date: updates.end, dateTime: null },
-    },
+    requestBody,
   });
   return res.data;
 }
 
-export async function createEvent(event: { start: string; end: string; summary: string; description?: string }) {
-  const calendarId = process.env.GOOGLE_CALENDAR_ID;
-  if (!calendarId) throw new Error('GOOGLE_CALENDAR_ID is missing');
+export async function createEvent(teamId: string, event: { start: string; end: string; summary: string; description?: string }) {
+  const { calClient, calendarId } = await getCalendarClient(teamId);
 
-  const calendar = getCalendarClient();
-  const res = await calendar.events.insert({
+  const res = await calClient.events.insert({
     calendarId,
     requestBody: {
       summary: event.summary,
@@ -81,5 +98,11 @@ export async function createEvent(event: { start: string; end: string; summary: 
       end: { date: event.end, dateTime: null },
     },
   });
+  return res.data;
+}
+
+export async function verifyConnection(teamId: string) {
+  const { calClient, calendarId } = await getCalendarClient(teamId);
+  const res = await calClient.calendars.get({ calendarId });
   return res.data;
 }
