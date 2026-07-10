@@ -31,6 +31,7 @@ export interface Booking {
   meta?: any;
   number_of_adults?: number;
   number_of_children?: number;
+  guest_count?: number;
   payment_status: string;
   source: string;
   status: string;
@@ -73,6 +74,7 @@ export interface Booking {
   meal_requests?: MealRequest[];
   /** Joined booking_services from the normalized table (not a DB column) */
   booking_services?: any[];
+  drinks_tab?: any;
 }
 
 export interface Tab {

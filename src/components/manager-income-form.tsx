@@ -27,7 +27,8 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
 
   // Fields
   const [guestName, setGuestName] = useState('');
-  const [guestCount, setGuestCount] = useState(1);
+  const [numAdults, setNumAdults] = useState(1);
+  const [numChildren, setNumChildren] = useState(0);
   const [checkIn, setCheckIn] = useState(selectedDate || new Date().toISOString().split('T')[0]);
   const [checkOut, setCheckOut] = useState('');
   const [amountUZS, setAmountUZS] = useState('');
@@ -41,7 +42,8 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
   // Switch-Reset Rule: Reset form when category changes
   const handleCategoryChange = (newCat: MainCategory) => {
     setGuestName('');
-    setGuestCount(1);
+    setNumAdults(1);
+    setNumChildren(0);
     setAmountUZS('');
     setCheckOut('');
     setIsCamper(false); // Reset camper toggle
@@ -87,7 +89,8 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
         guest_name: guestName.trim(),
         check_in: checkIn,
         check_out: checkOut || checkIn,
-        number_of_adults: guestCount,
+        number_of_adults: numAdults,
+        number_of_children: numChildren,
         status: isFinancial ? 'completed' : 'checked_in', // Local (Day/Night) and Pool are instant-completed
         source: 'manual',
         total_price: price, // Unified Financial Fix
@@ -153,7 +156,8 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
     setMainCategory('international');
     setIsCamper(false);
     setGuestName('');
-    setGuestCount(1);
+    setNumAdults(1);
+    setNumChildren(0);
     setAmountUZS('');
     setCheckIn(selectedDate || new Date().toISOString().split('T')[0]);
     setCheckOut('');
@@ -226,10 +230,15 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest ml-1">Guest Count</label>
-                <div className="relative">
-                  <input type="number" min="1" value={guestCount} onChange={e => setGuestCount(parseInt(e.target.value) || 1)}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest ml-1">Adults</label>
+                  <input type="number" min="1" value={numAdults} onChange={e => setNumAdults(parseInt(e.target.value) || 1)}
+                    className="w-full px-5 py-4 bg-[#1C232E]/50 border-2 border-[#5C4A2E]/30 rounded-[20px] text-base font-bold text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest ml-1">Children (under 12)</label>
+                  <input type="number" min="0" value={numChildren} onChange={e => setNumChildren(parseInt(e.target.value) || 0)}
                     className="w-full px-5 py-4 bg-[#1C232E]/50 border-2 border-[#5C4A2E]/30 rounded-[20px] text-base font-bold text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all" />
                 </div>
               </div>

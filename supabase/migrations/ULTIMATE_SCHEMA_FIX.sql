@@ -132,9 +132,9 @@ DROP POLICY IF EXISTS "drinks_all" ON drinks;
 DROP POLICY IF EXISTS "inventory_items_all" ON inventory_items;
 DROP POLICY IF EXISTS "inventory_ledger_all" ON inventory_ledger;
 
-CREATE POLICY "drinks_all" ON drinks FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "inventory_items_all" ON inventory_items FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "inventory_ledger_all" ON inventory_ledger FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+-- CREATE POLICY "drinks_all" ON drinks FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+-- CREATE POLICY "inventory_items_all" ON inventory_items FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+-- CREATE POLICY "inventory_ledger_all" ON inventory_ledger FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;

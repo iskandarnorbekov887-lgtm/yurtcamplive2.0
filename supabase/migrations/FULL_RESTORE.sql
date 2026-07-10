@@ -20,7 +20,7 @@ WHERE NOT EXISTS (SELECT 1 FROM yurts LIMIT 1);
 
 ALTER TABLE yurts ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "yurts_all" ON yurts;
-CREATE POLICY "yurts_all" ON yurts FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+-- CREATE POLICY "yurts_all" ON yurts FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 -- ============================================================
 -- 2. BOOKINGS
@@ -87,7 +87,7 @@ CREATE INDEX IF NOT EXISTS idx_bookings_meta ON bookings USING GIN(meta);
 
 ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "bookings_all" ON bookings;
-CREATE POLICY "bookings_all" ON bookings FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+-- CREATE POLICY "bookings_all" ON bookings FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 DROP TRIGGER IF EXISTS trg_bookings_updated_at ON bookings;
 CREATE TRIGGER trg_bookings_updated_at
@@ -115,7 +115,7 @@ CREATE INDEX IF NOT EXISTS idx_booking_services_type ON booking_services(service
 
 ALTER TABLE booking_services ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "booking_services_all" ON booking_services;
-CREATE POLICY "booking_services_all" ON booking_services FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+-- CREATE POLICY "booking_services_all" ON booking_services FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 -- ============================================================
 -- 4. PAYMENTS
@@ -137,7 +137,7 @@ CREATE INDEX IF NOT EXISTS idx_payments_booking_id ON payments(booking_id);
 
 ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "payments_all" ON payments;
-CREATE POLICY "payments_all" ON payments FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+-- CREATE POLICY "payments_all" ON payments FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 -- ============================================================
 -- 5. BOOKING RECEIPTS
@@ -155,7 +155,7 @@ CREATE INDEX IF NOT EXISTS idx_booking_receipts_booking_id ON booking_receipts(b
 
 ALTER TABLE booking_receipts ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "booking_receipts_all" ON booking_receipts;
-CREATE POLICY "booking_receipts_all" ON booking_receipts FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+-- CREATE POLICY "booking_receipts_all" ON booking_receipts FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 -- ============================================================
 -- 6. CAMP FINANCES
@@ -183,7 +183,7 @@ CREATE INDEX IF NOT EXISTS idx_camp_finances_created_by ON camp_finances(created
 
 ALTER TABLE camp_finances ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "camp_finances_all" ON camp_finances;
-CREATE POLICY "camp_finances_all" ON camp_finances FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+-- CREATE POLICY "camp_finances_all" ON camp_finances FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 DROP TRIGGER IF EXISTS trg_camp_finances_updated_at ON camp_finances;
 CREATE TRIGGER trg_camp_finances_updated_at
@@ -211,7 +211,7 @@ CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
 
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "notifications_all" ON notifications;
-CREATE POLICY "notifications_all" ON notifications FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+-- CREATE POLICY "notifications_all" ON notifications FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 DROP TRIGGER IF EXISTS trg_notifications_updated_at ON notifications;
 CREATE TRIGGER trg_notifications_updated_at
@@ -249,7 +249,7 @@ WHERE NOT EXISTS (SELECT 1 FROM service_pricing WHERE id = 1);
 
 ALTER TABLE service_pricing ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "service_pricing_all" ON service_pricing;
-CREATE POLICY "service_pricing_all" ON service_pricing FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+-- CREATE POLICY "service_pricing_all" ON service_pricing FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 DROP TRIGGER IF EXISTS trg_service_pricing_updated_at ON service_pricing;
 CREATE TRIGGER trg_service_pricing_updated_at
@@ -271,7 +271,7 @@ CREATE TABLE IF NOT EXISTS deleted_records (
 
 ALTER TABLE deleted_records ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "deleted_records_all" ON deleted_records;
-CREATE POLICY "deleted_records_all" ON deleted_records FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+-- CREATE POLICY "deleted_records_all" ON deleted_records FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 -- ============================================================
 -- 10. GROCERY REQUESTS
@@ -287,7 +287,7 @@ CREATE TABLE IF NOT EXISTS grocery_requests (
 
 ALTER TABLE grocery_requests ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "grocery_requests_all" ON grocery_requests;
-CREATE POLICY "grocery_requests_all" ON grocery_requests FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+-- CREATE POLICY "grocery_requests_all" ON grocery_requests FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 DROP TRIGGER IF EXISTS trg_grocery_requests_updated_at ON grocery_requests;
 CREATE TRIGGER trg_grocery_requests_updated_at
@@ -318,7 +318,7 @@ CREATE INDEX IF NOT EXISTS idx_meal_requests_status ON meal_requests(status);
 
 ALTER TABLE meal_requests ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "meal_requests_all" ON meal_requests;
-CREATE POLICY "meal_requests_all" ON meal_requests FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+-- CREATE POLICY "meal_requests_all" ON meal_requests FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 DROP TRIGGER IF EXISTS trg_meal_requests_updated_at ON meal_requests;
 CREATE TRIGGER trg_meal_requests_updated_at
@@ -387,10 +387,10 @@ DROP POLICY IF EXISTS "procurement_requests_all" ON procurement_requests;
 DROP POLICY IF EXISTS "procurement_items_all" ON procurement_items;
 DROP POLICY IF EXISTS "usage_logs_all" ON usage_logs;
 
-CREATE POLICY "inventory_all" ON inventory FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "procurement_requests_all" ON procurement_requests FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "procurement_items_all" ON procurement_items FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "usage_logs_all" ON usage_logs FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+-- CREATE POLICY "inventory_all" ON inventory FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+-- CREATE POLICY "procurement_requests_all" ON procurement_requests FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+-- CREATE POLICY "procurement_items_all" ON procurement_items FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+-- CREATE POLICY "usage_logs_all" ON usage_logs FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 -- ============================================================
 -- 13. GRANTS — Allow PostgREST (anon + authenticated) to access everything

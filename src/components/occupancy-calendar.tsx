@@ -530,7 +530,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                     now.getHours() >= 12;
 
                   // Check if this is a manager-created booking
-                    return ev.booking.meta || {};
+                  const currentMeta = ev.booking.meta || {};
                   const isManagerBooking = currentMeta.is_system_only;
                   const displayId = getDisplayId(ev.booking);
 

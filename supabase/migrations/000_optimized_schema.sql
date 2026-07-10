@@ -32,10 +32,10 @@ CREATE INDEX IF NOT EXISTS idx_profiles_email ON profiles(email);
 CREATE INDEX IF NOT EXISTS idx_profiles_role ON profiles(role);
 
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "profiles_select" ON profiles FOR SELECT USING (true);
+-- CREATE POLICY "profiles_select" ON profiles FOR SELECT USING (true);
 CREATE POLICY "profiles_insert" ON profiles FOR INSERT WITH CHECK (true);
-CREATE POLICY "profiles_update" ON profiles FOR UPDATE USING (true);
-CREATE POLICY "profiles_delete" ON profiles FOR DELETE USING (true);
+-- CREATE POLICY "profiles_update" ON profiles FOR UPDATE USING (true);
+-- CREATE POLICY "profiles_delete" ON profiles FOR DELETE USING (true);
 
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
@@ -133,7 +133,7 @@ CREATE INDEX IF NOT EXISTS idx_bookings_created_by ON bookings(created_by);
 CREATE INDEX IF NOT EXISTS idx_bookings_meta ON bookings USING GIN(meta);
 
 ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "bookings_all" ON bookings FOR ALL USING (true) WITH CHECK (true);
+-- CREATE POLICY "bookings_all" ON bookings FOR ALL USING (true) WITH CHECK (true);
 
 -- Auto-update updated_at
 CREATE OR REPLACE FUNCTION update_updated_at()
@@ -179,7 +179,7 @@ CREATE INDEX IF NOT EXISTS idx_booking_services_booking_id ON booking_services(b
 CREATE INDEX IF NOT EXISTS idx_booking_services_type ON booking_services(service_type);
 
 ALTER TABLE booking_services ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "booking_services_all" ON booking_services FOR ALL USING (true) WITH CHECK (true);
+-- CREATE POLICY "booking_services_all" ON booking_services FOR ALL USING (true) WITH CHECK (true);
 
 -- ============================================================
 -- 5. PAYMENTS (Individual payment records per booking)
@@ -200,7 +200,7 @@ CREATE TABLE IF NOT EXISTS payments (
 CREATE INDEX IF NOT EXISTS idx_payments_booking_id ON payments(booking_id);
 
 ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "payments_all" ON payments FOR ALL USING (true) WITH CHECK (true);
+-- CREATE POLICY "payments_all" ON payments FOR ALL USING (true) WITH CHECK (true);
 
 -- ============================================================
 -- 6. BOOKING RECEIPTS (Receipt snapshots)
@@ -217,7 +217,7 @@ CREATE TABLE IF NOT EXISTS booking_receipts (
 CREATE INDEX IF NOT EXISTS idx_booking_receipts_booking_id ON booking_receipts(booking_id);
 
 ALTER TABLE booking_receipts ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "booking_receipts_all" ON booking_receipts FOR ALL USING (true) WITH CHECK (true);
+-- CREATE POLICY "booking_receipts_all" ON booking_receipts FOR ALL USING (true) WITH CHECK (true);
 
 -- ============================================================
 -- 7. CAMP FINANCES (Income/Expense ledger)
@@ -247,7 +247,7 @@ CREATE INDEX IF NOT EXISTS idx_camp_finances_category ON camp_finances(category)
 CREATE INDEX IF NOT EXISTS idx_camp_finances_created_by ON camp_finances(created_by);
 
 ALTER TABLE camp_finances ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "camp_finances_all" ON camp_finances FOR ALL USING (true) WITH CHECK (true);
+-- CREATE POLICY "camp_finances_all" ON camp_finances FOR ALL USING (true) WITH CHECK (true);
 
 DROP TRIGGER IF EXISTS trg_camp_finances_updated_at ON camp_finances;
 CREATE TRIGGER trg_camp_finances_updated_at
@@ -276,7 +276,7 @@ CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
 CREATE INDEX IF NOT EXISTS idx_notifications_status ON notifications(status);
 
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "notifications_all" ON notifications FOR ALL USING (true) WITH CHECK (true);
+-- CREATE POLICY "notifications_all" ON notifications FOR ALL USING (true) WITH CHECK (true);
 
 DROP TRIGGER IF EXISTS trg_notifications_updated_at ON notifications;
 CREATE TRIGGER trg_notifications_updated_at
@@ -303,7 +303,7 @@ SELECT 1, 0, 0, 0, 0, 0, 0, FALSE
 WHERE NOT EXISTS (SELECT 1 FROM service_pricing WHERE id = 1);
 
 ALTER TABLE service_pricing ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "service_pricing_all" ON service_pricing FOR ALL USING (true) WITH CHECK (true);
+-- CREATE POLICY "service_pricing_all" ON service_pricing FOR ALL USING (true) WITH CHECK (true);
 
 DROP TRIGGER IF EXISTS trg_service_pricing_updated_at ON service_pricing;
 CREATE TRIGGER trg_service_pricing_updated_at
@@ -329,7 +329,7 @@ CREATE INDEX IF NOT EXISTS idx_deleted_records_original_id ON deleted_records(or
 CREATE INDEX IF NOT EXISTS idx_deleted_records_deleted_at ON deleted_records(deleted_at);
 
 ALTER TABLE deleted_records ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "deleted_records_all" ON deleted_records FOR ALL USING (true) WITH CHECK (true);
+-- CREATE POLICY "deleted_records_all" ON deleted_records FOR ALL USING (true) WITH CHECK (true);
 
 -- ============================================================
 -- 11. GROCERY REQUESTS (Kitchen supply requests)
@@ -346,7 +346,7 @@ CREATE TABLE IF NOT EXISTS grocery_requests (
 CREATE INDEX IF NOT EXISTS idx_grocery_requests_status ON grocery_requests(status);
 
 ALTER TABLE grocery_requests ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "grocery_requests_all" ON grocery_requests FOR ALL USING (true) WITH CHECK (true);
+-- CREATE POLICY "grocery_requests_all" ON grocery_requests FOR ALL USING (true) WITH CHECK (true);
 
 DROP TRIGGER IF EXISTS trg_grocery_requests_updated_at ON grocery_requests;
 CREATE TRIGGER trg_grocery_requests_updated_at

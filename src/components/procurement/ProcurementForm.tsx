@@ -84,7 +84,7 @@ export default function ProcurementForm({ onSubmit, isLoading = false }: Procure
       try {
         const { data, error: searchErr } = await supabase
           .from('inventory_items')
-          .select('id, item_name, current_stock, use_unit, buy_unit')
+          .select('id, item_name, current_stock, use_unit, buy_unit, conversion_factor, min_threshold, created_at')
           .ilike('item_name', `%${debouncedQuery.trim()}%`)
           .order('item_name')
           .limit(8);

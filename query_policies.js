@@ -1,0 +1,20 @@
+const { Client } = require('pg');
+
+const client = new Client({
+  connectionString: 'postgres://postgres.blcgjsnorpxsvaxohzxl:srWtnTWjcwutmIS6@aws-1-eu-central-1.pooler.supabase.com:5432/postgres',
+  ssl: { rejectUnauthorized: false }
+});
+
+async function run() {
+  try {
+    await client.connect();
+    const res = await client.query("SELECT schemaname, tablename, policyname, roles, cmd, qual, with_check FROM pg_policies WHERE schemaname = 'public' AND qual = 'true';");
+    console.log(JSON.stringify(res.rows, null, 2));
+  } catch (err) {
+    console.error(err);
+  } finally {
+    await client.end();
+  }
+}
+
+run();

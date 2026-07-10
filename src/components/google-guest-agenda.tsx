@@ -873,13 +873,13 @@ export function GoogleGuestAgenda({
       }
 
       const updates = {
-        collected_amount: Math.max(0, newCollectedAmount),
+        collected_amount: Math.max(0, totalPaidUsd),
         number_of_adults: svcAdults,
         number_of_children: svcChildren,
-        total_price: hasSettled ? ((sel.total_price || 0) + finalAdjustment) : (svcAmount + finalAdjustment),
-        payment_status: isCurrentlyPrepaid ? 'Prepaid' : 'Paid',
+        total_price: hasSettled ? ((sel.total_price || 0) + svcDateAdjustment) : (svcAmount + svcDateAdjustment),
+        payment_status: isPrepaid ? 'Prepaid' : 'Paid',
         payment_method: svcPayList.length > 0 ? svcPayList[svcPayList.length - 1].method : 'Cash',
-        is_prepaid: isCurrentlyPrepaid
+        is_prepaid: isPrepaid
       };
       
       if (onUpdateBooking) {

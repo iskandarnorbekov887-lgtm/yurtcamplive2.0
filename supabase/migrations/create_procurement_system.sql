@@ -31,7 +31,7 @@ CREATE INDEX IF NOT EXISTS idx_inventory_products_name_lower ON inventory_produc
 CREATE INDEX IF NOT EXISTS idx_inventory_products_category ON inventory_products(category);
 
 ALTER TABLE inventory_products ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "inventory_products_all" ON inventory_products FOR ALL USING (true) WITH CHECK (true);
+-- CREATE POLICY "inventory_products_all" ON inventory_products FOR ALL USING (true) WITH CHECK (true);
 
 DROP TRIGGER IF EXISTS trg_inventory_products_updated_at ON inventory_products;
 CREATE TRIGGER trg_inventory_products_updated_at
@@ -56,7 +56,7 @@ CREATE INDEX IF NOT EXISTS idx_procurement_lists_status ON procurement_lists(sta
 CREATE INDEX IF NOT EXISTS idx_procurement_lists_created_by ON procurement_lists(created_by);
 
 ALTER TABLE procurement_lists ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "procurement_lists_all" ON procurement_lists FOR ALL USING (true) WITH CHECK (true);
+-- CREATE POLICY "procurement_lists_all" ON procurement_lists FOR ALL USING (true) WITH CHECK (true);
 
 DROP TRIGGER IF EXISTS trg_procurement_lists_updated_at ON procurement_lists;
 CREATE TRIGGER trg_procurement_lists_updated_at
@@ -84,7 +84,7 @@ CREATE INDEX IF NOT EXISTS idx_procurement_items_procurement_id ON procurement_i
 CREATE INDEX IF NOT EXISTS idx_procurement_items_product_id ON procurement_items(product_id);
 
 ALTER TABLE procurement_items ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "procurement_items_all" ON procurement_items FOR ALL USING (true) WITH CHECK (true);
+-- CREATE POLICY "procurement_items_all" ON procurement_items FOR ALL USING (true) WITH CHECK (true);
 
 DROP TRIGGER IF EXISTS trg_procurement_items_updated_at ON procurement_items;
 CREATE TRIGGER trg_procurement_items_updated_at
@@ -112,7 +112,7 @@ CREATE INDEX IF NOT EXISTS idx_inventory_logs_change_type ON inventory_logs(chan
 CREATE INDEX IF NOT EXISTS idx_inventory_logs_created_at ON inventory_logs(created_at);
 
 ALTER TABLE inventory_logs ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "inventory_logs_all" ON inventory_logs FOR ALL USING (true) WITH CHECK (true);
+-- CREATE POLICY "inventory_logs_all" ON inventory_logs FOR ALL USING (true) WITH CHECK (true);
 
 -- ============================================================
 -- 5. Enable Realtime for all new tables
