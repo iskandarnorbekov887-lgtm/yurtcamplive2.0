@@ -32,6 +32,7 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
   const [checkIn, setCheckIn] = useState(selectedDate || new Date().toISOString().split('T')[0]);
   const [checkOut, setCheckOut] = useState('');
   const [amountUZS, setAmountUZS] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'online'>('cash');
 
   useEffect(() => {
     if (selectedDate) {
@@ -47,6 +48,7 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
     setAmountUZS('');
     setCheckOut('');
     setIsCamper(false); // Reset camper toggle
+    setPaymentMethod('cash');
     setMainCategory(newCat);
   };
 
@@ -65,11 +67,20 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!guestName.trim()) { setMessage('Error: Guest Name is required'); return; }
+    
+    const isFinancial = mainCategory === 'local' || mainCategory === 'pool';
+    if (isFinancial) {
+      const parsedAmount = parseFloat(amountUZS);
+      if (!amountUZS.trim() || isNaN(parsedAmount) || parsedAmount <= 0) {
+        setMessage('Error: Payment Amount is required for Local/Pool bookings');
+        return;
+      }
+    }
+    
     setSubmitting(true);
     setMessage('');
 
     try {
-      const isFinancial = mainCategory === 'local' || mainCategory === 'pool';
       const isRoomStay = mainCategory === 'international';
       const isDayVisit = mainCategory === 'pool' || (mainCategory === 'local' && localType === 'day');
       const finalCategory = isRoomStay && isCamper ? 'camper' : mainCategory;
@@ -103,7 +114,10 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
       if (isFinancial) {
         payload.collected_amount = price;
         payload.collected_currency = 'UZS';
+        payload.payment_method = paymentMethod;
       }
+
+      console.log('Submitting payload:', JSON.stringify(payload, null, 2));
 
       const { data: bookingData, error } = await supabase.from('bookings').insert([payload]).select().single();
       if (error) throw error;
@@ -119,10 +133,27 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
             total_usd: price / 12500, // Safe generic fallback for USD equivalent
             settled_at: checkIn,
             created_by: currentUserId,
-            snapshot: { note: mainCategory === 'pool' ? 'Instant Pool Payment' : `Local ${localType} payment` }
+            snapshot: { 
+              note: mainCategory === 'pool' ? 'Instant Pool Payment' : `Local ${localType} payment`,
+              payment_method: paymentMethod
+            }
           }]);
-        } catch (e) {
-          console.error('Failed to create booking receipt:', e);
+          
+          await supabase.from('payments').insert({
+            booking_id: bookingData.id,
+            amount_original: price,
+            currency_original: 'UZS',
+            method: paymentMethod === 'cash' ? 'Cash' : 'Online',
+            exchange_rate_used: 12500,
+            amount_usd_equivalent: price / 12500,
+            note: `Manager registration - ${mainCategory}`,
+          });
+        } catch (e: any) {
+          console.error('Failed to create booking receipt:');
+          console.error('message:', e?.message);
+          console.error('details:', e?.details);
+          console.error('hint:', e?.hint);
+          console.error('code:', e?.code);
         }
       }
 
@@ -151,6 +182,7 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
     setAmountUZS('');
     setCheckIn(selectedDate || new Date().toISOString().split('T')[0]);
     setCheckOut('');
+    setPaymentMethod('cash');
   };
 
   if (!isOpen) return null;
@@ -243,14 +275,37 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
             </div>
 
             {(mainCategory === 'local' || mainCategory === 'pool') && (
-              <div className="space-y-1.5 animate-in slide-in-from-top-2">
-                <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest ml-1">Payment Amount (UZS) *</label>
-                <div className="relative">
-                  <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[#9C9384] font-black text-xs">SUM</span>
-                  <input type="number" value={amountUZS} onChange={e => setAmountUZS(e.target.value)} placeholder="0.00"
-                    className="w-full px-5 py-4 bg-[#1C232E]/50 border-2 border-[#5C4A2E]/30 rounded-[20px] text-xl font-black text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all" />
+              <>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest ml-1">Payment Method *</label>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setPaymentMethod('cash')}
+                      className={`flex-1 py-3 rounded-[16px] text-sm font-black uppercase tracking-wider transition-all ${
+                        paymentMethod === 'cash' 
+                          ? 'bg-[#0B6E4F] text-[#EDE6D6]' 
+                          : 'bg-[#1C232E]/50 border-2 border-[#5C4A2E]/30 text-[#9C9384]'
+                      }`}>
+                      Cash
+                    </button>
+                    <button type="button" onClick={() => setPaymentMethod('online')}
+                      className={`flex-1 py-3 rounded-[16px] text-sm font-black uppercase tracking-wider transition-all ${
+                        paymentMethod === 'online' 
+                          ? 'bg-[#0B6E4F] text-[#EDE6D6]' 
+                          : 'bg-[#1C232E]/50 border-2 border-[#5C4A2E]/30 text-[#9C9384]'
+                      }`}>
+                      Online
+                    </button>
+                  </div>
                 </div>
-              </div>
+                <div className="space-y-1.5 animate-in slide-in-from-top-2">
+                  <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest ml-1">Payment Amount (UZS) *</label>
+                  <div className="relative">
+                    <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[#9C9384] font-black text-xs">SUM</span>
+                    <input type="number" required value={amountUZS} onChange={e => setAmountUZS(e.target.value)} placeholder="0.00"
+                      className="w-full px-5 py-4 bg-[#1C232E]/50 border-2 border-[#5C4A2E]/30 rounded-[20px] text-xl font-black text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all" />
+                  </div>
+                </div>
+              </>
             )}
           </div>
 

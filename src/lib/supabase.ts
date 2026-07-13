@@ -71,8 +71,12 @@ export interface Booking {
   collected_currency?: 'UZS' | 'USD' | 'EUR';
   payments?: any[];
   is_prepaid?: boolean;
+  is_accommodation_prepaid?: boolean;
+  is_food_prepaid?: boolean;
+  default_vegetarian_qty?: number;
   lunch_prepaid?: boolean;
   dinner_prepaid?: boolean;
+  guest_count_confirmed?: boolean;
   /** Joined meal_requests from the normalized table (not a DB column) */
   meal_requests?: MealRequest[];
   /** Joined booking_services from the normalized table (not a DB column) */
@@ -166,8 +170,11 @@ export interface MealRequest {
   meal_type: 'Lunch' | 'Dinner';
   adult_qty: number;
   child_qty: number;
+  vegetarian_qty: number;
+  veg_adults_qty: number;
+  veg_children_qty: number;
   dietary_type: 'Normal' | 'Vegetarian';
-  status: 'Pending' | 'Accepted' | 'Served';
+  status: 'Pending' | 'Accepted' | 'Served' | 'Cancelled';
   notes?: string;
   created_at: string;
   updated_at: string;

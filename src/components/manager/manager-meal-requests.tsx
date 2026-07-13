@@ -22,6 +22,7 @@ interface ManagerMealRequestsProps {
   onClose: () => void;
   onSent: () => void;
   teamId?: string;
+  userRole?: string;
 }
 
 function normalizeDate(d: string | Date | null) {
@@ -44,16 +45,15 @@ const fetchMealStats = async (bookingId: number) => {
   return stats;
 };
 
-export function ManagerMealRequests({ booking, onClose, onSent, teamId }: ManagerMealRequestsProps) {
-  const [mealDrafts, setMealDrafts] = useState<MealDraft[]>([]);
+export function ManagerMealRequests({ booking, onClose, onSent, teamId, userRole }: ManagerMealRequestsProps) {
+  const [mealRequests, setMealRequests] = useState<MealRequest[]>([]);
   const [loading, setLoading] = useState(false);
-  const [sentVersion, setSentVersion] = useState(0);
-
-  const { data: stats, mutate: mutateStats } = useSWR(
-    booking ? `meal-stats-${booking.id}` : null,
-    () => fetchMealStats(booking!.id),
-    { refreshInterval: 5000 }
-  );
+  const [flashMessage, setFlashMessage] = useState<string | null>(null);
+  const [drinks, setDrinks] = useState<any[]>([]);
+  const [selectedDrink, setSelectedDrink] = useState<number | null>(null);
+  const [drinkQuantity, setDrinkQuantity] = useState(1);
+  const [addedDrinks, setAddedDrinks] = useState<Array<{ drink_id: number; drink_name: string; quantity: number; price: number; currency: string }>>([]);
+  const [mealDrafts, setMealDrafts] = useState<Record<string, { checked: boolean; adult_qty: number; child_qty: number; veg_adults_qty: number; veg_children_qty: number; dietary: 'Normal' | 'Vegetarian' }>>({});
 
   useEffect(() => {
     if (!booking) return;
@@ -66,10 +66,11 @@ export function ManagerMealRequests({ booking, onClose, onSent, teamId }: Manage
         table: 'meal_requests',
         filter: `booking_id=eq.${booking.id}`
       }, () => {
-        mutateStats();
-        setSentVersion(v => v + 1);
+        fetchMeals();
       })
       .subscribe();
+
+    fetchMeals();
 
     return () => {
       supabase.removeChannel(channel);
@@ -77,111 +78,168 @@ export function ManagerMealRequests({ booking, onClose, onSent, teamId }: Manage
   }, [booking]);
 
   useEffect(() => {
-    if (!booking) {
-      setMealDrafts([]);
-      return;
-    }
+    supabase.from('drinks').select('*').eq('available', true).then(({ data }) => setDrinks(data || []));
+  }, []);
 
-    setMealDrafts([]);
-    const b = booking;
-
-    async function generateDrafts() {
-      setLoading(true);
-      const [ciy, cim, cid] = normalizeDate(b.check_in).split('-').map(Number);
-      const [coy, com, cod] = normalizeDate(b.check_out).split('-').map(Number);
-      const checkIn = new Date(ciy, cim - 1, cid);
-      const checkOut = new Date(coy, com - 1, cod);
-      const drafts: MealDraft[] = [];
-
-      const { data: existing } = await supabase
-        .from('meal_requests')
-        .select('meal_date, meal_type')
-        .eq('booking_id', b.id);
-      
-      const existingKeys = new Set(
-        (existing || []).map((e: any) => `${normalizeDate(e.meal_date)}|${e.meal_type}`)
-      );
-
-      for (let d = new Date(checkIn); d < checkOut; d.setDate(d.getDate() + 1)) {
-        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-          d.getDate()
-        ).padStart(2, '0')}`;
-        const lunchKey = `${dateStr}|Lunch`;
-        const dinnerKey = `${dateStr}|Dinner`;
-        drafts.push({
-          meal_date: dateStr,
-          meal_type: 'Lunch',
-          adult_qty: (b as any).number_of_adults || b.guest_count || 1,
-          child_qty: 0,
-          dietary_type: 'Normal',
-          notes: '',
-          sent: existingKeys.has(lunchKey),
-        });
-        drafts.push({
-          meal_date: dateStr,
-          meal_type: 'Dinner',
-          adult_qty: (b as any).number_of_adults || b.guest_count || 1,
-          child_qty: 0,
-          dietary_type: 'Normal',
-          notes: '',
-          sent: existingKeys.has(dinnerKey),
-        });
-      }
-      setMealDrafts(drafts);
-      setLoading(false);
-    }
-
-    generateDrafts();
-  }, [booking, sentVersion]);
-
-  const handleSendOne = async (idx: number) => {
+  const fetchMeals = async () => {
     if (!booking) return;
-    const draft = mealDrafts[idx];
-    if (draft.sent) return;
+    setLoading(true);
+    const { data } = await supabase
+      .from('meal_requests')
+      .select('*')
+      .eq('booking_id', booking.id)
+      .order('meal_date', { ascending: true })
+      .order('meal_type', { ascending: true });
+    setMealRequests(data || []);
+    setLoading(false);
+  };
 
+  const getStayDates = () => {
+    if (!booking) return [];
+    const dates = [];
+    const current = new Date(booking.check_in);
+    const end = new Date(booking.check_out);
+    while (current <= end) {
+      dates.push(current.toISOString().split('T')[0]);
+      current.setDate(current.getDate() + 1);
+    }
+    return dates;
+  };
+
+  const getMealForDate = (date: string, mealType: 'Lunch' | 'Dinner') => {
+    return mealRequests.find(m => m.meal_date === date && m.meal_type === mealType && m.status !== 'Cancelled');
+  };
+
+  const handleSendMeal = async (date: string, mealType: 'Lunch' | 'Dinner', adultQty: number, childQty: number, vegAdultsQty: number, vegChildrenQty: number, dietary: 'Normal' | 'Vegetarian') => {
+    if (!booking || (adultQty <= 0 && childQty <= 0)) return;
     const row = {
       booking_id: booking.id,
-      meal_date: draft.meal_date,
-      meal_type: draft.meal_type,
-      adult_qty: draft.adult_qty,
-      child_qty: draft.child_qty,
-      dietary_type: draft.dietary_type,
-      notes: draft.notes,
+      meal_date: date,
+      meal_type: mealType,
+      adult_qty: adultQty,
+      child_qty: childQty,
+      vegetarian_qty: vegAdultsQty + vegChildrenQty,
+      veg_adults_qty: vegAdultsQty,
+      veg_children_qty: vegChildrenQty,
+      dietary_type: dietary,
+      notes: '',
       status: 'Pending',
       team_id: teamId,
     };
 
-    const { error } = await supabase.from('meal_requests').insert(row);
-    if (error) return;
+    const { data: existing } = await supabase
+      .from('meal_requests')
+      .select('id')
+      .eq('booking_id', booking.id)
+      .eq('meal_date', date)
+      .eq('meal_type', mealType)
+      .neq('status', 'Cancelled')
+      .maybeSingle();
 
-    setMealDrafts((prev) => prev.map((d, i) => (i === idx ? { ...d, sent: true } : d)));
-    setSentVersion((v) => v + 1);
-    onSent();
+    let error;
+    if (existing) {
+      const { error: updateError } = await supabase
+        .from('meal_requests')
+        .update({
+          adult_qty: adultQty,
+          child_qty: childQty,
+          vegetarian_qty: vegAdultsQty + vegChildrenQty,
+          veg_adults_qty: vegAdultsQty,
+          veg_children_qty: vegChildrenQty,
+          dietary_type: dietary,
+        })
+        .eq('id', existing.id);
+      error = updateError;
+    } else {
+      const { error: insertError } = await supabase.from('meal_requests').insert(row);
+      error = insertError;
+    }
+
+    if (error) {
+      console.error('Failed to send meal request:');
+      console.error('message:', error?.message);
+      console.error('details:', error?.details);
+      console.error('hint:', error?.hint);
+      console.error('code:', error?.code);
+      return;
+    }
+
+    // Update bookings table with default_vegetarian_qty
+    await supabase
+      .from('bookings')
+      .update({ default_vegetarian_qty: vegAdultsQty + vegChildrenQty })
+      .eq('id', booking.id);
+
+    // If this is Lunch, auto-apply the same vegetarian count to Dinner on the same day
+    if (mealType === 'Lunch') {
+      const { data: existingDinner } = await supabase
+        .from('meal_requests')
+        .select('*')
+        .eq('booking_id', booking.id)
+        .eq('meal_date', date)
+        .eq('meal_type', 'Dinner')
+        .single();
+
+      if (existingDinner) {
+        await supabase
+          .from('meal_requests')
+          .update({ vegetarian_qty: vegAdultsQty + vegChildrenQty, veg_adults_qty: vegAdultsQty, veg_children_qty: vegChildrenQty })
+          .eq('id', existingDinner.id);
+      }
+    }
+
+    await fetchMeals();
+    setFlashMessage('✓ Sent to Kitchen');
+    setTimeout(() => setFlashMessage(null), 2000);
+    if (onSent) onSent();
   };
 
-  const handleSendAll = async () => {
+  const handleAddDrink = () => {
+    if (!selectedDrink) return;
+    const drink = drinks.find(d => d.id === selectedDrink);
+    if (!drink) return;
+
+    const existing = addedDrinks.find(d => d.drink_id === selectedDrink);
+    if (existing) {
+      setAddedDrinks(addedDrinks.map(d => d.drink_id === selectedDrink ? { ...d, quantity: d.quantity + drinkQuantity } : d));
+    } else {
+      setAddedDrinks([...addedDrinks, {
+        drink_id: drink.id,
+        drink_name: drink.name,
+        quantity: drinkQuantity,
+        price: drink.sold_price || drink.original_price,
+        currency: drink.currency
+      }]);
+    }
+    setSelectedDrink(null);
+    setDrinkQuantity(1);
+  };
+
+  const handleRemoveDrink = (drinkId: number) => {
+    setAddedDrinks(addedDrinks.filter(d => d.drink_id !== drinkId));
+  };
+
+  const handleCancel = async (meal: MealRequest) => {
     if (!booking) return;
-    const toSend = mealDrafts.filter((d) => !d.sent);
-    if (toSend.length === 0) return;
+    const confirmed = confirm(`Cancel this ${meal.meal_type} request for ${booking.guest_name}?`);
+    if (!confirmed) return;
 
-    const rows = toSend.map((d) => ({
-      booking_id: booking.id,
-      meal_date: d.meal_date,
-      meal_type: d.meal_type,
-      adult_qty: d.adult_qty,
-      child_qty: d.child_qty,
-      dietary_type: d.dietary_type,
-      notes: d.notes,
-      status: 'Pending',
-      team_id: teamId,
-    }));
+    const { error } = await supabase
+      .from('meal_requests')
+      .update({ status: 'Cancelled' })
+      .eq('id', meal.id);
 
-    const { error } = await supabase.from('meal_requests').insert(rows);
-    if (error) return;
+    if (error) {
+      console.error('Failed to cancel meal request:');
+      console.error('message:', error?.message);
+      console.error('details:', error?.details);
+      console.error('hint:', error?.hint);
+      console.error('code:', error?.code);
+      return;
+    }
 
-    setMealDrafts((prev) => prev.map((d) => ({ ...d, sent: true })));
-    setSentVersion((v) => v + 1);
-    onSent();
+    setFlashMessage('✓ Cancelled');
+    setTimeout(() => setFlashMessage(null), 2000);
   };
 
   if (!booking) return null;
@@ -194,181 +252,417 @@ export function ManagerMealRequests({ booking, onClose, onSent, teamId }: Manage
         className="bg-[#1C232E] border border-[#5C4A2E]/30 shadow-[12px_12px_0px_0px_rgba(92,74,46,0.3)] w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
       >
         {/* Header */}
-        <div className="p-8 border-b border-[#5C4A2E]/30 bg-[#1C232E]">
+        <div className="p-8 border-b border-[#2A2F36] bg-[#1C232E]">
           <div className="flex justify-between items-start mb-6">
             <div>
-              <div className="flex items-center gap-4 mb-1">
-                <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Fiscal Kitchen Request</p>
-                {stats && (
-                  <div className="flex items-center gap-1 border border-[#5C4A2E]/30 bg-[#1C232E] px-2 py-0.5 font-mono text-[9px] font-black">
-                    <span className="text-[#0B6E4F]">{stats.accepted} ACCEPTED</span>
-                    <span className="text-[#9C9384]">/</span>
-                    <span className="text-[#C9A227]">{stats.served} SERVED</span>
-                  </div>
-                )}
-              </div>
-              <h2 className="text-3xl font-black text-[#EDE6D6] uppercase tracking-tighter">
+              <h2 className="text-2xl font-black text-[#EDE6D6] uppercase tracking-tighter">
                 {booking.guest_name}
               </h2>
+              <p className="text-xs font-mono text-[#9C9384] mt-1">
+                {booking.number_of_adults || 1} adult{((booking.number_of_adults || 1) > 1) ? 's' : ''}{booking.number_of_children ? `, ${booking.number_of_children} child${booking.number_of_children > 1 ? 'ren' : ''}` : ''}
+              </p>
             </div>
             <button
               onClick={onClose}
-              className="w-10 h-10 border border-[#5C4A2E]/30 flex items-center justify-center hover:bg-[#2A1518] transition-all shadow-[2px_2px_0px_0px_rgba(92,74,46,0.3)] text-[#EDE6D6]"
+              className="w-10 h-10 border border-[#2A2F36] flex items-center justify-center hover:bg-[#2A1518] transition-all text-[#EDE6D6]"
             >
               <X size={20} />
             </button>
           </div>
-          
-          <div className="flex justify-between items-center">
-             <div className="text-xs font-mono font-black bg-[#1C232E]/50 border border-[#5C4A2E]/30 px-3 py-1.5 text-[#EDE6D6]">
-               {booking.check_in} → {booking.check_out}
-             </div>
-              
-             {/* REAL-TIME STATUS COUNTER */}
-             <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest mr-2">Confirmed:</span>
-                <div className="bg-[#0B6E4F] text-[#C9A227] px-4 py-1.5 border border-[#0B6E4F]/40 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)] flex gap-4">
-                   <div className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-[#C9A227] animate-pulse" />
-                      <span className="text-[11px] font-mono font-black uppercase tracking-widest">
-                         {(stats as any)?.lunch || 0} LUNCH
-                      </span>
-                   </div>
-                   <div className="w-px h-3 bg-[#C9A227]/20 self-center" />
-                   <div className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-[#C9A227] animate-pulse" />
-                      <span className="text-[11px] font-mono font-black uppercase tracking-widest">
-                         {(stats as any)?.dinner || 0} DINNER
-                      </span>
-                   </div>
+
+          {/* Day-by-Day Meals */}
+          <div className="space-y-6 max-h-[50vh] overflow-y-auto pr-2">
+            {getStayDates().map(date => (
+              <div key={date} className="border border-[#2A2F36] rounded-xl p-4">
+                <p className="text-xs font-black text-[#0B6E4F] uppercase tracking-widest mb-4">
+                  {normalizeDate(date)}
+                </p>
+                
+                {/* Lunch */}
+                <div className="mb-4">
+                  {(() => {
+                    const existingMeal = getMealForDate(date, 'Lunch');
+                    if (existingMeal) {
+                      const status = existingMeal.status || 'Pending';
+                      const statusColor = status === 'Pending' ? 'bg-[#9C9384]' : status === 'Accepted' ? 'bg-[#0B6E4F]' : status === 'Served' ? 'bg-[#3B82F6]' : 'bg-[#722F37]';
+                      const canCancel = status === 'Pending' || userRole === 'CEO';
+                      return (
+                        <div className="bg-[#1C232E]/30 border border-[#2A2F36] rounded-lg p-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm font-black text-[#EDE6D6] uppercase">Lunch</span>
+                              <span className="text-xs text-[#9C9384]">{existingMeal.adult_qty} adults, {existingMeal.child_qty} children ({existingMeal.dietary_type})</span>
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider text-white ${statusColor}`}>
+                                {status}
+                              </span>
+                            </div>
+                            {canCancel && (
+                              <button
+                                onClick={() => handleCancel(existingMeal)}
+                                className="text-[10px] font-black text-[#722F37] uppercase tracking-wider hover:text-[#722F37]/80"
+                              >
+                                Cancel
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="bg-[#1C232E]/50 border border-[#2A2F36] rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="checkbox"
+                              checked={mealDrafts[`${date}-Lunch`]?.checked || false}
+                              onChange={(e) => setMealDrafts(prev => ({
+                                ...prev,
+                                [`${date}-Lunch`]: {
+                                  ...prev[`${date}-Lunch`],
+                                  checked: e.target.checked,
+                                  adult_qty: e.target.checked ? (booking.number_of_adults || 1) : 0,
+                                  child_qty: e.target.checked ? (booking.number_of_children || 0) : 0,
+                                  veg_adults_qty: e.target.checked ? (booking.default_vegetarian_qty || 0) : 0,
+                                  veg_children_qty: 0,
+                                  dietary: prev[`${date}-Lunch`]?.dietary || 'Normal'
+                                }
+                              }))}
+                              className="w-4 h-4 rounded border-[#2A2F36] bg-[#1C232E] text-[#0B6E4F] focus:ring-[#0B6E4F]"
+                            />
+                            <span className="text-sm font-black text-[#EDE6D6] uppercase">Lunch</span>
+                          </div>
+                          <select
+                            value={mealDrafts[`${date}-Lunch`]?.dietary || 'Normal'}
+                            onChange={(e) => setMealDrafts(prev => ({
+                              ...prev,
+                              [`${date}-Lunch`]: {
+                                ...prev[`${date}-Lunch`],
+                                dietary: e.target.value as 'Normal' | 'Vegetarian'
+                              }
+                            }))}
+                            disabled={!mealDrafts[`${date}-Lunch`]?.checked}
+                            className="px-2 py-1 bg-[#1C232E] border border-[#2A2F36] text-[10px] font-black text-[#EDE6D6] outline-none appearance-none disabled:opacity-50"
+                          >
+                            <option value="Normal">Normal</option>
+                            <option value="Vegetarian">Vegetarian</option>
+                          </select>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <label className="text-[9px] font-black text-[#9C9384] uppercase tracking-widest">Adults</label>
+                            <input
+                              type="number"
+                              min={0}
+                              value={mealDrafts[`${date}-Lunch`]?.adult_qty || 0}
+                              onChange={(e) => setMealDrafts(prev => ({
+                                ...prev,
+                                [`${date}-Lunch`]: {
+                                  ...prev[`${date}-Lunch`],
+                                  adult_qty: parseInt(e.target.value) || 0
+                                }
+                              }))}
+                              disabled={!mealDrafts[`${date}-Lunch`]?.checked}
+                              className="w-12 px-2 py-1 bg-[#1C232E] border border-[#2A2F36] text-xs font-mono text-[#EDE6D6] outline-none disabled:opacity-50"
+                            />
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <label className="text-[9px] font-black text-[#9C9384] uppercase tracking-widest">Children</label>
+                            <input
+                              type="number"
+                              min={0}
+                              value={mealDrafts[`${date}-Lunch`]?.child_qty || 0}
+                              onChange={(e) => setMealDrafts(prev => ({
+                                ...prev,
+                                [`${date}-Lunch`]: {
+                                  ...prev[`${date}-Lunch`],
+                                  child_qty: parseInt(e.target.value) || 0
+                                }
+                              }))}
+                              disabled={!mealDrafts[`${date}-Lunch`]?.checked}
+                              className="w-12 px-2 py-1 bg-[#1C232E] border border-[#2A2F36] text-xs font-mono text-[#EDE6D6] outline-none disabled:opacity-50"
+                            />
+                          </div>
+                          {mealDrafts[`${date}-Lunch`]?.dietary === 'Vegetarian' && (
+                            <div className="flex items-center gap-2 mt-1">
+                              <div className="flex items-center gap-1">
+                                <label className="text-[9px] font-black text-[#0B6E4F] uppercase tracking-widest">Veg Adults</label>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={mealDrafts[`${date}-Lunch`]?.adult_qty || 0}
+                                  value={mealDrafts[`${date}-Lunch`]?.veg_adults_qty || 0}
+                                  onChange={(e) => setMealDrafts(prev => ({
+                                    ...prev,
+                                    [`${date}-Lunch`]: {
+                                      ...prev[`${date}-Lunch`],
+                                      veg_adults_qty: Math.min(prev[`${date}-Lunch`]?.adult_qty || 0, parseInt(e.target.value) || 0)
+                                    }
+                                  }))}
+                                  disabled={!mealDrafts[`${date}-Lunch`]?.checked}
+                                  className="w-12 px-2 py-1 bg-[#0B6E4F]/10 border border-[#0B6E4F]/30 text-xs font-mono text-[#EDE6D6] outline-none disabled:opacity-50"
+                                />
+                              </div>
+                              {(booking.number_of_children || 0) > 0 && (
+                                <div className="flex items-center gap-1">
+                                  <label className="text-[9px] font-black text-[#0B6E4F] uppercase tracking-widest">Veg Children</label>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={mealDrafts[`${date}-Lunch`]?.child_qty || 0}
+                                    value={mealDrafts[`${date}-Lunch`]?.veg_children_qty || 0}
+                                    onChange={(e) => setMealDrafts(prev => ({
+                                      ...prev,
+                                      [`${date}-Lunch`]: {
+                                        ...prev[`${date}-Lunch`],
+                                        veg_children_qty: Math.min(prev[`${date}-Lunch`]?.child_qty || 0, parseInt(e.target.value) || 0)
+                                      }
+                                    }))}
+                                    disabled={!mealDrafts[`${date}-Lunch`]?.checked}
+                                    className="w-12 px-2 py-1 bg-[#0B6E4F]/10 border border-[#0B6E4F]/30 text-xs font-mono text-[#EDE6D6] outline-none disabled:opacity-50"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          <button
+                            onClick={() => {
+                              const entry = mealDrafts[`${date}-Lunch`];
+                              console.log('Lunch Send clicked:', { date, entry });
+                              if (entry?.checked && (entry.adult_qty > 0 || entry.child_qty > 0)) {
+                                handleSendMeal(date, 'Lunch', entry.adult_qty, entry.child_qty, entry.veg_adults_qty, entry.veg_children_qty, entry.dietary);
+                                setMealDrafts(prev => ({ ...prev, [`${date}-Lunch`]: { checked: false, adult_qty: 0, child_qty: 0, veg_adults_qty: 0, veg_children_qty: 0, dietary: 'Normal' } }));
+                              }
+                            }}
+                            className="px-3 py-1 bg-[#0B6E4F] text-[#C9A227] text-[10px] font-black uppercase tracking-wider border border-[#0B6E4F]/40 hover:bg-[#0B6E4F]/80 transition-all"
+                          >
+                            Send
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
-             </div>
+
+                {/* Dinner */}
+                <div>
+                  {(() => {
+                    const existingMeal = getMealForDate(date, 'Dinner');
+                    if (existingMeal) {
+                      const status = existingMeal.status || 'Pending';
+                      const statusColor = status === 'Pending' ? 'bg-[#9C9384]' : status === 'Accepted' ? 'bg-[#0B6E4F]' : status === 'Served' ? 'bg-[#3B82F6]' : 'bg-[#722F37]';
+                      const canCancel = status === 'Pending' || userRole === 'CEO';
+                      return (
+                        <div className="bg-[#1C232E]/30 border border-[#2A2F36] rounded-lg p-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm font-black text-[#EDE6D6] uppercase">Dinner</span>
+                              <span className="text-xs text-[#9C9384]">{existingMeal.adult_qty} adults, {existingMeal.child_qty} children ({existingMeal.dietary_type})</span>
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider text-white ${statusColor}`}>
+                                {status}
+                              </span>
+                            </div>
+                            {canCancel && (
+                              <button
+                                onClick={() => handleCancel(existingMeal)}
+                                className="text-[10px] font-black text-[#722F37] uppercase tracking-wider hover:text-[#722F37]/80"
+                              >
+                                Cancel
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="bg-[#1C232E]/50 border border-[#2A2F36] rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="checkbox"
+                              checked={mealDrafts[`${date}-Dinner`]?.checked || false}
+                              onChange={(e) => setMealDrafts(prev => ({
+                                ...prev,
+                                [`${date}-Dinner`]: {
+                                  ...prev[`${date}-Dinner`],
+                                  checked: e.target.checked,
+                                  adult_qty: e.target.checked ? (booking.number_of_adults || 1) : 0,
+                                  child_qty: e.target.checked ? (booking.number_of_children || 0) : 0,
+                                  veg_adults_qty: e.target.checked ? (booking.default_vegetarian_qty || 0) : 0,
+                                  veg_children_qty: 0,
+                                  dietary: prev[`${date}-Dinner`]?.dietary || 'Normal'
+                                }
+                              }))}
+                              className="w-4 h-4 rounded border-[#2A2F36] bg-[#1C232E] text-[#0B6E4F] focus:ring-[#0B6E4F]"
+                            />
+                            <span className="text-sm font-black text-[#EDE6D6] uppercase">Dinner</span>
+                          </div>
+                          <select
+                            value={mealDrafts[`${date}-Dinner`]?.dietary || 'Normal'}
+                            onChange={(e) => setMealDrafts(prev => ({
+                              ...prev,
+                              [`${date}-Dinner`]: {
+                                ...prev[`${date}-Dinner`],
+                                dietary: e.target.value as 'Normal' | 'Vegetarian'
+                              }
+                            }))}
+                            disabled={!mealDrafts[`${date}-Dinner`]?.checked}
+                            className="px-2 py-1 bg-[#1C232E] border border-[#2A2F36] text-[10px] font-black text-[#EDE6D6] outline-none appearance-none disabled:opacity-50"
+                          >
+                            <option value="Normal">Normal</option>
+                            <option value="Vegetarian">Vegetarian</option>
+                          </select>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <label className="text-[9px] font-black text-[#9C9384] uppercase tracking-widest">Adults</label>
+                            <input
+                              type="number"
+                              min={0}
+                              value={mealDrafts[`${date}-Dinner`]?.adult_qty || 0}
+                              onChange={(e) => setMealDrafts(prev => ({
+                                ...prev,
+                                [`${date}-Dinner`]: {
+                                  ...prev[`${date}-Dinner`],
+                                  adult_qty: parseInt(e.target.value) || 0
+                                }
+                              }))}
+                              disabled={!mealDrafts[`${date}-Dinner`]?.checked}
+                              className="w-12 px-2 py-1 bg-[#1C232E] border border-[#2A2F36] text-xs font-mono text-[#EDE6D6] outline-none disabled:opacity-50"
+                            />
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <label className="text-[9px] font-black text-[#9C9384] uppercase tracking-widest">Children</label>
+                            <input
+                              type="number"
+                              min={0}
+                              value={mealDrafts[`${date}-Dinner`]?.child_qty || 0}
+                              onChange={(e) => setMealDrafts(prev => ({
+                                ...prev,
+                                [`${date}-Dinner`]: {
+                                  ...prev[`${date}-Dinner`],
+                                  child_qty: parseInt(e.target.value) || 0
+                                }
+                              }))}
+                              disabled={!mealDrafts[`${date}-Dinner`]?.checked}
+                              className="w-12 px-2 py-1 bg-[#1C232E] border border-[#2A2F36] text-xs font-mono text-[#EDE6D6] outline-none disabled:opacity-50"
+                            />
+                          </div>
+                          {mealDrafts[`${date}-Dinner`]?.dietary === 'Vegetarian' && (
+                            <div className="flex items-center gap-2 mt-1">
+                              <div className="flex items-center gap-1">
+                                <label className="text-[9px] font-black text-[#0B6E4F] uppercase tracking-widest">Veg Adults</label>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={mealDrafts[`${date}-Dinner`]?.adult_qty || 0}
+                                  value={mealDrafts[`${date}-Dinner`]?.veg_adults_qty || 0}
+                                  onChange={(e) => setMealDrafts(prev => ({
+                                    ...prev,
+                                    [`${date}-Dinner`]: {
+                                      ...prev[`${date}-Dinner`],
+                                      veg_adults_qty: Math.min(prev[`${date}-Dinner`]?.adult_qty || 0, parseInt(e.target.value) || 0)
+                                    }
+                                  }))}
+                                  disabled={!mealDrafts[`${date}-Dinner`]?.checked}
+                                  className="w-12 px-2 py-1 bg-[#0B6E4F]/10 border border-[#0B6E4F]/30 text-xs font-mono text-[#EDE6D6] outline-none disabled:opacity-50"
+                                />
+                              </div>
+                              {(booking.number_of_children || 0) > 0 && (
+                                <div className="flex items-center gap-1">
+                                  <label className="text-[9px] font-black text-[#0B6E4F] uppercase tracking-widest">Veg Children</label>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={mealDrafts[`${date}-Dinner`]?.child_qty || 0}
+                                    value={mealDrafts[`${date}-Dinner`]?.veg_children_qty || 0}
+                                    onChange={(e) => setMealDrafts(prev => ({
+                                      ...prev,
+                                      [`${date}-Dinner`]: {
+                                        ...prev[`${date}-Dinner`],
+                                        veg_children_qty: Math.min(prev[`${date}-Dinner`]?.child_qty || 0, parseInt(e.target.value) || 0)
+                                      }
+                                    }))}
+                                    disabled={!mealDrafts[`${date}-Dinner`]?.checked}
+                                    className="w-12 px-2 py-1 bg-[#0B6E4F]/10 border border-[#0B6E4F]/30 text-xs font-mono text-[#EDE6D6] outline-none disabled:opacity-50"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          <button
+                            onClick={() => {
+                              const entry = mealDrafts[`${date}-Dinner`];
+                              console.log('Dinner Send clicked:', { date, entry });
+                              if (entry?.checked && (entry.adult_qty > 0 || entry.child_qty > 0)) {
+                                handleSendMeal(date, 'Dinner', entry.adult_qty, entry.child_qty, entry.veg_adults_qty, entry.veg_children_qty, entry.dietary);
+                                setMealDrafts(prev => ({ ...prev, [`${date}-Dinner`]: { checked: false, adult_qty: 0, child_qty: 0, veg_adults_qty: 0, veg_children_qty: 0, dietary: 'Normal' } }));
+                              }
+                            }}
+                            className="px-3 py-1 bg-[#0B6E4F] text-[#C9A227] text-[10px] font-black uppercase tracking-wider border border-[#0B6E4F]/40 hover:bg-[#0B6E4F]/80 transition-all"
+                          >
+                            Send
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Drinks Section */}
+          <div className="mt-6 bg-[#1C232E]/50 border border-[#2A2F36] rounded-xl p-4">
+            <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest mb-3">Drinks</p>
+            <div className="flex gap-2 mb-3">
+              <select
+                value={selectedDrink || ''}
+                onChange={(e) => setSelectedDrink(e.target.value ? parseInt(e.target.value) : null)}
+                className="flex-1 px-3 py-2 bg-[#1C232E] border border-[#2A2F36] text-xs font-black text-[#EDE6D6] outline-none appearance-none"
+              >
+                <option value="">Select drink...</option>
+                {drinks.map(drink => (
+                  <option key={drink.id} value={drink.id}>{drink.name} ({drink.currency} {drink.sold_price || drink.original_price})</option>
+                ))}
+              </select>
+              <input
+                type="number"
+                min={1}
+                value={drinkQuantity}
+                onChange={(e) => setDrinkQuantity(parseInt(e.target.value) || 1)}
+                className="w-16 px-3 py-2 bg-[#1C232E] border border-[#2A2F36] text-xs font-mono text-[#EDE6D6] outline-none"
+              />
+              <button
+                onClick={handleAddDrink}
+                disabled={!selectedDrink}
+                className="px-4 py-2 bg-[#0B6E4F] text-[#C9A227] text-[10px] font-black uppercase tracking-wider border border-[#0B6E4F]/40 hover:bg-[#0B6E4F]/80 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Add
+              </button>
+            </div>
+            {addedDrinks.length > 0 && (
+              <div className="space-y-2">
+                {addedDrinks.map(drink => (
+                  <div key={drink.drink_id} className="flex items-center justify-between text-sm">
+                    <span className="text-[#EDE6D6]">{drink.drink_name} × {drink.quantity}</span>
+                    <button
+                      onClick={() => handleRemoveDrink(drink.drink_id)}
+                      className="text-[#722F37] text-[10px] font-black uppercase tracking-wider hover:text-[#722F37]/80"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Content */}
-        <div className="p-8 space-y-6 overflow-y-auto flex-1 bg-[#1C232E]/20">
-          {loading ? (
-            <div className="py-20 text-center">
-              <div className="w-12 h-12 border-2 border-[#5C4A2E]/30 border-t-[#9C9384] rounded-full animate-spin mx-auto mb-6" />
-              <p className="font-black text-xs uppercase tracking-widest text-[#EDE6D6]">Generating Manifest...</p>
-            </div>
-          ) : (
-            <div className="grid gap-4">
-              {mealDrafts.map((draft, idx) => (
-                <div
-                  key={`${booking.id}-${draft.meal_date}-${draft.meal_type}`}
-                  className={`bg-[#1C232E] border border-[#5C4A2E]/30 p-5 flex items-center gap-6 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)] ${
-                    draft.sent ? 'opacity-40 grayscale' : ''
-                  }`}
-                >
-                  <div className="w-28 border-r border-[#5C4A2E]/30 pr-6 shrink-0">
-                    <span className="text-[9px] font-black text-[#9C9384] uppercase tracking-[0.2em] block mb-1">{draft.meal_type}</span>
-                    <p className="text-sm font-mono font-black text-[#EDE6D6]">{draft.meal_date}</p>
-                  </div>
-
-                  {draft.sent ? (
-                    <div className="flex-1 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                         <div className="w-5 h-5 bg-[#0B6E4F] border border-[#0B6E4F]/40 flex items-center justify-center">
-                            <CheckCircle2 size={12} className="text-[#C9A227]" />
-                         </div>
-                         <span className="text-[10px] font-black text-[#EDE6D6] uppercase tracking-widest">Manifest Sent</span>
-                      </div>
-                      <span className="text-[10px] font-mono font-black text-[#9C9384]">
-                        {draft.adult_qty}A · {draft.child_qty}K
-                      </span>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex gap-4 flex-1">
-                        <div className="flex-1">
-                          <input
-                            type="number"
-                            min={0}
-                            value={draft.adult_qty}
-                            onChange={(e) => {
-                              const next = [...mealDrafts];
-                              next[idx].adult_qty = parseInt(e.target.value) || 0;
-                              setMealDrafts(next);
-                            }}
-                            className="w-full px-3 py-2 bg-[#1C232E] border border-[#5C4A2E]/30 text-xs font-mono font-black text-[#EDE6D6] outline-none focus:bg-[#2A1518]"
-                            placeholder="A"
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <input
-                            type="number"
-                            min={0}
-                            value={draft.child_qty}
-                            onChange={(e) => {
-                              const next = [...mealDrafts];
-                              next[idx].child_qty = parseInt(e.target.value) || 0;
-                              setMealDrafts(next);
-                            }}
-                            className="w-full px-3 py-2 bg-[#1C232E] border border-[#5C4A2E]/30 text-xs font-mono font-black text-[#EDE6D6] outline-none focus:bg-[#2A1518]"
-                            placeholder="K"
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <select
-                            value={draft.dietary_type}
-                            onChange={(e) => {
-                              const next = [...mealDrafts];
-                              next[idx].dietary_type = e.target.value as 'Normal' | 'Vegetarian';
-                              setMealDrafts(next);
-                            }}
-                            className="w-full px-3 py-2 bg-[#1C232E] border border-[#5C4A2E]/30 text-[10px] font-black text-[#EDE6D6] outline-none appearance-none"
-                          >
-                            <option value="Normal">STD</option>
-                            <option value="Vegetarian">VEG</option>
-                          </select>
-                        </div>
-                        <div className="flex-[2]">
-                          <input
-                            type="text"
-                            value={draft.notes}
-                            onChange={(e) => {
-                              const next = [...mealDrafts];
-                              next[idx].notes = e.target.value;
-                              setMealDrafts(next);
-                            }}
-                            className="w-full px-3 py-2 bg-[#1C232E] border border-[#5C4A2E]/30 text-[10px] font-black text-[#EDE6D6] outline-none"
-                            placeholder="Notes (e.g., No peanuts)"
-                          />
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => handleSendOne(idx)}
-                        className="px-6 py-2 bg-[#0B6E4F] text-[#C9A227] text-[10px] font-black uppercase tracking-widest border border-[#0B6E4F]/40 hover:bg-[#0B6E4F]/80 transition-all shadow-[2px_2px_0px_0px_rgba(92,74,46,0.3)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]"
-                      >
-                        Transmit
-                      </button>
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="p-8 border-t border-[#5C4A2E]/30 bg-[#1C232E] flex gap-4">
-          <button
-            onClick={handleSendAll}
-            disabled={mealDrafts.every((d) => d.sent)}
-            className={`flex-1 py-4 font-black uppercase tracking-[0.2em] text-xs transition-all flex items-center justify-center gap-3 border border-[#5C4A2E]/30 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px] ${
-              mealDrafts.every((d) => d.sent)
-                ? 'bg-[#1C232E]/50 text-[#9C9384] cursor-not-allowed border-[#5C4A2E]/20 shadow-none'
-                : 'bg-[#0B6E4F] text-[#C9A227] hover:bg-[#0B6E4F]/80'
-            }`}
-          >
-            <Send size={16} />
-            Batch Transmit
-          </button>
+        <div className="p-8 border-t border-[#2A2F36] bg-[#1C232E]">
           <button
             onClick={onClose}
-            className="px-10 py-4 bg-[#1C232E] text-[#EDE6D6] border border-[#5C4A2E]/30 font-black uppercase tracking-[0.2em] text-xs hover:bg-[#2A1518] transition-all shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]"
+            className="w-full py-4 bg-[#1C232E] text-[#EDE6D6] border border-[#2A2F36] font-black uppercase tracking-[0.2em] text-xs hover:bg-[#2A1518] transition-all"
           >
             Close
           </button>

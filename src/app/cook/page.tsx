@@ -107,7 +107,7 @@ function CookPortal() {
       
       const filteredMeals = allMeals.filter((m) => {
         const statusLower = (m.status || '').toLowerCase();
-        return statusLower !== 'served';
+        return statusLower !== 'served' && statusLower !== 'cancelled';
       });
       setMealRequests(filteredMeals);
 
@@ -184,7 +184,8 @@ function CookPortal() {
   };
 
   const today = getLocalDateStr();
-  const queueMeals = mealRequests;
+  const queueMeals = mealRequests.filter(m => m.meal_date === today);
+  const upcomingMeals = mealRequests.filter(m => m.meal_date > today);
   const pendingCount = queueMeals.filter(m => (m.status || '').toLowerCase() === 'pending').length;
 
   return (
@@ -355,6 +356,14 @@ function CookPortal() {
                                             isManager={false}
                                             orderId={meal.order_id}
                                           />
+                                          <div className="mt-2 space-y-1">
+                                            <p className="text-[9px] font-bold text-[#EDE6D6]">
+                                              Normal: {(meal.adult_qty + meal.child_qty - (meal.vegetarian_qty || 0))}
+                                            </p>
+                                            <p className="text-[9px] font-bold text-[#0B6E4F]">
+                                              Vegetarian: {meal.vegetarian_qty || 0}
+                                            </p>
+                                          </div>
                                        </div>
                                     </div>
 
@@ -380,6 +389,45 @@ function CookPortal() {
                           </div>
                         );
                       })}
+                    </div>
+                  )}
+
+                  {/* Upcoming Requests */}
+                  {upcomingMeals.length > 0 && (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400">Upcoming Requests</h3>
+                        <div className="flex-1 h-px bg-slate-200" />
+                        <span className="text-xs font-data text-slate-400">{upcomingMeals.length}</span>
+                      </div>
+                      <div className="bg-[#1C232E]/50 border border-[#5C4A2E]/20 rounded-lg p-4">
+                        <div className="space-y-3">
+                          {Array.from(new Set(upcomingMeals.map(m => m.meal_date))).sort().map((date) => {
+                            const dateMeals = upcomingMeals.filter(m => m.meal_date === date);
+                            return (
+                              <div key={date} className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest">{date}</span>
+                                  <span className="text-[9px] font-data text-[#9C9384]">{dateMeals.length} meals</span>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                  {dateMeals.map((meal) => (
+                                    <div key={meal.order_id || meal.id} className="bg-[#1C232E] border border-[#5C4A2E]/20 p-3 rounded text-xs">
+                                      <div className="flex justify-between items-center">
+                                        <span className="font-bold text-[#EDE6D6]">{meal.meal_type}</span>
+                                        <span className="text-[9px] text-[#9C9384]">{meal.status}</span>
+                                      </div>
+                                      <div className="mt-1 text-[9px] text-[#9C9384]">
+                                        {meal.adult_qty + meal.child_qty} total ({meal.vegetarian_qty || 0} veg)
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

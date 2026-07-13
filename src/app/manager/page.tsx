@@ -350,6 +350,7 @@ function ManagerPortal() {
         onClose={() => setSelectedMealBooking(null)}
         onSent={fetchData}
         teamId={user?.team_id}
+        userRole={user?.role}
       />
 
       <ManagerIncomeForm

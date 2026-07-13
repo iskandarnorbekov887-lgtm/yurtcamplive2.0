@@ -230,15 +230,6 @@ function CEODashboard() {
       has_guide: booking.has_guide,
       has_transportation: booking.has_transportation,
       transportation_details: booking.transportation_details,
-      lunch: booking.lunch,
-      lunch_count: booking.lunch_count,
-      dinner: booking.dinner,
-      dinner_count: booking.dinner_count,
-      drinks: booking.drinks,
-      drinks_count: booking.drinks_count,
-      laundry: booking.laundry,
-      laundry_price: booking.laundry_price,
-      laundry_currency: booking.laundry_currency,
       payment_method: booking.payment_method,
       created_by: booking.created_by_role || 'System',
       team_id: user?.team_id,
@@ -512,13 +503,6 @@ function CEODashboard() {
                                         guide_names: record.guide_names,
                                         transportation: record.transportation,
                                         transportation_details: record.transportation_details,
-                                        lunch: record.lunch,
-                                        lunch_count: record.lunch_count,
-                                        dinner: record.dinner,
-                                        dinner_count: record.dinner_count,
-                                        laundry: record.laundry,
-                                        laundry_price: record.laundry_price,
-                                        laundry_currency: record.laundry_currency,
                                         receipt_url: record.receipt_url,
                                         delete_reason: deleteReason,
                                         deleted_by: 'Manager',
@@ -991,6 +975,7 @@ function CEODashboard() {
         onClose={() => setSelectedMealBooking(null)}
         onSent={fetchData}
         teamId={user?.team_id}
+        userRole={user?.role}
       />
 
       <ManagerIncomeForm
@@ -1008,7 +993,9 @@ function CEODashboard() {
 function PricingSettings() {
   const [pricing, setPricing] = useState({
     lunch_price: 10,
+    lunch_child_price: 5,
     dinner_price: 10,
+    dinner_child_price: 5,
     guide_price: 40,
     usd_to_uzs: 12500,
     usd_to_eur: 0.92
@@ -1047,13 +1034,26 @@ function PricingSettings() {
       <div className="p-8 space-y-6">
         <div className="grid grid-cols-2 gap-6">
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Lunch Price (USD)</label>
+            <label className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Lunch Price - Adults (USD)</label>
             <input type="number" value={pricing.lunch_price} onChange={e => setPricing({...pricing, lunch_price: parseFloat(e.target.value) || 0})}
               className="w-full px-4 py-3 bg-[#1C232E] border-2 border-[#5C4A2E]/30 rounded-xl font-black text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all" />
           </div>
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Dinner Price (USD)</label>
+            <label className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Lunch Price - Children (USD)</label>
+            <input type="number" value={pricing.lunch_child_price} onChange={e => setPricing({...pricing, lunch_child_price: parseFloat(e.target.value) || 0})}
+              className="w-full px-4 py-3 bg-[#1C232E] border-2 border-[#5C4A2E]/30 rounded-xl font-black text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Dinner Price - Adults (USD)</label>
             <input type="number" value={pricing.dinner_price} onChange={e => setPricing({...pricing, dinner_price: parseFloat(e.target.value) || 0})}
+              className="w-full px-4 py-3 bg-[#1C232E] border-2 border-[#5C4A2E]/30 rounded-xl font-black text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Dinner Price - Children (USD)</label>
+            <input type="number" value={pricing.dinner_child_price} onChange={e => setPricing({...pricing, dinner_child_price: parseFloat(e.target.value) || 0})}
               className="w-full px-4 py-3 bg-[#1C232E] border-2 border-[#5C4A2E]/30 rounded-xl font-black text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all" />
           </div>
         </div>

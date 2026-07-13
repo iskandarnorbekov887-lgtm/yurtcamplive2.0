@@ -53,7 +53,6 @@ function CEOFinancialCalendar() {
     status: string;
     number_of_adults: number | null;
     number_of_children: number | null;
-    guest_count: number | null;
   };
 
   const fetchCheckedInCounts = async () => {
@@ -63,7 +62,7 @@ function CEOFinancialCalendar() {
     try {
       const { data } = await supabase
         .from('bookings')
-        .select('check_in, check_out, status, number_of_adults, number_of_children, guest_count')
+        .select('check_in, check_out, status, number_of_adults, number_of_children')
         .gte('check_in', start)
         .lte('check_in', end)
         .in('status', ['checked_in', 'completed']);
@@ -73,7 +72,7 @@ function CEOFinancialCalendar() {
         (data as CheckedInBookingRow[]).forEach((booking) => {
           const checkIn = booking.check_in;
           const checkOut = booking.check_out;
-          const people = (booking.number_of_adults || 0) + (booking.number_of_children || 0) || booking.guest_count || 1;
+          const people = (booking.number_of_adults || 0) + (booking.number_of_children || 0) || 1;
           
           // Count for each day of the stay
           const current = new Date(checkIn);
@@ -318,21 +317,39 @@ function CEOFinancialCalendar() {
             ) : (
               <>
                 {/* Net Profit Summary */}
-                <div className="bg-[#1C232E]/50 rounded-lg p-6 mb-8 border border-[#5C4A2E]/30 shadow-sm flex items-center justify-between">
-                  <div>
-                    <p className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest mb-1">Net Day Performance</p>
-                    <p className="text-4xl font-data font-bold text-[#EDE6D6] tracking-tighter">
-                      {(() => {
-                        const revenue = dayReceipts.reduce((sum, r) => sum + (r.total_usd || 0), 0);
-                        const expenses = dayFinances.filter(f => f.type === 'expense').reduce((sum, f) => sum + f.amount_uzs, 0);
-                        const expenseUsd = expenses / 12500; 
-                        const net = revenue - expenseUsd;
-                        return `$${net.toFixed(2)}`;
-                      })()}
-                    </p>
+                <div className="grid grid-cols-2 gap-6 mb-8">
+                  <div className="bg-[#1C232E]/50 rounded-lg p-6 border border-[#5C4A2E]/30 shadow-sm flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest mb-1">Net Day Performance</p>
+                      <p className="text-4xl font-data font-bold text-[#EDE6D6] tracking-tighter">
+                        {(() => {
+                          const revenue = dayReceipts.reduce((sum, r) => sum + (r.total_usd || 0), 0);
+                          const expenses = dayFinances.filter(f => f.type === 'expense').reduce((sum, f) => sum + f.amount_uzs, 0);
+                          const expenseUsd = expenses / 12500; 
+                          const net = revenue - expenseUsd;
+                          return `$${net.toFixed(2)}`;
+                        })()}
+                      </p>
+                    </div>
+                    <div className={`p-4 rounded-full ${dayReceipts.length > 0 ? 'bg-[#0B6E4F]/20 text-[#0B6E4F]' : 'bg-[#1C232E]/30 text-[#9C9384]'}`}>
+                      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                    </div>
                   </div>
-                  <div className={`p-4 rounded-full ${dayReceipts.length > 0 ? 'bg-[#0B6E4F]/20 text-[#0B6E4F]' : 'bg-[#1C232E]/30 text-[#9C9384]'}`}>
-                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                  <div className="bg-[#1C232E]/50 rounded-lg p-6 border border-[#5C4A2E]/30 shadow-sm flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest mb-1">UZS Collected Today</p>
+                      <p className="text-4xl font-data font-bold text-[#EDE6D6] tracking-tighter">
+                        {(() => {
+                          const uzsCollected = dayReceipts
+                            .filter(r => r.currency === 'UZS')
+                            .reduce((sum, r) => sum + (r.amount || 0), 0);
+                          return uzsCollected.toLocaleString() + " SUM";
+                        })()}
+                      </p>
+                    </div>
+                    <div className={`p-4 rounded-full ${dayReceipts.length > 0 ? 'bg-[#0B6E4F]/20 text-[#0B6E4F]' : 'bg-[#1C232E]/30 text-[#9C9384]'}`}>
+                      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    </div>
                   </div>
                 </div>
 

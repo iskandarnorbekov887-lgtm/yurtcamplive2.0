@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { formatSpace } from '@/utils/calendar-logic';
-import { UnifiedFolio } from '@/components/manager/UnifiedFolio';
 import { LockedBookingPanel } from '@/components/LockedBookingPanel';
 import * as htmlToImage from 'html-to-image';
 
@@ -39,6 +38,8 @@ interface BookingModalProps {
   setIsLunchPrepaid: (v: boolean) => void;
   isDinnerPrepaid: boolean;
   setIsDinnerPrepaid: (v: boolean) => void;
+  isFoodPrepaid: boolean;
+  setIsFoodPrepaid: (v: boolean) => void;
   svcLunch: boolean;
   setSvcLunch: (v: boolean) => void;
   svcLunchCount: number;
@@ -59,6 +60,8 @@ interface BookingModalProps {
   setSvcTransList: (v: any[]) => void;
   svcDiscount: number;
   setSvcDiscount: (v: number) => void;
+  svcDiscountReason: string;
+  setSvcDiscountReason: (v: string) => void;
   svcPayList: any[];
   setSvcPayList: (v: any[]) => void;
   
@@ -101,11 +104,14 @@ interface BookingModalProps {
   handleCheckOut: () => Promise<void | boolean>;
   handleCancel: () => Promise<void>;
   finalizeTab?: () => Promise<boolean>;
+  handleSaveServices?: () => Promise<void>;
   handleCreateFromEvent: (doCheckIn: boolean) => Promise<void>;
   fetchCbuRate: (curr: any) => Promise<void>;
   
   // Derived values
   gTotal: number;
+  gTotalWithPending?: number;
+  hasPendingUnsavedServices?: boolean;
   debtRemaining: number;
   tPaidUsd: number;
   isBalanceMatched: boolean;
@@ -115,6 +121,7 @@ interface BookingModalProps {
   syncWarnings?: any;
   setSyncWarnings?: (v: any) => void;
   activeMeals: any[];
+  activeServices: any[];
 }
 
 export function BookingModal(props: BookingModalProps) {
@@ -126,19 +133,20 @@ export function BookingModal(props: BookingModalProps) {
     svcChildren, setSvcChildren,
     svcAmount, setSvcAmount,
     svcDateAdjustment, setSvcDateAdjustment,
-    isPrepaid, setIsPrepaid, isLunchPrepaid, setIsLunchPrepaid, isDinnerPrepaid, setIsDinnerPrepaid,
+    isPrepaid, setIsPrepaid, isLunchPrepaid, setIsLunchPrepaid, isDinnerPrepaid, setIsDinnerPrepaid, isFoodPrepaid, setIsFoodPrepaid,
     svcLunch, setSvcLunch, svcLunchCount, setSvcLunchCount, svcDinner, setSvcDinner, svcDinnerCount, setSvcDinnerCount,
     svcGuide, setSvcGuide, svcGuidePrice, setSvcGuidePrice, svcGuideNames, setSvcGuideNames,
     svcTransport, setSvcTransport, svcTransList, setSvcTransList,
-    svcDiscount, setSvcDiscount, svcPayList, setSvcPayList,
+    svcDiscount, setSvcDiscount, svcDiscountReason, setSvcDiscountReason, svcPayList, setSvcPayList,
     showDrinks, setShowDrinks, drinks, selectedDrinks, setSelectedDrinks,
     extraServices, setExtraServices, newExtraName, setNewExtraName, newExtraPrice, setNewExtraPrice,
     showServices, setShowServices, showNotes, setShowNotes, showFinalReceipt, setShowFinalReceipt,
     selectedReceipt, setSelectedReceipt, editingDates, setEditingDates,
     editCheckIn, setEditCheckIn, editCheckOut, setEditCheckOut, dateAdjAmount, setDateAdjAmount,
     valError, setValError, getSettledReceiptsForSel, handleCheckIn, handleCheckOut, handleCancel,
-    fetchCbuRate, gTotal, debtRemaining, tPaidUsd, isBalanceMatched, today,
-    dayEntries, finalizeTab, activeMeals
+    handleSaveServices,
+    fetchCbuRate, gTotal, gTotalWithPending, hasPendingUnsavedServices, debtRemaining, tPaidUsd, isBalanceMatched, today,
+    dayEntries, finalizeTab, activeMeals, activeServices
   } = props;
 
   console.trace('BookingModal render, svcAdults:', svcAdults);
@@ -149,20 +157,46 @@ export function BookingModal(props: BookingModalProps) {
   const [localAdults, setLocalAdults] = useState<number | null>(null);
   const [localChildren, setLocalChildren] = useState<number | null>(null);
   const [loadingGuestCounts, setLoadingGuestCounts] = useState(false);
+  const [adultsChildrenLocked, setAdultsChildrenLocked] = useState(false);
+
+  // Use svcDiscountReason from props instead of local state
 
   useEffect(() => {
     if (sel?.id) {
       setLoadingGuestCounts(true);
       supabase.from('bookings')
-        .select('number_of_adults, number_of_children')
+        .select('number_of_adults, number_of_children, guest_count_confirmed')
         .eq('id', sel.id)
         .single()
         .then(({ data, error }) => {
           if (!error && data) {
             setLocalAdults(data.number_of_adults);
             setLocalChildren(data.number_of_children);
+            // Lock if guest count has been explicitly confirmed by a manager
+            setAdultsChildrenLocked(data.guest_count_confirmed === true);
           }
           setLoadingGuestCounts(false);
+        });
+    }
+  }, [sel?.id]);
+
+  // Pre-fill meal counts from meal_requests when booking changes
+  useEffect(() => {
+    if (sel?.id) {
+      supabase
+        .from('meal_requests')
+        .select('meal_type, status')
+        .eq('booking_id', sel.id)
+        .then(({ data, error }) => {
+          if (!error && data) {
+            const lunchCount = data.filter(m => m.meal_type === 'Lunch' && m.status !== 'Cancelled').length;
+            const dinnerCount = data.filter(m => m.meal_type === 'Dinner' && m.status !== 'Cancelled').length;
+            setSvcLunchCount(lunchCount);
+            setSvcDinnerCount(dinnerCount);
+            // Enable the meal toggles if there are any requests
+            setSvcLunch(lunchCount > 0);
+            setSvcDinner(dinnerCount > 0);
+          }
         });
     }
   }, [sel?.id]);
@@ -184,10 +218,12 @@ export function BookingModal(props: BookingModalProps) {
 
   // Build receipt items array for both settled and pending receipts
   const receiptItems = useMemo(() => {
+    if (!sel) return [];
     if (selectedReceipt) {
+      console.log('[receiptItems] selectedReceipt.items:', JSON.stringify(selectedReceipt.items, null, 2));
       const items: any[] = [];
       if ((selectedReceipt.items?.accommodation || 0) > 0 || selectedReceipt.items?.isPrepaid) {
-        items.push({ name: 'Accommodation', description: `${sel.number_of_adults || 1} adult${(sel.number_of_adults || 1) > 1 ? 's' : ''}${sel.number_of_children ? `, ${sel.number_of_children} child${sel.number_of_children > 1 ? 'ren' : ''}` : ''}`, price: selectedReceipt.items?.isPrepaid ? 0 : (selectedReceipt.items.accommodation || 0), isPrepaid: selectedReceipt.items?.isPrepaid, paid: true });
+        items.push({ name: 'Accommodation', description: `${sel?.number_of_adults || 1} adult${(sel?.number_of_adults || 1) > 1 ? 's' : ''}${sel?.number_of_children ? `, ${sel?.number_of_children} child${(sel?.number_of_children || 0) > 1 ? 'ren' : ''}` : ''}`, price: selectedReceipt.items?.isPrepaid ? 0 : (selectedReceipt.items.accommodation || 0), isPrepaid: selectedReceipt.items?.isPrepaid, paid: true });
       }
       const meals = selectedReceipt.items?.meals || {};
       Object.entries(meals).forEach(([type, count]: [string, any]) => {
@@ -205,44 +241,67 @@ export function BookingModal(props: BookingModalProps) {
         items.push({ name: 'Stay Extension Fee', description: '', price: selectedReceipt.items.stay_adjustment, isPrepaid: false, paid: true });
       }
       if (selectedReceipt.items?.drinks?.length > 0) {
-        const drinksTotal = selectedReceipt.items.drinks.reduce((s: number, d: any) => s + (d.price * d.qty), 0);
+        const drinksTotal = selectedReceipt.items.drinks.reduce((s: number, d: any) => s + (d.price * d.quantity), 0);
         items.push({ name: 'Drinks', description: `${selectedReceipt.items.drinks.length} item${selectedReceipt.items.drinks.length > 1 ? 's' : ''}`, price: drinksTotal, isPrepaid: false, paid: true });
       }
       return items;
     } else {
       const items: any[] = [];
-      if (svcAmount > 0 || (isPrepaid && (sel.collected_amount || 0) === 0)) {
-        items.push({ name: 'Accommodation', description: `${localAdults || sel.number_of_adults || 1} adult${(localAdults || sel.number_of_adults || 1) > 1 ? 's' : ''}${(localChildren || sel.number_of_children) ? `, ${localChildren || sel.number_of_children} child${(localChildren || sel.number_of_children) > 1 ? 'ren' : ''}` : ''}`, price: isPrepaid && (sel.collected_amount || 0) === 0 ? 0 : svcAmount, isPrepaid: isPrepaid && (sel.collected_amount || 0) === 0, paid: isPrepaid && (sel.collected_amount || 0) === 0 });
+      if (svcAmount > 0 || (isPrepaid && (sel?.collected_amount || 0) === 0)) {
+        items.push({ name: 'Accommodation', description: `${localAdults || sel?.number_of_adults || 1} adult${(localAdults || sel?.number_of_adults || 1) > 1 ? 's' : ''}${(localChildren || sel?.number_of_children) ? `, ${localChildren || sel?.number_of_children} child${(localChildren || sel?.number_of_children) > 1 ? 'ren' : ''}` : ''}`, price: svcAmount, isPrepaid: isPrepaid && (sel?.collected_amount || 0) === 0, paid: isPrepaid && (sel?.collected_amount || 0) === 0 });
       }
-      if (svcLunch && svcLunchCount > 0) {
-        items.push({ name: 'Lunch', description: `×${svcLunchCount}`, price: isLunchPrepaid ? 0 : (svcLunchCount * (pricing?.lunch_price || 10)), isPrepaid: isLunchPrepaid, paid: isLunchPrepaid });
+      
+      // Calculate meal totals from activeMeals (Single Source of Truth)
+      const unpaidMeals = activeMeals.filter(m => 
+        !m.is_paid && (m.status === 'confirmed' || m.status === 'served')
+      );
+      
+      const lunchMeals = unpaidMeals.filter(m => m.meal_type === 'Lunch');
+      const lunchAdultQty = lunchMeals.reduce((sum, m) => sum + (m.adult_qty || 0), 0);
+      const lunchChildQty = lunchMeals.reduce((sum, m) => sum + (m.child_qty || 0), 0);
+      const lunchTotalQty = lunchAdultQty + lunchChildQty;
+      if (lunchTotalQty > 0) {
+        const lunchPrepaid = isLunchPrepaid || isFoodPrepaid;
+        const lunchAdultPrice = pricing?.lunch_price || 10;
+        const lunchChildPrice = pricing?.lunch_child_price || 5;
+        const lunchTotalPrice = (lunchAdultQty * lunchAdultPrice) + (lunchChildQty * lunchChildPrice);
+        items.push({ name: 'Lunch', description: `×${lunchTotalQty}`, price: lunchTotalPrice, isPrepaid: lunchPrepaid, paid: lunchPrepaid });
       }
-      if (svcDinner && svcDinnerCount > 0) {
-        items.push({ name: 'Dinner', description: `×${svcDinnerCount}`, price: isDinnerPrepaid ? 0 : (svcDinnerCount * (pricing?.dinner_price || 10)), isPrepaid: isDinnerPrepaid, paid: isDinnerPrepaid });
+      
+      const dinnerMeals = unpaidMeals.filter(m => m.meal_type === 'Dinner');
+      const dinnerAdultQty = dinnerMeals.reduce((sum, m) => sum + (m.adult_qty || 0), 0);
+      const dinnerChildQty = dinnerMeals.reduce((sum, m) => sum + (m.child_qty || 0), 0);
+      const dinnerTotalQty = dinnerAdultQty + dinnerChildQty;
+      if (dinnerTotalQty > 0) {
+        const dinnerPrepaid = isDinnerPrepaid || isFoodPrepaid;
+        const dinnerAdultPrice = pricing?.dinner_price || 10;
+        const dinnerChildPrice = pricing?.dinner_child_price || 5;
+        const dinnerTotalPrice = (dinnerAdultQty * dinnerAdultPrice) + (dinnerChildQty * dinnerChildPrice);
+        items.push({ name: 'Dinner', description: `×${dinnerTotalQty}`, price: dinnerTotalPrice, isPrepaid: dinnerPrepaid, paid: dinnerPrepaid });
       }
-      if (svcGuide) {
-        items.push({ name: 'Guide Service', description: svcGuideNames.filter((n: string) => n).join(', ') || '1 guide', price: svcGuidePrice, isPrepaid: false, paid: false });
-      }
-      if (svcTransport) {
-        const transportTotal = svcTransList.reduce((s: number, t: any) => s + (t.price || 0), 0);
-        items.push({ name: 'Transport', description: svcTransList.filter((t: any) => t.name).map((t: any) => t.name).join(', ') || 'Custom', price: transportTotal, isPrepaid: false, paid: false });
-      }
-      extraServices.forEach((svc: any) => {
-        items.push({ name: svc.name, description: '', price: svc.price, isPrepaid: false, paid: false });
+      
+      // Add services from activeServices (guide, transport, drinks, extras)
+      activeServices.forEach((s: any) => {
+        const price = s.unit_price * s.quantity;
+        const isPrepaid = s.is_paid;
+        
+        if (s.service_type === 'guide') {
+          items.push({ name: 'Guide Service', description: s.details?.names || '1 guide', price, isPrepaid, paid: isPrepaid });
+        } else if (s.service_type === 'transportation') {
+          items.push({ name: 'Transport', description: s.details?.name || s.details?.destination || '', price, isPrepaid, paid: isPrepaid });
+        } else if (s.service_type === 'drink') {
+          items.push({ name: s.details?.name || 'Drink', description: `${s.currency}`, price, isPrepaid, paid: isPrepaid });
+        } else if (s.service_type === 'extra') {
+          items.push({ name: s.details?.name || 'Extra', description: '', price, isPrepaid, paid: isPrepaid });
+        }
       });
+      
       if (svcDiscount > 0) {
         items.push({ name: 'Discount', description: '', price: -svcDiscount, isPrepaid: false, paid: false });
       }
-      const dTotal_calc = Object.entries(selectedDrinks || {}).reduce((sum: number, [id, qty]: [string, any]) => {
-        const drink = drinks.find((d: any) => d.id === parseInt(id));
-        return sum + (drink ? (drink.sold_price || drink.original_price || 0) * qty : 0);
-      }, 0);
-      if (dTotal_calc > 0) {
-        items.push({ name: 'Drinks', description: `${Object.values(selectedDrinks || {}).reduce((s: number, q: any) => s + q, 0)} item${Object.values(selectedDrinks || {}).reduce((s: number, q: any) => s + q, 0) > 1 ? 's' : ''}`, price: dTotal_calc, isPrepaid: false, paid: false });
-      }
       return items;
     }
-  }, [selectedReceipt, sel, pricing, svcAmount, isPrepaid, svcLunch, svcLunchCount, isLunchPrepaid, svcDinner, svcDinnerCount, isDinnerPrepaid, svcGuide, svcGuidePrice, svcGuideNames, svcTransport, svcTransList, extraServices, svcDiscount, localAdults, localChildren, selectedDrinks, drinks]);
+  }, [selectedReceipt, sel, pricing, svcAmount, isPrepaid, isLunchPrepaid, isDinnerPrepaid, isFoodPrepaid, svcDiscount, localAdults, localChildren, activeMeals, activeServices]);
 
   const currentMeta = useMemo(() => {
     if (!sel) return {};
@@ -255,75 +314,36 @@ export function BookingModal(props: BookingModalProps) {
     return meta;
   }, [sel?.meta]);
 
-  const guestStatement = useMemo(() => {
-    if (!sel) return null;
-    
-    const accommodation = sel.total_price || 0;
-    const mealRequests = sel.meal_requests || [];
-    const payments = (sel as any).payments || [];
-    const collected = sel.collected_amount || 0;
-    
-    const mealItems = mealRequests.map((m: any) => {
-       const qty = (m.adult_qty || 0) + (m.child_qty || 0);
-       const isLunch = m.meal_type.toLowerCase().includes('lunch');
-       const pricePer = isLunch ? (pricing?.lunch_price || 10) : (pricing?.dinner_price || 12);
-       return {
-         name: m.meal_type,
-         date: m.meal_date,
-         qty,
-         price: pricePer,
-         total: qty * pricePer,
-         status: m.status
-       };
-    });
-    
-    const mealsTotal = mealItems.reduce((s: number, i: any) => s + i.total, 0);
-    
-    // Guide service from component state
-    const guideTotal = svcGuide ? svcGuidePrice : 0;
-    const guideNamesJoined = svcGuideNames.join(', ');
-    
-    // Transportation from component state
-    const transportTotal = svcTransport ? svcTransList.reduce((sum: number, t: any) => sum + (t.price || 0), 0) : 0;
-    const transportationDetailsString = svcTransport 
-      ? svcTransList.filter((t: any) => t.name || t.details || t.price)
-          .map((t: any) => `${t.name} | ${t.details} | Price: $${t.price}`)
-          .join('\n')
-      : '';
-    
-    const grandTotal = accommodation + mealsTotal + guideTotal + transportTotal;
-    
-    const paymentsTotal = payments.reduce((s: number, p: any) => s + (p.amount_usd_equivalent || 0), 0);
-    const totalReconciled = collected + paymentsTotal;
-    const remaining = Math.max(0, grandTotal - totalReconciled);
-    
-    let status = 'OPEN TAB';
-    if (remaining < 0.01) status = 'PAID';
-    if (isPrepaid) status = 'PREPAID';
-    
-    return {
-      accommodation,
-      mealItems,
-      mealsTotal,
-      guideTotal,
-      guideNames: guideNamesJoined,
-      transportTotal,
-      transportationDetails: transportationDetailsString,
-      grandTotal,
-      totalReconciled,
-      remaining,
-      status
-    };
-  }, [sel, pricing, isPrepaid, svcGuide, svcGuidePrice, svcGuideNames, svcTransport, svcTransList]);
-
   const isPOS = currentMeta.guest_category === 'local' || currentMeta.guest_category === 'pool';
 
   const [mealAssurance, setMealAssurance] = useState({ accepted: 0, served: 0 });
   const [showMealRequestModal, setShowMealRequestModal] = useState(false);
   const [currentMealType, setCurrentMealType] = useState<'lunch' | 'dinner' | null>(null);
-  const [mealRequestAmount, setMealRequestAmount] = useState(0);
+  const [mealRequestAdultQty, setMealRequestAdultQty] = useState(0);
+  const [mealRequestChildQty, setMealRequestChildQty] = useState(0);
+  const [mealRequestAdultVegQty, setMealRequestAdultVegQty] = useState(0);
+  const [mealRequestChildVegQty, setMealRequestChildVegQty] = useState(0);
+  const [lastVegSplit, setLastVegSplit] = useState({ adultVeg: 0, childVeg: 0 });
   const [mealRequestDietary, setMealRequestDietary] = useState<'Normal' | 'Vegetarian'>('Normal');
   const [mealRequestNotes, setMealRequestNotes] = useState('');
+  const [mealRequestDate, setMealRequestDate] = useState('');
+  const [expandedMealGroups, setExpandedMealGroups] = useState<Set<string>>(new Set());
+  const [expandedReceiptId, setExpandedReceiptId] = useState<string | null>(null);
+
+  // Pre-fill meal request quantities when modal opens
+  useEffect(() => {
+    if (showMealRequestModal && sel) {
+      setMealRequestAdultQty(sel.number_of_adults || 1);
+      setMealRequestChildQty(sel.number_of_children || 0);
+      // Use carried-over split if available, otherwise default to 0
+      setMealRequestAdultVegQty(lastVegSplit.adultVeg);
+      setMealRequestChildVegQty(lastVegSplit.childVeg);
+      setMealRequestDate(new Date().toISOString().split('T')[0]);
+    } else if (!showMealRequestModal) {
+      // Reset fields when modal closes
+      setMealRequestDate('');
+    }
+  }, [showMealRequestModal, sel, lastVegSplit]);
 
   // Meal assurance logic (calculated from the prop)
   useEffect(() => {
@@ -341,26 +361,25 @@ export function BookingModal(props: BookingModalProps) {
 
       // 1. Prepare the standard fields
       const data: any = {
-        number_of_adults: svcAdults,
-        number_of_children: svcChildren,
+        guest_count_confirmed: true,
         is_prepaid: isPrepaid,
-        lunch: svcLunch,
-        lunch_count: svcLunchCount,
-        lunch_paid: isLunchPrepaid,
-        dinner: svcDinner,
-        dinner_count: svcDinnerCount,
-        dinner_paid: isDinnerPrepaid,
-        has_guide: svcGuide,
-        has_transportation: svcTransport,
-        extra_services: extraServices,
+        is_accommodation_prepaid: isPrepaid,
+        is_food_prepaid: isFoodPrepaid,
         guest_category: category,
         
         // 2. Map all numeric data to the single 'amount' column
         amount: svcAmount, 
       };
 
-      // 3. Keep payment logic synchronized
-      if (isPrepaid && svcAmount > 0) {
+      // Only update guest counts if they haven't been confirmed yet
+      if (!sel.guest_count_confirmed) {
+        data.number_of_adults = svcAdults;
+        data.number_of_children = svcChildren;
+      }
+
+      // 3. Keep payment logic synchronized - prepaid should NOT add to collected_amount
+      // collected_amount is for manager-collected cash only, not office-prepaid amounts
+      if (!isPrepaid && svcAmount > 0) {
         data.collected_amount = (sel.collected_amount || 0) + svcAmount;
         data.collected_currency = 'USD';
       }
@@ -388,9 +407,35 @@ export function BookingModal(props: BookingModalProps) {
       // Force Supabase schema reload
       try { await supabase.rpc('reload_schema'); } catch { /* ignore if not exist */ }
 
+      // Re-lock adults/children inputs after successful save
+      setAdultsChildrenLocked(true);
+
       flash('✓ Choices saved to guest file!');
     } catch (err) {
       flash('⚠ Failed to save progress.');
+    } finally {
+      setLoadingAction('');
+    }
+  };
+
+  const handleSaveGuestCount = async () => {
+    if (!sel || !onUpdateBooking) return;
+    setLoadingAction('save');
+    try {
+      const data: any = {
+        number_of_adults: localAdults,
+        number_of_children: localChildren,
+        guest_count_confirmed: true,
+      };
+
+      await onUpdateBooking(sel.id, data);
+
+      // Lock the fields immediately after successful save
+      setAdultsChildrenLocked(true);
+
+      flash('✓ Guest count saved and locked!');
+    } catch (err) {
+      flash('⚠ Failed to save guest count.');
     } finally {
       setLoadingAction('');
     }
@@ -506,11 +551,6 @@ export function BookingModal(props: BookingModalProps) {
   const canCancel = sel && ['confirmed', 'pending'].includes(sel.status) && !!onCancelBooking && !isDayGuest;
   const isAfterNoon = new Date().getHours() >= 12;
   const isAfterTwo = new Date().getHours() >= 14;
-
-  const dTotal_calc = Object.entries(selectedDrinks).reduce((sum: number, [id, qty]: [string, any]) => {
-    const drink = drinks.find((d: any) => d.id === parseInt(id));
-    return sum + (Number(qty) * (drink?.sold_price || 0));
-  }, 0);
 
   if (!selectedItem) return null;
 
@@ -709,8 +749,8 @@ export function BookingModal(props: BookingModalProps) {
                             ✓ Checked In
                           </span>
                         </div>
-                        {/* Gate "Edit Dates" behind lock when booking is paid */}
-                        {sel.payment_status === 'paid' ? (
+                        {/* Gate "Edit Dates" behind lock when booking is paid, unless CEO */}
+                        {sel.payment_status === 'paid' && userRole !== 'CEO' ? (
                           <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#C9A227]">
                             <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
@@ -767,7 +807,7 @@ export function BookingModal(props: BookingModalProps) {
                             setLoadingAction('editdates');
                             try {
                               const settledReceipts = getSettledReceiptsForSel ? getSettledReceiptsForSel() : [];
-                              const isTab1Closed = settledReceipts.length > 0 || (sel.collected_amount || 0) > 0;
+                              const isTab1Closed = settledReceipts.length > 0 || (sel.collected_amount || 0) > 0 || sel.is_prepaid || sel.is_accommodation_prepaid || sel.is_food_prepaid;
                               
                               const currentMeta: any = Array.isArray(sel.meta) ? { days: sel.meta } : (sel.meta || {});
 
@@ -837,57 +877,6 @@ export function BookingModal(props: BookingModalProps) {
                       Check In
                     </button>
                   )}
-                  {canCheckOut && (() => {
-                    return (
-                      <div className="flex flex-col gap-2">
-                        <button
-                          onClick={async () => {
-                            if (guestStatement?.status === 'OPEN TAB') {
-                              flash(`⚠ Guest has an open balance of $${guestStatement.remaining.toFixed(2)}. Settle tab first.`);
-                              return;
-                            }
-
-                            const receipts = getSettledReceiptsForSel();
-                            const hasSettled = receipts.length > 0 || (sel.collected_amount || 0) > 0;
-                            const guestNum = (sel.number_of_adults || 0) + (sel.number_of_children || 0) || sel.guest_count || 0;
-                            const price = sel.total_price || 0;
-                            const isPrepaidVal = isPrepaid || sel.is_prepaid || false;
-
-                            if (guestNum <= 0) {
-                              flash(`⚠ Please enter the Number of Guests before checking out.`);
-                              return;
-                            }
-                            
-                            if (!confirm(`Complete stay for ${sel.guest_name}?`)) return;
-                            setLoadingAction('checkout_manual');
-                            try { 
-                              if (finalizeTab && gTotal >= 0) {
-                                 const success = await finalizeTab();
-                                 if (success === false) {
-                                   setLoadingAction('');
-                                   return; 
-                                 }
-                              }
-                              if (onCheckOut) await onCheckOut(sel.id); 
-                              flash('✓ Guest checked out successfully!'); 
-                              setSelectedItem(null); 
-                            }
-                            catch { flash('⚠ Check-out failed.'); }
-                            finally { setLoadingAction(''); }
-                          }}
-                          disabled={loadingAction === 'checkout_manual' || guestStatement?.status === 'OPEN TAB'}
-                          className={`px-4 py-3 text-sm font-bold rounded-xl transition-all disabled:opacity-60 flex items-center justify-center gap-2 ${
-                            (guestStatement?.status === 'OPEN TAB' || ((sel.number_of_adults || 0) + (sel.number_of_children || 0) || sel.guest_count || 0) <= 0)
-                              ? 'bg-rose-100 border-2 border-rose-300 text-rose-700'
-                              : 'bg-black hover:bg-zinc-950 text-white shadow-lg shadow-zinc-200 border-2 border-black'
-                          }`}
-                        >
-                          {loadingAction === 'checkout_manual' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '✈'}
-                          {guestStatement?.status === 'OPEN TAB' ? `Pay $${guestStatement.remaining.toFixed(2)} to Settle` : 'Finalize Stay'}
-                        </button>
-                      </div>
-                    );
-                  })()}
                   {isComingSoon && (
                     <div className="px-4 py-2 bg-sky-50 border border-sky-200 rounded-xl text-sm font-bold text-sky-700">
                       ⏰ Coming in {String(daysUntilCheckIn)} day{daysUntilCheckIn !== 1 ? 's' : ''}
@@ -908,42 +897,19 @@ export function BookingModal(props: BookingModalProps) {
 
               {(sel.status === 'checked_in' || sel.status === 'confirmed') && isStaff && (
                 <div className="bg-[#1C232E] border-2 border-[#2A2F36] rounded-[32px] p-6 shadow-xl shadow-[#5C4A2E]/20 mb-6">
-                  <div className="flex justify-between items-center mb-6">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-[#0B6E4F] rounded-2xl flex items-center justify-center text-[#C9A227] shadow-lg shadow-[#0B6E4F]/20">
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight leading-tight">Add to Tab</h3>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Post new charges for this guest</p>
-                      </div>
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-12 h-12 bg-[#0B6E4F] rounded-2xl flex items-center justify-center text-[#C9A227] shadow-lg shadow-[#0B6E4F]/20">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
                     </div>
-                    <button 
-                      onClick={() => setShowServices(!showServices)} 
-                      className={`text-[10px] font-black px-5 py-2.5 rounded-xl border-2 transition-all active:scale-95 ${showServices ? 'bg-[#1C232E]/50 text-[#9C9384] border-[#2A2F36] hover:bg-[#2A1518]' : 'bg-[#0B6E4F] text-[#C9A227] border-[#0B6E4F]/40 shadow-lg shadow-[#0B6E4F]/20 hover:bg-[#0B6E4F]/80'}`}
-                    >
-                      {showServices ? 'HIDE OPTIONS' : 'START NEW ORDER'}
-                    </button>
+                    <div>
+                      <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight leading-tight">Add to Tab</h3>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Post new charges for this guest</p>
+                    </div>
                   </div>
-                  
-                  {!showServices && (
-                    <div 
-                      className="group relative flex items-center justify-center py-10 border-2 border-dashed border-[#2A2F36] rounded-[24px] bg-[#1C232E]/50 cursor-pointer hover:bg-[#2A1518] hover:border-[#0B6E4F]/40 transition-all duration-300 overflow-hidden" 
-                      onClick={() => setShowServices(true)}
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-br from-[#0B6E4F]/0 to-[#0B6E4F]/50 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      <div className="relative flex flex-col items-center">
-                        <div className="w-10 h-10 bg-[#1C232E] rounded-full flex items-center justify-center shadow-md mb-3 group-hover:scale-110 transition-transform border border-[#2A2F36]">
-                          <span className="text-[#0B6E4F] text-3xl font-light">+</span>
-                        </div>
-                        <p className="text-[11px] font-black text-[#9C9384] uppercase tracking-[0.2em] group-hover:text-[#0B6E4F] transition-colors">Select Meals or Services</p>
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
 
-              {showServices && (sel.status === 'checked_in' || sel.status === 'confirmed') && isStaff && (
+              {(sel.status === 'checked_in' || sel.status === 'confirmed') && isStaff && (
                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300 mt-4">
                   {isRoomStay && sel?.guest_category !== 'pool' && (() => {
                     // ── LOCKED BOOKING: show read-only panel when payment_status === 'paid' ──
@@ -958,7 +924,7 @@ export function BookingModal(props: BookingModalProps) {
                     }
 
                     // ── NORMAL editable Stay Configuration ──────────────────────────────────
-                    const isTab1Closed = getSettledReceiptsForSel().length > 0 || (sel.collected_amount || 0) > 0;
+                    const isTab1Closed = getSettledReceiptsForSel().length > 0 || (sel.collected_amount || 0) > 0 || sel.is_prepaid || sel.is_accommodation_prepaid || sel.is_food_prepaid;
                     const isDatesChanged = editCheckOut !== sel.check_out;
                     const isExtended = editCheckOut > sel.check_out;
                     const isShortened = editCheckOut < sel.check_out;
@@ -977,42 +943,72 @@ export function BookingModal(props: BookingModalProps) {
                         {/* Entrants Grid */}
                         <div className="grid grid-cols-2 gap-4 pb-4 border-b border-slate-100">
                           <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Adults *</label>
+                            <div className="flex items-center justify-between">
+                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Adults *</label>
+                              {adultsChildrenLocked && !isTab1Closed && (
+                                <button
+                                  onClick={() => {
+                                    if (confirm('Change guest count? This will require re-entering the values.')) {
+                                      setAdultsChildrenLocked(false);
+                                    }
+                                  }}
+                                  className="text-[9px] font-black text-[#0B6E4F] uppercase tracking-wider hover:text-[#0B6E4F]/80"
+                                >
+                                  Edit
+                                </button>
+                              )}
+                            </div>
                             <input
                               type="number"
-                              value={loadingGuestCounts ? '...' : (localAdults ?? '')}
-                              disabled={isTab1Closed}
+                              value={loadingGuestCounts ? '' : (localAdults ?? '')}
+                              disabled={isTab1Closed || adultsChildrenLocked || loadingGuestCounts}
                               onChange={e => {
                                 const val = parseInt(e.target.value) || 0;
                                 setSvcAdults(val);
                                 setLocalAdults(val);
                               }}
-                              className={`w-full px-3 py-2 border text-sm font-black focus:outline-none ${isTab1Closed ? 'bg-[#1C232E]/50 border-[#2A2F36] text-[#9C9384] cursor-not-allowed' : 'bg-[#1C232E]/50 border-[#2A2F36] text-[#EDE6D6]'}`}
+                              className={`w-full px-3 py-2 border text-sm font-black focus:outline-none ${(isTab1Closed || adultsChildrenLocked || loadingGuestCounts) ? 'bg-[#1C232E]/50 border-[#2A2F36] text-[#9C9384] cursor-not-allowed' : 'bg-[#1C232E]/50 border-[#2A2F36] text-[#EDE6D6]'}`}
                             />
                           </div>
                           <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Children</label>
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Children under 12</label>
                             <input 
                               type="number" 
-                              value={loadingGuestCounts ? '...' : (localChildren ?? '')} 
-                              disabled={isTab1Closed}
+                              value={loadingGuestCounts ? '' : (localChildren ?? '')} 
+                              disabled={isTab1Closed || adultsChildrenLocked || loadingGuestCounts}
                               onChange={e => {
                                 const val = parseInt(e.target.value) || 0;
                                 setSvcChildren(val);
                                 setLocalChildren(val);
                               }}
-                              className={`w-full px-3 py-2 border text-sm font-black focus:outline-none ${isTab1Closed ? 'bg-[#1C232E]/50 border-[#2A2F36] text-[#9C9384] cursor-not-allowed' : 'bg-[#1C232E]/50 border-[#2A2F36] text-[#EDE6D6]'}`}
+                              className={`w-full px-3 py-2 border text-sm font-black focus:outline-none ${(isTab1Closed || adultsChildrenLocked || loadingGuestCounts) ? 'bg-[#1C232E]/50 border-[#2A2F36] text-[#9C9384] cursor-not-allowed' : 'bg-[#1C232E]/50 border-[#2A2F36] text-[#EDE6D6]'}`}
                             />
                           </div>
                         </div>
 
+                        {!isTab1Closed && !adultsChildrenLocked && (
+                          <button
+                            onClick={handleSaveGuestCount}
+                            disabled={loadingAction === 'save'}
+                            className="w-full py-2 px-4 bg-[#0B6E4F] text-[#C9A227] text-[10px] font-black uppercase tracking-wider border border-[#0B6E4F]/40 hover:bg-[#0B6E4F]/80 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {loadingAction === 'save' ? 'Saving...' : 'Save Guest Count'}
+                          </button>
+                        )}
+
                         {isTab1Closed ? (
                           <div className="space-y-4">
-                            {/* Condition A: Tab 1 Closed (Locked Mode) */}
                             <div className="space-y-1.5">
-                              <label className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Original Stay Price (Baseline)</label>
+                              <div className="flex items-center justify-between">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Accommodation</label>
+                                <div className="flex items-center gap-3">
+                                  {sel.is_accommodation_prepaid && (
+                                    <span className="text-[10px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">Prepaid</span>
+                                  )}
+                                </div>
+                              </div>
                               <div className="px-3 py-2 bg-[#1C232E]/50 border border-[#2A2F36] text-sm font-mono text-[#9C9384] font-bold">
-                                ${String((sel.total_price || 0).toFixed(2))}
+                                ${String((sel.is_accommodation_prepaid ? 0 : (sel.total_price || 0)).toFixed(2))}
                               </div>
                             </div>
 
@@ -1037,20 +1033,36 @@ export function BookingModal(props: BookingModalProps) {
                           /* Condition B: No Tab Closed (Fresh Mode) */
                           <div className="space-y-4">
                             <div className="space-y-1.5">
-                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Original Stay Price (USD)</label>
-                              <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-xs">$</span>
-                                <input 
-                                  type="number" 
-                                  value={String(svcAmount || '')} 
-                                  onChange={e => {
-                                    const val = parseFloat(e.target.value) || 0;
-                                    setSvcAmount(val);
-                                    setSvcDateAdjustment(0);
-                                  }}
-                                  className="w-full pl-7 pr-3 py-2 bg-[#1C232E]/50 border border-[#2A2F36] text-sm font-black text-[#EDE6D6] font-mono focus:outline-none"
-                                  placeholder="0.00"
-                                />
+                              <div className="flex items-center justify-between">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Accommodation</label>
+                                <div className="flex items-center gap-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => setIsPrepaid(!isPrepaid)}
+                                    className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${isPrepaid ? 'bg-[#0B6E4F]' : 'bg-[#2A2F36]'}`}
+                                  >
+                                    <span
+                                      className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${isPrepaid ? 'translate-x-5' : 'translate-x-0'}`}
+                                    />
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <div className="relative flex-1">
+                                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-xs">$</span>
+                                  <input 
+                                    type="number" 
+                                    value={String(isPrepaid ? 0 : (svcAmount || ''))} 
+                                    disabled={isPrepaid}
+                                    onChange={e => {
+                                      const val = parseFloat(e.target.value) || 0;
+                                      setSvcAmount(val);
+                                      setSvcDateAdjustment(0);
+                                    }}
+                                    className={`w-full pl-7 pr-3 py-2 bg-[#1C232E]/50 border border-[#2A2F36] text-sm font-black font-mono focus:outline-none ${isPrepaid ? 'text-[#9C9384] cursor-not-allowed' : 'text-[#EDE6D6]'}`}
+                                    placeholder="0.00"
+                                  />
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -1058,79 +1070,6 @@ export function BookingModal(props: BookingModalProps) {
                       </div>
                     );
                   })()}
-
-                  {isRoomStay && (
-                    <div className="border border-[#2A2F36] rounded-xl p-4 space-y-4 bg-[#1C232E] shadow-lg">
-                      <div className="flex justify-between items-end mb-3">
-                        <div className="space-y-1">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Kitchen Orders</p>
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-3">
-                        {/* Lunch Request Button */}
-                        <div className="space-y-2">
-                          {(() => {
-                            const lunchOrders = activeMeals.filter(o => o.type === 'lunch');
-                            const totalLunchQty = lunchOrders.reduce((sum, o) => sum + (o.quantity || 0), 0);
-                            const isPending = lunchOrders.some(o => o.status === 'pending');
-                            const hasAcceptedLunch = lunchOrders.some(o => o.status === 'confirmed');
-                            return (
-                              <button type="button" 
-                                onClick={() => { 
-                                  setCurrentMealType('lunch'); 
-                                  setMealRequestAmount(0); // Default to 0 for adding extra portions
-                                  setShowMealRequestModal(true); 
-                                }}
-                                className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all flex flex-col items-center justify-center gap-1 border-2 ${
-                                  hasAcceptedLunch ? 'bg-[#0B6E4F] border-[#0B6E4F]/80 text-[#C9A227] shadow-md active:scale-95' : 
-                                  isPending ? 'bg-[#C9A227] border-[#C9A227]/80 text-[#1C232E] shadow-md active:scale-95' : 
-                                  'bg-[#1C232E] border-[#2A2F36] text-[#9C9384] hover:border-[#0B6E4F] hover:text-[#0B6E4F] shadow-md active:scale-95'
-                                }`}>
-                                {isPending ? <span className="opacity-80">⏳ Sent — + Add More</span> :
-                                 hasAcceptedLunch ? <span className="opacity-80">✓ Accepted — + Add More</span> :
-                                 <span className="opacity-80">Request Lunch</span>}
-                                {totalLunchQty > 0 && <span className="text-sm font-black">x {totalLunchQty} Total</span>}
-                              </button>
-                            );
-                          })()}
-                        </div>
-
-                        {/* Dinner Request Button */}
-                        <div className="space-y-2">
-                          {(() => {
-                            const dinnerOrders = activeMeals.filter(o => o.type === 'dinner');
-                            const totalDinnerQty = dinnerOrders.reduce((sum, o) => sum + (o.quantity || 0), 0);
-                            const isPending = dinnerOrders.some(o => o.status === 'pending');
-                            const hasAcceptedDinner = dinnerOrders.some(o => o.status === 'confirmed');
-                            return (
-                              <button type="button" 
-                                onClick={() => { 
-                                  setCurrentMealType('dinner'); 
-                                  setMealRequestAmount(0); // Default to 0 for adding extra portions
-                                  setShowMealRequestModal(true); 
-                                }}
-                                className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all flex flex-col items-center justify-center gap-1 border-2 ${
-                                  hasAcceptedDinner ? 'bg-[#0B6E4F] border-[#0B6E4F]/80 text-[#C9A227] shadow-md active:scale-95' : 
-                                  isPending ? 'bg-[#C9A227] border-[#C9A227]/80 text-[#1C232E] shadow-md active:scale-95' : 
-                                  'bg-[#1C232E] border-[#2A2F36] text-[#9C9384] hover:border-[#0B6E4F] hover:text-[#0B6E4F] shadow-md active:scale-95'
-                                }`}>
-                                {isPending ? <span className="opacity-80">⏳ Sent — + Add More</span> :
-                                 hasAcceptedDinner ? <span className="opacity-80">✓ Accepted — + Add More</span> :
-                                 <span className="opacity-80">Request Dinner</span>}
-                                {totalDinnerQty > 0 && <span className="text-sm font-black">x {totalDinnerQty} Total</span>}
-                              </button>
-                            );
-                          })()}
-                        </div>
-                      </div>
-
-                      {/* Info Text */}
-                      <p className="text-[9px] font-bold text-slate-400 text-center italic">
-                        * Items appear in the Tab only after Kitchen Acceptance.
-                      </p>
-                    </div>
-                  )}
 
                   {/* Meal Request Modal */}
                   {showMealRequestModal && (
@@ -1142,10 +1081,51 @@ export function BookingModal(props: BookingModalProps) {
                         </div>
                         
                         <div className="space-y-6">
-                          <div className="flex items-center justify-center gap-6">
-                            <button type="button" onClick={() => setMealRequestAmount(Math.max(0, mealRequestAmount - 1))} className="w-16 h-16 rounded-3xl bg-[#1C232E]/50 text-[#9C9384] text-2xl font-black hover:bg-[#2A1518] transition-all shadow-sm border border-[#2A2F36]">－</button>
-                            <div className="text-5xl font-black text-[#EDE6D6] min-w-[60px] text-center">{mealRequestAmount}</div>
-                            <button type="button" onClick={() => setMealRequestAmount(mealRequestAmount + 1)} className="w-16 h-16 rounded-3xl bg-[#0B6E4F]/20 text-[#0B6E4F] text-2xl font-black hover:bg-[#0B6E4F]/30 transition-all shadow-sm border border-[#0B6E4F]/40">＋</button>
+                          <div className="space-y-4">
+                            <div>
+                              <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest block mb-2">Adults Qty</label>
+                              <div className="flex items-center justify-center gap-4">
+                                <button type="button" onClick={() => setMealRequestAdultQty(Math.max(0, mealRequestAdultQty - 1))} className="w-12 h-12 rounded-2xl bg-[#1C232E]/50 text-[#9C9384] text-xl font-black hover:bg-[#2A1518] transition-all shadow-sm border border-[#2A2F36]">－</button>
+                                <div className="text-3xl font-black text-[#EDE6D6] min-w-[50px] text-center">{mealRequestAdultQty}</div>
+                                <button type="button" onClick={() => setMealRequestAdultQty(mealRequestAdultQty + 1)} className="w-12 h-12 rounded-2xl bg-[#0B6E4F]/20 text-[#0B6E4F] text-xl font-black hover:bg-[#0B6E4F]/30 transition-all shadow-sm border border-[#0B6E4F]/40">＋</button>
+                              </div>
+                            </div>
+                            {(sel?.children_under_12 || 0) > 0 && (
+                              <div>
+                                <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest block mb-2">Children Qty</label>
+                                <div className="flex items-center justify-center gap-4">
+                                  <button type="button" onClick={() => setMealRequestChildQty(Math.max(0, mealRequestChildQty - 1))} className="w-12 h-12 rounded-2xl bg-[#1C232E]/50 text-[#9C9384] text-xl font-black hover:bg-[#2A1518] transition-all shadow-sm border border-[#2A2F36]">－</button>
+                                  <div className="text-3xl font-black text-[#EDE6D6] min-w-[50px] text-center">{mealRequestChildQty}</div>
+                                  <button type="button" onClick={() => setMealRequestChildQty(mealRequestChildQty + 1)} className="w-12 h-12 rounded-2xl bg-[#0B6E4F]/20 text-[#0B6E4F] text-xl font-black hover:bg-[#0B6E4F]/30 transition-all shadow-sm border border-[#0B6E4F]/40">＋</button>
+                                </div>
+                              </div>
+                            )}
+                            <div>
+                              <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest block mb-2">Adult Vegetarian Qty</label>
+                              <div className="flex items-center justify-center gap-4">
+                                <button type="button" onClick={() => setMealRequestAdultVegQty(Math.max(0, mealRequestAdultVegQty - 1))} className="w-12 h-12 rounded-2xl bg-[#1C232E]/50 text-[#9C9384] text-xl font-black hover:bg-[#2A1518] transition-all shadow-sm border border-[#2A2F36]">－</button>
+                                <div className="text-3xl font-black text-[#EDE6D6] min-w-[50px] text-center">{mealRequestAdultVegQty}</div>
+                                <button type="button" onClick={() => setMealRequestAdultVegQty(Math.min(mealRequestAdultQty, mealRequestAdultVegQty + 1))} className="w-12 h-12 rounded-2xl bg-[#0B6E4F]/20 text-[#0B6E4F] text-xl font-black hover:bg-[#0B6E4F]/30 transition-all shadow-sm border border-[#0B6E4F]/40">＋</button>
+                              </div>
+                              <div className="flex items-center justify-between mt-2 px-2 py-1 bg-[#0B6E4F]/10 rounded-lg border border-[#0B6E4F]/30">
+                                <span className="text-[10px] font-bold text-[#0B6E4F]">Normal Adults:</span>
+                                <span className="text-[10px] font-black text-[#EDE6D6]">{mealRequestAdultQty - mealRequestAdultVegQty}</span>
+                              </div>
+                            </div>
+                            {(sel?.children_under_12 || 0) > 0 && (
+                              <div>
+                                <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest block mb-2">Child Vegetarian Qty</label>
+                                <div className="flex items-center justify-center gap-4">
+                                  <button type="button" onClick={() => setMealRequestChildVegQty(Math.max(0, mealRequestChildVegQty - 1))} className="w-12 h-12 rounded-2xl bg-[#1C232E]/50 text-[#9C9384] text-xl font-black hover:bg-[#2A1518] transition-all shadow-sm border border-[#2A2F36]">－</button>
+                                  <div className="text-3xl font-black text-[#EDE6D6] min-w-[50px] text-center">{mealRequestChildVegQty}</div>
+                                  <button type="button" onClick={() => setMealRequestChildVegQty(Math.min(mealRequestChildQty, mealRequestChildVegQty + 1))} className="w-12 h-12 rounded-2xl bg-[#0B6E4F]/20 text-[#0B6E4F] text-xl font-black hover:bg-[#0B6E4F]/30 transition-all shadow-sm border border-[#0B6E4F]/40">＋</button>
+                                </div>
+                                <div className="flex items-center justify-between mt-2 px-2 py-1 bg-[#0B6E4F]/10 rounded-lg border border-[#0B6E4F]/30">
+                                  <span className="text-[10px] font-bold text-[#0B6E4F]">Normal Children:</span>
+                                  <span className="text-[10px] font-black text-[#EDE6D6]">{mealRequestChildQty - mealRequestChildVegQty}</span>
+                                </div>
+                              </div>
+                            )}
                           </div>
 
                           <div className="flex items-center justify-between p-4 bg-[#1C232E]/50 rounded-2xl border border-[#2A2F36]">
@@ -1160,6 +1140,15 @@ export function BookingModal(props: BookingModalProps) {
                           </div>
 
                           <div className="space-y-3">
+                            <div>
+                              <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest block mb-2">Meal Date</label>
+                              <input
+                                type="date"
+                                value={mealRequestDate}
+                                onChange={(e) => setMealRequestDate(e.target.value)}
+                                className="w-full px-4 py-3 bg-[#1C232E] border border-[#2A2F36] rounded-xl text-sm font-black text-[#EDE6D6] outline-none focus:border-[#0B6E4F] transition-all"
+                              />
+                            </div>
                             <div>
                               <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest block mb-2">Dietary Type</label>
                               <select
@@ -1195,7 +1184,7 @@ export function BookingModal(props: BookingModalProps) {
                           )}
 
                           <button type="button"
-                            disabled={mealRequestAmount <= 0}
+                            disabled={mealRequestAdultQty <= 0 && mealRequestChildQty <= 0}
                             onClick={async () => {
                               // 1. Fetch latest metadata first to prevent overwriting other fields (like settled_receipts)
                               const { data: latest } = await supabase
@@ -1207,15 +1196,15 @@ export function BookingModal(props: BookingModalProps) {
                               const latestMeta = latest?.meta || {};
 
                               // 3. Insert into normalized meal_requests table so Cook dashboard sees it
-                              const todayStr = new Date().toISOString().split('T')[0];
                               const dbMealType = currentMealType === 'lunch' ? 'Lunch' : 'Dinner';
                               
                               const mealRow = {
                                 booking_id: sel.id,
-                                meal_date: todayStr,
+                                meal_date: mealRequestDate,
                                 meal_type: dbMealType,
-                                adult_qty: mealRequestAmount,
-                                child_qty: 0,
+                                adult_qty: mealRequestAdultQty,
+                                child_qty: mealRequestChildQty,
+                                vegetarian_qty: mealRequestAdultVegQty + mealRequestChildVegQty,
                                 dietary_type: mealRequestDietary,
                                 notes: mealRequestNotes,
                                 status: 'Pending',
@@ -1231,9 +1220,33 @@ export function BookingModal(props: BookingModalProps) {
                                 return;
                               }
 
+                              // Update bookings table with default_vegetarian_qty
+                              await supabase
+                                .from('bookings')
+                                .update({ default_vegetarian_qty: mealRequestAdultVegQty + mealRequestChildVegQty })
+                                .eq('id', sel.id);
+
+                              // If this is Lunch, auto-apply the same vegetarian count to Dinner on the same day
+                              if (currentMealType === 'lunch') {
+                                const { data: existingDinner } = await supabase
+                                  .from('meal_requests')
+                                  .select('*')
+                                  .eq('booking_id', sel.id)
+                                  .eq('meal_date', mealRequestDate)
+                                  .eq('meal_type', 'Dinner')
+                                  .single();
+
+                                if (existingDinner) {
+                                  await supabase
+                                    .from('meal_requests')
+                                    .update({ vegetarian_qty: mealRequestAdultVegQty + mealRequestChildVegQty })
+                                    .eq('id', existingDinner.id);
+                                }
+                              }
+
                               const order = {
                                 type: currentMealType,
-                                quantity: mealRequestAmount,
+                                quantity: mealRequestAdultQty + mealRequestChildQty,
                                 status: 'pending',
                                 prepaid: currentMealType === 'lunch' ? isLunchPrepaid : isDinnerPrepaid,
                                 guest_name: sel.guest_name,
@@ -1244,6 +1257,10 @@ export function BookingModal(props: BookingModalProps) {
 
                               // meal_requests table is the Single Source of Truth.
                               // The parent's realtime subscription will auto-update activeMeals.
+                              
+                              // Save the veg split for carry-over to future meals
+                              setLastVegSplit({ adultVeg: mealRequestAdultVegQty, childVeg: mealRequestChildVegQty });
+                              
                               if (onRefresh) onRefresh();
                               flash('✓ Sent to Kitchen!');
                               setShowMealRequestModal(false);
@@ -1257,10 +1274,55 @@ export function BookingModal(props: BookingModalProps) {
                     </div>
                   )}
 
-                  {isRoomStay && (
-                    <div className="border border-[#2A2F36] rounded-xl p-4 space-y-3 bg-[#1C232E]">
-
-                      <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Other Services</p>
+                  {isRoomStay && (() => {
+                    const isTab1Closed = getSettledReceiptsForSel().length > 0 || (sel.collected_amount || 0) > 0 || sel.is_prepaid || sel.is_accommodation_prepaid || sel.is_food_prepaid;
+                    const relevantMealsForToggle = activeMeals.filter((m: any) => 
+                      m.status === 'confirmed' || m.status === 'served'
+                    );
+                    const hasMeals = relevantMealsForToggle.length > 0;
+                    const allMealsPrepaid = relevantMealsForToggle.length > 0 && relevantMealsForToggle.every((m: any) => m.is_paid);
+                    return (
+                      <div className="border border-[#2A2F36] rounded-xl p-4 space-y-3 bg-[#1C232E]">
+                        <div className="flex justify-between items-center">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Other Services</p>
+                          {hasMeals && (
+                            <div className="flex items-center gap-3">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const newValue = !isFoodPrepaid;
+                                  setIsFoodPrepaid(newValue);
+                                  
+                                  // Bulk update all relevant meals
+                                  if (relevantMealsForToggle.length > 0) {
+                                    const mealIds = relevantMealsForToggle.map((m: any) => m.id);
+                                    const { error } = await supabase
+                                      .from('meal_requests')
+                                      .update({ is_paid: newValue })
+                                      .in('id', mealIds);
+                                    if (error) {
+                                      console.error('Failed to bulk update meal prepaid status:');
+                                      console.error('message:', error?.message);
+                                      console.error('details:', error?.details);
+                                      console.error('hint:', error?.hint);
+                                      console.error('code:', error?.code);
+                                    } else {
+                                      onRefresh?.();
+                                    }
+                                  }
+                                }}
+                                className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${allMealsPrepaid ? 'bg-[#0B6E4F]' : 'bg-[#5C4A2E]'}`}
+                              >
+                                <span
+                                  className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${allMealsPrepaid ? 'translate-x-5' : 'translate-x-0'}`}
+                                />
+                              </button>
+                              {allMealsPrepaid && (
+                                <span className="text-[10px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">Prepaid</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       <div className="grid grid-cols-1 gap-4">
                         <div className="space-y-2">
                           <div className="flex justify-between items-center">
@@ -1340,13 +1402,38 @@ export function BookingModal(props: BookingModalProps) {
                         </div>
                       </div>
                     </div>
-                  )}
+                    );
+                  })()}
                 </div>
               )}
 
               {(canCheckOut || sel.status === 'checked_in') && isStaff && (
                 <div className="border border-[#2A2F36] rounded-xl p-4 space-y-3 bg-[#1C232E]">
                   <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Extra Services</p>
+                  
+                  {userRole === 'CEO' && (
+                    <div className="space-y-2 p-3 bg-[#0B6E4F]/10 rounded-lg border border-[#0B6E4F]/30">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-[#0B6E4F] block mb-2">Discount (CEO Only)</label>
+                      <div className="flex gap-2">
+                        <input 
+                          type="number" 
+                          value={String(svcDiscount)} 
+                          onChange={e => setSvcDiscount(parseFloat(e.target.value) || 0)}
+                          placeholder="0.00"
+                          className="flex-1 px-3 py-2 bg-[#1C232E] border-2 border-[#0B6E4F]/40 rounded-lg text-sm font-black text-[#EDE6D6] outline-none focus:border-[#0B6E4F]"
+                        />
+                        <span className="flex items-center px-2 text-xs font-bold text-[#0B6E4F]">USD</span>
+                      </div>
+                      <input
+                        type="text"
+                        value={svcDiscountReason}
+                        onChange={e => setSvcDiscountReason(e.target.value)}
+                        placeholder="Reason for discount"
+                        className="w-full px-3 py-2 bg-[#1C232E] border-2 border-[#0B6E4F]/40 rounded-lg text-sm font-bold text-[#EDE6D6] outline-none focus:border-[#0B6E4F]"
+                      />
+                    </div>
+                  )}
+                  
                   <button onClick={() => setShowDrinks(!showDrinks)} className="text-sm font-bold text-[#0B6E4F] hover:text-[#0B6E4F]/80">{showDrinks ? '− Hide Drinks' : '+ Add Drinks'}</button>
                   {showDrinks && drinks.length > 0 && (
                     <div className="grid grid-cols-2 gap-2">
@@ -1354,9 +1441,51 @@ export function BookingModal(props: BookingModalProps) {
                         <div key={d.id} className="flex items-center gap-2 bg-[#1C232E]/50 rounded-lg px-3 py-2 border border-[#2A2F36]">
                           <span className="text-xs text-[#EDE6D6] flex-1 truncate">{String(d.name)}</span>
                           <div className="flex items-center gap-1">
-                            <button onClick={() => setSelectedDrinks({ ...selectedDrinks, [d.id]: Math.max(0, (selectedDrinks[d.id] || 0) - 1) })} className="w-5 h-5 rounded bg-[#1C232E]/50 text-[#9C9384] text-xs font-bold hover:bg-[#2A1518] border border-[#2A2F36]">−</button>
+                            <button onClick={async () => {
+                              const currentQty = selectedDrinks[d.id] || 0;
+                              if (currentQty > 0) {
+                                // Delete most recent unpaid booking_services row for this drink
+                                const { data: existingRows, error: fetchError } = await supabase
+                                  .from('booking_services')
+                                  .select('id')
+                                  .eq('booking_id', sel.id)
+                                  .eq('service_type', 'drink')
+                                  .filter('details->>drink_id', 'eq', String(d.id))
+                                  .eq('is_paid', false)
+                                  .order('created_at', { ascending: false })
+                                  .limit(1);
+                                if (fetchError) {
+                                  flash('⚠ Failed to remove drink.');
+                                  return;
+                                }
+                                if (existingRows && existingRows.length > 0) {
+                                  const { error: deleteError } = await supabase.from('booking_services').delete().eq('id', existingRows[0].id);
+                                  if (deleteError) {
+                                    flash('⚠ Failed to remove drink.');
+                                    return;
+                                  }
+                                }
+                                setSelectedDrinks({ ...selectedDrinks, [d.id]: currentQty - 1 });
+                              }
+                            }} className="w-5 h-5 rounded bg-[#1C232E]/50 text-[#9C9384] text-xs font-bold hover:bg-[#2A1518] border border-[#2A2F36]">−</button>
                             <span className="w-5 text-center text-xs font-bold text-[#EDE6D6]">{String(selectedDrinks[d.id] || 0)}</span>
-                            <button onClick={() => setSelectedDrinks({ ...selectedDrinks, [d.id]: (selectedDrinks[d.id] || 0) + 1 })} className="w-5 h-5 rounded bg-[#0B6E4F]/20 text-[#0B6E4F] text-xs font-bold hover:bg-[#0B6E4F]/30 border border-[#0B6E4F]/40">+</button>
+                            <button onClick={async () => {
+                              // Insert into booking_services
+                              const { error } = await supabase.from('booking_services').insert({
+                                booking_id: sel.id,
+                                service_type: 'drink',
+                                unit_price: d.sold_price || d.price || 0,
+                                quantity: 1,
+                                currency: d.currency || 'USD',
+                                details: { name: d.name, drink_id: d.id },
+                                is_paid: false
+                              });
+                              if (error) {
+                                flash('⚠ Failed to add drink.');
+                                return;
+                              }
+                              setSelectedDrinks({ ...selectedDrinks, [d.id]: (selectedDrinks[d.id] || 0) + 1 });
+                            }} className="w-5 h-5 rounded bg-[#0B6E4F]/20 text-[#0B6E4F] text-xs font-bold hover:bg-[#0B6E4F]/30 border border-[#0B6E4F]/40">+</button>
                           </div>
                         </div>
                       ))}
@@ -1367,7 +1496,26 @@ export function BookingModal(props: BookingModalProps) {
                       className="flex-1 px-3 py-2 text-base rounded-lg border border-[#2A2F36] bg-[#1C232E] focus:outline-none focus:ring-2 focus:ring-[#0B6E4F]/30 text-[#EDE6D6]" />
                     <input type="number" value={String(newExtraPrice)} onChange={e => setNewExtraPrice(e.target.value)} placeholder="Price"
                       className="w-20 px-3 py-2 text-base rounded-lg border border-[#2A2F36] bg-[#1C232E] focus:outline-none text-[#EDE6D6]" />
-                    <button onClick={() => { if (!newExtraName.trim()) return; setExtraServices([...extraServices, { name: newExtraName.trim(), price: newExtraPrice, currency: 'USD' }]); setNewExtraName(''); setNewExtraPrice(''); }}
+                    <button onClick={async () => {
+                      if (!newExtraName.trim()) return;
+                      // Insert into booking_services
+                      const { error } = await supabase.from('booking_services').insert({
+                        booking_id: sel.id,
+                        service_type: 'extra',
+                        unit_price: parseFloat(newExtraPrice) || 0,
+                        quantity: 1,
+                        currency: 'USD',
+                        details: { name: newExtraName.trim() },
+                        is_paid: false
+                      });
+                      if (error) {
+                        flash('⚠ Failed to add extra.');
+                        return;
+                      }
+                      setExtraServices([...extraServices, { name: newExtraName.trim(), price: newExtraPrice, currency: 'USD' }]);
+                      setNewExtraName('');
+                      setNewExtraPrice('');
+                    }}
                       className="px-3 py-2 bg-[#0B6E4F] text-[#C9A227] text-xs font-bold rounded-lg hover:bg-[#0B6E4F]/80 border border-[#0B6E4F]/40">Add</button>
                   </div>
                   {extraServices.length > 0 && (
@@ -1377,7 +1525,31 @@ export function BookingModal(props: BookingModalProps) {
                           <span className="text-[#EDE6D6]">{String(s.name)}</span>
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-[#0B6E4F]">{String(s.price)} {String(s.currency)}</span>
-                            <button onClick={() => setExtraServices(extraServices.filter((_: any, j: number) => j !== i))} className="text-[#722F37] hover:text-[#722F37]/80 font-bold">×</button>
+                            <button onClick={async () => {
+                              const extra = extraServices[i];
+                              // Delete corresponding booking_services row
+                              const { data: existingRows, error: fetchError } = await supabase
+                                .from('booking_services')
+                                .select('id')
+                                .eq('booking_id', sel.id)
+                                .eq('service_type', 'extra')
+                                .filter('details->>name', 'eq', extra.name)
+                                .eq('is_paid', false)
+                                .order('created_at', { ascending: false })
+                                .limit(1);
+                              if (fetchError) {
+                                flash('⚠ Failed to remove extra.');
+                                return;
+                              }
+                              if (existingRows && existingRows.length > 0) {
+                                const { error: deleteError } = await supabase.from('booking_services').delete().eq('id', existingRows[0].id);
+                                if (deleteError) {
+                                  flash('⚠ Failed to remove extra.');
+                                  return;
+                                }
+                              }
+                              setExtraServices(extraServices.filter((_: any, j: number) => j !== i));
+                            }} className="text-[#722F37] hover:text-[#722F37]/80 font-bold">×</button>
                           </div>
                         </div>
                       ))}
@@ -1386,12 +1558,14 @@ export function BookingModal(props: BookingModalProps) {
                 </div>
               )}
 
-              {isStaff && !isPOS && sel.status !== 'completed' && (
-                <div className="bg-[#0B6E4F] rounded-2xl p-5 text-[#C9A227] shadow-xl shadow-[#0B6E4F]/20 animate-in fade-in zoom-in duration-500 border border-[#0B6E4F]/40">
-                  <div className="flex justify-between items-center mb-4">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-[#C9A227]/80">Tab Summary</p>
-                    <svg className="w-5 h-5 text-[#C9A227]/60 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
-                  </div>
+              {isStaff && !isPOS && sel.status !== 'completed' && (() => {
+                const isTab1Closed = getSettledReceiptsForSel().length > 0 || (sel.collected_amount || 0) > 0 || sel.is_prepaid || sel.is_accommodation_prepaid || sel.is_food_prepaid;
+                return (
+                  <div className="bg-[#0B6E4F] rounded-2xl p-5 text-[#C9A227] shadow-xl shadow-[#0B6E4F]/20 animate-in fade-in zoom-in duration-500 border border-[#0B6E4F]/40">
+                    <div className="flex justify-between items-center mb-4">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-[#C9A227]/80">Tab Summary</p>
+                      <svg className="w-5 h-5 text-[#C9A227]/60 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                    </div>
                   
                   <div className="space-y-2">
                     {(svcAmount > 0 || (isPrepaid && (sel.collected_amount || 0) === 0)) && (() => {
@@ -1404,11 +1578,12 @@ export function BookingModal(props: BookingModalProps) {
                           <span className="font-bold">
                             Accommodation {isExtended && <span className="text-amber-200">(Extended)</span>}
                           </span>
-                          {isPrepaid ? (
-                            <span className="text-[10px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">PREPAID</span>
-                          ) : (
+                          <div className="flex items-center gap-2">
+                            {isPrepaid && (
+                              <span className="text-[9px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">PREPAID</span>
+                            )}
                             <span className="font-black">${String(svcAmount.toFixed(2))}</span>
-                          )}
+                          </div>
                         </div>
                       );
                     })()}
@@ -1439,45 +1614,237 @@ export function BookingModal(props: BookingModalProps) {
                       );
                       
                       const individualMeals = acceptedOrders.map((o: any) => {
-                        const dietaryInfo = o.dietary_type && o.dietary_type !== 'Normal' ? ` - ${o.dietary_type}` : '';
-                        const notesInfo = o.notes ? ` - *${o.notes}*` : '';
-                        return {
-                          name: `${o.type.charAt(0).toUpperCase() + o.type.slice(1)} (${o.meal_date || 'N/A'})${dietaryInfo}${notesInfo} - ID: #${o.meal_id}`,
-                          price: (o.quantity || 1) * (o.type === 'lunch' ? pricing.lunch_price : pricing.dinner_price),
-                          prepaid: o.prepaid
-                        };
-                      });
+                        const adultQty = o.adult_qty || 0;
+                        const childQty = o.child_qty || 0;
+                        const vegAdultQty = o.veg_adults_qty || 0;
+                        const vegChildQty = o.veg_children_qty || 0;
+                        
+                        const adultPrice = o.type === 'lunch' ? (pricing?.lunch_price || 10) : (pricing?.dinner_price || 12);
+                        const childPrice = o.type === 'lunch' ? (pricing?.lunch_child_price || 5) : (pricing?.dinner_child_price || 5);
+                        const adultTotal = adultQty * adultPrice;
+                        const childTotal = childQty * childPrice;
+                        
+                        const mealType = o.type.charAt(0).toUpperCase() + o.type.slice(1);
+                        const mealDate = o.meal_date || 'N/A';
+                        
+                        const items = [];
+                        if (adultQty > 0) {
+                          items.push({
+                            mealId: o.id,
+                            mealType,
+                            mealDate,
+                            category: 'Adult',
+                            qty: adultQty,
+                            vegQty: vegAdultQty,
+                            unitPrice: adultPrice,
+                            price: adultTotal,
+                            prepaid: o.prepaid
+                          });
+                        }
+                        if (childQty > 0) {
+                          items.push({
+                            mealId: o.id,
+                            mealType,
+                            mealDate,
+                            category: 'Child',
+                            qty: childQty,
+                            vegQty: vegChildQty,
+                            unitPrice: childPrice,
+                            price: childTotal,
+                            prepaid: o.prepaid
+                          });
+                        }
+                        return items;
+                      }).flat();
+
+                      const pendingGuide = svcGuide && !activeServices.some((s: any) => s.service_type === 'guide') 
+                        ? { name: 'Guide', description: svcGuideNames.filter(n => n.trim()).join(', ') || 'Pending...', price: svcGuidePrice, prepaid: false, pending: true } 
+                        : null;
+
+                      const pendingTransport = svcTransport && !activeServices.some((s: any) => s.service_type === 'transportation') && svcTransList.some((t: any) => t.price > 0)
+                        ? { name: 'Transport', description: svcTransList.map((t: any) => t.name).filter(Boolean).join(', ') || 'Pending...', price: svcTransList.reduce((s: number, t: any) => s + (t.price || 0), 0), prepaid: false, pending: true } 
+                        : null;
 
                       const sItems = [
                         ...individualMeals,
-                        svcGuide && { name: 'Guide', price: svcGuidePrice, prepaid: false },
-                        svcTransport && { name: 'Transport', price: svcTransList.reduce((s: number, t: any) => s + (t.price || 0), 0), prepaid: false },
+                        ...activeServices.map((s: any) => {
+                          const baseItem = {
+                            id: s.id,
+                            serviceType: s.service_type,
+                            price: s.unit_price * s.quantity,
+                            currency: s.currency,
+                            prepaid: s.is_paid,
+                            details: s.details
+                          };
+                          
+                          if (s.service_type === 'guide') {
+                            return { ...baseItem, name: 'Guide', description: s.details?.names || '1 guide' };
+                          }
+                          if (s.service_type === 'transportation') {
+                            return { ...baseItem, name: 'Transport', description: s.details?.name || s.details?.destination || '' };
+                          }
+                          if (s.service_type === 'drink') {
+                            return { ...baseItem, name: s.details?.name || 'Drink', description: s.currency };
+                          }
+                          if (s.service_type === 'extra') {
+                            return { ...baseItem, name: s.details?.name || 'Extra', description: '' };
+                          }
+                          return null;
+                        }).filter(Boolean),
+                        pendingGuide,
+                        pendingTransport,
                         svcDiscount > 0 && { name: 'Discount', price: -svcDiscount, prepaid: false }
                       ].filter(Boolean) as any[];
 
                       if (sItems.length === 0) return null;
 
-                      return sItems.map((item: any, idx: number) => (
-                        <div key={idx} className="flex justify-between items-center opacity-90 border-b border-white/10 pb-1 mb-1 last:border-none last:pb-0 last:mb-0">
-                          <span className="font-bold">{String(item.name)}</span>
-                          {item.prepaid ? (
-                            <span className="text-[9px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">Prepaid</span>
-                          ) : (
-                            <span className="font-black">${String(item.price.toFixed(2))}</span>
-                          )}
-                        </div>
-                      ));
+                      // Group all meal items into a single "Food" group
+                      const foodGroup = individualMeals.reduce((group: any, item: any) => {
+                        group.items.push(item);
+                        group.totalPrice += item.price;
+                        if (item.prepaid) group.hasPrepaid = true;
+                        return group;
+                      }, { items: [], totalPrice: 0, hasPrepaid: false });
+                      
+                      // Update hasPrepaid to also check the isFoodPrepaid toggle
+                      foodGroup.hasPrepaid = foodGroup.hasPrepaid || isFoodPrepaid;
+
+                      const nonMealItems = sItems.filter((item: any) => !item.mealType);
+
+                      return (
+                        <>
+                          {foodGroup.items.length > 0 && (() => {
+                            const foodKey = 'Food';
+                            const isExpanded = expandedMealGroups.has(foodKey);
+                            
+                            return (
+                              <div className="py-3 border-b border-white/10 last:border-none">
+                                <div 
+                                  className="flex justify-between items-center cursor-pointer hover:bg-white/5 rounded-lg px-2 py-1 transition-colors"
+                                  onClick={() => {
+                                    const newExpanded = new Set(expandedMealGroups);
+                                    if (newExpanded.has(foodKey)) {
+                                      newExpanded.delete(foodKey);
+                                    } else {
+                                      newExpanded.add(foodKey);
+                                    }
+                                    setExpandedMealGroups(newExpanded);
+                                  }}
+                                >
+                                  <span className="font-bold text-sm">Food</span>
+                                  <div className="flex items-center gap-2">
+                                    {foodGroup.hasPrepaid && (
+                                      <span className="text-[9px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">Prepaid</span>
+                                    )}
+                                    <span className="font-black text-sm">${foodGroup.totalPrice.toFixed(2)}</span>
+                                  </div>
+                                </div>
+                                {isExpanded && (
+                                  <div className="mt-2 pl-2 border-l-2 border-white/20 ml-2">
+                                    {(() => {
+                                      // Group items by date for separator lines
+                                      const itemsByDate = foodGroup.items.reduce((groups: any, item: any) => {
+                                        if (!groups[item.mealDate]) {
+                                          groups[item.mealDate] = [];
+                                        }
+                                        groups[item.mealDate].push(item);
+                                        return groups;
+                                      }, {});
+
+                                      const dates = Object.keys(itemsByDate);
+                                      return dates.map((date: string, dateIdx: number) => (
+                                        <div key={date}>
+                                          {itemsByDate[date].map((item: any, itemIdx: number) => (
+                                            <div key={itemIdx} className="flex justify-between items-center mb-1 last:mb-0">
+                                              <span className="font-bold text-sm">
+                                                {item.mealType} — {item.mealDate}: Size: {item.category} {item.qty} x ${item.unitPrice.toFixed(2)}{item.vegQty > 0 ? ` (${item.vegQty} veg)` : ''}
+                                              </span>
+                                              <div className="flex items-center gap-2">
+                                                <button
+                                                  type="button"
+                                                  onClick={async () => {
+                                                    const { error } = await supabase
+                                                      .from('meal_requests')
+                                                      .update({ is_paid: !item.is_paid })
+                                                      .eq('id', item.mealId);
+                                                    if (error) {
+                                                      console.error('Failed to update meal prepaid status:', error);
+                                                    }
+                                                  }}
+                                                  className={`relative w-8 h-4 rounded-full transition-colors duration-200 ${item.prepaid ? 'bg-[#0B6E4F]' : 'bg-[#5C4A2E]'}`}
+                                                >
+                                                  <span
+                                                    className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform duration-200 ${item.prepaid ? 'translate-x-4' : 'translate-x-0'}`}
+                                                  />
+                                                </button>
+                                                {item.prepaid ? (
+                                                  <span className="text-[9px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">Prepaid</span>
+                                                ) : (
+                                                  <span className="font-black text-sm">${String(item.price.toFixed(2))}</span>
+                                                )}
+                                              </div>
+                                            </div>
+                                          ))}
+                                          {dateIdx < dates.length - 1 && (
+                                            <div className="border-t border-white/10 my-2"></div>
+                                          )}
+                                        </div>
+                                      ));
+                                    })()}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                          {nonMealItems.map((item: any, idx: number) => (
+                            <div key={`nonmeal-${idx}`} className="flex justify-between items-center py-3 border-b border-white/10 last:border-none">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-sm">{item.name}</span>
+                                {item.description && <span className="text-xs text-[#9C9384]">{item.description}</span>}
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (!item.id) return;
+                                    const { error } = await supabase
+                                      .from('booking_services')
+                                      .delete()
+                                      .eq('id', item.id);
+                                    if (error) {
+                                      flash('⚠ Failed to remove service.');
+                                      return;
+                                    }
+                                    // State will update via realtime subscription
+                                  }}
+                                  className="text-[#722F37] hover:text-[#722F37]/80 font-bold text-sm"
+                                >
+                                  ×
+                                </button>
+                                <span className="font-black text-sm">${String(item.price.toFixed(2))}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </>
+                      );
                     })()}
 
-                    {dTotal_calc > 0 && (
-                      <div className="flex justify-between items-center opacity-90">
-                        <span className="font-bold">Drinks Tab</span>
-                        <span className="font-black">${String(dTotal_calc.toFixed(2))}</span>
-                      </div>
-                    )}
+                    {(() => {
+                      const drinkServices = activeServices.filter((s: any) => s.service_type === 'drink');
+                      if (drinkServices.length === 0) return null;
+                      const drinkTotal = drinkServices.reduce((sum: number, s: any) => sum + (s.unit_price * s.quantity), 0);
+                      return (
+                        <div className="flex justify-between items-center opacity-90">
+                          <span className="font-bold">Drinks Tab</span>
+                          <span className="font-black">${String(drinkTotal.toFixed(2))}</span>
+                        </div>
+                      );
+                    })()}
 
                     {(() => {
-                      const eTotal = extraServices.reduce((sum: number, s: any) => sum + (parseFloat(s.price) || 0), 0);
+                      const extraServices = activeServices.filter((s: any) => s.service_type === 'extra');
+                      if (extraServices.length === 0) return null;
+                      const eTotal = extraServices.reduce((sum: number, s: any) => sum + (s.unit_price * s.quantity), 0);
                       if (eTotal <= 0) return null;
                       return (
                         <div className="flex justify-between items-center opacity-90">
@@ -1499,17 +1866,7 @@ export function BookingModal(props: BookingModalProps) {
                         };
                       });
 
-                      return (
-                        <div className="mt-4 pt-4 border-t border-white/20 animate-in fade-in duration-700">
-                          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-indigo-200 mb-2 opacity-70">Historical Receipts / Settled</p>
-                          {individualPaidMeals.map((item: any, idx: number) => (
-                            <div key={idx} className="flex justify-between items-center opacity-60 text-xs italic line-through decoration-indigo-300/50">
-                              <span>{String(item.name)}</span>
-                              <span>Settled</span>
-                            </div>
-                          ))}
-                        </div>
-                      );
+                      return null; // Removed old Historical Receipts section - now using clickable Receipt History at bottom
                     })()}
                   </div>
 
@@ -1517,13 +1874,8 @@ export function BookingModal(props: BookingModalProps) {
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <p className="text-[10px] font-black uppercase tracking-widest text-indigo-100">
-                          {gTotal > 0 ? 'Current Tab Balance' : gTotal < 0 ? 'Refund Due to Guest' : 'Tab Settled (Zero Balance)'}
+                          {(gTotalWithPending ?? gTotal) > 0 ? 'Current Tab Balance' : (gTotalWithPending ?? gTotal) < 0 ? 'Refund Due to Guest' : 'Tab Settled (Zero Balance)'}
                         </p>
-                        {sel.payment_status === 'Prepaid' && (
-                          <span className="font-mono text-[9px] font-black uppercase tracking-widest border border-white px-2 py-0.5 bg-indigo-500 text-white">
-                            [ PREPAID ]
-                          </span>
-                        )}
                         {sel.payment_status === 'paid' && (
                           <span className="font-mono text-[9px] font-black uppercase tracking-widest border border-[#2A2F36] px-2 py-0.5 bg-[#1C232E] text-[#0B6E4F]">
                             [ PAID - {svcPayList?.[0]?.method?.toUpperCase() || 'CASH'} ]
@@ -1531,15 +1883,18 @@ export function BookingModal(props: BookingModalProps) {
                         )}
                       </div>
                       <p className="text-3xl font-black tracking-tighter leading-none mb-2">
-                        ${String(gTotal.toFixed(2))}
+                        ${String((gTotalWithPending ?? gTotal).toFixed(2))}
                       </p>
                     </div>
                   </div>
                 </div>
-              )}
+                );
+              })()}
 
-              {isStaff && sel.status !== 'completed' && (
-                  Math.abs(debtRemaining) > 0.01 && (
+              {(() => {
+                const hasTabItems = svcAmount > 0 || isPrepaid || activeServices.length > 0 || activeMeals.some(m => !m.is_paid && (m.status === 'confirmed' || m.status === 'served'));
+                if (!isStaff || sel.status === 'completed' || (!hasTabItems && Math.abs(debtRemaining) <= 0.01)) return null;
+                return (
                     <div className="bg-[#1C232E] border border-[#2A2F36] p-6 space-y-4 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)]">
                       <div className="flex justify-between items-center">
                         <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Payment Collection</p>
@@ -1739,7 +2094,7 @@ export function BookingModal(props: BookingModalProps) {
                                 setValError('Stay Price is missing. Please enter the guest\'s accommodation cost before proceeding.');
                                 return;
                               }
-                              if (!isBalanceMatched) {
+                              if (!isBalanceMatched && userRole !== 'CEO') {
                                 setValError(`Payment balance mismatch. You are trying to collect ${tPaidUsd.toFixed(2)} USD, but the debt is ${debtRemaining.toFixed(2)} USD. Please use the "Match Balance" button to even the tab.`);
                                 return;
                               }
@@ -1754,14 +2109,14 @@ export function BookingModal(props: BookingModalProps) {
                         </div>
                       </div>
                     </div>
-                  )
-              )}
+                );
+              })()}
 
               {/* FOLIO HISTORY — settled tabs (green) + active tab (indigo) */}
               {isStaff && !isPOS && sel.status !== 'completed' && (() => {
                 const receipts = getSettledReceiptsForSel();
                 const tabCount = receipts.length;
-                if (tabCount === 0 && gTotal <= 0.01 && (sel.collected_amount || 0) === 0) return null;
+                if (tabCount === 0 && gTotal <= 0.01 && (sel.collected_amount || 0) === 0 && !hasPendingUnsavedServices) return null;
                 return (
                   <div className="border border-[#2A2F36] rounded-2xl p-4 bg-[#1C232E]/50 space-y-3">
                     <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Guest Folio</p>
@@ -1855,11 +2210,11 @@ export function BookingModal(props: BookingModalProps) {
                             <div className="space-y-3">
                               {((selectedReceipt.items?.accommodation || 0) > 0 || selectedReceipt.items?.isPrepaid) && (
                                 <div className="flex justify-between items-center text-sm">
-                                  <span className="text-slate-600 font-bold">Stay Price</span>
+                                  <span className="text-slate-400 font-medium">Accommodation ×1</span>
                                   {selectedReceipt.items?.isPrepaid ? (
                                     <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">PREPAID</span>
                                   ) : (
-                                    <span className="text-slate-900 font-black">${String((selectedReceipt.items.accommodation || 0).toFixed(2))}</span>
+                                    <span className="text-slate-500 font-bold">${String((selectedReceipt.items.accommodation || 0).toFixed(2))}</span>
                                   )}
                                 </div>
                               )}
@@ -1867,16 +2222,18 @@ export function BookingModal(props: BookingModalProps) {
                               {(() => {
                                 const meals = selectedReceipt.items?.meals || {};
                                 return Object.entries(meals).map(([type, count]: [string, any]) => {
-                                  if (type.startsWith('is') || !count) return null;
+                                  if (type.startsWith('is') || type === 'mealDetails' || type === 'lunchCharged' || type === 'dinnerCharged' || !count) return null;
                                   const isMealPrepaid = type === 'lunch' ? meals.isLunchPrepaid : meals.isDinnerPrepaid;
                                   const price = type === 'lunch' ? (pricing?.lunch_price || 10) : (pricing?.dinner_price || 10);
+                                  const charged = type === 'lunch' ? meals.lunchCharged : meals.dinnerCharged;
+                                  const displayPrice = charged !== undefined ? charged : (count * price);
                                   return (
                                     <div key={type} className="flex justify-between items-center text-sm">
                                       <span className="text-slate-400 font-medium capitalize">{type} ×{String(count)}</span>
                                       {isMealPrepaid ? (
                                         <span className="text-[9px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">PREPAID</span>
                                       ) : (
-                                        <span className="text-slate-500 font-bold">${String((count * price).toFixed(2))}</span>
+                                        <span className="text-slate-500 font-bold">${String(displayPrice.toFixed(2))}</span>
                                       )}
                                     </div>
                                   );
@@ -1906,12 +2263,12 @@ export function BookingModal(props: BookingModalProps) {
                               {(selectedReceipt.items?.drinks?.length > 0) && (
                                 <div className="flex justify-between items-center text-sm">
                                   <span className="text-slate-400 font-medium">Drinks</span>
-                                  <span className="text-slate-500 font-bold">${String(selectedReceipt.items.drinks.reduce((s: number, d: any) => s + (d.price * d.qty), 0).toFixed(2))}</span>
+                                  <span className="text-slate-500 font-bold">${String(selectedReceipt.items.drinks.reduce((s: number, d: any) => s + (d.price * d.quantity), 0).toFixed(2))}</span>
                                 </div>
                               )}
 
                               <div className="flex justify-between items-center pt-4 border-t border-slate-100 mt-2">
-                                <span className="text-base font-black text-slate-900">Tab Total</span>
+                                <span className="text-base font-black text-slate-400">Tab Total</span>
                                 <span className="text-lg font-black text-[#6366f1]">${String((selectedReceipt.total || 0).toFixed(2))}</span>
                               </div>
                             </div>
@@ -1942,8 +2299,8 @@ export function BookingModal(props: BookingModalProps) {
                                 Tab #{getSettledReceiptsForSel().length + 1} Breakdown
                               </p>
                               <button 
-                                onClick={handleSaveProgress}
-                                disabled={loadingAction === 'save'}
+                                onClick={handleSaveServices}
+                                disabled={loadingAction === 'saveservices'}
                                 className="text-[10px] font-black text-emerald-600 hover:text-emerald-700 flex items-center gap-1 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100 transition-all active:scale-95 disabled:opacity-50"
                               >
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
@@ -1953,19 +2310,33 @@ export function BookingModal(props: BookingModalProps) {
                             <div className="space-y-3 bg-[#1C232E]/50 rounded-2xl p-4 border border-[#2A2F36]">
                               {(svcAmount > 0 || (isPrepaid && (sel.collected_amount || 0) === 0)) && (
                                 <div className="flex justify-between items-center text-sm">
-                                  <span className="text-[#9C9384] font-bold">Stay Price</span>
+                                  <span className="text-slate-400 font-medium">Accommodation ×1</span>
                                   {isPrepaid && (sel.collected_amount || 0) === 0 ? (
                                     <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">PREPAID</span>
                                   ) : (
-                                    <span className="text-slate-900 font-black">${String(svcAmount.toFixed(2))}</span>
+                                    <span className="text-slate-500 font-bold">${String(svcAmount.toFixed(2))}</span>
                                   )}
                                 </div>
                               )}
                               
                               {(() => {
+                                // Calculate meal totals from activeMeals (Single Source of Truth)
+                                const unpaidMeals = activeMeals.filter(m => 
+                                  !m.is_paid && (m.status === 'confirmed' || m.status === 'served')
+                                );
+                                
+                                const lunchMeals = unpaidMeals.filter(m => m.meal_type === 'Lunch');
+                                const lunchAdultQty = lunchMeals.reduce((sum, m) => sum + (m.adult_qty || 0), 0);
+                                const lunchChildQty = lunchMeals.reduce((sum, m) => sum + (m.child_qty || 0), 0);
+                                const lunchTotalQty = lunchAdultQty + lunchChildQty;
+                                const dinnerMeals = unpaidMeals.filter(m => m.meal_type === 'Dinner');
+                                const dinnerAdultQty = dinnerMeals.reduce((sum, m) => sum + (m.adult_qty || 0), 0);
+                                const dinnerChildQty = dinnerMeals.reduce((sum, m) => sum + (m.child_qty || 0), 0);
+                                const dinnerTotalQty = dinnerAdultQty + dinnerChildQty;
+                                
                                 const items = [
-                                  svcLunch && { name: 'Lunch', count: svcLunchCount, price: pricing.lunch_price, prepaid: isLunchPrepaid },
-                                  svcDinner && { name: 'Dinner', count: svcDinnerCount, price: pricing.dinner_price, prepaid: isDinnerPrepaid },
+                                  lunchTotalQty > 0 && { name: 'Lunch', count: lunchTotalQty, adultQty: lunchAdultQty, childQty: lunchChildQty, price: pricing.lunch_price, childPrice: pricing.lunch_child_price, prepaid: isLunchPrepaid || isFoodPrepaid },
+                                  dinnerTotalQty > 0 && { name: 'Dinner', count: dinnerTotalQty, adultQty: dinnerAdultQty, childQty: dinnerChildQty, price: pricing.dinner_price, childPrice: pricing.dinner_child_price, prepaid: isDinnerPrepaid || isFoodPrepaid },
                                   svcGuide && { name: 'Guide', price: svcGuidePrice },
                                   svcTransport && { name: 'Transport', price: svcTransList.reduce((s: number, t: any) => s + (t.price || 0), 0) },
                                   svcDiscount > 0 && { name: 'Discount', price: -svcDiscount }
@@ -1977,22 +2348,47 @@ export function BookingModal(props: BookingModalProps) {
                                     {item.prepaid ? (
                                       <span className="text-[9px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">PREPAID</span>
                                     ) : (
-                                      <span className="text-slate-500 font-bold">${String((item.count ? item.count * item.price : item.price).toFixed(2))}</span>
+                                      <span className="text-slate-500 font-bold">${String((item.adultQty !== undefined ? ((item.adultQty * item.price) + (item.childQty * item.childPrice)) : (item.count ? item.count * item.price : item.price)).toFixed(2))}</span>
                                     )}
                                   </div>
                                 ));
                               })()}
 
-                              {dTotal_calc > 0 && (
-                                <div className="flex justify-between items-center text-sm">
-                                  <span className="text-slate-400 font-medium">Drinks</span>
-                                  <span className="text-slate-500 font-bold">${String(dTotal_calc.toFixed(2))}</span>
-                                </div>
-                              )}
+                              {(() => {
+                                const drinkServices = activeServices.filter((s: any) => s.service_type === 'drink');
+                                const extraServices = activeServices.filter((s: any) => s.service_type === 'extra');
+                                
+                                if (drinkServices.length === 0 && extraServices.length === 0) return null;
+                                
+                                return (
+                                  <>
+                                    {drinkServices.map((s: any) => (
+                                      <div key={s.id} className="flex justify-between items-center text-sm">
+                                        <span className="text-slate-400 font-medium">{s.details?.name || 'Drink'} ({s.currency})</span>
+                                        {s.is_paid ? (
+                                          <span className="text-[9px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">PREPAID</span>
+                                        ) : (
+                                          <span className="text-slate-500 font-bold">${String((s.unit_price * s.quantity).toFixed(2))}</span>
+                                        )}
+                                      </div>
+                                    ))}
+                                    {extraServices.map((s: any) => (
+                                      <div key={s.id} className="flex justify-between items-center text-sm">
+                                        <span className="text-slate-400 font-medium">{s.details?.name || 'Extra'}</span>
+                                        {s.is_paid ? (
+                                          <span className="text-[9px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">PREPAID</span>
+                                        ) : (
+                                          <span className="text-slate-500 font-bold">${String((s.unit_price * s.quantity).toFixed(2))}</span>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </>
+                                );
+                              })()}
 
                               <div className="flex justify-between items-center pt-3 border-t border-slate-200 mt-1">
-                                <span className="text-sm font-black text-slate-900">Current Total</span>
-                                <span className="text-base font-black text-[#6366f1]">${String(gTotal.toFixed(2))}</span>
+                                <span className="text-sm font-black text-slate-400">Current Total</span>
+                                <span className="text-base font-black text-[#6366f1]">${String((gTotalWithPending ?? gTotal).toFixed(2))}</span>
                               </div>
                             </div>
                           </div>
@@ -2000,20 +2396,25 @@ export function BookingModal(props: BookingModalProps) {
                       )}
 
                       <div className="space-y-4">
-                        {gTotal > 0 && (
-                          <button 
+                        <button 
                             onClick={async () => {
                               if (finalizeTab) {
                                 const ok = await finalizeTab();
-                                if (ok) setShowFinalReceipt(false);
+                                if (ok) {
+                                  // Auto-select the newly created receipt
+                                  const receipts = getSettledReceiptsForSel();
+                                  if (receipts.length > 0) {
+                                    setSelectedReceipt(receipts[receipts.length - 1]);
+                                  }
+                                  setShowFinalReceipt(false);
+                                }
                               }
                             }}
-                            disabled={loadingAction === 'finalize' || !isBalanceMatched}
-                            className={`w-full py-4 rounded-2xl font-black uppercase text-[11px] tracking-widest transition-all shadow-lg active:scale-95 ${isBalanceMatched ? 'bg-[#0B6E4F] text-[#C9A227] shadow-[#0B6E4F]/30 hover:bg-[#0B6E4F]/80' : 'bg-[#1C232E]/50 text-[#9C9384] cursor-not-allowed'}`}
+                            disabled={loadingAction === 'finalize' || (!isBalanceMatched && gTotal > 0)}
+                            className={`w-full py-4 rounded-2xl font-black uppercase text-[11px] tracking-widest transition-all shadow-lg active:scale-95 ${(isBalanceMatched || gTotal === 0) ? 'bg-[#0B6E4F] text-[#C9A227] shadow-[#0B6E4F]/30 hover:bg-[#0B6E4F]/80' : 'bg-[#1C232E]/50 text-[#9C9384] cursor-not-allowed'}`}
                           >
-                            {loadingAction === 'finalize' ? 'PROCESSING...' : isBalanceMatched ? 'SETTLE & CLOSE TAB' : 'BALANCE MISMATCH'}
+                            {loadingAction === 'finalize' ? 'PROCESSING...' : gTotal === 0 ? 'SAVE RECEIPT' : isBalanceMatched ? 'SETTLE & CLOSE TAB' : 'BALANCE MISMATCH'}
                           </button>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -2045,159 +2446,172 @@ export function BookingModal(props: BookingModalProps) {
                   <div className="flex justify-between items-center mb-6">
                     <div>
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Guest Folio History</p>
-                      <h3 className="text-xl font-black text-black uppercase tracking-tighter mt-1">Settlement History</h3>
+                      <h3 className="text-xl font-black text-black uppercase tracking-tighter mt-1">Receipt History</h3>
                     </div>
                   </div>
                   <div className="grid gap-2">
-                    {getSettledReceiptsForSel().map((receipt: any, idx: number) => (
-                      <div key={idx} className={`p-4 border border-[#2A2F36] group ${parseFloat(receipt.total_usd || 0) < 0 ? 'bg-[#722F37]/10 border-[#722F37]/30' : 'bg-[#1C232E]'}`}>
-                        <div className="flex justify-between items-start mb-2 border-b border-[#2A2F36] pb-2">
-                          <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">
-                              {parseFloat(receipt.total_usd || 0) < 0 ? 'Settled Refund' : `Tab #${idx + 1}`}
-                            </span>
-                            <span className="font-mono text-[10px] text-black font-black mt-0.5">{new Date(receipt.settled_at || new Date()).toLocaleString()}</span>
+                    {getSettledReceiptsForSel().map((receipt: any, idx: number) => {
+                      const isExpanded = expandedReceiptId === receipt.id;
+                      return (
+                        <div key={idx} className={`border border-[#2A2F36] group ${parseFloat(receipt.total_usd || 0) < 0 ? 'bg-[#722F37]/10 border-[#722F37]/30' : 'bg-[#1C232E]'} rounded-lg overflow-hidden`}>
+                          <div 
+                            className="p-4 cursor-pointer hover:bg-white/5 transition-colors"
+                            onClick={() => setExpandedReceiptId(isExpanded ? null : receipt.id)}
+                          >
+                            <div className="flex justify-between items-start mb-2 border-b border-[#2A2F36] pb-2">
+                              <div className="flex flex-col">
+                                <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">
+                                  {parseFloat(receipt.total_usd || 0) < 0 ? 'Settled Refund' : `Tab #${idx + 1}`}
+                                </span>
+                                <span className="font-mono text-[10px] text-black font-black mt-0.5">{new Date(receipt.settled_at || new Date()).toLocaleString()}</span>
+                                <span className="text-[9px] font-mono text-slate-400 mt-0.5">{receipt.receipt_id || receipt.id}</span>
+                              </div>
+                              <div className="text-right flex flex-col items-end">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Amount</span>
+                                <span className={`font-mono text-sm font-black ${parseFloat(receipt.total_usd || 0) < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                  {parseFloat(receipt.total_usd || 0) < 0 ? '-' : ''}${Math.abs(parseFloat(receipt.total_usd || 0)).toFixed(2)}
+                                </span>
+                                {receipt.payments && receipt.payments.length > 0 && (
+                                   <span className="text-[8px] font-mono font-black uppercase tracking-widest text-slate-400 mt-1">
+                                     [ {receipt.payments.map((p: any) => p.method).join(', ')} ]
+                                   </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2 mt-2">
+                               {receipt.items?.accommodation > 0 && (
+                                 <span className="text-[8px] font-mono font-black uppercase bg-[#1C232E]/50 border border-[#2A2F36] px-1.5 py-0.5 text-[#EDE6D6]">Stay: ${receipt.items.accommodation.toFixed(2)}</span>
+                               )}
+                               {receipt.items?.meals?.lunch > 0 && (
+                                 <span className="text-[8px] font-mono font-black uppercase bg-[#1C232E]/50 border border-[#2A2F36] px-1.5 py-0.5 text-[#EDE6D6]">Lunch x{receipt.items.meals.lunch}</span>
+                               )}
+                               {receipt.items?.meals?.dinner > 0 && (
+                                 <span className="text-[8px] font-mono font-black uppercase bg-[#1C232E]/50 border border-[#2A2F36] px-1.5 py-0.5 text-[#EDE6D6]">Dinner x{receipt.items.meals.dinner}</span>
+                               )}
+                               {receipt.items?.drinks?.length > 0 && (
+                                 <span className="text-[8px] font-mono font-black uppercase bg-[#1C232E]/50 border border-[#2A2F36] px-1.5 py-0.5 text-[#EDE6D6]">Drinks</span>
+                               )}
+                               {receipt.items?.extras?.length > 0 && (
+                                 <span className="text-[8px] font-mono font-black uppercase bg-[#1C232E]/50 border border-[#2A2F36] px-1.5 py-0.5 text-[#EDE6D6]">Extras</span>
+                               )}
+                            </div>
                           </div>
-                          <div className="text-right flex flex-col items-end">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Amount</span>
-                            <span className={`font-mono text-sm font-black ${parseFloat(receipt.total_usd || 0) < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                              {parseFloat(receipt.total_usd || 0) < 0 ? '-' : ''}${Math.abs(parseFloat(receipt.total_usd || 0)).toFixed(2)}
-                            </span>
-                            {receipt.payments && receipt.payments.length > 0 && (
-                               <span className="text-[8px] font-mono font-black uppercase tracking-widest text-slate-400 mt-1">
-                                 [ {receipt.payments.map((p: any) => p.method).join(', ')} ]
-                               </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                           {receipt.items?.accommodation > 0 && (
-                             <span className="text-[8px] font-mono font-black uppercase bg-[#1C232E]/50 border border-[#2A2F36] px-1.5 py-0.5 text-[#EDE6D6]">Stay: ${receipt.items.accommodation.toFixed(2)}</span>
-                           )}
-                           {receipt.items?.meals?.lunch > 0 && (
-                             <span className="text-[8px] font-mono font-black uppercase bg-[#1C232E]/50 border border-[#2A2F36] px-1.5 py-0.5 text-[#EDE6D6]">Lunch x{receipt.items.meals.lunch}</span>
-                           )}
-                           {receipt.items?.meals?.dinner > 0 && (
-                             <span className="text-[8px] font-mono font-black uppercase bg-[#1C232E]/50 border border-[#2A2F36] px-1.5 py-0.5 text-[#EDE6D6]">Dinner x{receipt.items.meals.dinner}</span>
-                           )}
-                           {receipt.items?.drinks?.length > 0 && (
-                             <span className="text-[8px] font-mono font-black uppercase bg-[#1C232E]/50 border border-[#2A2F36] px-1.5 py-0.5 text-[#EDE6D6]">Drinks</span>
-                           )}
-                           {receipt.items?.extras?.length > 0 && (
-                             <span className="text-[8px] font-mono font-black uppercase bg-[#1C232E]/50 border border-[#2A2F36] px-1.5 py-0.5 text-[#EDE6D6]">Extras</span>
-                           )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* UNIFIED GUEST FOLIO — Final Reconciliation */}
-              {isStaff && guestStatement && (
-                <div className="mt-8 border-t-2 border-black pt-6">
-                  <div className="flex justify-between items-center mb-6">
-                    <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unified Guest Folio</p>
-                      <h3 className="text-xl font-black text-[#EDE6D6] uppercase tracking-tighter mt-1">Audit Manifest</h3>
-                    </div>
-                    <span className={`px-4 py-1.5 text-[10px] font-black uppercase border-2 border-[#2A2F36] shadow-[2px_2px_0px_0px_rgba(92,74,46,0.3)] ${
-                      guestStatement.status === 'PAID' || guestStatement.status === 'PREPAID' ? 'bg-[#0B6E4F] text-[#C9A227]' : 'bg-[#1C232E] text-[#EDE6D6] animate-pulse'
-                    }`}>
-                      [ STATUS: {guestStatement.status} {guestStatement.status === 'OPEN TAB' ? `- $${guestStatement.remaining.toFixed(2)}` : ''} ]
-                    </span>
-                  </div>
-
-                  <div className="space-y-2">
-                    {/* Line Items - Bento Style */}
-                    <div className="grid gap-2">
-                      {/* Accommodation */}
-                      <div className="flex justify-between items-center p-4 bg-[#1C232E] border border-[#2A2F36] group">
-                        <div className="flex flex-col">
-                          <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Service</span>
-                          <span className="text-xs font-black text-[#EDE6D6] uppercase">Accommodation / Stay Fee</span>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Amount</span>
-                          <span className="font-mono text-sm font-black text-black">${guestStatement.accommodation.toFixed(2)}</span>
-                        </div>
-                      </div>
-
-                      {/* Meals */}
-                      {guestStatement.mealItems.map((item: any, idx: number) => (
-                        <div key={idx} className="flex justify-between items-center p-4 bg-[#1C232E] border border-[#2A2F36]">
-                          <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Kitchen Request</span>
-                            <span className="text-xs font-black text-[#EDE6D6] uppercase">{item.name} · <span className="font-mono text-[9px]">{item.date}</span></span>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
-                              <span className="font-mono">{item.qty}</span> x $<span className="font-mono">{item.price}</span>
-                            </span>
-                            <span className="font-mono text-sm font-black text-black">${item.total.toFixed(2)}</span>
-                          </div>
-                        </div>
-                      ))}
-
-                      {/* Guide Service */}
-                      {guestStatement.guideTotal > 0 && (
-                        <div className="flex justify-between items-center p-4 bg-[#1C232E] border border-[#2A2F36]">
-                          <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Guide Service</span>
-                            <span className="text-xs font-black text-[#EDE6D6] uppercase">{guestStatement.guideNames || 'Guide'}</span>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Amount</span>
-                            <span className="font-mono text-sm font-black text-black">${guestStatement.guideTotal.toFixed(2)}</span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Transportation */}
-                      {guestStatement.transportTotal > 0 && (
-                        <div className="flex justify-between items-center p-4 bg-[#1C232E] border border-[#2A2F36]">
-                          <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Transportation</span>
-                            <span className="text-xs font-black text-[#EDE6D6] uppercase max-w-[200px] truncate">{guestStatement.transportationDetails || 'Transport'}</span>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Amount</span>
-                            <span className="font-mono text-sm font-black text-black">${guestStatement.transportTotal.toFixed(2)}</span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Grand Total Row */}
-                      <div className="flex justify-between items-center p-4 bg-black text-white border border-black mt-2">
-                        <span className="text-sm font-black uppercase tracking-widest">Grand Total Manifest</span>
-                        <span className="font-mono text-lg font-black">${guestStatement.grandTotal.toFixed(2)}</span>
-                      </div>
-
-                      {/* Reconciliation / Payments */}
-                      <div className="flex justify-between items-center p-4 bg-[#0F1419] border border-[#2A2F36] mt-4 border-dashed">
-                        <div className="flex flex-col">
-                          <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Reconciliation</span>
-                          <span className="text-xs font-black text-[#EDE6D6] uppercase">Settled Payments / Pre-Paid Credit</span>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest block">Total Paid</span>
-                          <span className="font-mono text-sm font-black text-[#0B6E4F]">-${guestStatement.totalReconciled.toFixed(2)}</span>
-                        </div>
-                      </div>
-
-                      {/* Final Balance */}
-                      <div className="flex justify-between items-center p-5 bg-[#1C232E] border-2 border-[#2A2F36] mt-2 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)]">
-                        <span className="text-md font-black uppercase tracking-[0.1em] text-[#EDE6D6]">Remaining Balance</span>
-                        <div className="text-right">
-                          <p className={`text-2xl font-mono font-black ${guestStatement.status === 'OPEN TAB' ? 'text-[#722F37]' : 'text-[#0B6E4F]'}`}>
-                            {guestStatement.status === 'PREPAID' ? 'PREPAID' : `$${guestStatement.remaining.toFixed(2)}`}
-                          </p>
-                          {guestStatement.status === 'OPEN TAB' && (
-                            <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest animate-pulse mt-1">⚠ Settlement Required at Front Desk</p>
+                          {isExpanded && receipt.snapshot && (
+                            <div className="p-4 border-t border-[#2A2F36] bg-black/20 space-y-3">
+                              <div className="space-y-2">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Receipt Snapshot</p>
+                                
+                                {receipt.snapshot.items?.accommodation !== undefined && (
+                                  <div className="flex justify-between items-center py-2 border-b border-white/10">
+                                    <span className="text-sm font-bold">Accommodation</span>
+                                    <div className="flex items-center gap-2">
+                                      {receipt.snapshot.items.isPrepaid && (
+                                        <span className="text-[9px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">Prepaid</span>
+                                      )}
+                                      <span className="font-mono font-black">${receipt.snapshot.items.accommodation.toFixed(2)}</span>
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {receipt.snapshot.items?.meals && (
+                                  <div className="space-y-2 py-2 border-b border-white/10">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Meals</p>
+                                    {receipt.snapshot.items.meals.lunch > 0 && (
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-sm font-bold">Lunch x{receipt.snapshot.items.meals.lunch}</span>
+                                        <div className="flex items-center gap-2">
+                                          {receipt.snapshot.items.meals.isLunchPrepaid && (
+                                            <span className="text-[9px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">Prepaid</span>
+                                          )}
+                                          <span className="font-mono font-black">${(receipt.snapshot.items.meals.lunch * 10).toFixed(2)}</span>
+                                        </div>
+                                      </div>
+                                    )}
+                                    {receipt.snapshot.items.meals.dinner > 0 && (
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-sm font-bold">Dinner x{receipt.snapshot.items.meals.dinner}</span>
+                                        <div className="flex items-center gap-2">
+                                          {receipt.snapshot.items.meals.isDinnerPrepaid && (
+                                            <span className="text-[9px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">Prepaid</span>
+                                          )}
+                                          <span className="font-mono font-black">${(receipt.snapshot.items.meals.dinner * 10).toFixed(2)}</span>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                
+                                {receipt.snapshot.items?.services && (
+                                  <div className="space-y-2 py-2 border-b border-white/10">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Services</p>
+                                    {receipt.snapshot.items.services.guide > 0 && (
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-sm font-bold">Guide Service</span>
+                                        <span className="font-mono font-black">${receipt.snapshot.items.services.guide.toFixed(2)}</span>
+                                      </div>
+                                    )}
+                                    {receipt.snapshot.items.services.transport > 0 && (
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-sm font-bold">Transport</span>
+                                        <span className="font-mono font-black">${receipt.snapshot.items.services.transport.toFixed(2)}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                
+                                {receipt.snapshot.items?.extras && receipt.snapshot.items.extras.length > 0 && (
+                                  <div className="space-y-2 py-2 border-b border-white/10">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Extras</p>
+                                    {receipt.snapshot.items.extras.map((extra: any, i: number) => (
+                                      <div key={i} className="flex justify-between items-center">
+                                        <span className="text-sm font-bold">{extra.name}</span>
+                                        <span className="font-mono font-black">${parseFloat(extra.price).toFixed(2)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                
+                                {receipt.snapshot.items?.drinks && receipt.snapshot.items.drinks.length > 0 && (
+                                  <div className="space-y-2 py-2 border-b border-white/10">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Drinks</p>
+                                    {receipt.snapshot.items.drinks.map((drink: any, i: number) => (
+                                      <div key={i} className="flex justify-between items-center">
+                                        <span className="text-sm font-bold">{drink.drink_name} x{drink.quantity}</span>
+                                        <span className="font-mono font-black">${(drink.price * drink.quantity).toFixed(2)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                
+                                {receipt.snapshot.items?.stay_adjustment > 0 && (
+                                  <div className="flex justify-between items-center py-2 border-b border-white/10">
+                                    <span className="text-sm font-bold">Stay Extension Fee</span>
+                                    <span className="font-mono font-black text-amber-300">+${receipt.snapshot.items.stay_adjustment.toFixed(2)}</span>
+                                  </div>
+                                )}
+                                
+                                {receipt.snapshot.payments && receipt.snapshot.payments.length > 0 && (
+                                  <div className="space-y-2 py-2">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Payments</p>
+                                    {receipt.snapshot.payments.map((payment: any, i: number) => (
+                                      <div key={i} className="flex justify-between items-center">
+                                        <span className="text-sm font-bold">{payment.method}</span>
+                                        <span className="font-mono font-black">${parseFloat(payment.amount).toFixed(2)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                
+                                <div className="flex justify-between items-center py-2 border-t border-white/20 mt-2">
+                                  <span className="text-sm font-black uppercase tracking-widest">Total</span>
+                                  <span className="font-mono font-black text-lg">${parseFloat(receipt.total_usd || 0).toFixed(2)}</span>
+                                </div>
+                              </div>
+                            </div>
                           )}
                         </div>
-                      </div>
-                    </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}

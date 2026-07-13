@@ -45,9 +45,8 @@ export async function processMealRequest(mealId: number, orderId?: string) {
     // 3. Billing Logic
     // Requirement: If the booking is NOT marked as "Prepaid," add the cost of the meal
     const isBookingPrepaid = booking.is_prepaid || booking.payment_status === 'paid';
-    const isMealPrepaid = meal.meal_type === 'Lunch' ? booking.lunch_prepaid : booking.dinner_prepaid;
 
-    if (!isBookingPrepaid && !isMealPrepaid) {
+    if (!isBookingPrepaid) {
       // Fetch pricing
       const { data: pricing } = await supabase.from('service_pricing').select('*').eq('id', 1).single();
       const pricePerMeal = meal.meal_type === 'Lunch' 
