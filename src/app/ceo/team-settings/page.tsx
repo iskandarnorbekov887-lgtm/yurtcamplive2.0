@@ -168,6 +168,8 @@ function TeamSettingsContent() {
   const [serviceAccountEmail, setServiceAccountEmail] = useState('');
   const [privateKey, setPrivateKey] = useState('');
   const [showPrivateKey, setShowPrivateKey] = useState(false);
+  const [integrationMethod, setIntegrationMethod] = useState<'api' | 'ical'>('api');
+  const [icalUrl, setIcalUrl] = useState('');
 
   // Resolved team_id (falls back to user.id if no team_id column exists)
   const [teamId, setTeamId] = useState<string | null>(null);
@@ -215,7 +217,7 @@ function TeamSettingsContent() {
 
       const { data, error } = await supabase
         .from('team_settings')
-        .select('google_calendar_id, google_service_account_email, google_private_key, updated_at')
+        .select('google_calendar_id, google_service_account_email, google_private_key, google_calendar_integration_method, google_ical_url, updated_at')
         .eq('team_id', resolved)
         .maybeSingle();
 
@@ -233,6 +235,8 @@ function TeamSettingsContent() {
         setCalendarId((data as any).google_calendar_id ?? '');
         setServiceAccountEmail((data as any).google_service_account_email ?? '');
         setPrivateKey((data as any).google_private_key ?? '');
+        setIntegrationMethod((data as any).google_calendar_integration_method ?? 'api');
+        setIcalUrl((data as any).google_ical_url ?? '');
         setLastSaved((data as any).updated_at ?? null);
       }
     } finally {
@@ -254,8 +258,14 @@ function TeamSettingsContent() {
       showAlert({ kind: 'warning', title: 'Validation', message: 'Google Calendar ID is required.' });
       return;
     }
-    if (!serviceAccountEmail.trim() || !privateKey.trim()) {
-      showAlert({ kind: 'warning', title: 'Validation', message: 'Service Account credentials are required.' });
+
+    if (integrationMethod === 'api' && (!serviceAccountEmail.trim() || !privateKey.trim())) {
+      showAlert({ kind: 'warning', title: 'Validation', message: 'Service Account credentials are required for API mode.' });
+      return;
+    }
+
+    if (integrationMethod === 'ical' && !icalUrl.trim()) {
+      showAlert({ kind: 'warning', title: 'Validation', message: 'iCal Feed URL is required for iCal mode.' });
       return;
     }
 
@@ -269,6 +279,8 @@ function TeamSettingsContent() {
           google_calendar_id: calendarId.trim(),
           google_service_account_email: serviceAccountEmail.trim(),
           google_private_key: privateKey.trim(),
+          google_calendar_integration_method: integrationMethod,
+          google_ical_url: icalUrl.trim(),
         },
         { onConflict: 'team_id' },
       );
@@ -407,6 +419,38 @@ function TeamSettingsContent() {
 
           <form onSubmit={handleSave} className="p-6 sm:p-8 space-y-6">
 
+            {/* ── Integration Method Toggle ─────────────────────────────────────── */}
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-[10px] font-black text-[#9C9384] uppercase tracking-widest">
+                <Calendar size={11} />
+                Integration Method
+              </label>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIntegrationMethod('api')}
+                  className={`flex-1 px-4 py-3 rounded-xl border-2 text-xs font-bold uppercase tracking-wider transition-all ${
+                    integrationMethod === 'api'
+                      ? 'bg-[#0B6E4F]/20 border-[#0B6E4F] text-[#0B6E4F]'
+                      : 'bg-[#0F1419]/60 border-[#5C4A2E]/30 text-[#9C9384] hover:border-[#5C4A2E]/60'
+                  }`}
+                >
+                  Service Account (API)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIntegrationMethod('ical')}
+                  className={`flex-1 px-4 py-3 rounded-xl border-2 text-xs font-bold uppercase tracking-wider transition-all ${
+                    integrationMethod === 'ical'
+                      ? 'bg-[#0B6E4F]/20 border-[#0B6E4F] text-[#0B6E4F]'
+                      : 'bg-[#0F1419]/60 border-[#5C4A2E]/30 text-[#9C9384] hover:border-[#5C4A2E]/60'
+                  }`}
+                >
+                  Public iCal Feed
+                </button>
+              </div>
+            </div>
+
             {/* ── Google Calendar ID ─────────────────────────────────────────── */}
             <div className="space-y-2">
               <label
@@ -436,70 +480,104 @@ function TeamSettingsContent() {
               </p>
             </div>
 
-            {/* ── Service Account Email ─────────────────────────────────────────────── */}
-            <div className="space-y-2">
-              <label
-                htmlFor="service-account-email"
-                className="flex items-center gap-2 text-[10px] font-black text-[#9C9384] uppercase tracking-widest"
-              >
-                <Key size={11} />
-                Service Account Email
-                <span className="text-[#722F37] font-black">*</span>
-              </label>
-              {fetchLoading ? (
-                <SkeletonField />
-              ) : (
-                <div className="relative">
-                  <input
-                    id="service-account-email"
-                    type="text"
-                    value={serviceAccountEmail}
-                    onChange={(e) => setServiceAccountEmail(e.target.value)}
-                    placeholder="service-account@project.iam.gserviceaccount.com"
-                    autoComplete="off"
-                    className="w-full px-5 py-[15px] bg-[#0F1419]/70 border-2 border-[#5C4A2E]/30 rounded-[18px] text-sm font-semibold text-[#EDE6D6] placeholder-[#5C4A2E]/50 focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/15 outline-none transition-all duration-200 font-mono tracking-wider"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* ── Private Key ─────────────────────────────────────────────── */}
-            <div className="space-y-2">
-              <label
-                htmlFor="private-key"
-                className="flex items-center gap-2 text-[10px] font-black text-[#9C9384] uppercase tracking-widest"
-              >
-                <Key size={11} />
-                Private Key
-                <span className="text-[#722F37] font-black">*</span>
-              </label>
-              {fetchLoading ? (
-                <SkeletonField />
-              ) : (
-                <div className="relative">
-                  <textarea
-                    id="private-key"
-                    value={privateKey}
-                    onChange={(e) => setPrivateKey(e.target.value)}
-                    placeholder={"-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----"}
-                    autoComplete="new-password"
-                    className={`w-full ${showPrivateKey ? 'h-48' : 'h-14 truncate'} pl-5 pr-14 py-[15px] bg-[#0F1419]/70 border-2 border-[#5C4A2E]/30 rounded-[18px] text-sm font-semibold text-[#EDE6D6] placeholder-[#5C4A2E]/50 focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/15 outline-none transition-all duration-200 font-mono tracking-wider resize-none`}
-                  />
-                  {/* Reveal/hide toggle */}
-                  <button
-                    type="button"
-                    onClick={() => setShowPrivateKey((v) => !v)}
-                    className="absolute right-4 top-[15px] text-[#5C4A2E] hover:text-[#9C9384] transition-colors"
-                    aria-label={showPrivateKey ? 'Hide Private Key' : 'Show Private Key'}
+            {/* ── Conditional fields based on integration method ──────────────── */}
+            {integrationMethod === 'api' ? (
+              <>
+                {/* ── Service Account Email ─────────────────────────────────────────────── */}
+                <div className="space-y-2">
+                  <label
+                    htmlFor="service-account-email"
+                    className="flex items-center gap-2 text-[10px] font-black text-[#9C9384] uppercase tracking-widest"
                   >
-                    {showPrivateKey ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
+                    <Key size={11} />
+                    Service Account Email
+                    <span className="text-[#722F37] font-black">*</span>
+                  </label>
+                  {fetchLoading ? (
+                    <SkeletonField />
+                  ) : (
+                    <div className="relative">
+                      <input
+                        id="service-account-email"
+                        type="text"
+                        value={serviceAccountEmail}
+                        onChange={(e) => setServiceAccountEmail(e.target.value)}
+                        placeholder="service-account@project.iam.gserviceaccount.com"
+                        autoComplete="off"
+                        className="w-full px-5 py-[15px] bg-[#0F1419]/70 border-2 border-[#5C4A2E]/30 rounded-[18px] text-sm font-semibold text-[#EDE6D6] placeholder-[#5C4A2E]/50 focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/15 outline-none transition-all duration-200 font-mono tracking-wider"
+                      />
+                    </div>
+                  )}
                 </div>
-              )}
-              <p className="text-[10px] text-[#5C4A2E] font-medium px-1">
-                Generate this in Google Cloud Console → IAM &amp; Admin → Service Accounts → Keys (JSON format).
-              </p>
-            </div>
+
+                {/* ── Private Key ─────────────────────────────────────────────── */}
+                <div className="space-y-2">
+                  <label
+                    htmlFor="private-key"
+                    className="flex items-center gap-2 text-[10px] font-black text-[#9C9384] uppercase tracking-widest"
+                  >
+                    <Key size={11} />
+                    Private Key
+                    <span className="text-[#722F37] font-black">*</span>
+                  </label>
+                  {fetchLoading ? (
+                    <SkeletonField />
+                  ) : (
+                    <div className="relative">
+                      <textarea
+                        id="private-key"
+                        value={privateKey}
+                        onChange={(e) => setPrivateKey(e.target.value)}
+                        placeholder={"-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----"}
+                        autoComplete="new-password"
+                        className={`w-full ${showPrivateKey ? 'h-48' : 'h-14 truncate'} pl-5 pr-14 py-[15px] bg-[#0F1419]/70 border-2 border-[#5C4A2E]/30 rounded-[18px] text-sm font-semibold text-[#EDE6D6] placeholder-[#5C4A2E]/50 focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/15 outline-none transition-all duration-200 font-mono tracking-wider resize-none`}
+                      />
+                      {/* Reveal/hide toggle */}
+                      <button
+                        type="button"
+                        onClick={() => setShowPrivateKey((v) => !v)}
+                        className="absolute right-4 top-[15px] text-[#5C4A2E] hover:text-[#9C9384] transition-colors"
+                        aria-label={showPrivateKey ? 'Hide Private Key' : 'Show Private Key'}
+                      >
+                        {showPrivateKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  )}
+                  <p className="text-[10px] text-[#5C4A2E] font-medium px-1">
+                    Generate this in Google Cloud Console → IAM &amp; Admin → Service Accounts → Keys (JSON format).
+                  </p>
+                </div>
+              </>
+            ) : (
+              /* ── iCal URL ─────────────────────────────────────────────────────── */
+              <div className="space-y-2">
+                <label
+                  htmlFor="ical-url"
+                  className="flex items-center gap-2 text-[10px] font-black text-[#9C9384] uppercase tracking-widest"
+                >
+                  <Calendar size={11} />
+                  iCal Feed URL
+                  <span className="text-[#722F37] font-black">*</span>
+                </label>
+                {fetchLoading ? (
+                  <SkeletonField />
+                ) : (
+                  <input
+                    id="ical-url"
+                    type="text"
+                    value={icalUrl}
+                    onChange={(e) => setIcalUrl(e.target.value)}
+                    placeholder="https://calendar.google.com/calendar/ical/.../public/basic.ics"
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="w-full px-5 py-[15px] bg-[#0F1419]/70 border-2 border-[#5C4A2E]/30 rounded-[18px] text-sm font-semibold text-[#EDE6D6] placeholder-[#5C4A2E]/50 focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 outline-none transition-all duration-200 font-mono tracking-wider"
+                  />
+                )}
+                <p className="text-[10px] text-[#5C4A2E] font-medium px-1">
+                  Get this from Google Calendar → Settings → specific calendar → Integrate calendar → Public address in iCal format.
+                </p>
+              </div>
+            )}
 
             {/* ── Security note ──────────────────────────────────────────────── */}
             <div className="flex gap-3 p-4 bg-[#C9A227]/8 border border-[#C9A227]/20 rounded-2xl">
@@ -541,7 +619,7 @@ function TeamSettingsContent() {
                 id="test-connection-btn"
                 type="button"
                 onClick={handleTestConnection}
-                disabled={fetchLoading || saving || connectionStatus === 'testing' || !calendarId.trim() || !serviceAccountEmail.trim() || !privateKey.trim()}
+                disabled={fetchLoading || saving || connectionStatus === 'testing' || !calendarId.trim() || (integrationMethod === 'api' && (!serviceAccountEmail.trim() || !privateKey.trim())) || (integrationMethod === 'ical' && !icalUrl.trim())}
                 className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-[#C9A227]/15 border-2 border-[#C9A227]/30 text-[#C9A227] text-xs font-black uppercase tracking-[0.15em] hover:bg-[#C9A227]/25 active:scale-[0.98] transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {connectionStatus === 'testing' ? (

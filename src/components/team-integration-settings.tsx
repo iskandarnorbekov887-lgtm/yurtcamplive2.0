@@ -13,6 +13,8 @@ interface TeamSettings {
   google_calendar_id: string;
   google_service_account_email: string;
   google_private_key: string;
+  google_calendar_integration_method: 'api' | 'ical';
+  google_ical_url: string;
   updated_at?: string;
 }
 
@@ -74,6 +76,8 @@ export function TeamIntegrationSettings() {
   const [calendarId, setCalendarId] = useState('');
   const [serviceAccountEmail, setServiceAccountEmail] = useState('');
   const [privateKey, setPrivateKey] = useState('');
+  const [integrationMethod, setIntegrationMethod] = useState<'api' | 'ical'>('api');
+  const [icalUrl, setIcalUrl] = useState('');
   const [teamId, setTeamId] = useState<string | null>(null);
 
   // UI state
@@ -129,6 +133,8 @@ export function TeamIntegrationSettings() {
         setCalendarId((data as TeamSettings).google_calendar_id ?? '');
         setServiceAccountEmail((data as TeamSettings).google_service_account_email ?? '');
         setPrivateKey((data as TeamSettings).google_private_key ?? '');
+        setIntegrationMethod((data as TeamSettings).google_calendar_integration_method ?? 'api');
+        setIcalUrl((data as TeamSettings).google_ical_url ?? '');
         setLastSaved((data as TeamSettings).updated_at ?? null);
       }
     } finally {
@@ -149,6 +155,27 @@ export function TeamIntegrationSettings() {
     e.preventDefault();
     if (!teamId) return;
 
+    if (!calendarId.trim()) {
+      setSaveStatus('error');
+      setSaveMessage('Google Calendar ID is required.');
+      setTimeout(() => { setSaveStatus('idle'); setSaveMessage(undefined); }, 4000);
+      return;
+    }
+
+    if (integrationMethod === 'api' && (!serviceAccountEmail.trim() || !privateKey.trim())) {
+      setSaveStatus('error');
+      setSaveMessage('Service Account credentials are required for API mode.');
+      setTimeout(() => { setSaveStatus('idle'); setSaveMessage(undefined); }, 4000);
+      return;
+    }
+
+    if (integrationMethod === 'ical' && !icalUrl.trim()) {
+      setSaveStatus('error');
+      setSaveMessage('iCal Feed URL is required for iCal mode.');
+      setTimeout(() => { setSaveStatus('idle'); setSaveMessage(undefined); }, 4000);
+      return;
+    }
+
     setSaveStatus('loading');
     setSaveMessage(undefined);
 
@@ -158,6 +185,8 @@ export function TeamIntegrationSettings() {
         google_calendar_id: calendarId.trim(),
         google_service_account_email: serviceAccountEmail.trim(),
         google_private_key: privateKey.trim(),
+        google_calendar_integration_method: integrationMethod,
+        google_ical_url: icalUrl.trim(),
       };
 
       const { error } = await supabase
@@ -220,6 +249,38 @@ export function TeamIntegrationSettings() {
           {/* Status banner */}
           <StatusBanner status={saveStatus} message={saveMessage} />
 
+          {/* Integration Method Toggle */}
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-[10px] font-black text-[#9C9384] uppercase tracking-widest">
+              <Calendar size={11} />
+              Integration Method
+            </label>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setIntegrationMethod('api')}
+                className={`flex-1 px-4 py-3 rounded-xl border-2 text-xs font-bold uppercase tracking-wider transition-all ${
+                  integrationMethod === 'api'
+                    ? 'bg-[#0B6E4F]/20 border-[#0B6E4F] text-[#0B6E4F]'
+                    : 'bg-[#0F1419]/60 border-[#5C4A2E]/30 text-[#9C9384] hover:border-[#5C4A2E]/60'
+                }`}
+              >
+                Service Account (API)
+              </button>
+              <button
+                type="button"
+                onClick={() => setIntegrationMethod('ical')}
+                className={`flex-1 px-4 py-3 rounded-xl border-2 text-xs font-bold uppercase tracking-wider transition-all ${
+                  integrationMethod === 'ical'
+                    ? 'bg-[#0B6E4F]/20 border-[#0B6E4F] text-[#0B6E4F]'
+                    : 'bg-[#0F1419]/60 border-[#5C4A2E]/30 text-[#9C9384] hover:border-[#5C4A2E]/60'
+                }`}
+              >
+                Public iCal Feed
+              </button>
+            </div>
+          </div>
+
           {/* Google Calendar ID */}
           <div className="space-y-2">
             <label
@@ -245,52 +306,85 @@ export function TeamIntegrationSettings() {
             )}
           </div>
 
-          {/* Google Service Account Email */}
-          <div className="space-y-2">
-            <label
-              htmlFor="service-account-email"
-              className="flex items-center gap-2 text-[10px] font-black text-[#9C9384] uppercase tracking-widest"
-            >
-              <Key size={11} />
-              Service Account Email
-            </label>
-            {fetchLoading ? (
-              <FieldSkeleton />
-            ) : (
-              <input
-                id="service-account-email"
-                type="text"
-                value={serviceAccountEmail}
-                onChange={(e) => setServiceAccountEmail(e.target.value)}
-                placeholder="service-account@project.iam.gserviceaccount.com"
-                autoComplete="off"
-                className="w-full px-5 py-[14px] bg-[#0F1419]/60 border-2 border-[#5C4A2E]/30 rounded-[18px] text-sm font-semibold text-[#EDE6D6] placeholder-[#5C4A2E]/60 focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/15 outline-none transition-all duration-200 font-mono tracking-wider"
-              />
-            )}
-          </div>
+          {/* Conditional fields based on integration method */}
+          {integrationMethod === 'api' ? (
+            <>
+              {/* Google Service Account Email */}
+              <div className="space-y-2">
+                <label
+                  htmlFor="service-account-email"
+                  className="flex items-center gap-2 text-[10px] font-black text-[#9C9384] uppercase tracking-widest"
+                >
+                  <Key size={11} />
+                  Service Account Email
+                </label>
+                {fetchLoading ? (
+                  <FieldSkeleton />
+                ) : (
+                  <input
+                    id="service-account-email"
+                    type="text"
+                    value={serviceAccountEmail}
+                    onChange={(e) => setServiceAccountEmail(e.target.value)}
+                    placeholder="service-account@project.iam.gserviceaccount.com"
+                    autoComplete="off"
+                    className="w-full px-5 py-[14px] bg-[#0F1419]/60 border-2 border-[#5C4A2E]/30 rounded-[18px] text-sm font-semibold text-[#EDE6D6] placeholder-[#5C4A2E]/60 focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/15 outline-none transition-all duration-200 font-mono tracking-wider"
+                  />
+                )}
+              </div>
 
-          {/* Google Private Key */}
-          <div className="space-y-2">
-            <label
-              htmlFor="private-key"
-              className="flex items-center gap-2 text-[10px] font-black text-[#9C9384] uppercase tracking-widest"
-            >
-              <Key size={11} />
-              Private Key
-            </label>
-            {fetchLoading ? (
-              <FieldSkeleton />
-            ) : (
-              <textarea
-                id="private-key"
-                value={privateKey}
-                onChange={(e) => setPrivateKey(e.target.value)}
-                placeholder={"-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----"}
-                autoComplete="new-password"
-                className="w-full h-32 px-5 py-[14px] bg-[#0F1419]/60 border-2 border-[#5C4A2E]/30 rounded-[18px] text-sm font-semibold text-[#EDE6D6] placeholder-[#5C4A2E]/60 focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/15 outline-none transition-all duration-200 font-mono tracking-wider resize-none"
-              />
-            )}
-          </div>
+              {/* Google Private Key */}
+              <div className="space-y-2">
+                <label
+                  htmlFor="private-key"
+                  className="flex items-center gap-2 text-[10px] font-black text-[#9C9384] uppercase tracking-widest"
+                >
+                  <Key size={11} />
+                  Private Key
+                </label>
+                {fetchLoading ? (
+                  <FieldSkeleton />
+                ) : (
+                  <textarea
+                    id="private-key"
+                    value={privateKey}
+                    onChange={(e) => setPrivateKey(e.target.value)}
+                    placeholder={"-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----"}
+                    autoComplete="new-password"
+                    className="w-full h-32 px-5 py-[14px] bg-[#0F1419]/60 border-2 border-[#5C4A2E]/30 rounded-[18px] text-sm font-semibold text-[#EDE6D6] placeholder-[#5C4A2E]/60 focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/15 outline-none transition-all duration-200 font-mono tracking-wider resize-none"
+                  />
+                )}
+              </div>
+            </>
+          ) : (
+            /* iCal URL */
+            <div className="space-y-2">
+              <label
+                htmlFor="ical-url"
+                className="flex items-center gap-2 text-[10px] font-black text-[#9C9384] uppercase tracking-widest"
+              >
+                <Calendar size={11} />
+                iCal Feed URL
+              </label>
+              {fetchLoading ? (
+                <FieldSkeleton />
+              ) : (
+                <input
+                  id="ical-url"
+                  type="text"
+                  value={icalUrl}
+                  onChange={(e) => setIcalUrl(e.target.value)}
+                  placeholder="https://calendar.google.com/calendar/ical/.../public/basic.ics"
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="w-full px-5 py-[14px] bg-[#0F1419]/60 border-2 border-[#5C4A2E]/30 rounded-[18px] text-sm font-semibold text-[#EDE6D6] placeholder-[#5C4A2E]/60 focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 outline-none transition-all duration-200 font-mono tracking-wider"
+                />
+              )}
+              <p className="text-[10px] text-[#5C4A2E] font-medium px-1">
+                Get this from Google Calendar → Settings → specific calendar → Integrate calendar → Public address in iCal format.
+              </p>
+            </div>
+          )}
 
           {/* Security warning */}
           <div className="flex gap-3 p-4 bg-[#C9A227]/8 border border-[#C9A227]/25 rounded-2xl">

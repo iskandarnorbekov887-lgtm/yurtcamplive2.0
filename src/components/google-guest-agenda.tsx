@@ -12,6 +12,7 @@ import {
   isGcCancelled,
   handleApproveDatesLogic
 } from '@/utils/calendar-logic';
+import { buildReceiptLineItems } from '@/utils/receipt-logic';
 
 import { ManagerIncomeForm } from '@/components/manager-income-form';
 
@@ -27,31 +28,11 @@ interface CalEvent {
   status?: string | null;
 }
 
-interface Drink {
-  id: number;
-  name: string;
-  original_price: number;
-  sold_price: number;
-  currency: 'UZS' | 'USD' | 'EUR';
-  available: boolean;
-}
-
 interface DayEntry {
   date: string;
   lunch: boolean; lunchCount: number; lunchDietary: string;
   dinner: boolean; dinnerCount: number; dinnerDietary: string;
-  guideService: boolean; guideNames: string[];
-  transportation: boolean; transEntries: TransEntry[];
   specialRequest: string;
-}
-
-interface TransEntry {
-  driver: string;
-  time: string;
-  from: string;
-  to: string;
-  arrivalTime: string;
-  price: string;
 }
 
 interface ListItem {
@@ -85,9 +66,6 @@ export function GoogleGuestAgenda({
   const sel = selectedItem?.booking ?? null;
 
   const [loadingAction, setLoadingAction] = useState('');
-  const [drinks, setDrinks] = useState<Drink[]>([]);
-  const [selectedDrinks, setSelectedDrinks] = useState<Record<number, number>>({});
-  const [showDrinks, setShowDrinks] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
   
   const getPrefix = (item: ListItem) => {
@@ -115,19 +93,7 @@ export function GoogleGuestAgenda({
   const [svcDateAdjustment, setSvcDateAdjustment] = useState<number>(0);
 
   const [isPrepaid, setIsPrepaid] = useState(false);
-  const [isLunchPrepaid, setIsLunchPrepaid] = useState(false);
-  const [isDinnerPrepaid, setIsDinnerPrepaid] = useState(false);
-  const [isFoodPrepaid, setIsFoodPrepaid] = useState(false);
-  
-  // Sync isFoodPrepaid with isLunchPrepaid and isDinnerPrepaid
-  useEffect(() => {
-    setIsLunchPrepaid(isFoodPrepaid);
-    setIsDinnerPrepaid(isFoodPrepaid);
-  }, [isFoodPrepaid]);
-  
-  useEffect(() => {
-    setIsFoodPrepaid(isLunchPrepaid && isDinnerPrepaid);
-  }, [isLunchPrepaid, isDinnerPrepaid]);
+
   
   const [selectedCalendarDay, setSelectedCalendarDay] = useState<string>(localDateStr(new Date()));
   const [editingDates, setEditingDates] = useState(false);
@@ -135,6 +101,7 @@ export function GoogleGuestAgenda({
   const [editCheckOut, setEditCheckOut] = useState('');
   const [nowTime, setNowTime] = useState(new Date());
   const [showAddModal, setShowAddModal] = useState(false);
+  const [checkoutBlockReason, setCheckoutBlockReason] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setInterval(() => setNowTime(new Date()), 60000);
@@ -145,11 +112,6 @@ export function GoogleGuestAgenda({
   const [svcLunchCount, setSvcLunchCount] = useState(0);
   const [svcDinner, setSvcDinner] = useState(false);
   const [svcDinnerCount, setSvcDinnerCount] = useState(0);
-  const [svcGuide, setSvcGuide] = useState(false);
-  const [svcGuideNames, setSvcGuideNames] = useState<string[]>(['']);
-  const [svcGuidePrice, setSvcGuidePrice] = useState(0);
-  const [svcTransport, setSvcTransport] = useState(false);
-  const [svcTransList, setSvcTransList] = useState<Array<{ name: string; details: string; price: number }>>([{ name: '', details: '', price: 0 }]);
   const [svcAdults, setSvcAdults] = useState(1);
   const [svcChildren, setSvcChildren] = useState(0);
   const [showFinalReceipt, setShowFinalReceipt] = useState(false);
@@ -157,9 +119,6 @@ export function GoogleGuestAgenda({
   const [historyPayments, setHistoryPayments] = useState<any[]>([]);
   const [dateAdjAmount, setDateAdjAmount] = useState('');
   const [dbSettledReceipts, setDbSettledReceipts] = useState<any[]>([]);
-  const [extraServices, setExtraServices] = useState<any[]>([]);
-  const [newExtraName, setNewExtraName] = useState('');
-  const [newExtraPrice, setNewExtraPrice] = useState('');
   const [showServices, setShowServices] = useState(false);
   const [showNotes, setShowNotes] = useState(true);
   const [collectedAmount, setCollectedAmount] = useState('');
@@ -171,6 +130,10 @@ export function GoogleGuestAgenda({
   const [activeMeals, setActiveMeals] = useState<any[]>([]);
   const [activeServices, setActiveServices] = useState<any[]>([]);
   const [settledReceipts, setSettledReceipts] = useState<any[]>([]);
+
+  const finalizingRef = useRef(false);
+  const creatingFromEventRef = useRef(false);
+  const idempotencyKeyRef = useRef<string>(crypto.randomUUID());
 
   // Fetch settled receipts from booking_receipts table when booking changes
   useEffect(() => {
@@ -213,11 +176,39 @@ export function GoogleGuestAgenda({
     return settledReceipts;
   };
 
-  const DEFAULT_PRICING = { lunch_price: 10, lunch_child_price: 5, dinner_price: 10, dinner_child_price: 5, guide_price: 40, usd_to_uzs: 12500, usd_to_eur: 0.92 };
+  const DEFAULT_PRICING = { lunch_price: 10, lunch_child_price: 5, dinner_price: 10, dinner_child_price: 5, usd_to_uzs: 12500, usd_to_eur: 0.92 };
   const [pricing, setPricing] = useState(DEFAULT_PRICING);
   const [valError, setValError] = useState<string | null>(null);
+  const [managerAccessUntil, setManagerAccessUntil] = useState<string | null>(null);
+
+  // Fetch team_settings for global manager access
+  useEffect(() => {
+    const fetchTeamSettings = async () => {
+      if (!teamId) return;
+      const { data } = await supabase.from('team_settings').select('manager_access').eq('team_id', teamId).maybeSingle();
+      if (data?.manager_access) {
+        const access = data.manager_access as { enabled: boolean; expires_at: string | null };
+        if (access.expires_at && new Date(access.expires_at).getTime() > Date.now()) {
+          setManagerAccessUntil(access.expires_at);
+        } else {
+          setManagerAccessUntil(null);
+        }
+      }
+    };
+    fetchTeamSettings();
+  }, [teamId]);
+
+  // INVARIANT: bookings.total_price represents ONLY:
+  // (a) the accommodation base price, adjusted only by explicit date/stay changes, and
+  // (b) after settlement, the cumulative settled revenue added exactly once by finalizeTab.
+  // It must NEVER be incremented by meal or service costs before settlement — those live
+  // exclusively in meal_requests and booking_services and are summed live by calculateTabTotals() for display.
 
   // Shared function to calculate tab totals - Single Source of Truth
+  // total_price must NEVER include meal/service costs pre-finalize — those are summed live from meal_requests/booking_services here.
+  // Only /api/bookings/finalize is allowed to fold them into total_price.
+  // Note: This function is for live tab calculation from database tables, not receipt snapshot rendering.
+  // For receipt snapshot rendering, use buildReceiptLineItems from @/utils/receipt-logic.
   const calculateTabTotals = (
     meals: any[],
     accommodationAmount: number,
@@ -267,26 +258,21 @@ export function GoogleGuestAgenda({
       activeMeals,
       svcAmount,
       isPrepaid,
-      isLunchPrepaid,
-      isDinnerPrepaid,
+      false,
+      false,
       activeServices,
       svcDateAdjustment,
       svcDiscount,
       pricing
     );
     return totals.grandTotal;
-  }, [activeMeals, svcAmount, svcDateAdjustment, svcDiscount, activeServices, pricing, isPrepaid, isLunchPrepaid, isDinnerPrepaid, calculateTabTotals]);
+  }, [activeMeals, svcAmount, svcDateAdjustment, svcDiscount, activeServices, pricing, isPrepaid, calculateTabTotals]);
 
-  const pendingServicesTotal = 
-    (svcGuide && !activeServices.some((s: any) => s.service_type === 'guide') ? svcGuidePrice : 0) +
-    (svcTransport && !activeServices.some((s: any) => s.service_type === 'transportation') 
-      ? svcTransList.reduce((s: number, t: any) => s + (t.price || 0), 0) : 0);
+  const pendingServicesTotal = 0;
 
   const gTotalWithPending = gTotal + pendingServicesTotal;
 
   const hasPendingUnsavedServices = 
-    (svcGuide && svcGuidePrice > 0) || 
-    (svcTransport && svcTransList.some((t: any) => t.price > 0)) ||
     (svcLunch && svcLunchCount > 0) || 
     (svcDinner && svcDinnerCount > 0);
 
@@ -294,6 +280,7 @@ export function GoogleGuestAgenda({
   const realTotal = useMemo(() => {
     const mealTotal = activeMeals.reduce((sum, m) => {
       if (m.is_paid) return sum;
+      if (m.status !== 'confirmed' && m.status !== 'served') return sum;
       const isLunch = m.meal_type === 'Lunch';
       const adultPrice = isLunch ? (pricing.lunch_price || 10) : (pricing.dinner_price || 12);
       const childPrice = isLunch ? (pricing.lunch_child_price || 5) : (pricing.dinner_child_price || 5);
@@ -327,7 +314,6 @@ export function GoogleGuestAgenda({
     supabase.from('service_pricing').select('*').eq('id', 1).then(({ data }) => {
       if (data?.[0]) setPricing({ ...DEFAULT_PRICING, ...data[0] });
     });
-    supabase.from('drinks').select('*').eq('available', true).then(({ data }) => setDrinks(data || []));
   }, []);
 
   const [gcEvents, setGcEvents] = useState<CalEvent[]>([]);
@@ -340,6 +326,9 @@ export function GoogleGuestAgenda({
         const contentType = res.headers.get('content-type');
         if (contentType && contentType.indexOf('application/json') !== -1) {
           const data = await res.json();
+          console.log('[google-guest-agenda] DEBUG: Received events from API:', JSON.stringify(data, null, 2));
+          console.log('[google-guest-agenda] DEBUG: Events count:', data?.length || 0);
+          console.log('[google-guest-agenda] DEBUG: First event sample:', data?.[0] || 'No events');
           if (Array.isArray(data)) setGcEvents(data);
         } else {
           console.error(`Expected JSON, got ${contentType}`);
@@ -358,11 +347,14 @@ export function GoogleGuestAgenda({
     }
 
     const syncKitchen = async () => {
+      const fetchedForId = sel.id;
+      
       const { data: dbMeals } = await supabase
         .from('meal_requests')
         .select('*')
         .eq('booking_id', sel.id);
       
+      if (sel?.id !== fetchedForId) return; // stale response, discard
       if (!dbMeals) return;
 
       const statusMap: Record<string, string> = { 'Pending': 'pending', 'Accepted': 'confirmed', 'Served': 'served', 'Paid': 'paid' };
@@ -381,6 +373,7 @@ export function GoogleGuestAgenda({
           status: statusMap[m.status] || m.status.toLowerCase(),
           prepaid: m.prepaid || false,
           is_paid: m.is_paid || false,
+          is_manual_entry: m.is_manual_entry || false,
           meal_date: m.created_at ? m.created_at.split('T')[0] : ''
         };
       });
@@ -391,24 +384,9 @@ export function GoogleGuestAgenda({
         .select('*')
         .eq('booking_id', sel.id);
         
-      if (dbServices) {
-        const guides = dbServices.filter((s: any) => s.service_type === 'guide');
-        if (guides.length > 0) {
-          setSvcGuide(true);
-          setSvcGuidePrice(guides[0].unit_price || pricing.guide_price);
-          setSvcGuideNames(guides[0].details?.names ? guides[0].details.names.split(', ') : ['']);
-        }
+      if (sel?.id !== fetchedForId) return; // check again after second await
         
-        const transports = dbServices.filter((s: any) => s.service_type === 'transportation');
-        if (transports.length > 0) {
-          setSvcTransport(true);
-          setSvcTransList(transports.map((t: any) => ({
-            name: t.details?.name || '',
-            details: t.details?.destination || '',
-            price: t.unit_price || 0
-          })));
-        }
-
+      if (dbServices) {
         // Store all unpaid services for display in BookingModal
         const unpaidServices = dbServices.filter((s: any) => !s.is_paid);
         setActiveServices(unpaidServices);
@@ -426,7 +404,7 @@ export function GoogleGuestAgenda({
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [sel?.id, isLunchPrepaid, isDinnerPrepaid]);
+  }, [sel?.id]);
 
   useEffect(() => {
     if (gcEvents.length === 0 || bookings.length === 0) return;
@@ -485,7 +463,16 @@ export function GoogleGuestAgenda({
     return [...dbs, ...gcs].sort((a, b) => a.start.localeCompare(b.start));
   }, [bookingItems, unlinkedGcItems, D]);
 
-  const checkedOutItems = useMemo(() => bookingItems.filter(i => i.booking!.status === 'completed' && i.booking!.check_out === D).sort((a, b) => b.start.localeCompare(a.start)), [bookingItems, D]);
+  const checkedOutItems = useMemo(() => bookingItems.filter(i => {
+    const b = i.booking!;
+    if (b.status !== 'completed') return false;
+    if (userRole === 'CEO') return true;
+    const grantActive = managerAccessUntil && new Date(managerAccessUntil).getTime() > Date.now();
+    if (grantActive) return true;
+    if (!b.checked_out_at) return false;
+    const hoursSince = (Date.now() - new Date(b.checked_out_at).getTime()) / 3600000;
+    return hoursSince <= 24;
+  }).sort((a, b) => b.start.localeCompare(a.start)), [bookingItems, userRole, managerAccessUntil]);
   const cancelledItems = useMemo(() => bookingItems.filter(i => i.booking!.status === 'cancelled' && i.booking!.check_in <= D && i.booking!.check_out > D).sort((a, b) => b.start.localeCompare(a.start)), [bookingItems, D]);
 
   useEffect(() => {
@@ -645,9 +632,16 @@ export function GoogleGuestAgenda({
     });
   };
 
-  const handleCreateFromEvent = async (doCheckIn = false) => {
-    if (!selectedItem?.event) { flash('⚠ No event selected.'); return; }
-    if (!currentUserId) { flash('⚠ Not logged in — please refresh and try again.'); return; }
+  const handleCreateFromEvent = async (
+    doCheckIn = false,
+    adults: number = 1,
+    children: number = 0
+  ) => {
+    if (creatingFromEventRef.current) return;
+    creatingFromEventRef.current = true;
+    
+    if (!selectedItem?.event) { flash('⚠ No event selected.'); creatingFromEventRef.current = false; return; }
+    if (!currentUserId) { flash('⚠ Not logged in — please refresh and try again.'); creatingFromEventRef.current = false; return; }
     const ev = selectedItem.event;
     setLoadingAction('creating');
     try {
@@ -661,18 +655,24 @@ export function GoogleGuestAgenda({
       const payload: any = {
         guest_name: String(ev.summary || "Unnamed Guest"),
         check_in: String(ev.start),
-        check_out: String(ev.end || ev.start),
+        check_out: String(
+          ev.end && ev.end !== ev.start
+            ? ev.end
+            : localDateStr(new Date(new Date(ev.start).getTime() + 86400000))
+        ),
         status: 'checked_in',
         source: 'System',
         google_event_id: String(ev.id),
         total_price: 0,
-        number_of_adults: 1,
-        number_of_children: 0,
+        number_of_adults: adults,
+        number_of_children: children,
+        guest_count_confirmed: true,
         payment_status: 'Unpaid',
         approved_by_manager: true,
         created_by: String(currentUserId),
         team_id: teamId,
         notes: sanitizeNotes(ev.description),
+        idempotency_key: idempotencyKeyRef.current,
       };
 
       const { data: inserted, error: insertErr } = await supabase.from('bookings').insert(payload).select().single();
@@ -684,12 +684,27 @@ export function GoogleGuestAgenda({
       try { await supabase.rpc('reload_schema'); } catch { }
 
       flash(doCheckIn ? '✓ Guest checked in from calendar event.' : '✓ Booking created from calendar event.');
-      setSelectedItem(null);
       if (onRefresh) await onRefresh();
+      handleSelect({
+        key: `db-${insertedId}`,
+        name: inserted.guest_name,
+        start: inserted.check_in,
+        end: inserted.check_out,
+        source: 'db',
+        booking: inserted as Booking,
+        event: ev
+      });
     } catch (e: any) {
       console.error('Create from event error:', e);
-      flash(`⚠ ${String(e.message || e).slice(0, 100)}`);
-    } finally { setLoadingAction(''); }
+      if (e.code === '23505') {
+        flash('This booking was already created from this event — check the list before retrying.');
+      } else {
+        flash(`⚠ ${String(e.message || e).slice(0, 100)}`);
+      }
+    } finally { 
+      setLoadingAction('');
+      creatingFromEventRef.current = false;
+    }
   };
 
 
@@ -724,12 +739,37 @@ export function GoogleGuestAgenda({
 
   const handleSelect = async (item: ListItem) => {
     setSelectedItem(item);
-    setCollectedAmount(''); setSelectedDrinks({}); setExtraServices([]);
-    setNewExtraName(''); setNewExtraPrice(''); setShowDrinks(false); setActionMsg('');
-    setShowServices(false); setShowFinalReceipt(false); setShowNotes(true); 
-    
+    setCollectedAmount(''); setActionMsg('');
+    setShowServices(false); setShowFinalReceipt(false); setShowNotes(true);
+
+    // Regenerate idempotency key when selecting a different calendar event
+    if (item.event && item.event.id !== selectedItem?.event?.id) {
+      idempotencyKeyRef.current = crypto.randomUUID();
+    }
+
     if (item.booking) {
       const b = item.booking;
+
+      // Guard for closed tabs: only allow if CEO, grant active, or within 24h of checkout
+      if (b.status === 'completed') {
+        if (userRole !== 'CEO') {
+          const grantActive = managerAccessUntil && new Date(managerAccessUntil).getTime() > Date.now();
+          if (!grantActive) {
+            if (!b.checked_out_at) {
+              flash('⚠ This booking is closed and cannot be opened.');
+              setSelectedItem(null);
+              return;
+            }
+            const hoursSince = (Date.now() - new Date(b.checked_out_at).getTime()) / 3600000;
+            if (hoursSince > 24) {
+              flash('⚠ This booking is closed and cannot be opened.');
+              setSelectedItem(null);
+              return;
+            }
+          }
+        }
+      }
+
       setEditCheckIn(b.check_in);
       setEditCheckOut(b.check_out);
       setEditingDates(false);
@@ -754,8 +794,6 @@ export function GoogleGuestAgenda({
           date: ds,
           lunch: false, lunchCount: 0, lunchDietary: '',
           dinner: false, dinnerCount: 0, dinnerDietary: '',
-          guideService: false, guideNames: [''],
-          transportation: false, transEntries: [{ driver: '', time: '', from: '', to: '', arrivalTime: '', price: '' }],
           specialRequest: '',
         });
       }
@@ -770,15 +808,9 @@ export function GoogleGuestAgenda({
 
       // ── Prepaid flags from DB columns ──
       setIsPrepaid(hasSettled ? (b.payment_status === 'Prepaid' || b.is_prepaid || b.is_accommodation_prepaid || false) : (b.payment_status === 'Prepaid' || b.payment_note?.includes('Accommodation') || b.is_accommodation_prepaid || false));
-      setIsLunchPrepaid(b.payment_note?.includes('Lunch') || false);
-      setIsDinnerPrepaid(b.payment_note?.includes('Dinner') || false);
+
       
       // ── Services will be fetched via useEffect syncData ──
-      setSvcGuide(false);
-      setSvcGuideNames(['']);
-      setSvcGuidePrice(pricing.guide_price);
-      setSvcTransport(false);
-      setSvcTransList([{ name: '', details: '', price: 0 }]);
 
       // ── Payment line defaults ──
       let defaultCurrency: 'UZS' | 'USD' | 'EUR' = 'USD';
@@ -800,8 +832,6 @@ export function GoogleGuestAgenda({
       setDayEntries([]);
       setSvcLunch(false); setSvcLunchCount(0);
       setSvcDinner(false); setSvcDinnerCount(0);
-      setSvcGuide(false); setSvcGuideNames(['']); setSvcGuidePrice(40);
-      setSvcTransport(false); setSvcTransList([{ name: '', details: '', price: 0 }]);
       setSvcAmount(0);
       setSvcDiscount(0);
       setSvcPayList([{ amount: '0', currency: 'USD', method: 'Cash' }]);
@@ -814,10 +844,8 @@ export function GoogleGuestAgenda({
     
     const timer = setTimeout(async () => {
       const draft = {
-        isPrepaid, isLunchPrepaid, isDinnerPrepaid,
+        isPrepaid,
         svcLunch, svcLunchCount, svcDinner, svcDinnerCount,
-        svcGuide, svcGuidePrice, svcGuideNames,
-        svcTransport, svcTransList,
         svcAmount, svcDiscount
       };
       
@@ -848,22 +876,14 @@ export function GoogleGuestAgenda({
 
     return () => clearTimeout(timer);
   }, [
-    sel?.id, isPrepaid, isLunchPrepaid, isDinnerPrepaid,
+    sel?.id, isPrepaid,
     svcLunch, svcLunchCount, svcDinner, svcDinnerCount,
-    svcGuide, svcGuidePrice, svcGuideNames,
-    svcTransport, svcTransList,
     svcAmount, svcDiscount,
     dayEntries
   ]);
 
   const updateDay = (index: number, updates: Partial<DayEntry>) =>
     setDayEntries(prev => prev.map((d, i) => i === index ? { ...d, ...updates } : d));
-
-  const updateDayGuideName = (dayIndex: number, nameIndex: number, value: string) =>
-    setDayEntries(prev => { const days = [...prev]; const names = [...days[dayIndex].guideNames]; names[nameIndex] = value; days[dayIndex] = { ...days[dayIndex], guideNames: names }; return days; });
-
-  const updateDayTransEntry = (dayIndex: number, ei: number, field: string, value: string) =>
-    setDayEntries(prev => { const days = [...prev]; const ents = [...days[dayIndex].transEntries]; ents[ei] = { ...ents[ei], [field]: value }; days[dayIndex] = { ...days[dayIndex], transEntries: ents }; return days; });
 
   const daysUntilCheckIn = sel
     ? Math.ceil((new Date(sel.check_in + 'T00:00:00').getTime() - new Date(today + 'T00:00:00').getTime()) / 86400000)
@@ -888,6 +908,8 @@ export function GoogleGuestAgenda({
   };
 
   const finalizeTab = async (): Promise<boolean> => {
+    // INVARIANT: This is the ONLY function permitted to add settled costs to bookings.total_price, and it must only run once per tab.
+    // Guarded by marking meal_requests/booking_services is_paid=true (which happens in STEP 6/6b below).
     if (!sel || !onCheckOut) return false;
     const receipts = getSettledReceiptsForSel();
     const hasSettled = receipts.length > 0 || (sel.collected_amount || 0) > 0;
@@ -902,26 +924,14 @@ export function GoogleGuestAgenda({
       setShowServices(true);
       return false;
     }
-    if (svcGuide && (svcGuideNames.some(n => !n.trim()) || svcGuidePrice <= 0)) {
-      flash('⚠ Please enter guide name and amount.');
-      setShowServices(true);
-      return false;
-    }
-    if (svcTransport && svcTransList.some(t => !t.name.trim() || !t.details.trim() || t.price <= 0)) {
-      flash('⚠ Please fill all transport fields (name, destination, amount).');
-      setShowServices(true);
-      return false;
-    }
 
-    // Final safety check: cannot close tab with money still owed unless explicitly marked prepaid
-    if (gTotal > 0 && !isBalanceMatched) {
-      flash(`⚠ Cannot close tab: Balance mismatch. Amount owed: $${gTotal.toFixed(2)}, Amount collected: $${tPaidUsd.toFixed(2)}. Please ensure all charges are either paid or marked as prepaid.`);
-      return false;
-    }
+    if (finalizingRef.current) return false;
+    finalizingRef.current = true;
 
-    setLoadingAction('checkout');
+    if (loadingAction === 'finalize') return false;
+
+    setLoadingAction('finalize');
     try {
-      // ── STEP 1: Identify unpaid meals from the table ──
       const mealsToPay = activeMeals.filter(m => 
         !m.is_paid && (m.status === 'confirmed' || m.status === 'served')
       );
@@ -951,24 +961,6 @@ export function GoogleGuestAgenda({
         return sum + (p.currency === 'USD' ? amt : (amt / rate));
       }, 0);
 
-      const drinkServices = activeServices.filter((s: any) => s.service_type === 'drink');
-      const drinkGroups: Record<string, any[]> = {};
-      drinkServices.forEach((s: any) => {
-        const drinkId = s.details?.drink_id ? String(s.details.drink_id) : String(s.id);
-        if (!drinkGroups[drinkId]) {
-          drinkGroups[drinkId] = [];
-        }
-        drinkGroups[drinkId].push(s);
-      });
-      
-      const drinkTab = Object.entries(drinkGroups).map(([drinkId, rows]: [string, any[]]) => ({
-        drink_id: parseInt(drinkId),
-        drink_name: rows[0].details?.name || 'Drink',
-        quantity: rows.reduce((sum: number, r: any) => sum + r.quantity, 0),
-        price: rows[0].unit_price,
-        currency: rows[0].currency || 'USD'
-      }));
-
       // ── STEP 3: Generate receipt snapshot ──
       const now = new Date();
       const datePart = now.toISOString().split('T')[0].replace(/-/g, '').slice(2);
@@ -982,8 +974,8 @@ export function GoogleGuestAgenda({
         mealsToPay,
         svcAmount,
         isPrepaid,
-        isLunchPrepaid,
-        isDinnerPrepaid,
+        false,
+        false,
         activeServices,
         svcDateAdjustment,
         svcDiscount,
@@ -1003,8 +995,7 @@ export function GoogleGuestAgenda({
             dinner: dinnerTotal,
             lunchCharged: lunchCharged,
             dinnerCharged: dinnerCharged,
-            isLunchPrepaid: isLunchPrepaid,
-            isDinnerPrepaid: isDinnerPrepaid,
+
             // Record individual meal prepaid status
             mealDetails: mealsToPay.map(m => ({
               id: m.id,
@@ -1015,21 +1006,31 @@ export function GoogleGuestAgenda({
               prepaid: m.prepaid || false
             }))
           },
-          services: { 
-            guide: activeServices.filter((s: any) => s.service_type === 'guide').reduce((sum: number, s: any) => sum + (s.unit_price * s.quantity), 0),
-            transport: activeServices.filter((s: any) => s.service_type === 'transportation').reduce((sum: number, s: any) => sum + (s.unit_price * s.quantity), 0),
-          },
+          services: {},
           stay_adjustment: svcDateAdjustment,
-          extras: activeServices.filter((s: any) => s.service_type === 'extra').map((s: any) => ({
-            name: s.details?.name || 'Extra',
-            price: String(s.unit_price * s.quantity)
-          })),
-          drinks: drinkTab,
+          extras: [],
+          drinks: [],
           discount: svcDiscount > 0 ? { amount: svcDiscount, reason: svcDiscountReason } : null
         },
         total: receiptTotals.grandTotal,
         payments: receiptTotals.grandTotal === 0 ? [] : svcPayList.filter(p => parseFloat(p.amount) !== 0)
       };
+
+      // ── Pre-insert duplicate check ──
+      const { data: recentReceipts } = await supabase
+        .from('booking_receipts')
+        .select('id, snapshot, created_at')
+        .eq('booking_id', sel.id)
+        .gte('created_at', new Date(Date.now() - 15000).toISOString());
+      const isDuplicate = (recentReceipts || []).some(r => {
+        const existingIds = r.snapshot?.items?.settled_meal_ids || [];
+        return existingIds.length === mealIds.length && 
+               existingIds.every((id: number) => mealIds.includes(id));
+      });
+      if (isDuplicate) {
+        flash('⚠ Duplicate checkout detected and blocked.');
+        return false;
+      }
 
       // ── STEP 4: Record payments in payments table ──
       for (const p of svcPayList) {
@@ -1055,7 +1056,20 @@ export function GoogleGuestAgenda({
           receipt_id: receiptId,
           snapshot,
           total_usd: realTotal, // Use real total for revenue/statistics
+          settled_at: now.toISOString(),
         });
+        // Optimistic add — show immediately without refresh
+        setSettledReceipts(prev => [{
+          id: receiptId,
+          receipt_id: receiptId,
+          date: snapshot.date || now.toISOString(),
+          settled_at: snapshot.settled_at || now.toISOString(),
+          items: snapshot.items,
+          total: receiptTotals.grandTotal,
+          total_usd: realTotal,
+          payments: snapshot.payments,
+          snapshot,
+        }, ...prev]);
       } catch {}
 
       // ── STEP 6: Flip meal_requests to Paid (Single Source of Truth) ──
@@ -1099,11 +1113,11 @@ export function GoogleGuestAgenda({
       const updates = {
         collected_amount: isPrepaid ? (sel.collected_amount || 0) : Math.max(0, totalPaidUsd),
         total_price: hasSettled ? ((sel.total_price || 0) + svcDateAdjustment) : (svcAmount + svcDateAdjustment),
-        payment_status: (gTotal === 0) || (isPrepaid && isFoodPrepaid) ? 'Prepaid' : 'Paid',
+        payment_status: (gTotal === 0) || isPrepaid ? 'Prepaid' : 'Paid',
         payment_method: svcPayList.length > 0 ? svcPayList[svcPayList.length - 1].method : 'Cash',
         is_prepaid: isPrepaid,
         is_accommodation_prepaid: isPrepaid,
-        is_food_prepaid: isFoodPrepaid,
+
         meta: updatedMeta
       };
       
@@ -1122,11 +1136,8 @@ export function GoogleGuestAgenda({
       // ── STEP 9: HARD RESET all React state ──
       setActiveMeals([]);
       setSvcAmount(0); setSvcDiscount(0); setSvcDateAdjustment(0); 
-      setIsPrepaid(false); setIsLunchPrepaid(false); setIsDinnerPrepaid(false); setIsFoodPrepaid(false);
+      setIsPrepaid(false);
       setSvcLunch(false); setSvcLunchCount(0); setSvcDinner(false); setSvcDinnerCount(0);
-      setSvcGuide(false); setSvcGuidePrice(40); setSvcGuideNames(['']);
-      setSvcTransport(false); setSvcTransList([{ name: '', details: '', price: 0 }]);
-      setExtraServices([]); setSelectedDrinks({});
       setSvcPayList([{ amount: '', currency: 'USD', method: 'Cash' }]);
       setPayModified(false);
 
@@ -1136,7 +1147,48 @@ export function GoogleGuestAgenda({
       flash('⚠ Failed to settle tab.');
       return false;
     }
-    finally { setLoadingAction(''); }
+    finally { 
+      setLoadingAction('');
+      finalizingRef.current = false;
+    }
+  };
+
+  const handleGuestCheckOut = async (): Promise<boolean> => {
+    console.log('[handleGuestCheckOut] called, sel:', sel?.id, 'onUpdateBooking:', !!onUpdateBooking);
+    if (!sel || !onUpdateBooking) return false;
+    const isAccommodationSettled = getSettledReceiptsForSel().length > 0 ||
+      (sel.collected_amount || 0) > 0 ||
+      sel.is_prepaid ||
+      sel.is_accommodation_prepaid;
+
+    const hasUnpaidMeals = activeMeals.some((m: any) =>
+      !m.is_paid && (m.status === 'confirmed' || m.status === 'served')
+    );
+    const hasUnpaidServices = activeServices.some((s: any) => !s.is_paid);
+
+    if (!isAccommodationSettled) {
+      setCheckoutBlockReason('Accommodation must be marked prepaid or the tab settled first.');
+      flash('⚠ Cannot check out — accommodation must be marked prepaid or the tab settled first.');
+      return false;
+    }
+    if (hasUnpaidMeals || hasUnpaidServices) {
+      setCheckoutBlockReason('This guest has unpaid meals or services. Settle the tab first.');
+      flash('⚠ Cannot check out — this guest has unpaid meals or services. Settle the tab first.');
+      return false;
+    }
+    setLoadingAction('guestcheckout');
+    try {
+      await onUpdateBooking(sel.id, { status: 'completed', checked_out_at: new Date().toISOString() });
+      flash('✓ Guest checked out.');
+      if (onRefresh) await onRefresh();
+      return true;
+    } catch (err) {
+      console.error('Guest checkout failed:', err);
+      flash('⚠ Failed to check out guest.');
+      return false;
+    } finally {
+      setLoadingAction('');
+    }
   };
 
   const handleSaveServices = async () => {
@@ -1147,76 +1199,35 @@ export function GoogleGuestAgenda({
       flash('⚠ Please enter quantity for selected meals.');
       return;
     }
-    if (svcGuide && (svcGuideNames.some(n => !n.trim()) || svcGuidePrice <= 0)) {
-      console.log('DEBUG: guide check failing', svcGuide, svcGuideNames, svcGuidePrice);
-      flash('⚠ Please enter guide name and amount.');
-      return;
-    }
-    if (svcTransport && svcTransList.some(t => !t.name.trim() || !t.details.trim() || t.price <= 0)) {
-      console.log('DEBUG: transport check failing', svcTransport, svcTransList);
-      flash('⚠ Please enter all transport details.');
-      return;
-    }
     console.log('DEBUG: validation passed, proceeding to insert');
     setLoadingAction('saveservices');
     try {
-      const dTotal = Object.entries(selectedDrinks).reduce((sum, [id, qty]) => {
-        const drink = drinks.find(d => d.id === parseInt(id));
-        return sum + (qty * (drink?.sold_price || 0));
-      }, 0);
-      const eTotal = extraServices.reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0);
       const sTotal = (
         (svcLunch ? svcLunchCount * (pricing.lunch_price) : 0) +
-        (svcDinner ? svcDinnerCount * (pricing.dinner_price) : 0) +
-        (svcGuide ? svcGuidePrice : 0) +
-        (svcTransport ? svcTransList.reduce((s, t) => s + (t.price || 0), 0) : 0)
+        (svcDinner ? svcDinnerCount * (pricing.dinner_price) : 0)
       );
 
-      const isTab1Closed = (getSettledReceiptsForSel ? getSettledReceiptsForSel() : []).length > 0 || (sel.collected_amount || 0) > 0 || sel.is_prepaid || sel.is_accommodation_prepaid || sel.is_food_prepaid;
+      const isTab1Closed = (getSettledReceiptsForSel ? getSettledReceiptsForSel() : []).length > 0 || (sel.collected_amount || 0) > 0 || sel.is_prepaid || sel.is_accommodation_prepaid;
 
       // Manually insert services since booking columns are removed
       if (svcLunch) {
         await supabase.from('meal_requests').insert({
-          booking_id: sel.id, meal_date: today, meal_type: 'Lunch', adult_qty: svcLunchCount, child_qty: 0, status: 'Pending', team_id: teamId
+          booking_id: sel.id, meal_date: today, meal_type: 'Lunch', adult_qty: svcLunchCount, child_qty: 0, status: 'Pending', team_id: teamId, is_manual_entry: true
         });
       }
       if (svcDinner) {
         await supabase.from('meal_requests').insert({
-          booking_id: sel.id, meal_date: today, meal_type: 'Dinner', adult_qty: svcDinnerCount, child_qty: 0, status: 'Pending', team_id: teamId
+          booking_id: sel.id, meal_date: today, meal_type: 'Dinner', adult_qty: svcDinnerCount, child_qty: 0, status: 'Pending', team_id: teamId, is_manual_entry: true
         });
       }
-      if (svcGuide) {
-        const { error } = await supabase.from('booking_services').insert({
-          booking_id: sel.id, service_type: 'guide', unit_price: svcGuidePrice, quantity: 1, currency: 'USD', is_paid: false,
-          details: { names: svcGuideNames.join(', ') }
-        });
-        if (error) console.error('Failed to save guide service:', error);
-      }
-      if (svcTransport) {
-        for (const t of svcTransList) {
-          if (t.name.trim() || t.details.trim() || t.price > 0) {
-            const { error } = await supabase.from('booking_services').insert({
-              booking_id: sel.id, service_type: 'transportation', unit_price: t.price || 0, quantity: 1, currency: 'USD', is_paid: false,
-              details: { name: t.name, destination: t.details }
-            });
-            if (error) console.error('Failed to save transport service:', error);
-          }
-        }
-      }
-
-      const updates: Partial<Booking> = {
-        total_price: isTab1Closed 
-          ? ((sel.total_price || 0) + svcDateAdjustment)
-          : (svcAmount + svcDateAdjustment + sTotal + dTotal + eTotal - svcDiscount),
-      };
+      
+      // INVARIANT: total_price is NOT modified here for service costs - those live in meal_requests/booking_services
+      // svcDateAdjustment is also NOT applied here - only the date-edit handler should apply date adjustments
+      // This function ONLY inserts line-item rows and does not touch total_price
+      const updates: Partial<Booking> = {};
       await onUpdateBooking(sel.id, updates);
       flash('✓ Services updated.');
       setShowServices(false);
-      setSvcGuide(false);
-      setSvcGuideNames(['']);
-      setSvcGuidePrice(0);
-      setSvcTransport(false);
-      setSvcTransList([{ name: '', details: '', price: 0 }]);
       setSvcLunch(false);
       setSvcDinner(false);
     } catch {
@@ -1440,12 +1451,7 @@ export function GoogleGuestAgenda({
         setSvcDateAdjustment={setSvcDateAdjustment}
         isPrepaid={isPrepaid}
         setIsPrepaid={setIsPrepaid}
-        isLunchPrepaid={isLunchPrepaid}
-        setIsLunchPrepaid={setIsLunchPrepaid}
-        isDinnerPrepaid={isDinnerPrepaid}
-        setIsDinnerPrepaid={setIsDinnerPrepaid}
-        isFoodPrepaid={isFoodPrepaid}
-        setIsFoodPrepaid={setIsFoodPrepaid}
+
         svcLunch={svcLunch}
         setSvcLunch={setSvcLunch}
         svcLunchCount={svcLunchCount}
@@ -1454,33 +1460,12 @@ export function GoogleGuestAgenda({
         setSvcDinner={setSvcDinner}
         svcDinnerCount={svcDinnerCount}
         setSvcDinnerCount={setSvcDinnerCount}
-        svcGuide={svcGuide}
-        setSvcGuide={setSvcGuide}
-        svcGuidePrice={svcGuidePrice}
-        setSvcGuidePrice={setSvcGuidePrice}
-        svcGuideNames={svcGuideNames}
-        setSvcGuideNames={setSvcGuideNames}
-        svcTransport={svcTransport}
-        setSvcTransport={setSvcTransport}
-        svcTransList={svcTransList}
-        setSvcTransList={setSvcTransList}
         svcDiscount={svcDiscount}
         setSvcDiscount={setSvcDiscount}
         svcDiscountReason={svcDiscountReason}
         setSvcDiscountReason={setSvcDiscountReason}
         svcPayList={svcPayList}
         setSvcPayList={setSvcPayList}
-        showDrinks={showDrinks}
-        setShowDrinks={setShowDrinks}
-        drinks={drinks}
-        selectedDrinks={selectedDrinks}
-        setSelectedDrinks={setSelectedDrinks}
-        extraServices={extraServices}
-        setExtraServices={setExtraServices}
-        newExtraName={newExtraName}
-        setNewExtraName={setNewExtraName}
-        newExtraPrice={newExtraPrice}
-        setNewExtraPrice={setNewExtraPrice}
         showServices={showServices}
         setShowServices={setShowServices}
         showNotes={showNotes}
@@ -1489,6 +1474,9 @@ export function GoogleGuestAgenda({
         setShowFinalReceipt={setShowFinalReceipt}
         handleCheckOut={finalizeTab}
         finalizeTab={finalizeTab}
+        handleGuestCheckOut={handleGuestCheckOut}
+        checkoutBlockReason={checkoutBlockReason}
+        setCheckoutBlockReason={setCheckoutBlockReason}
         selectedReceipt={selectedReceipt}
         setSelectedReceipt={setSelectedReceipt}
         editingDates={editingDates}
@@ -1515,7 +1503,9 @@ export function GoogleGuestAgenda({
         gcEvents={gcEvents}
         dayEntries={dayEntries}
         activeMeals={activeMeals}
+        setActiveMeals={setActiveMeals}
         activeServices={activeServices}
+        setActiveServices={setActiveServices}
       />
 
       <ManagerIncomeForm 

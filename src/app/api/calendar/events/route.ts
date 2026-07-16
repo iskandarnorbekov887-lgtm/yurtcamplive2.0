@@ -22,13 +22,31 @@ async function getTeamId() {
 
 export async function GET(request: NextRequest) {
   try {
-    const teamId = await getTeamId();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Unauthorized');
+    
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('team_id')
+      .eq('id', user.id)
+      .single();
+      
+    if (!profile?.team_id) throw new Error('User does not belong to a team');
+    const teamId = profile.team_id;
     
     const { searchParams } = new URL(request.url);
     const timeMin = searchParams.get('timeMin') || undefined;
     const timeMax = searchParams.get('timeMax') || undefined;
     
-    const events = await listEvents(teamId, timeMin, timeMax);
+    // Get the user's session token for Edge Function authentication
+    const { data: { session } } = await supabase.auth.getSession();
+    const userJwt = session?.access_token;
+    
+    const events = await listEvents(teamId, timeMin, timeMax, userJwt);
+    
+    console.log('[api/calendar/events] DEBUG: Raw events from listEvents:', JSON.stringify(events, null, 2));
+    console.log('[api/calendar/events] DEBUG: Events count:', events.length);
     
     // Map to a cleaner format if needed, but here we return raw for compatibility
     const formatted = events.map((ev: any) => ({
@@ -41,6 +59,9 @@ export async function GET(request: NextRequest) {
       colorId: ev.colorId,
       status: ev.status
     }));
+    
+    console.log('[api/calendar/events] DEBUG: Formatted events count:', formatted.length);
+    console.log('[api/calendar/events] DEBUG: First formatted event:', formatted[0] || 'No events');
 
     return NextResponse.json(formatted);
   } catch (err: any) {

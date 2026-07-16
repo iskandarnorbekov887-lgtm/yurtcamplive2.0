@@ -123,7 +123,7 @@ Deno.serve(async (req: Request) => {
   // ── Step 2: Fetch credentials from team_settings ─────────────────────────
   const { data: settings, error: settingsError } = await adminClient
     .from('team_settings')
-    .select('google_api_key, google_calendar_id')
+    .select('google_api_key, google_calendar_id, google_calendar_integration_method, google_ical_url')
     .eq('team_id', teamId)
     .maybeSingle();
 
@@ -140,9 +140,80 @@ Deno.serve(async (req: Request) => {
     );
   }
 
-  const { google_api_key: apiKey, google_calendar_id: calendarId } =
-    settings as { google_api_key: string; google_calendar_id: string };
+  const integrationMethod = (settings as any).google_calendar_integration_method || 'api';
+  const icalUrl = (settings as any).google_ical_url;
+  const apiKey = (settings as any).google_api_key;
+  const calendarId = (settings as any).google_calendar_id;
 
+  // ── Step 3: Branch based on integration method ───────────────────────────
+  if (integrationMethod === 'ical') {
+    // iCal mode: validate the iCal URL is accessible and returns valid iCal data
+    if (!icalUrl || !calendarId) {
+      return errorResponse(
+        'CREDENTIALS_INCOMPLETE',
+        'iCal Feed URL and Calendar ID are required for iCal mode.',
+        422,
+      );
+    }
+
+    let icsResponse: Response;
+    let icsText: string;
+    try {
+      icsResponse = await fetch(icalUrl, {
+        method: 'GET',
+        headers: {
+          Accept: 'text/calendar',
+          'User-Agent': 'YurtCamp-ICalVerify/1.0',
+        },
+      });
+
+      if (!icsResponse.ok) {
+        console.error(`[verify-google-calendar] Failed to fetch iCal: HTTP ${icsResponse.status}`);
+        return errorResponse(
+          'ICAL_FETCH_ERROR',
+          `Failed to fetch iCal feed (HTTP ${icsResponse.status}). Please verify the URL is correct and publicly accessible.`,
+          502,
+        );
+      }
+
+      icsText = await icsResponse.text();
+    } catch (networkErr: unknown) {
+      const msg = networkErr instanceof Error ? networkErr.message : String(networkErr);
+      console.error('[verify-google-calendar] Network error fetching iCal:', msg);
+      return errorResponse(
+        'ICAL_NETWORK_ERROR',
+        'Could not reach the iCal feed URL. Please check the URL and your network.',
+        502,
+      );
+    }
+
+    // Validate it's a valid iCal file
+    if (!icsText.trim().startsWith('BEGIN:VCALENDAR')) {
+      return errorResponse(
+        'ICAL_INVALID_FORMAT',
+        'The URL does not return valid iCal data. Please verify the URL points to a valid .ics file.',
+        422,
+      );
+    }
+
+    console.info(
+      `[verify-google-calendar] ✅ iCal verification OK. team=${teamId} user=${user.id} calendar="${calendarId}"`,
+    );
+
+    return json({
+      ok: true,
+      meta: {
+        team_id: teamId,
+        calendar_id: calendarId,
+        calendar_name: 'iCal Feed',
+        integration_method: 'ical',
+        verified_at: new Date().toISOString(),
+        verified_by_role: role,
+      },
+    }, 200);
+  }
+
+  // API mode: existing Google Calendar API validation
   if (!apiKey || !calendarId) {
     return errorResponse(
       'CREDENTIALS_INCOMPLETE',
