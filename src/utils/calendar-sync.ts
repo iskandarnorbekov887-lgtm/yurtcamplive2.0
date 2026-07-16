@@ -311,6 +311,46 @@ export async function verifyConnection(teamId: string) {
     }
   }
 
+  if (clientInfo.integrationMethod === 'oauth') {
+    // For OAuth, verify the token works by calling the calendar metadata endpoint
+    const { calendarId, accessToken, tokenExpiry } = clientInfo;
+    
+    // Check if token is expired or will expire soon (within 5 minutes)
+    let currentAccessToken = accessToken;
+    const now = new Date();
+    const expiryDate = tokenExpiry ? new Date(tokenExpiry) : null;
+    const isExpired = expiryDate && now >= new Date(expiryDate.getTime() - 5 * 60 * 1000);
+    
+    if (isExpired) {
+      // Refresh the token
+      const refreshedToken = await refreshOAuthToken(teamId);
+      if (refreshedToken) {
+        currentAccessToken = refreshedToken;
+        // Update cache with new token
+        clientCache.set(teamId, { ...clientInfo, accessToken: refreshedToken, tokenExpiry: new Date(Date.now() + 3600 * 1000).toISOString() });
+      }
+    }
+    
+    // Simple decryption (upgrade to proper encryption in production)
+    const decryptedToken = Buffer.from(currentAccessToken, 'base64').toString('utf8');
+    
+    // Call Google Calendar API with OAuth token to verify access
+    const response = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}`, {
+      headers: {
+        Authorization: `Bearer ${decryptedToken}`,
+      },
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[calendar-sync] OAuth verify error:', errorText);
+      throw new Error(`OAuth verification failed: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return { calendarId, integrationMethod: 'oauth', summary: data.summary };
+  }
+
   const { calClient, calendarId } = clientInfo;
   const res = await calClient.calendars.get({ calendarId });
   return res.data;
