@@ -516,7 +516,7 @@ export function GoogleGuestAgenda({
     return (
       <div key={item.key} className={`w-full px-4 py-3 transition-all border-l-4 ${
         isActuallyCancelled
-          ? 'border-red-300 bg-[#722F37]/10/50'
+          ? 'bg-red-600 border border-red-700'
           : isRedWarning
           ? 'border-red-400 bg-[#722F37]/5'
           : isSelected
@@ -535,16 +535,16 @@ export function GoogleGuestAgenda({
         >
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className={`font-bold text-sm truncate ${isActuallyCancelled ? 'text-[#722F37] line-through' : 'text-[#EDE6D6]'}`}>
+              <p className={`font-bold text-sm truncate ${isActuallyCancelled ? 'text-white' : 'text-[#EDE6D6]'}`}>
                 <span className="text-[#9C9384] font-medium mr-1">{getPrefix(item)}</span>
                 {item.name}
               </p>
-              <p className="text-xs text-[#9C9384] mt-0.5 font-data">{item.start} → {item.end}</p>
-              {booking ? <p className="text-xs text-[#9C9384]">Booking</p> : <p className="text-xs text-[#9C9384]">calendar only</p>}
+              <p className={`text-xs mt-0.5 font-data ${isActuallyCancelled ? 'text-red-100' : 'text-[#9C9384]'}`}>{item.start} → {item.end}</p>
+              {booking ? <p className={`text-xs ${isActuallyCancelled ? 'text-red-100' : 'text-[#9C9384]'}`}>Booking</p> : <p className={`text-xs ${isActuallyCancelled ? 'text-red-100' : 'text-[#9C9384]'}`}>calendar only</p>}
             </div>
             <div className="flex flex-col items-end gap-1 shrink-0">
               {isActuallyCancelled
-                ? <span className="text-[10px] font-bold px-2 py-0.5 border border-red-600 text-red-600 font-mono uppercase">cancelled</span>
+                ? <span className="text-[10px] font-bold px-2 py-0.5 border border-red-800 bg-red-800 text-white font-mono uppercase">cancelled</span>
                 : isRedWarning
                 ? <span className="text-[10px] font-bold px-2 py-0.5 border border-red-500 text-red-500 font-mono uppercase">full occupancy</span>
                 : booking ? (
