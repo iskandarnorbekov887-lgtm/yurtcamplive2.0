@@ -1615,9 +1615,9 @@ export function BookingModal(props: BookingModalProps) {
                                       }
                                     }}
                                     disabled={!transportFrom || !transportTo || !transportDriver || !transportPrice || parseFloat(transportPrice) <= 0 || addingTransport}
-                                    className="px-4 py-2 bg-[#0B6E4F] text-[#C9A227] rounded-lg text-xs font-black uppercase tracking-widest hover:bg-[#0B6E4F]/80 transition-all disabled:opacity-50"
+                                    className="px-3 py-1.5 bg-[#0B6E4F] text-[#C9A227] rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-[#0B6E4F]/80 transition-all disabled:opacity-50 whitespace-nowrap"
                                   >
-                                    {addingTransport ? 'Adding...' : transportEntries.length > 0 ? '+ Add Another Transportation' : 'Add'}
+                                    {addingTransport ? 'Adding...' : transportEntries.length > 0 ? '+ Add' : 'Add'}
                                   </button>
                                 </div>
                               </div>
@@ -1738,9 +1738,9 @@ export function BookingModal(props: BookingModalProps) {
                                     }
                                   }}
                                   disabled={!guideName || !guidePrice || parseFloat(guidePrice) <= 0 || addingGuide}
-                                  className="w-full px-4 py-2 bg-[#0B6E4F] text-[#C9A227] rounded-lg text-xs font-black uppercase tracking-widest hover:bg-[#0B6E4F]/80 transition-all disabled:opacity-50"
+                                  className="w-full px-3 py-1.5 bg-[#0B6E4F] text-[#C9A227] rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-[#0B6E4F]/80 transition-all disabled:opacity-50"
                                 >
-                                  {addingGuide ? 'Adding...' : guideEntries.length > 0 ? '+ Add Another Guide' : 'Add'}
+                                  {addingGuide ? 'Adding...' : guideEntries.length > 0 ? '+ Add' : 'Add'}
                                 </button>
                               </div>
                               {guideEntries.length > 0 && (() => {
