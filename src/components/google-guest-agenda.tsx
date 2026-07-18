@@ -1102,6 +1102,14 @@ export function GoogleGuestAgenda({
             }))
           },
           services: {},
+          service_details: Object.fromEntries(
+            activeServices
+              .filter((s: any) => s.service_type === 'extra')
+              .map((s: any) => [
+                s.details?.name || 'Extra',
+                s.details || {}
+              ])
+          ),
           stay_adjustment: svcDateAdjustment,
           extras: [],
           drinks: [],

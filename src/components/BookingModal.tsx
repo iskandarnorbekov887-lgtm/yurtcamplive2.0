@@ -2552,11 +2552,27 @@ export function BookingModal(props: BookingModalProps) {
 
                               {(() => {
                                 const svcs = selectedReceipt.items?.services || {};
+                                const svcDetails = selectedReceipt.items?.service_details || {};
                                 return Object.entries(svcs).map(([name, price]: [string, any]) => {
                                   if (!price) return null;
+                                  const detail = svcDetails[name];
                                   return (
-                                    <div key={name} className="flex justify-between items-center text-sm">
-                                      <span className="text-slate-400 font-medium capitalize">{name}</span>
+                                    <div key={name} className="flex justify-between items-start text-sm">
+                                      <div className="flex flex-col">
+                                        <span className="text-slate-400 font-medium capitalize">{name}</span>
+                                        {detail?.from && (
+                                          <span className="text-[10px] text-[#9C9384]">
+                                            {detail.from} → {detail.to}
+                                            {detail.driver_name ? ` · ${detail.driver_name}` : ''}
+                                          </span>
+                                        )}
+                                        {detail?.guide_name && (
+                                          <span className="text-[10px] text-[#9C9384]">
+                                            {detail.guide_name}
+                                            {detail.paxod_type ? ` · ${detail.paxod_type}` : ''}
+                                          </span>
+                                        )}
+                                      </div>
                                       <span className="text-slate-500 font-bold">${String(price.toFixed(2))}</span>
                                     </div>
                                   );
@@ -2676,16 +2692,36 @@ export function BookingModal(props: BookingModalProps) {
                                         )}
                                       </div>
                                     ))}
-                                    {extraServices.map((s: any) => (
-                                      <div key={s.id} className="flex justify-between items-center text-sm">
-                                        <span className="text-slate-400 font-medium">{s.details?.name || 'Extra'}</span>
-                                        {s.is_paid ? (
-                                          <span className="text-[9px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">PREPAID</span>
-                                        ) : (
-                                          <span className="text-slate-500 font-bold">${String((s.unit_price * s.quantity).toFixed(2))}</span>
-                                        )}
-                                      </div>
-                                    ))}
+                                    {extraServices.map((s: any) => {
+                                      const isTransport = s.details?.name === 'Transportation';
+                                      const isGuide = s.details?.name === 'Guide Service';
+                                      return (
+                                        <div key={s.id} className="flex justify-between items-start text-sm">
+                                          <div className="flex flex-col">
+                                            <span className="text-slate-400 font-medium">
+                                              {s.details?.name || 'Extra'}
+                                            </span>
+                                            {isTransport && s.details?.from && (
+                                              <span className="text-[10px] text-[#9C9384]">
+                                                {s.details.from} → {s.details.to}
+                                                {s.details.driver_name ? ` · ${s.details.driver_name}` : ''}
+                                              </span>
+                                            )}
+                                            {isGuide && s.details?.guide_name && (
+                                              <span className="text-[10px] text-[#9C9384]">
+                                                {s.details.guide_name}
+                                                {s.details.paxod_type ? ` · ${s.details.paxod_type}` : ''}
+                                              </span>
+                                            )}
+                                          </div>
+                                          {s.is_paid ? (
+                                            <span className="text-[9px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">PREPAID</span>
+                                          ) : (
+                                            <span className="text-slate-500 font-bold">${String((s.unit_price * s.quantity).toFixed(2))}</span>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
                                   </>
                                 );
                               })()}
