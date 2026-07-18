@@ -72,11 +72,9 @@ export interface Booking {
   payments?: any[];
   is_prepaid?: boolean;
   is_accommodation_prepaid?: boolean;
-  is_food_prepaid?: boolean;
   default_vegetarian_qty?: number;
-  lunch_prepaid?: boolean;
-  dinner_prepaid?: boolean;
   guest_count_confirmed?: boolean;
+  checked_out_at?: string;
   /** Joined meal_requests from the normalized table (not a DB column) */
   meal_requests?: MealRequest[];
   /** Joined booking_services from the normalized table (not a DB column) */
@@ -88,8 +86,6 @@ export interface Tab {
   id: string;
   date: string;
   is_prepaid: boolean;
-  lunch_prepaid: boolean;
-  dinner_prepaid: boolean;
   items: {
     accommodation: number;
     meals: { lunch: number; dinner: number };
@@ -183,7 +179,7 @@ export interface MealRequest {
 export interface ExtraService {
   id: number;
   booking_id: number;
-  service_type: 'drink' | 'other';
+  service_type: 'drinks' | 'other';
   source_id?: number | null;
   name: string;
   quantity: number;
