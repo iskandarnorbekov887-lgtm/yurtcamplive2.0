@@ -85,7 +85,9 @@ function ManagerPortal() {
     };
   }, []);
 
-  const checkedInCount = bookings.filter(b => b.status === 'checked_in').length;
+  const checkedInCount = bookings
+    .filter(b => b.status === 'checked_in')
+    .reduce((sum, b) => sum + (b.number_of_adults ?? b.guest_count ?? 1) + (b.number_of_children ?? 0), 0);
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#0F1419] text-[#EDE6D6] font-sans">
