@@ -215,39 +215,58 @@ export async function listEvents(teamId: string, timeMin?: string, timeMax?: str
     // Simple decryption (upgrade to proper encryption in production)
     const decryptedToken = Buffer.from(currentAccessToken, 'base64').toString('utf8');
     
-    // Call Google Calendar API with OAuth token
-    const response = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?${new URLSearchParams({
-      timeMin: timeMin || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString(),
-      timeMax: timeMax || new Date(new Date().getFullYear(), new Date().getMonth() + 2, 0).toISOString(),
-      singleEvents: 'true',
-      orderBy: 'startTime',
-    })}`, {
-      headers: {
-        Authorization: `Bearer ${decryptedToken}`,
-      },
-    });
+    // Call Google Calendar API with OAuth token and pagination
+    let allItems: any[] = [];
+    let pageToken: string | undefined = undefined;
+    do {
+      const params = new URLSearchParams({
+        timeMin: timeMin || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString(),
+        timeMax: timeMax || new Date(new Date().getFullYear(), new Date().getMonth() + 2, 0).toISOString(),
+        singleEvents: 'true',
+        orderBy: 'startTime',
+        maxResults: '2500',
+      });
+      if (pageToken) params.set('pageToken', pageToken);
+
+      const response = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?${params}`,
+        { headers: { Authorization: `Bearer ${decryptedToken}` } }
+      );
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[calendar-sync] OAuth API error:', errorText);
+        throw new Error('Failed to fetch calendar events via OAuth');
+      }
+      
+      const data = await response.json();
+      allItems = allItems.concat(data.items || []);
+      pageToken = data.nextPageToken;
+    } while (pageToken);
     
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[calendar-sync] OAuth API error:', errorText);
-      throw new Error('Failed to fetch calendar events via OAuth');
-    }
-    
-    const data = await response.json();
-    return data.items || [];
+    return allItems;
   }
 
-  // Original API mode
+  // Original API mode with pagination
   const { calClient, calendarId } = clientInfo;
 
-  const res = await calClient.events.list({
-    calendarId,
-    timeMin: timeMin || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString(),
-    timeMax: timeMax || new Date(new Date().getFullYear(), new Date().getMonth() + 2, 0).toISOString(),
-    singleEvents: true,
-    orderBy: 'startTime',
-  });
-  return res.data.items || [];
+  let allItems: any[] = [];
+  let pageToken: string | undefined = undefined;
+  do {
+    const res: any = await calClient.events.list({
+      calendarId,
+      timeMin: timeMin || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString(),
+      timeMax: timeMax || new Date(new Date().getFullYear(), new Date().getMonth() + 2, 0).toISOString(),
+      singleEvents: true,
+      orderBy: 'startTime',
+      maxResults: 2500,
+      pageToken: pageToken,
+    });
+    allItems = allItems.concat(res.data.items || []);
+    pageToken = res.data.nextPageToken;
+  } while (pageToken);
+  
+  return allItems;
 }
 
 export async function updateEvent(teamId: string, eventId: string, updates: { start?: string; end?: string; summary?: string; description?: string }) {
