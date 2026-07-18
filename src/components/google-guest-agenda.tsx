@@ -489,6 +489,64 @@ export function GoogleGuestAgenda({
   }).sort((a, b) => b.start.localeCompare(a.start)), [bookingItems, userRole, managerAccessUntil]);
   const cancelledItems = useMemo(() => bookingItems.filter(i => i.booking!.status === 'cancelled' && i.booking!.check_in <= D && i.booking!.check_out > D).sort((a, b) => b.start.localeCompare(a.start)), [bookingItems, D]);
 
+  // Guest count calculations for section headers
+  const arrivingGuestTotal = useMemo(() => {
+    return arrivingItems.reduce((sum, item) => {
+      const b = item.booking;
+      if (!b) return sum;
+      const adults = b.number_of_adults ?? b.guest_count ?? 1;
+      const children = b.number_of_children ?? 0;
+      return sum + adults + children;
+    }, 0);
+  }, [arrivingItems]);
+
+  const stayingGuestTotal = useMemo(() => {
+    return stayingItems.reduce((sum, item) => {
+      const b = item.booking;
+      if (!b) return sum;
+      const adults = b.number_of_adults ?? b.guest_count ?? 1;
+      const children = b.number_of_children ?? 0;
+      return sum + adults + children;
+    }, 0);
+  }, [stayingItems]);
+
+  const checkedInGuestTotal = useMemo(() => {
+    return checkedInItems.reduce((sum, item) => {
+      const b = item.booking!;
+      const adults = b.number_of_adults ?? b.guest_count ?? 1;
+      const children = b.number_of_children ?? 0;
+      return sum + adults + children;
+    }, 0);
+  }, [checkedInItems]);
+
+  const checkingOutGuestTotal = useMemo(() => {
+    return checkingOutItems.reduce((sum, item) => {
+      const b = item.booking;
+      if (!b) return sum;
+      const adults = b.number_of_adults ?? b.guest_count ?? 1;
+      const children = b.number_of_children ?? 0;
+      return sum + adults + children;
+    }, 0);
+  }, [checkingOutItems]);
+
+  const checkedOutGuestTotal = useMemo(() => {
+    return checkedOutItems.reduce((sum, item) => {
+      const b = item.booking!;
+      const adults = b.number_of_adults ?? b.guest_count ?? 1;
+      const children = b.number_of_children ?? 0;
+      return sum + adults + children;
+    }, 0);
+  }, [checkedOutItems]);
+
+  const cancelledGuestTotal = useMemo(() => {
+    return cancelledItems.reduce((sum, item) => {
+      const b = item.booking!;
+      const adults = b.number_of_adults ?? b.guest_count ?? 1;
+      const children = b.number_of_children ?? 0;
+      return sum + adults + children;
+    }, 0);
+  }, [cancelledItems]);
+
   useEffect(() => {
     if (selectedItem?.booking) {
       const updated = bookings.find(b => b.id === selectedItem.booking!.id);
@@ -1402,7 +1460,7 @@ export function GoogleGuestAgenda({
                 <div className="mb-4">
                   <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#C9A227] bg-[#C9A227]/10 rounded-xl mb-1 flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#C9A227]/100 animate-pulse" />
-                    Arriving · {arrivingItems.length}
+                    Arriving · {arrivingGuestTotal} guests ({arrivingItems.length} bookings)
                   </p>
                   {arrivingItems.map(item => renderCard(item as any, !!(item.event && isGcCancelled(item.event))))}
                 </div>
@@ -1411,7 +1469,7 @@ export function GoogleGuestAgenda({
                 <div className="mb-4">
                   <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#0B6E4F] bg-[#0B6E4F]/10 rounded-xl mb-1 flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#0B6E4F]/100" />
-                    In Stay · {stayingItems.length}
+                    In Stay · {stayingGuestTotal} guests ({stayingItems.length} bookings)
                   </p>
                   {stayingItems.map(item => renderCard(item as any, !!(item.event && isGcCancelled(item.event))))}
                 </div>
@@ -1420,7 +1478,7 @@ export function GoogleGuestAgenda({
                 <div className="mb-4">
                   <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#0B6E4F] bg-[#0B6E4F]/10 rounded-xl mb-1 flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#0B6E4F]/100" />
-                    Checked In · {checkedInItems.length}
+                    Checked In · {checkedInGuestTotal} guests ({checkedInItems.length} bookings)
                   </p>
                   {checkedInItems.map(item => renderCard(item as any, false))}
                 </div>
@@ -1429,11 +1487,18 @@ export function GoogleGuestAgenda({
                 const arrivingKeys = new Set(arrivingItems.map(i => i.key));
                 const checkingOutItemsDeduped = checkingOutItems.filter(i => !arrivingKeys.has(i.key));
                 if (checkingOutItemsDeduped.length === 0) return null;
+                const checkingOutGuestTotal = checkingOutItemsDeduped.reduce((sum, item) => {
+                  const b = item.booking;
+                  if (!b) return sum;
+                  const adults = b.number_of_adults ?? b.guest_count ?? 1;
+                  const children = b.number_of_children ?? 0;
+                  return sum + adults + children;
+                }, 0);
                 return (
                   <div className="mb-4">
                     <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#0B6E4F] bg-[#0B6E4F]/10 rounded-xl mb-1 flex items-center gap-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-[#0B6E4F]/100" />
-                      Checking Out · {checkingOutItemsDeduped.length}
+                      Checking Out · {checkingOutGuestTotal} guests ({checkingOutItemsDeduped.length} bookings)
                     </p>
                     {checkingOutItemsDeduped.map(item => renderCard(item as any, false))}
                   </div>
@@ -1443,7 +1508,7 @@ export function GoogleGuestAgenda({
                 <div className="mb-4">
                   <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#9C9384] bg-[#1C232E]/50 rounded-xl mb-1 flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#9C9384]" />
-                    Checked Out · {checkedOutItems.length}
+                    Checked Out · {checkedOutGuestTotal} guests ({checkedOutItems.length} bookings)
                   </p>
                   {checkedOutItems.map(item => renderCard(item as any, false))}
                 </div>
@@ -1451,7 +1516,7 @@ export function GoogleGuestAgenda({
               {cancelledItems.length > 0 && (
                 <div className="mb-4">
                   <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#722F37] bg-[#722F37]/10 rounded-xl mb-1 flex items-center gap-2">
-                    ✕ Cancelled · {cancelledItems.length}
+                    ✕ Cancelled · {cancelledGuestTotal} guests ({cancelledItems.length} bookings)
                   </p>
                   {cancelledItems.map(item => renderCard(item, true))}
                 </div>
