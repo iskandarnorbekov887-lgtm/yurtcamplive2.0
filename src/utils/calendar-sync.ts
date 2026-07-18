@@ -225,7 +225,6 @@ export async function listEvents(teamId: string, timeMin?: string, timeMax?: str
         singleEvents: 'true',
         orderBy: 'startTime',
         maxResults: '2500',
-        showDeleted: 'true',
       });
       if (pageToken) params.set('pageToken', pageToken);
 
@@ -262,7 +261,6 @@ export async function listEvents(teamId: string, timeMin?: string, timeMax?: str
       orderBy: 'startTime',
       maxResults: 2500,
       pageToken: pageToken,
-      showDeleted: true,
     });
     allItems = allItems.concat(res.data.items || []);
     pageToken = res.data.nextPageToken;

@@ -18,7 +18,7 @@ export const formatSpace = (num: number, decimals = 2): string => {
 
 export const isGcCancelled = (ev: any) => {
   const text = `${ev.summary || ''} ${ev.description || ''}`;
-  return ev.status === 'cancelled' || /cancelled/i.test(text);
+  return ev.colorId === '11' || /cancelled/i.test(text);
 };
 
 export const isGcRedWarning = (ev: any) => {

@@ -8,6 +8,7 @@ interface CalendarEventItem {
   summary: string;
   start: string;
   end: string;
+  status?: string;
 }
 
 interface EventBar {
@@ -116,7 +117,7 @@ export function PrivateCalendarView({ bookings, calendarEvents, onSelectBooking,
         if (endCol < startCol) endCol = startCol;
         bars.push({
           startCol, endCol, label: ev.summary || '(No title)', type: 'gc', id: ev.id,
-          status: 'gc_event', rawEvent: ev, category: '',
+          status: ev.status === 'cancelled' ? 'cancelled' : 'gc_event', rawEvent: ev, category: '',
           startsThisWeek: ev.start >= weekStart,
           endsThisWeek: ev.end <= weekEnd,
         });
@@ -138,23 +139,23 @@ export function PrivateCalendarView({ bookings, calendarEvents, onSelectBooking,
   };
 
   const barColor = (bar: EventBar) => {
+    if (bar.status === 'cancelled') return 'bg-red-500 text-white';
     if (bar.type === 'gc') return 'bg-amber-400 text-white';
     if (bar.category === 'pool') return 'bg-teal-500 text-white';
     if (bar.category === 'local') return 'bg-violet-500 text-white';
-    if (bar.status === 'cancelled') return 'bg-red-500 text-white';
     if (bar.status === 'checked_in') return 'bg-emerald-500 text-white';
     if (bar.status === 'completed') return 'bg-blue-500 text-white';
     return 'bg-amber-400 text-white';
   };
 
   const barIcon = (bar: EventBar) => {
-    if (bar.type === 'gc') return '📅 ';
+    let prefix = '';
+    if (bar.status === 'cancelled') prefix += '✕ ';
+    if (bar.type === 'gc') return prefix + '📅 ';
     if (bar.category === 'local') return '🏠 ';
     if (bar.category === 'pool') return '🏊 ';
-    let prefix = '';
     if (bar.status === 'checked_in') prefix += '✓ ';
     if (bar.status === 'completed') prefix += '✈ ';
-    if (bar.status === 'cancelled') prefix += '✕ ';
     return prefix;
   };
 
