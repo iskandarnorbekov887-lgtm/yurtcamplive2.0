@@ -171,6 +171,8 @@ export function BookingModal(props: BookingModalProps) {
 
   const [showTransportList, setShowTransportList] = useState(true);
   const [showGuideList, setShowGuideList] = useState(true);
+  const [showTransportSummary, setShowTransportSummary] = useState(true);
+  const [showGuideSummary, setShowGuideSummary] = useState(true);
 
   const [showCreatePopover, setShowCreatePopover] = useState<false | 'checkin' | 'only'>(false);
   const [newAdults, setNewAdults] = useState<string | number>(1);
@@ -1619,6 +1621,33 @@ export function BookingModal(props: BookingModalProps) {
                                   </button>
                                 </div>
                               </div>
+                              {transportEntries.length > 0 && (() => {
+                                const last = transportEntries[transportEntries.length - 1];
+                                return (
+                                  <div className="mt-2 border-t border-[#2A2F36] pt-2">
+                                    <button
+                                      onClick={() => setShowTransportSummary(!showTransportSummary)}
+                                      className="flex items-center justify-between w-full text-[10px] font-black uppercase tracking-widest text-[#9C9384] mb-1"
+                                    >
+                                      <span>Last added · {transportEntries.length} total</span>
+                                      <span>{showTransportSummary ? '▲' : '▼'}</span>
+                                    </button>
+                                    {showTransportSummary && (
+                                      <div className="bg-[#1C232E] rounded-lg px-3 py-2 space-y-0.5">
+                                        <p className="text-[11px] text-[#EDE6D6] font-bold">
+                                          {last.details?.from} → {last.details?.to}
+                                        </p>
+                                        <p className="text-[10px] text-[#9C9384]">
+                                          Driver: {last.details?.driver_name}
+                                        </p>
+                                        <p className="text-[10px] text-[#C9A227] font-black">
+                                          ${last.unit_price}
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                               {transportEntries.length > 0 && (
                                 <div className="mt-2 border-t border-[#2A2F36] pt-2">
                                   <button
@@ -1709,6 +1738,33 @@ export function BookingModal(props: BookingModalProps) {
                                   {addingGuide ? 'Adding...' : guideEntries.length > 0 ? '+ Add Another Guide' : 'Add'}
                                 </button>
                               </div>
+                              {guideEntries.length > 0 && (() => {
+                                const last = guideEntries[guideEntries.length - 1];
+                                return (
+                                  <div className="mt-2 border-t border-[#2A2F36] pt-2">
+                                    <button
+                                      onClick={() => setShowGuideSummary(!showGuideSummary)}
+                                      className="flex items-center justify-between w-full text-[10px] font-black uppercase tracking-widest text-[#9C9384] mb-1"
+                                    >
+                                      <span>Last added · {guideEntries.length} total</span>
+                                      <span>{showGuideSummary ? '▲' : '▼'}</span>
+                                    </button>
+                                    {showGuideSummary && (
+                                      <div className="bg-[#1C232E] rounded-lg px-3 py-2 space-y-0.5">
+                                        <p className="text-[11px] text-[#EDE6D6] font-bold">
+                                          {last.details?.guide_name}
+                                        </p>
+                                        <p className="text-[10px] text-[#9C9384]">
+                                          Tour: {last.details?.paxod_type}
+                                        </p>
+                                        <p className="text-[10px] text-[#C9A227] font-black">
+                                          ${last.unit_price}
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                               {guideEntries.length > 0 && (
                                 <div className="mt-2 border-t border-[#2A2F36] pt-2">
                                   <button
