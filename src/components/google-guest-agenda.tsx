@@ -1320,7 +1320,8 @@ export function GoogleGuestAgenda({
 
       {(() => {
         const upcoming = [...bookingItems.filter(i => i.booking!.status === 'confirmed' && i.booking!.check_in >= today && i.booking!.check_in <= localDateStr(new Date(Date.now() + 7 * 86400000))),
-          ...unlinkedGcItems.filter(i => i.start >= today && i.start <= localDateStr(new Date(Date.now() + 7 * 86400000)))
+          ...unlinkedGcItems.filter(i => i.start >= today && i.start <= localDateStr(new Date(Date.now() + 7 * 86400000))),
+          ...cancelledGcItems.filter(i => i.start >= today && i.start <= localDateStr(new Date(Date.now() + 7 * 86400000)))
         ].sort((a, b) => a.start.localeCompare(b.start));
         const checkedIn = bookingItems.filter(i => i.booking!.status === 'checked_in').sort((a, b) => a.start.localeCompare(b.start));
         if (upcoming.length === 0 && checkedIn.length === 0) return null;
@@ -1362,7 +1363,9 @@ export function GoogleGuestAgenda({
                       </div>
                       {item.booking
                         ? <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#B8860B]/20 text-[#B8860B] border border-[#B8860B]/40">confirmed</span>
-                        : <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#1C232E]/20 text-[#9C9384] border border-[#5C4A2E]/30">📅 calendar</span>
+                        : item.event && isGcCancelled(item.event)
+                          ? <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-red-600/20 text-red-500 border border-red-600/40">✕ cancelled</span>
+                          : <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#1C232E]/20 text-[#9C9384] border border-[#5C4A2E]/30">📅 calendar</span>
                       }
                     </button>
                   ))}
