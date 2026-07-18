@@ -2224,7 +2224,7 @@ export function BookingModal(props: BookingModalProps) {
 
               {(() => {
                 const hasTabItems = svcAmount > 0 || isPrepaid || activeServices.length > 0 || activeMeals.some(m => !m.is_paid && (m.status === 'confirmed' || m.status === 'served'));
-                if (!isStaff || sel.status === 'completed' || (!hasTabItems && Math.abs(debtRemaining) <= 0.01)) return null;
+                if (!isStaff || sel.status === 'completed' || (!hasTabItems && Math.abs(debtRemaining) <= 0.01) || Math.abs(gTotalWithPending ?? gTotal) <= 0.01) return null;
                 return (
                     <div className="bg-[#1C232E] border border-[#2A2F36] p-6 space-y-4 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)]">
                       <div className="flex justify-between items-center">
