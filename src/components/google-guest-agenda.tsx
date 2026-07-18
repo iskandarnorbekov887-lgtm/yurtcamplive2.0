@@ -1101,7 +1101,14 @@ export function GoogleGuestAgenda({
               prepaid: m.prepaid || false
             }))
           },
-          services: {},
+          services: Object.fromEntries(
+            activeServices
+              .filter((s: any) => s.service_type === 'extra')
+              .map((s: any) => [
+                s.details?.name || 'Extra',
+                s.unit_price * s.quantity
+              ])
+          ),
           service_details: Object.fromEntries(
             activeServices
               .filter((s: any) => s.service_type === 'extra')
