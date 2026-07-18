@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { formatSpace } from '@/utils/calendar-logic';
 import { LockedBookingPanel } from '@/components/LockedBookingPanel';
 import * as htmlToImage from 'html-to-image';
+import { buildReceiptLineItems } from '@/utils/receipt-logic';
 
 interface BookingModalProps {
   selectedItem: any;
@@ -34,12 +35,7 @@ interface BookingModalProps {
   setSvcDateAdjustment: (v: number) => void;
   isPrepaid: boolean;
   setIsPrepaid: (v: boolean) => void;
-  isLunchPrepaid: boolean;
-  setIsLunchPrepaid: (v: boolean) => void;
-  isDinnerPrepaid: boolean;
-  setIsDinnerPrepaid: (v: boolean) => void;
-  isFoodPrepaid: boolean;
-  setIsFoodPrepaid: (v: boolean) => void;
+
   svcLunch: boolean;
   setSvcLunch: (v: boolean) => void;
   svcLunchCount: number;
@@ -48,35 +44,12 @@ interface BookingModalProps {
   setSvcDinner: (v: boolean) => void;
   svcDinnerCount: number;
   setSvcDinnerCount: (v: number) => void;
-  svcGuide: boolean;
-  setSvcGuide: (v: boolean) => void;
-  svcGuidePrice: number;
-  setSvcGuidePrice: (v: number) => void;
-  svcGuideNames: string[];
-  setSvcGuideNames: (v: string[]) => void;
-  svcTransport: boolean;
-  setSvcTransport: (v: boolean) => void;
-  svcTransList: any[];
-  setSvcTransList: (v: any[]) => void;
   svcDiscount: number;
   setSvcDiscount: (v: number) => void;
   svcDiscountReason: string;
   setSvcDiscountReason: (v: string) => void;
   svcPayList: any[];
   setSvcPayList: (v: any[]) => void;
-  
-  // Drink/Extra service states
-  showDrinks: boolean;
-  setShowDrinks: (v: boolean) => void;
-  drinks: any[];
-  selectedDrinks: any;
-  setSelectedDrinks: (v: any) => void;
-  extraServices: any[];
-  setExtraServices: (v: any[]) => void;
-  newExtraName: string;
-  setNewExtraName: (v: string) => void;
-  newExtraPrice: string;
-  setNewExtraPrice: (v: string) => void;
   
   // UI states
   showServices: boolean;
@@ -104,9 +77,12 @@ interface BookingModalProps {
   handleCheckOut: () => Promise<void | boolean>;
   handleCancel: () => Promise<void>;
   finalizeTab?: () => Promise<boolean>;
+  handleGuestCheckOut?: () => Promise<boolean>;
   handleSaveServices?: () => Promise<void>;
-  handleCreateFromEvent: (doCheckIn: boolean) => Promise<void>;
+  handleCreateFromEvent: (doCheckIn: boolean, adults: number, children: number) => Promise<void>;
   fetchCbuRate: (curr: any) => Promise<void>;
+  checkoutBlockReason?: string | null;
+  setCheckoutBlockReason?: (val: string | null) => void;
   
   // Derived values
   gTotal: number;
@@ -121,7 +97,9 @@ interface BookingModalProps {
   syncWarnings?: any;
   setSyncWarnings?: (v: any) => void;
   activeMeals: any[];
+  setActiveMeals: (meals: any[]) => void;
   activeServices: any[];
+  setActiveServices: (services: any[]) => void;
 }
 
 export function BookingModal(props: BookingModalProps) {
@@ -133,20 +111,16 @@ export function BookingModal(props: BookingModalProps) {
     svcChildren, setSvcChildren,
     svcAmount, setSvcAmount,
     svcDateAdjustment, setSvcDateAdjustment,
-    isPrepaid, setIsPrepaid, isLunchPrepaid, setIsLunchPrepaid, isDinnerPrepaid, setIsDinnerPrepaid, isFoodPrepaid, setIsFoodPrepaid,
+    isPrepaid, setIsPrepaid,
     svcLunch, setSvcLunch, svcLunchCount, setSvcLunchCount, svcDinner, setSvcDinner, svcDinnerCount, setSvcDinnerCount,
-    svcGuide, setSvcGuide, svcGuidePrice, setSvcGuidePrice, svcGuideNames, setSvcGuideNames,
-    svcTransport, setSvcTransport, svcTransList, setSvcTransList,
     svcDiscount, setSvcDiscount, svcDiscountReason, setSvcDiscountReason, svcPayList, setSvcPayList,
-    showDrinks, setShowDrinks, drinks, selectedDrinks, setSelectedDrinks,
-    extraServices, setExtraServices, newExtraName, setNewExtraName, newExtraPrice, setNewExtraPrice,
     showServices, setShowServices, showNotes, setShowNotes, showFinalReceipt, setShowFinalReceipt,
     selectedReceipt, setSelectedReceipt, editingDates, setEditingDates,
     editCheckIn, setEditCheckIn, editCheckOut, setEditCheckOut, dateAdjAmount, setDateAdjAmount,
     valError, setValError, getSettledReceiptsForSel, handleCheckIn, handleCheckOut, handleCancel,
     handleSaveServices,
     fetchCbuRate, gTotal, gTotalWithPending, hasPendingUnsavedServices, debtRemaining, tPaidUsd, isBalanceMatched, today,
-    dayEntries, finalizeTab, activeMeals, activeServices
+    dayEntries, finalizeTab, activeMeals, setActiveMeals, activeServices, setActiveServices
   } = props;
 
   console.trace('BookingModal render, svcAdults:', svcAdults);
@@ -158,6 +132,37 @@ export function BookingModal(props: BookingModalProps) {
   const [localChildren, setLocalChildren] = useState<number | null>(null);
   const [loadingGuestCounts, setLoadingGuestCounts] = useState(false);
   const [adultsChildrenLocked, setAdultsChildrenLocked] = useState(false);
+
+  // Temporary Manager Bypass state
+  const [bypassLunchAdults, setBypassLunchAdults] = useState(0);
+  const [bypassLunchChildren, setBypassLunchChildren] = useState(0);
+  const [bypassDinnerAdults, setBypassDinnerAdults] = useState(0);
+  const [bypassDinnerChildren, setBypassDinnerChildren] = useState(0);
+
+  // Transportation & Guide Service state
+  const [transportPrice, setTransportPrice] = useState('');
+  const [guidePrice, setGuidePrice] = useState('');
+
+  const [transportFrom, setTransportFrom] = useState('');
+  const [transportTo, setTransportTo] = useState('');
+  const [transportDriver, setTransportDriver] = useState('');
+  const [addingTransport, setAddingTransport] = useState(false);
+
+  const [guideName, setGuideName] = useState('');
+  const [paxodType, setPaxodType] = useState<'kichik' | 'katta' | 'both'>('kichik');
+  const [addingGuide, setAddingGuide] = useState(false);
+
+  const [showTransportList, setShowTransportList] = useState(true);
+  const [showGuideList, setShowGuideList] = useState(true);
+
+  const [showCreatePopover, setShowCreatePopover] = useState<false | 'checkin' | 'only'>(false);
+  const [newAdults, setNewAdults] = useState<string | number>(1);
+  const [newChildren, setNewChildren] = useState<string | number>(0);
+
+  const resetCreatePopoverState = () => {
+    setNewAdults(1);
+    setNewChildren(0);
+  };
 
   // Use svcDiscountReason from props instead of local state
 
@@ -220,88 +225,43 @@ export function BookingModal(props: BookingModalProps) {
   const receiptItems = useMemo(() => {
     if (!sel) return [];
     if (selectedReceipt) {
-      console.log('[receiptItems] selectedReceipt.items:', JSON.stringify(selectedReceipt.items, null, 2));
-      const items: any[] = [];
-      if ((selectedReceipt.items?.accommodation || 0) > 0 || selectedReceipt.items?.isPrepaid) {
-        items.push({ name: 'Accommodation', description: `${sel?.number_of_adults || 1} adult${(sel?.number_of_adults || 1) > 1 ? 's' : ''}${sel?.number_of_children ? `, ${sel?.number_of_children} child${(sel?.number_of_children || 0) > 1 ? 'ren' : ''}` : ''}`, price: selectedReceipt.items?.isPrepaid ? 0 : (selectedReceipt.items.accommodation || 0), isPrepaid: selectedReceipt.items?.isPrepaid, paid: true });
-      }
-      const meals = selectedReceipt.items?.meals || {};
-      Object.entries(meals).forEach(([type, count]: [string, any]) => {
-        if (type.startsWith('is') || !count) return;
-        const isMealPrepaid = type === 'lunch' ? meals.isLunchPrepaid : meals.isDinnerPrepaid;
-        const price = type === 'lunch' ? (pricing?.lunch_price || 10) : (pricing?.dinner_price || 10);
-        items.push({ name: type.charAt(0).toUpperCase() + type.slice(1), description: `×${count}`, price: isMealPrepaid ? 0 : (count * price), isPrepaid: isMealPrepaid, paid: true });
-      });
-      const svcs = selectedReceipt.items?.services || {};
-      Object.entries(svcs).forEach(([name, price]: [string, any]) => {
-        if (!price) return;
-        items.push({ name: name.charAt(0).toUpperCase() + name.slice(1), description: '', price: price, isPrepaid: false, paid: true });
-      });
-      if (selectedReceipt.items?.stay_adjustment > 0) {
-        items.push({ name: 'Stay Extension Fee', description: '', price: selectedReceipt.items.stay_adjustment, isPrepaid: false, paid: true });
-      }
-      if (selectedReceipt.items?.drinks?.length > 0) {
-        const drinksTotal = selectedReceipt.items.drinks.reduce((s: number, d: any) => s + (d.price * d.quantity), 0);
-        items.push({ name: 'Drinks', description: `${selectedReceipt.items.drinks.length} item${selectedReceipt.items.drinks.length > 1 ? 's' : ''}`, price: drinksTotal, isPrepaid: false, paid: true });
-      }
-      return items;
+      const { lineItems } = buildReceiptLineItems(selectedReceipt, pricing, selectedReceipt.total, selectedReceipt.id);
+      return lineItems.map(item => ({
+        name: item.label,
+        description: '',
+        price: item.amount,
+        isPrepaid: item.isPrepaid,
+        paid: true
+      }));
     } else {
-      const items: any[] = [];
-      if (svcAmount > 0 || (isPrepaid && (sel?.collected_amount || 0) === 0)) {
-        items.push({ name: 'Accommodation', description: `${localAdults || sel?.number_of_adults || 1} adult${(localAdults || sel?.number_of_adults || 1) > 1 ? 's' : ''}${(localChildren || sel?.number_of_children) ? `, ${localChildren || sel?.number_of_children} child${(localChildren || sel?.number_of_children) > 1 ? 'ren' : ''}` : ''}`, price: svcAmount, isPrepaid: isPrepaid && (sel?.collected_amount || 0) === 0, paid: isPrepaid && (sel?.collected_amount || 0) === 0 });
-      }
-      
-      // Calculate meal totals from activeMeals (Single Source of Truth)
-      const unpaidMeals = activeMeals.filter(m => 
-        !m.is_paid && (m.status === 'confirmed' || m.status === 'served')
-      );
-      
-      const lunchMeals = unpaidMeals.filter(m => m.meal_type === 'Lunch');
-      const lunchAdultQty = lunchMeals.reduce((sum, m) => sum + (m.adult_qty || 0), 0);
-      const lunchChildQty = lunchMeals.reduce((sum, m) => sum + (m.child_qty || 0), 0);
-      const lunchTotalQty = lunchAdultQty + lunchChildQty;
-      if (lunchTotalQty > 0) {
-        const lunchPrepaid = isLunchPrepaid || isFoodPrepaid;
-        const lunchAdultPrice = pricing?.lunch_price || 10;
-        const lunchChildPrice = pricing?.lunch_child_price || 5;
-        const lunchTotalPrice = (lunchAdultQty * lunchAdultPrice) + (lunchChildQty * lunchChildPrice);
-        items.push({ name: 'Lunch', description: `×${lunchTotalQty}`, price: lunchTotalPrice, isPrepaid: lunchPrepaid, paid: lunchPrepaid });
-      }
-      
-      const dinnerMeals = unpaidMeals.filter(m => m.meal_type === 'Dinner');
-      const dinnerAdultQty = dinnerMeals.reduce((sum, m) => sum + (m.adult_qty || 0), 0);
-      const dinnerChildQty = dinnerMeals.reduce((sum, m) => sum + (m.child_qty || 0), 0);
-      const dinnerTotalQty = dinnerAdultQty + dinnerChildQty;
-      if (dinnerTotalQty > 0) {
-        const dinnerPrepaid = isDinnerPrepaid || isFoodPrepaid;
-        const dinnerAdultPrice = pricing?.dinner_price || 10;
-        const dinnerChildPrice = pricing?.dinner_child_price || 5;
-        const dinnerTotalPrice = (dinnerAdultQty * dinnerAdultPrice) + (dinnerChildQty * dinnerChildPrice);
-        items.push({ name: 'Dinner', description: `×${dinnerTotalQty}`, price: dinnerTotalPrice, isPrepaid: dinnerPrepaid, paid: dinnerPrepaid });
-      }
-      
-      // Add services from activeServices (guide, transport, drinks, extras)
-      activeServices.forEach((s: any) => {
-        const price = s.unit_price * s.quantity;
-        const isPrepaid = s.is_paid;
-        
-        if (s.service_type === 'guide') {
-          items.push({ name: 'Guide Service', description: s.details?.names || '1 guide', price, isPrepaid, paid: isPrepaid });
-        } else if (s.service_type === 'transportation') {
-          items.push({ name: 'Transport', description: s.details?.name || s.details?.destination || '', price, isPrepaid, paid: isPrepaid });
-        } else if (s.service_type === 'drink') {
-          items.push({ name: s.details?.name || 'Drink', description: `${s.currency}`, price, isPrepaid, paid: isPrepaid });
-        } else if (s.service_type === 'extra') {
-          items.push({ name: s.details?.name || 'Extra', description: '', price, isPrepaid, paid: isPrepaid });
+      // Fresh Mode - build snapshot-like object from live data
+      const liveSnapshot = {
+        items: {
+          accommodation: svcAmount,
+          isPrepaid: isPrepaid && (sel?.collected_amount || 0) === 0,
+          meals: {
+            lunch: activeMeals.filter(m => !m.is_paid && !m.prepaid && (m.status === 'confirmed' || m.status === 'served') && m.meal_type === 'Lunch').reduce((sum, m) => sum + (m.adult_qty || 0) + (m.child_qty || 0), 0),
+            dinner: activeMeals.filter(m => !m.is_paid && !m.prepaid && (m.status === 'confirmed' || m.status === 'served') && m.meal_type === 'Dinner').reduce((sum, m) => sum + (m.adult_qty || 0) + (m.child_qty || 0), 0),
+          },
+          services: {},
+          extras: activeServices.filter((s: any) => s.service_type === 'extra').map((s: any) => ({
+            name: s.details?.name || 'Extra',
+            price: String(s.unit_price * s.quantity)
+          })),
+          stay_adjustment: svcDateAdjustment,
+          discount: svcDiscount > 0 ? { amount: svcDiscount, reason: svcDiscountReason } : null
         }
-      });
-      
-      if (svcDiscount > 0) {
-        items.push({ name: 'Discount', description: '', price: -svcDiscount, isPrepaid: false, paid: false });
-      }
-      return items;
+      };
+      const { lineItems } = buildReceiptLineItems(liveSnapshot, pricing, gTotal);
+      return lineItems.map(item => ({
+        name: item.label,
+        description: '',
+        price: item.amount,
+        isPrepaid: item.isPrepaid,
+        paid: item.isPrepaid
+      }));
     }
-  }, [selectedReceipt, sel, pricing, svcAmount, isPrepaid, isLunchPrepaid, isDinnerPrepaid, isFoodPrepaid, svcDiscount, localAdults, localChildren, activeMeals, activeServices]);
+  }, [selectedReceipt, sel, pricing, svcAmount, isPrepaid, svcDiscount, svcDateAdjustment, svcDiscountReason, activeMeals, activeServices, gTotal]);
 
   const currentMeta = useMemo(() => {
     if (!sel) return {};
@@ -347,8 +307,8 @@ export function BookingModal(props: BookingModalProps) {
 
   // Meal assurance logic (calculated from the prop)
   useEffect(() => {
-    const acceptedCount = activeMeals.filter(m => m.status === 'confirmed').length;
-    const servedCount = activeMeals.filter(m => m.status === 'served').length;
+    const acceptedCount = activeMeals.filter(m => m.status === 'Accepted').length;
+    const servedCount = activeMeals.filter(m => m.status === 'Served').length;
     setMealAssurance({ accepted: acceptedCount, served: servedCount });
   }, [activeMeals]);
 
@@ -364,7 +324,7 @@ export function BookingModal(props: BookingModalProps) {
         guest_count_confirmed: true,
         is_prepaid: isPrepaid,
         is_accommodation_prepaid: isPrepaid,
-        is_food_prepaid: isFoodPrepaid,
+
         guest_category: category,
         
         // 2. Map all numeric data to the single 'amount' column
@@ -384,20 +344,7 @@ export function BookingModal(props: BookingModalProps) {
         data.collected_currency = 'USD';
       }
 
-      // 4. Drinks Tab
-      const dTab = Object.entries(selectedDrinks).map(([id, qty]) => {
-        const d = (drinks || []).find(dr => dr.id === Number(id));
-        return { 
-          drink_id: Number(id), 
-          drink_name: d?.name || '', 
-          quantity: qty, 
-          price: d?.sold_price || 0, 
-          currency: d?.currency || 'USD' 
-        };
-      });
-      data.drinks_tab = dTab;
-
-      // 5. Manual Protection Rule
+      // 4. Manual Protection Rule
       if (sel.google_event_id || sel.source === 'System' || sel.source === 'office') {
         data.is_manually_updated = true;
       }
@@ -548,6 +495,7 @@ export function BookingModal(props: BookingModalProps) {
   const isComingSoon = sel?.status === 'confirmed' && daysUntilCheckIn > 2 && !isDayGuest;
 
   const canCheckOut = (sel?.status === 'checked_in' || isGracePeriodActive) && daysUntilCheckOut <= 1 && !!onCheckOut && !isDayGuest;
+  const isCheckoutDay = daysUntilCheckOut <= 0 && sel?.status === 'checked_in';
   const canCancel = sel && ['confirmed', 'pending'].includes(sel.status) && !!onCancelBooking && !isDayGuest;
   const isAfterNoon = new Date().getHours() >= 12;
   const isAfterTwo = new Date().getHours() >= 14;
@@ -579,10 +527,9 @@ export function BookingModal(props: BookingModalProps) {
               <p className="text-[10px] font-black uppercase tracking-widest text-[#B8860B] mb-2">Calendar Only — No Booking Yet</p>
               <p className="text-xs text-[#B8860B]">Create a booking from this event to manage check-in, services, and payments.</p>
             </div>
-            {props.handleCreateFromEvent && (
-              <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2">
                 <button
-                  onClick={() => props.handleCreateFromEvent(true)}
+                  onClick={() => setShowCreatePopover('checkin')}
                   disabled={loadingAction === 'creating'}
                   className="w-full py-3 bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2 transition-all disabled:opacity-60 border border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]"
                 >
@@ -590,14 +537,67 @@ export function BookingModal(props: BookingModalProps) {
                   Create Booking & Check In
                 </button>
                 <button
-                  onClick={() => props.handleCreateFromEvent(false)}
+                  onClick={() => setShowCreatePopover('only')}
                   disabled={loadingAction === 'creating'}
                   className="w-full py-3 bg-[#1C232E] hover:bg-[#2A1518] text-[#9C9384] text-[11px] font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2 transition-all disabled:opacity-60 border border-[#2A2F36]"
                 >
                   Create Booking Only
                 </button>
+            </div>
+
+            {showCreatePopover && (
+              <div className="fixed inset-0 z-[150] flex items-center justify-center p-4" onClick={() => { setShowCreatePopover(false); resetCreatePopoverState(); }}>
+                <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+                <div className="relative bg-[#1C232E] border border-[#2A2F36] rounded-xl p-4 shadow-xl w-full max-w-sm animate-in fade-in zoom-in-95" onClick={e => e.stopPropagation()}>
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">New Booking Details</p>
+                    <button onClick={() => { setShowCreatePopover(false); resetCreatePopoverState(); }} className="text-[#9C9384] hover:text-[#EDE6D6] font-bold text-lg">×</button>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Adults *</label>
+                      <input
+                        type="number"
+                        value={newAdults}
+                        onChange={e => setNewAdults(e.target.value)}
+                        onBlur={() => setNewAdults(Math.max(1, parseInt(String(newAdults)) || 1))}
+                        className="w-full px-3 py-2 border text-sm font-black focus:outline-none bg-[#1C232E]/50 border-[#2A2F36] text-[#EDE6D6]"
+                        min="1"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Children under 12</label>
+                      <input
+                        type="number"
+                        value={newChildren}
+                        onChange={e => setNewChildren(e.target.value)}
+                        onBlur={() => setNewChildren(Math.max(0, parseInt(String(newChildren)) || 0))}
+                        className="w-full px-3 py-2 border text-sm font-black focus:outline-none bg-[#1C232E]/50 border-[#2A2F36] text-[#EDE6D6]"
+                        min="0"
+                      />
+                    </div>
+                    <button
+                      onClick={() => {
+                        const adultsFinal = Math.max(1, parseInt(String(newAdults)) || 1);
+                        const childrenFinal = Math.max(0, parseInt(String(newChildren)) || 0);
+                        props.handleCreateFromEvent(
+                          showCreatePopover === 'checkin',
+                          adultsFinal,
+                          childrenFinal
+                        );
+                        setShowCreatePopover(false);
+                        resetCreatePopoverState();
+                      }}
+                      disabled={loadingAction === 'creating'}
+                      className="w-full py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-black uppercase tracking-[0.15em] transition-all disabled:opacity-60 border border-black rounded-lg"
+                    >
+                      Create
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
+
             {actionMsg && (
               <div className="bg-[#1C232E] text-[#EDE6D6] px-4 py-2 rounded-xl text-xs font-bold text-center animate-in fade-in border border-[#2A2F36]">{actionMsg}</div>
             )}
@@ -654,6 +654,22 @@ export function BookingModal(props: BookingModalProps) {
                 )}
               </div>
             </div>
+
+            {isCheckoutDay && isStaff && (
+              <button
+                onClick={async () => {
+                  console.log('[Check Out Guest button] clicked, handleGuestCheckOut exists:', !!props.handleGuestCheckOut);
+                  if (props.handleGuestCheckOut) {
+                    const result = await props.handleGuestCheckOut();
+                    console.log('[Check Out Guest button] result:', result);
+                  }
+                }}
+                disabled={loadingAction === 'guestcheckout'}
+                className="w-full py-3 bg-amber-700 hover:bg-amber-800 text-white text-[11px] font-black uppercase tracking-[0.15em] transition-all disabled:opacity-60"
+              >
+                {loadingAction === 'guestcheckout' ? 'Checking Out...' : 'Check Out Guest'}
+              </button>
+            )}
 
             {showNotes && sel && (sel.notes || sel.description) && (
               <div className="bg-[#B8860B]/20 rounded-[20px] p-4 border border-[#B8860B]/30 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
@@ -806,8 +822,11 @@ export function BookingModal(props: BookingModalProps) {
                             if (!confirm(`Update check-out date to ${editCheckOut}?`)) return;
                             setLoadingAction('editdates');
                             try {
+                              // INVARIANT: This is the ONLY place non-settlement accommodation price changes should happen.
+                              // total_price represents accommodation base price + date adjustments only.
+                              // Service/meal costs are never included here - they live in meal_requests/booking_services.
                               const settledReceipts = getSettledReceiptsForSel ? getSettledReceiptsForSel() : [];
-                              const isTab1Closed = settledReceipts.length > 0 || (sel.collected_amount || 0) > 0 || sel.is_prepaid || sel.is_accommodation_prepaid || sel.is_food_prepaid;
+                              const isTab1Closed = settledReceipts.length > 0 || (sel.collected_amount || 0) > 0 || sel.is_prepaid || sel.is_accommodation_prepaid;
                               
                               const currentMeta: any = Array.isArray(sel.meta) ? { days: sel.meta } : (sel.meta || {});
 
@@ -924,7 +943,7 @@ export function BookingModal(props: BookingModalProps) {
                     }
 
                     // ── NORMAL editable Stay Configuration ──────────────────────────────────
-                    const isTab1Closed = getSettledReceiptsForSel().length > 0 || (sel.collected_amount || 0) > 0 || sel.is_prepaid || sel.is_accommodation_prepaid || sel.is_food_prepaid;
+                    const isTab1Closed = getSettledReceiptsForSel().length > 0 || (sel.collected_amount || 0) > 0 || sel.is_prepaid || sel.is_accommodation_prepaid;
                     const isDatesChanged = editCheckOut !== sel.check_out;
                     const isExtended = editCheckOut > sel.check_out;
                     const isShortened = editCheckOut < sel.check_out;
@@ -1002,12 +1021,14 @@ export function BookingModal(props: BookingModalProps) {
                               <div className="flex items-center justify-between">
                                 <label className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Accommodation</label>
                                 <div className="flex items-center gap-3">
-                                  {sel.is_accommodation_prepaid && (
+                                  {sel.is_accommodation_prepaid ? (
                                     <span className="text-[10px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">Prepaid</span>
+                                  ) : (
+                                    <span className="text-[10px] font-black bg-emerald-500 text-white px-2 py-0.5 rounded-md uppercase tracking-wider">✓ Paid</span>
                                   )}
                                 </div>
                               </div>
-                              <div className="px-3 py-2 bg-[#1C232E]/50 border border-[#2A2F36] text-sm font-mono text-[#9C9384] font-bold">
+                              <div className={`px-3 py-2 text-sm font-mono font-bold ${(sel.is_accommodation_prepaid || isTab1Closed) ? 'border-emerald-700/40 bg-emerald-950/20 text-emerald-400' : 'bg-[#1C232E]/50 border border-[#2A2F36] text-[#9C9384]'}`}>
                                 ${String((sel.is_accommodation_prepaid ? 0 : (sel.total_price || 0)).toFixed(2))}
                               </div>
                             </div>
@@ -1036,6 +1057,9 @@ export function BookingModal(props: BookingModalProps) {
                               <div className="flex items-center justify-between">
                                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Accommodation</label>
                                 <div className="flex items-center gap-3">
+                                  {isPrepaid && (
+                                    <span className="text-[10px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">Prepaid</span>
+                                  )}
                                   <button
                                     type="button"
                                     onClick={() => setIsPrepaid(!isPrepaid)}
@@ -1052,7 +1076,7 @@ export function BookingModal(props: BookingModalProps) {
                                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-xs">$</span>
                                   <input 
                                     type="number" 
-                                    value={String(isPrepaid ? 0 : (svcAmount || ''))} 
+                                    value={String(svcAmount || '')} 
                                     disabled={isPrepaid}
                                     onChange={e => {
                                       const val = parseFloat(e.target.value) || 0;
@@ -1132,10 +1156,10 @@ export function BookingModal(props: BookingModalProps) {
                             <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Include in Booking (Prepaid)</span>
                             <button 
                               type="button"
-                              onClick={() => currentMealType === 'lunch' ? setIsLunchPrepaid(!isLunchPrepaid) : setIsDinnerPrepaid(!isDinnerPrepaid)}
-                              className={`w-12 h-6 rounded-full transition-all relative ${ (currentMealType === 'lunch' ? isLunchPrepaid : isDinnerPrepaid) ? 'bg-[#0B6E4F]' : 'bg-[#5C4A2E]' }`}
+                              disabled
+                              className={`w-12 h-6 rounded-full transition-all relative bg-[#5C4A2E] opacity-50 cursor-not-allowed`}
                             >
-                              <div className={`absolute top-1 w-4 h-4 bg-[#EDE6D6] rounded-full transition-all ${ (currentMealType === 'lunch' ? isLunchPrepaid : isDinnerPrepaid) ? 'left-7' : 'left-1' }`} />
+                              <div className={`absolute top-1 w-4 h-4 bg-[#EDE6D6] rounded-full transition-all left-1`} />
                             </button>
                           </div>
 
@@ -1172,16 +1196,7 @@ export function BookingModal(props: BookingModalProps) {
                             </div>
                           </div>
 
-                          {(currentMealType === 'lunch' ? isLunchPrepaid : isDinnerPrepaid) && (
-                            <div className="bg-[#0B6E4F]/10 border border-[#0B6E4F]/30 rounded-2xl p-4 flex items-center gap-3 animate-in fade-in slide-in-from-top-1">
-                              <div className="w-8 h-8 bg-[#0B6E4F]/20 rounded-full flex items-center justify-center text-[#0B6E4F] shrink-0">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                              </div>
-                              <p className="text-[11px] font-bold text-[#0B6E4F] leading-tight">
-                                This is a <span className="font-black uppercase">Prepaid</span> request. It will not increase the guest's debt on the tab.
-                              </p>
-                            </div>
-                          )}
+
 
                           <button type="button"
                             disabled={mealRequestAdultQty <= 0 && mealRequestChildQty <= 0}
@@ -1248,7 +1263,7 @@ export function BookingModal(props: BookingModalProps) {
                                 type: currentMealType,
                                 quantity: mealRequestAdultQty + mealRequestChildQty,
                                 status: 'pending',
-                                prepaid: currentMealType === 'lunch' ? isLunchPrepaid : isDinnerPrepaid,
+                                prepaid: false,
                                 guest_name: sel.guest_name,
                                 id: sel.id,
                                 meal_id: insertedMeal.id,
@@ -1275,131 +1290,404 @@ export function BookingModal(props: BookingModalProps) {
                   )}
 
                   {isRoomStay && (() => {
-                    const isTab1Closed = getSettledReceiptsForSel().length > 0 || (sel.collected_amount || 0) > 0 || sel.is_prepaid || sel.is_accommodation_prepaid || sel.is_food_prepaid;
-                    const relevantMealsForToggle = activeMeals.filter((m: any) => 
-                      m.status === 'confirmed' || m.status === 'served'
-                    );
-                    const hasMeals = relevantMealsForToggle.length > 0;
-                    const allMealsPrepaid = relevantMealsForToggle.length > 0 && relevantMealsForToggle.every((m: any) => m.is_paid);
+                    const isTab1Closed = getSettledReceiptsForSel().length > 0 || (sel.collected_amount || 0) > 0 || sel.is_prepaid || sel.is_accommodation_prepaid;
                     return (
                       <div className="border border-[#2A2F36] rounded-xl p-4 space-y-3 bg-[#1C232E]">
                         <div className="flex justify-between items-center">
                           <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Other Services</p>
-                          {hasMeals && (
-                            <div className="flex items-center gap-3">
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  const newValue = !isFoodPrepaid;
-                                  setIsFoodPrepaid(newValue);
-                                  
-                                  // Bulk update all relevant meals
-                                  if (relevantMealsForToggle.length > 0) {
-                                    const mealIds = relevantMealsForToggle.map((m: any) => m.id);
-                                    const { error } = await supabase
-                                      .from('meal_requests')
-                                      .update({ is_paid: newValue })
-                                      .in('id', mealIds);
-                                    if (error) {
-                                      console.error('Failed to bulk update meal prepaid status:');
-                                      console.error('message:', error?.message);
-                                      console.error('details:', error?.details);
-                                      console.error('hint:', error?.hint);
-                                      console.error('code:', error?.code);
-                                    } else {
-                                      onRefresh?.();
-                                    }
-                                  }
-                                }}
-                                className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${allMealsPrepaid ? 'bg-[#0B6E4F]' : 'bg-[#5C4A2E]'}`}
-                              >
-                                <span
-                                  className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${allMealsPrepaid ? 'translate-x-5' : 'translate-x-0'}`}
-                                />
-                              </button>
-                              {allMealsPrepaid && (
-                                <span className="text-[10px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">Prepaid</span>
-                              )}
-                            </div>
-                          )}
                         </div>
                       <div className="grid grid-cols-1 gap-4">
-                        <div className="space-y-2">
-                          <div className="flex justify-between items-center">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input type="checkbox" checked={svcGuide} onChange={e => { 
-                                setSvcGuide(e.target.checked); 
-                                if (e.target.checked) { 
-                                  setSvcGuidePrice(pricing?.guide_price || 0); 
-                                  setSvcGuideNames(['']); 
-                                } 
-                              }} className="w-5 h-5 border-2 border-[#2A2F36] text-[#0B6E4F] rounded" />
-                              <div className="flex flex-col">
-                                <span className="text-sm font-bold text-[#EDE6D6]">Guide Service</span>
-                                {pricing?.guide_price && pricing.guide_price > 0 && (
-                                  <span className="text-[9px] font-bold text-[#9C9384] uppercase tracking-wider">System Price: ${String(pricing.guide_price)} / guide</span>
-                                )}
-                              </div>
-                            </label>
-                            {svcGuide && (
-                              <div className="flex items-center gap-2">
-                                <button type="button" onClick={() => setSvcGuidePrice(Math.max(0, svcGuidePrice - 5))} className="w-8 h-8 flex items-center justify-center bg-[#1C232E]/50 hover:bg-[#2A1518] text-[#9C9384] rounded-xl font-black text-sm transition-all shadow-sm border border-[#2A2F36]">－</button>
-                                <div className="relative">
-                                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[#9C9384] font-bold text-[10px]">$</span>
-                                  <input type="number" value={String(svcGuidePrice)} onChange={e => setSvcGuidePrice(parseFloat(e.target.value) || 0)}
-                                    className="w-20 pl-5 pr-2 py-2 bg-[#1C232E] border-2 border-[#2A2F36] rounded-xl text-base font-black text-[#EDE6D6] focus:border-[#0B6E4F] outline-none text-center" />
+                        {(() => {
+                          const hasActiveFoodTab = activeMeals.some((m: any) =>
+                            !m.is_paid && (m.status === 'confirmed' || m.status === 'served')
+                          );
+                          if (!hasActiveFoodTab) return null;
+
+                          const activeUnpaidMeals = activeMeals.filter((m: any) =>
+                            !m.is_paid && (m.status === 'confirmed' || m.status === 'served')
+                          );
+                          const isFoodPrepaid = activeUnpaidMeals.length > 0 &&
+                            activeUnpaidMeals.every((m: any) => m.prepaid);
+
+                          return (
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium text-slate-400">Food Prepaid</span>
+                              <button
+                                onClick={async () => {
+                                  const newValue = !isFoodPrepaid;
+                                  const idsToUpdate = activeUnpaidMeals.map((m: any) => m.meal_id || m.id);
+                                  console.log('[FoodPrepaid] idsToUpdate:', idsToUpdate, 'types:', idsToUpdate.map(id => typeof id));
+                                  if (idsToUpdate.length === 0) return;
+
+                                  // Optimistic update — flip immediately, matches accommodation's
+                                  // isPrepaid responsiveness
+                                  const idSet = new Set(idsToUpdate);
+                                  setActiveMeals(activeMeals.map((m: any) =>
+                                    idSet.has(m.meal_id || m.id) ? { ...m, prepaid: newValue } : m
+                                  ));
+
+                                  const { error } = await supabase
+                                    .from('meal_requests')
+                                    .update({ prepaid: newValue })
+                                    .in('id', idsToUpdate);
+
+                                  if (error) {
+                                    console.error('[FoodPrepaid] Update failed:', JSON.stringify(error, null, 2));
+                                    // Roll back on failure
+                                    setActiveMeals(activeMeals.map((m: any) =>
+                                      idSet.has(m.meal_id || m.id) ? { ...m, prepaid: !newValue } : m
+                                    ));
+                                    flash('⚠ Failed to update food prepaid status.');
+                                    return;
+                                  }
+                                  flash(newValue ? '✓ Food marked prepaid.' : '✓ Food marked billable.');
+                                }}
+                                className={`relative w-11 h-6 rounded-full transition-colors ${
+                                  isFoodPrepaid ? 'bg-[#0B6E4F]' : 'bg-[#2A2F36]'
+                                }`}
+                              >
+                                <span
+                                  className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                                    isFoodPrepaid ? 'translate-x-5' : 'translate-x-0'
+                                  }`}
+                                />
+                              </button>
+                            </div>
+                          );
+                        })()}
+
+                        {/* TEMPORARY: Manager bypass — adds meal directly as Accepted, skipping cook queue. Remove when no longer needed. */}
+                        {isStaff && (
+                          <div className="grid grid-cols-2 gap-3">
+                            {/* Quick Add Lunch */}
+                            <div className="bg-[#1C232E]/50 rounded-lg p-3 border border-[#2A2F36]">
+                              <div className="text-[10px] font-black uppercase tracking-widest text-[#9C9384] mb-2">Quick Add Lunch</div>
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-slate-400">Adults</span>
+                                  <div className="flex items-center gap-2">
+                                    <button onClick={() => setBypassLunchAdults(Math.max(0, bypassLunchAdults - 1))} className="w-8 h-8 rounded-lg bg-[#1C232E]/50 text-[#9C9384] text-sm font-black hover:bg-[#2A1518] transition-all border border-[#2A2F36]">－</button>
+                                    <span className="text-sm font-black text-[#EDE6D6] min-w-[20px] text-center">{bypassLunchAdults}</span>
+                                    <button onClick={() => setBypassLunchAdults(bypassLunchAdults + 1)} className="w-8 h-8 rounded-lg bg-[#0B6E4F]/20 text-[#0B6E4F] text-sm font-black hover:bg-[#0B6E4F]/30 transition-all border border-[#0B6E4F]/40">＋</button>
+                                  </div>
                                 </div>
-                                <button type="button" onClick={() => setSvcGuidePrice(svcGuidePrice + 5)} className="w-8 h-8 flex items-center justify-center bg-[#0B6E4F]/20 hover:bg-[#0B6E4F]/30 text-[#0B6E4F] rounded-xl font-black text-sm transition-all shadow-sm border border-[#0B6E4F]/40">＋</button>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-slate-400">Children</span>
+                                  <div className="flex items-center gap-2">
+                                    <button onClick={() => setBypassLunchChildren(Math.max(0, bypassLunchChildren - 1))} className="w-8 h-8 rounded-lg bg-[#1C232E]/50 text-[#9C9384] text-sm font-black hover:bg-[#2A1518] transition-all border border-[#2A2F36]">－</button>
+                                    <span className="text-sm font-black text-[#EDE6D6] min-w-[20px] text-center">{bypassLunchChildren}</span>
+                                    <button onClick={() => setBypassLunchChildren(bypassLunchChildren + 1)} className="w-8 h-8 rounded-lg bg-[#0B6E4F]/20 text-[#0B6E4F] text-sm font-black hover:bg-[#0B6E4F]/30 transition-all border border-[#0B6E4F]/40">＋</button>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={async () => {
+                                    const adultQty = bypassLunchAdults;
+                                    const childQty = bypassLunchChildren;
+                                    if (adultQty <= 0 && childQty <= 0) return;
+                                    const { data: inserted, error } = await supabase.from('meal_requests').insert({
+                                      booking_id: sel.id,
+                                      meal_date: today,
+                                      meal_type: 'Lunch',
+                                      adult_qty: adultQty,
+                                      child_qty: childQty,
+                                      status: 'Accepted',
+                                      team_id: teamId,
+                                      is_manual_entry: true,
+                                    }).select().single();
+                                    if (error) {
+                                      flash('⚠ Failed to add to tab.');
+                                      return;
+                                    }
+                                    // Optimistic add — show immediately, matches Food Prepaid's pattern
+                                    setActiveMeals([...activeMeals, {
+                                      meal_id: inserted.id,
+                                      id: inserted.id,
+                                      meal_type: inserted.meal_type,
+                                      type: inserted.meal_type.toLowerCase(),
+                                      adult_qty: inserted.adult_qty,
+                                      child_qty: inserted.child_qty,
+                                      status: 'confirmed', // matches statusMap['Accepted'] used elsewhere
+                                      prepaid: false,
+                                      is_paid: false,
+                                      meal_date: inserted.meal_date,
+                                      is_manual_entry: true,
+                                    }]);
+                                    setBypassLunchAdults(0);
+                                    setBypassLunchChildren(0);
+                                    flash('✓ Added directly to tab (bypassed kitchen).');
+                                  }}
+                                  disabled={bypassLunchAdults <= 0 && bypassLunchChildren <= 0}
+                                  className="w-full py-2 bg-[#0B6E4F] text-[#C9A227] rounded-lg text-xs font-black uppercase tracking-widest hover:bg-[#0B6E4F]/80 transition-all disabled:opacity-50"
+                                >
+                                  Add to Tab
+                                </button>
                               </div>
-                            )}
+                            </div>
+
+                            {/* Quick Add Dinner */}
+                            <div className="bg-[#1C232E]/50 rounded-lg p-3 border border-[#2A2F36]">
+                              <div className="text-[10px] font-black uppercase tracking-widest text-[#9C9384] mb-2">Quick Add Dinner</div>
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-slate-400">Adults</span>
+                                  <div className="flex items-center gap-2">
+                                    <button onClick={() => setBypassDinnerAdults(Math.max(0, bypassDinnerAdults - 1))} className="w-8 h-8 rounded-lg bg-[#1C232E]/50 text-[#9C9384] text-sm font-black hover:bg-[#2A1518] transition-all border border-[#2A2F36]">－</button>
+                                    <span className="text-sm font-black text-[#EDE6D6] min-w-[20px] text-center">{bypassDinnerAdults}</span>
+                                    <button onClick={() => setBypassDinnerAdults(bypassDinnerAdults + 1)} className="w-8 h-8 rounded-lg bg-[#0B6E4F]/20 text-[#0B6E4F] text-sm font-black hover:bg-[#0B6E4F]/30 transition-all border border-[#0B6E4F]/40">＋</button>
+                                  </div>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-slate-400">Children</span>
+                                  <div className="flex items-center gap-2">
+                                    <button onClick={() => setBypassDinnerChildren(Math.max(0, bypassDinnerChildren - 1))} className="w-8 h-8 rounded-lg bg-[#1C232E]/50 text-[#9C9384] text-sm font-black hover:bg-[#2A1518] transition-all border border-[#2A2F36]">－</button>
+                                    <span className="text-sm font-black text-[#EDE6D6] min-w-[20px] text-center">{bypassDinnerChildren}</span>
+                                    <button onClick={() => setBypassDinnerChildren(bypassDinnerChildren + 1)} className="w-8 h-8 rounded-lg bg-[#0B6E4F]/20 text-[#0B6E4F] text-sm font-black hover:bg-[#0B6E4F]/30 transition-all border border-[#0B6E4F]/40">＋</button>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={async () => {
+                                    const adultQty = bypassDinnerAdults;
+                                    const childQty = bypassDinnerChildren;
+                                    if (adultQty <= 0 && childQty <= 0) return;
+                                    const { data: inserted, error } = await supabase.from('meal_requests').insert({
+                                      booking_id: sel.id,
+                                      meal_date: today,
+                                      meal_type: 'Dinner',
+                                      adult_qty: adultQty,
+                                      child_qty: childQty,
+                                      status: 'Accepted',
+                                      team_id: teamId,
+                                      is_manual_entry: true,
+                                    }).select().single();
+                                    if (error) {
+                                      flash('⚠ Failed to add to tab.');
+                                      return;
+                                    }
+                                    // Optimistic add — show immediately, matches Food Prepaid's pattern
+                                    setActiveMeals([...activeMeals, {
+                                      meal_id: inserted.id,
+                                      id: inserted.id,
+                                      meal_type: inserted.meal_type,
+                                      type: inserted.meal_type.toLowerCase(),
+                                      adult_qty: inserted.adult_qty,
+                                      child_qty: inserted.child_qty,
+                                      status: 'confirmed', // matches statusMap['Accepted'] used elsewhere
+                                      prepaid: false,
+                                      is_paid: false,
+                                      meal_date: inserted.meal_date,
+                                      is_manual_entry: true,
+                                    }]);
+                                    setBypassDinnerAdults(0);
+                                    setBypassDinnerChildren(0);
+                                    flash('✓ Added directly to tab (bypassed kitchen).');
+                                  }}
+                                  disabled={bypassDinnerAdults <= 0 && bypassDinnerChildren <= 0}
+                                  className="w-full py-2 bg-[#0B6E4F] text-[#C9A227] rounded-lg text-xs font-black uppercase tracking-widest hover:bg-[#0B6E4F]/80 transition-all disabled:opacity-50"
+                                >
+                                  Add to Tab
+                                </button>
+                              </div>
+                            </div>
                           </div>
-                          {svcGuide && (
-                            <div className="space-y-2">
-                              {svcGuideNames.map((name: any, ni: number) => (
-                                <div key={ni} className="flex gap-2">
-                                  <input type="text" value={String(name || '')} onChange={e => { const next = [...svcGuideNames]; next[ni] = e.target.value; setSvcGuideNames(next); }}
-                                    placeholder={`Guide ${ni + 1} name...`}
-                                    className={`flex-1 px-3 py-2 border-2 ${!String(name).trim() ? 'border-[#722F37] bg-[#722F37]/10' : 'border-[#2A2F36] bg-[#1C232E]'} rounded-lg text-base font-bold text-[#EDE6D6] focus:border-[#0B6E4F] transition-all`} />
-                                  {svcGuideNames.length > 1 && <button type="button" onClick={() => { setSvcGuideNames(svcGuideNames.filter((_: any, i: number) => i !== ni)); setSvcGuidePrice(Math.max(0, svcGuidePrice - 40)); }}
-                                    className="text-[#722F37] hover:text-[#722F37]/80 font-black text-xl px-1">×</button>}
+                        )}
+
+                        {/* Transportation & Guide Services */}
+                        {isStaff && (() => {
+                          const transportEntries = activeServices.filter((s: any) => s.details?.name === 'Transportation');
+                          const guideEntries = activeServices.filter((s: any) => s.details?.name === 'Guide Service');
+                          return (
+                          <div className="space-y-3">
+                            <div className="bg-[#1C232E]/50 rounded-lg p-3 border border-[#2A2F36]">
+                              <div className="text-[10px] font-black uppercase tracking-widest text-[#9C9384] mb-2">Transportation</div>
+                              <div className="space-y-2">
+                                <div className="grid grid-cols-2 gap-2">
+                                  <input
+                                    type="text"
+                                    value={transportFrom}
+                                    onChange={(e) => setTransportFrom(e.target.value)}
+                                    placeholder="From"
+                                    className="px-3 py-2 bg-[#1C232E] border border-[#2A2F36] rounded-lg text-sm text-[#EDE6D6] placeholder:text-[#9C9384] focus:outline-none focus:border-[#0B6E4F]"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={transportTo}
+                                    onChange={(e) => setTransportTo(e.target.value)}
+                                    placeholder="To"
+                                    className="px-3 py-2 bg-[#1C232E] border border-[#2A2F36] rounded-lg text-sm text-[#EDE6D6] placeholder:text-[#9C9384] focus:outline-none focus:border-[#0B6E4F]"
+                                  />
                                 </div>
-                              ))}
-                              <button type="button" onClick={() => { setSvcGuideNames([...svcGuideNames, '']); setSvcGuidePrice(svcGuidePrice + 40); }}
-                                className="w-full py-1.5 border-2 border-dashed border-[#2A2F36] rounded-xl text-[10px] font-black text-[#9C9384] uppercase tracking-widest hover:border-[#0B6E4F] hover:text-[#0B6E4F] transition-all">+ Add Another Guide ($40)</button>
-                            </div>
-                          )}
-                        </div>
-                        <div className="space-y-2 pt-2 border-t border-[#2A2F36]">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" checked={svcTransport} onChange={e => setSvcTransport(e.target.checked)} className="w-5 h-5 border-2 border-[#2A2F36] text-[#0B6E4F] rounded" />
-                            <span className="text-sm font-bold text-[#EDE6D6]">Transport</span>
-                          </label>
-                          {svcTransport && (
-                            <div className="space-y-3">
-                              {svcTransList.map((trans: any, ti: number) => (
-                                <div key={ti} className="p-3 border border-[#2A2F36] rounded-xl bg-[#1C232E]/50 space-y-2">
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Transfer {String(ti + 1)}</span>
-                                    {svcTransList.length > 1 && <button type="button" onClick={() => setSvcTransList(svcTransList.filter((_: any, i: number) => i !== ti))} className="text-[#722F37] hover:text-[#722F37]/80 font-bold text-xs">✕ Remove</button>}
-                                  </div>
-                                  <input type="text" value={String(trans.name)} onChange={e => setSvcTransList(svcTransList.map((t: any, i: number) => i === ti ? { ...t, name: e.target.value } : t))} placeholder="Driver Name..."
-                                    className={`w-full px-3 py-2 border-2 ${!String(trans.name).trim() ? 'border-[#722F37] bg-[#722F37]/10' : 'border-[#2A2F36] bg-[#1C232E]'} rounded-lg text-base font-bold text-[#EDE6D6] focus:border-[#0B6E4F] transition-all`} />
-                                  <div className="flex gap-2">
-                                    <input type="text" value={String(trans.details)} onChange={e => setSvcTransList(svcTransList.map((t: any, i: number) => i === ti ? { ...t, details: e.target.value } : t))} placeholder="From/To..."
-                                      className={`flex-1 px-3 py-2 border-2 ${!String(trans.details).trim() ? 'border-[#722F37] bg-[#722F37]/10' : 'border-[#2A2F36] bg-[#1C232E]'} rounded-lg text-base font-bold text-[#EDE6D6] focus:border-[#0B6E4F] transition-all`} />
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="text-[10px] font-bold text-[#9C9384]">$</span>
-                                      <input type="number" value={String(trans.price)} onChange={e => setSvcTransList(svcTransList.map((t: any, i: number) => i === ti ? { ...t, price: parseFloat(e.target.value) || 0 } : t))} placeholder="Price"
-                                        className={`w-20 px-3 py-2 border-2 ${trans.price <= 0 ? 'border-[#722F37] bg-[#722F37]/10' : 'border-[#2A2F36] bg-[#1C232E]'} rounded-lg text-base font-bold text-[#EDE6D6] focus:border-[#0B6E4F] transition-all`} />
+                                <input
+                                  type="text"
+                                  value={transportDriver}
+                                  onChange={(e) => setTransportDriver(e.target.value)}
+                                  placeholder="Driver Name"
+                                  className="w-full px-3 py-2 bg-[#1C232E] border border-[#2A2F36] rounded-lg text-sm text-[#EDE6D6] placeholder:text-[#9C9384] focus:outline-none focus:border-[#0B6E4F]"
+                                />
+                                <div className="flex gap-2">
+                                  <input
+                                    type="number"
+                                    value={transportPrice}
+                                    onChange={(e) => setTransportPrice(e.target.value)}
+                                    placeholder="Price (USD)"
+                                    className="flex-1 px-3 py-2 bg-[#1C232E] border border-[#2A2F36] rounded-lg text-sm text-[#EDE6D6] placeholder:text-[#9C9384] focus:outline-none focus:border-[#0B6E4F]"
+                                  />
+                                  <button
+                                    onClick={async () => {
+                                      if (addingTransport) return;
+                                      setAddingTransport(true);
+                                      try {
+                                        const price = parseFloat(transportPrice);
+                                        if (price <= 0) return;
+                                        const { data: insertedRow, error } = await supabase.from('booking_services').insert({
+                                          booking_id: sel.id,
+                                          service_type: 'extra',
+                                          unit_price: price,
+                                          quantity: 1,
+                                          currency: 'USD',
+                                          details: { 
+                                            name: 'Transportation',
+                                            from: transportFrom,
+                                            to: transportTo,
+                                            driver_name: transportDriver,
+                                          },
+                                          team_id: teamId,
+                                        }).select().single();
+                                        if (error) {
+                                          flash('⚠ Failed to add service.');
+                                          return;
+                                        }
+                                        setActiveServices([...activeServices, insertedRow]);
+                                        setTransportFrom('');
+                                        setTransportTo('');
+                                        setTransportDriver('');
+                                        setTransportPrice('');
+                                        flash('✓ Transportation added to tab.');
+                                      } finally {
+                                        setAddingTransport(false);
+                                      }
+                                    }}
+                                    disabled={!transportFrom || !transportTo || !transportDriver || !transportPrice || parseFloat(transportPrice) <= 0 || addingTransport}
+                                    className="px-4 py-2 bg-[#0B6E4F] text-[#C9A227] rounded-lg text-xs font-black uppercase tracking-widest hover:bg-[#0B6E4F]/80 transition-all disabled:opacity-50"
+                                  >
+                                    {addingTransport ? 'Adding...' : transportEntries.length > 0 ? '+ Add Another Transportation' : 'Add'}
+                                  </button>
+                                </div>
+                              </div>
+                              {transportEntries.length > 0 && (
+                                <div className="mt-2 border-t border-[#2A2F36] pt-2">
+                                  <button
+                                    onClick={() => setShowTransportList(!showTransportList)}
+                                    className="flex items-center justify-between w-full text-[10px] font-black uppercase tracking-widest text-[#9C9384]"
+                                  >
+                                    <span>{transportEntries.length} Added</span>
+                                    <span>{showTransportList ? '▲' : '▼'}</span>
+                                  </button>
+                                  {showTransportList && (
+                                    <div className="mt-2 space-y-1.5">
+                                      {transportEntries.map((s: any, i: number) => (
+                                        <div key={s.id ?? i} className="flex items-center justify-between text-xs text-[#EDE6D6] bg-[#1C232E] rounded-lg px-2 py-1.5">
+                                          <span>{s.details?.from} → {s.details?.to} ({s.details?.driver_name})</span>
+                                          <span className="font-black text-[#C9A227]">${s.unit_price}</span>
+                                        </div>
+                                      ))}
                                     </div>
-                                  </div>
+                                  )}
                                 </div>
-                              ))}
-                              <button type="button" onClick={() => setSvcTransList([...svcTransList, { name: '', details: '', price: 0 }])}
-                                className="w-full py-1.5 border-2 border-dashed border-[#2A2F36] rounded-xl text-[10px] font-black text-[#9C9384] uppercase tracking-widest hover:border-[#0B6E4F] hover:text-[#0B6E4F] transition-all">+ Add Transfer</button>
+                              )}
                             </div>
-                          )}
-                        </div>
+
+                            <div className="bg-[#1C232E]/50 rounded-lg p-3 border border-[#2A2F36]">
+                              <div className="text-[10px] font-black uppercase tracking-widest text-[#9C9384] mb-2">Guide Service</div>
+                              <div className="space-y-2">
+                                <input
+                                  type="text"
+                                  value={guideName}
+                                  onChange={(e) => setGuideName(e.target.value)}
+                                  placeholder="Guide Name"
+                                  className="w-full px-3 py-2 bg-[#1C232E] border border-[#2A2F36] rounded-lg text-sm text-[#EDE6D6] placeholder:text-[#9C9384] focus:outline-none focus:border-[#0B6E4F]"
+                                />
+                                <div className="flex gap-2">
+                                  <select
+                                    value={paxodType}
+                                    onChange={(e) => setPaxodType(e.target.value as 'kichik' | 'katta' | 'both')}
+                                    className="flex-1 px-3 py-2 bg-[#1C232E] border border-[#2A2F36] rounded-lg text-sm text-[#EDE6D6] focus:outline-none focus:border-[#0B6E4F]"
+                                  >
+                                    <option value="kichik">Kichik paxod</option>
+                                    <option value="katta">Katta paxod</option>
+                                    <option value="both">Both</option>
+                                  </select>
+                                  <input
+                                    type="number"
+                                    value={guidePrice}
+                                    onChange={(e) => setGuidePrice(e.target.value)}
+                                    placeholder="Price (USD)"
+                                    className="flex-1 px-3 py-2 bg-[#1C232E] border border-[#2A2F36] rounded-lg text-sm text-[#EDE6D6] placeholder:text-[#9C9384] focus:outline-none focus:border-[#0B6E4F]"
+                                  />
+                                </div>
+                                <button
+                                  onClick={async () => {
+                                    if (addingGuide) return;
+                                    setAddingGuide(true);
+                                    try {
+                                      const basePrice = parseFloat(guidePrice);
+                                      if (basePrice <= 0) return;
+                                      const finalPrice = paxodType === 'both' ? basePrice * 2 : basePrice;
+                                      const { data: insertedRow, error } = await supabase.from('booking_services').insert({
+                                        booking_id: sel.id,
+                                        service_type: 'extra',
+                                        unit_price: finalPrice,
+                                        quantity: 1,
+                                        currency: 'USD',
+                                        details: { 
+                                          name: 'Guide Service',
+                                          guide_name: guideName,
+                                          paxod_type: paxodType,
+                                        },
+                                        team_id: teamId,
+                                      }).select().single();
+                                      if (error) {
+                                        flash('⚠ Failed to add service.');
+                                        return;
+                                      }
+                                      setActiveServices([...activeServices, insertedRow]);
+                                      setGuideName('');
+                                      setGuidePrice('');
+                                      flash('✓ Guide Service added to tab.');
+                                    } finally {
+                                      setAddingGuide(false);
+                                    }
+                                  }}
+                                  disabled={!guideName || !guidePrice || parseFloat(guidePrice) <= 0 || addingGuide}
+                                  className="w-full px-4 py-2 bg-[#0B6E4F] text-[#C9A227] rounded-lg text-xs font-black uppercase tracking-widest hover:bg-[#0B6E4F]/80 transition-all disabled:opacity-50"
+                                >
+                                  {addingGuide ? 'Adding...' : guideEntries.length > 0 ? '+ Add Another Guide' : 'Add'}
+                                </button>
+                              </div>
+                              {guideEntries.length > 0 && (
+                                <div className="mt-2 border-t border-[#2A2F36] pt-2">
+                                  <button
+                                    onClick={() => setShowGuideList(!showGuideList)}
+                                    className="flex items-center justify-between w-full text-[10px] font-black uppercase tracking-widest text-[#9C9384]"
+                                  >
+                                    <span>{guideEntries.length} Added</span>
+                                    <span>{showGuideList ? '▲' : '▼'}</span>
+                                  </button>
+                                  {showGuideList && (
+                                    <div className="mt-2 space-y-1.5">
+                                      {guideEntries.map((s: any, i: number) => (
+                                        <div key={s.id ?? i} className="flex items-center justify-between text-xs text-[#EDE6D6] bg-[#1C232E] rounded-lg px-2 py-1.5">
+                                          <span>{s.details?.guide_name} ({s.details?.paxod_type})</span>
+                                          <span className="font-black text-[#C9A227]">${s.unit_price}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          );
+                        })()}
                       </div>
                     </div>
                     );
@@ -1433,133 +1721,11 @@ export function BookingModal(props: BookingModalProps) {
                       />
                     </div>
                   )}
-                  
-                  <button onClick={() => setShowDrinks(!showDrinks)} className="text-sm font-bold text-[#0B6E4F] hover:text-[#0B6E4F]/80">{showDrinks ? '− Hide Drinks' : '+ Add Drinks'}</button>
-                  {showDrinks && drinks.length > 0 && (
-                    <div className="grid grid-cols-2 gap-2">
-                      {drinks.map((d: any) => (
-                        <div key={d.id} className="flex items-center gap-2 bg-[#1C232E]/50 rounded-lg px-3 py-2 border border-[#2A2F36]">
-                          <span className="text-xs text-[#EDE6D6] flex-1 truncate">{String(d.name)}</span>
-                          <div className="flex items-center gap-1">
-                            <button onClick={async () => {
-                              const currentQty = selectedDrinks[d.id] || 0;
-                              if (currentQty > 0) {
-                                // Delete most recent unpaid booking_services row for this drink
-                                const { data: existingRows, error: fetchError } = await supabase
-                                  .from('booking_services')
-                                  .select('id')
-                                  .eq('booking_id', sel.id)
-                                  .eq('service_type', 'drink')
-                                  .filter('details->>drink_id', 'eq', String(d.id))
-                                  .eq('is_paid', false)
-                                  .order('created_at', { ascending: false })
-                                  .limit(1);
-                                if (fetchError) {
-                                  flash('⚠ Failed to remove drink.');
-                                  return;
-                                }
-                                if (existingRows && existingRows.length > 0) {
-                                  const { error: deleteError } = await supabase.from('booking_services').delete().eq('id', existingRows[0].id);
-                                  if (deleteError) {
-                                    flash('⚠ Failed to remove drink.');
-                                    return;
-                                  }
-                                }
-                                setSelectedDrinks({ ...selectedDrinks, [d.id]: currentQty - 1 });
-                              }
-                            }} className="w-5 h-5 rounded bg-[#1C232E]/50 text-[#9C9384] text-xs font-bold hover:bg-[#2A1518] border border-[#2A2F36]">−</button>
-                            <span className="w-5 text-center text-xs font-bold text-[#EDE6D6]">{String(selectedDrinks[d.id] || 0)}</span>
-                            <button onClick={async () => {
-                              // Insert into booking_services
-                              const { error } = await supabase.from('booking_services').insert({
-                                booking_id: sel.id,
-                                service_type: 'drink',
-                                unit_price: d.sold_price || d.price || 0,
-                                quantity: 1,
-                                currency: d.currency || 'USD',
-                                details: { name: d.name, drink_id: d.id },
-                                is_paid: false
-                              });
-                              if (error) {
-                                flash('⚠ Failed to add drink.');
-                                return;
-                              }
-                              setSelectedDrinks({ ...selectedDrinks, [d.id]: (selectedDrinks[d.id] || 0) + 1 });
-                            }} className="w-5 h-5 rounded bg-[#0B6E4F]/20 text-[#0B6E4F] text-xs font-bold hover:bg-[#0B6E4F]/30 border border-[#0B6E4F]/40">+</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex gap-2">
-                    <input type="text" value={String(newExtraName)} onChange={e => setNewExtraName(e.target.value)} placeholder="Service name"
-                      className="flex-1 px-3 py-2 text-base rounded-lg border border-[#2A2F36] bg-[#1C232E] focus:outline-none focus:ring-2 focus:ring-[#0B6E4F]/30 text-[#EDE6D6]" />
-                    <input type="number" value={String(newExtraPrice)} onChange={e => setNewExtraPrice(e.target.value)} placeholder="Price"
-                      className="w-20 px-3 py-2 text-base rounded-lg border border-[#2A2F36] bg-[#1C232E] focus:outline-none text-[#EDE6D6]" />
-                    <button onClick={async () => {
-                      if (!newExtraName.trim()) return;
-                      // Insert into booking_services
-                      const { error } = await supabase.from('booking_services').insert({
-                        booking_id: sel.id,
-                        service_type: 'extra',
-                        unit_price: parseFloat(newExtraPrice) || 0,
-                        quantity: 1,
-                        currency: 'USD',
-                        details: { name: newExtraName.trim() },
-                        is_paid: false
-                      });
-                      if (error) {
-                        flash('⚠ Failed to add extra.');
-                        return;
-                      }
-                      setExtraServices([...extraServices, { name: newExtraName.trim(), price: newExtraPrice, currency: 'USD' }]);
-                      setNewExtraName('');
-                      setNewExtraPrice('');
-                    }}
-                      className="px-3 py-2 bg-[#0B6E4F] text-[#C9A227] text-xs font-bold rounded-lg hover:bg-[#0B6E4F]/80 border border-[#0B6E4F]/40">Add</button>
-                  </div>
-                  {extraServices.length > 0 && (
-                    <div className="space-y-1">
-                      {extraServices.map((s: any, i: number) => (
-                        <div key={i} className="flex justify-between items-center text-xs bg-[#0B6E4F]/10 px-3 py-1.5 rounded-lg border border-[#0B6E4F]/20">
-                          <span className="text-[#EDE6D6]">{String(s.name)}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-[#0B6E4F]">{String(s.price)} {String(s.currency)}</span>
-                            <button onClick={async () => {
-                              const extra = extraServices[i];
-                              // Delete corresponding booking_services row
-                              const { data: existingRows, error: fetchError } = await supabase
-                                .from('booking_services')
-                                .select('id')
-                                .eq('booking_id', sel.id)
-                                .eq('service_type', 'extra')
-                                .filter('details->>name', 'eq', extra.name)
-                                .eq('is_paid', false)
-                                .order('created_at', { ascending: false })
-                                .limit(1);
-                              if (fetchError) {
-                                flash('⚠ Failed to remove extra.');
-                                return;
-                              }
-                              if (existingRows && existingRows.length > 0) {
-                                const { error: deleteError } = await supabase.from('booking_services').delete().eq('id', existingRows[0].id);
-                                if (deleteError) {
-                                  flash('⚠ Failed to remove extra.');
-                                  return;
-                                }
-                              }
-                              setExtraServices(extraServices.filter((_: any, j: number) => j !== i));
-                            }} className="text-[#722F37] hover:text-[#722F37]/80 font-bold">×</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
               )}
 
               {isStaff && !isPOS && sel.status !== 'completed' && (() => {
-                const isTab1Closed = getSettledReceiptsForSel().length > 0 || (sel.collected_amount || 0) > 0 || sel.is_prepaid || sel.is_accommodation_prepaid || sel.is_food_prepaid;
+                const isTab1Closed = getSettledReceiptsForSel().length > 0 || (sel.collected_amount || 0) > 0 || sel.is_prepaid || sel.is_accommodation_prepaid;
                 return (
                   <div className="bg-[#0B6E4F] rounded-2xl p-5 text-[#C9A227] shadow-xl shadow-[#0B6E4F]/20 animate-in fade-in zoom-in duration-500 border border-[#0B6E4F]/40">
                     <div className="flex justify-between items-center mb-4">
@@ -1572,18 +1738,71 @@ export function BookingModal(props: BookingModalProps) {
                       const currentMeta: any = Array.isArray(sel.meta) ? { days: sel.meta } : (sel.meta || {});
                       const lastAdjustment = parseFloat(currentMeta.last_adjustment) || 0;
                       const isExtended = lastAdjustment > 0;
+                      const accKey = 'Accommodation';
+                      const isExpandedState = expandedMealGroups.has(accKey);
 
                       return (
-                        <div className="flex justify-between items-center opacity-90 border-b border-white/20 pb-2 mb-2">
-                          <span className="font-bold">
-                            Accommodation {isExtended && <span className="text-amber-200">(Extended)</span>}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            {isPrepaid && (
-                              <span className="text-[9px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">PREPAID</span>
-                            )}
-                            <span className="font-black">${String(svcAmount.toFixed(2))}</span>
+                        <div className="py-3 border-b border-white/10 last:border-none">
+                          <div 
+                            className="flex justify-between items-center cursor-pointer hover:bg-white/5 rounded-lg px-2 py-1 transition-colors"
+                            onClick={() => {
+                              const newExpanded = new Set(expandedMealGroups);
+                              if (newExpanded.has(accKey)) {
+                                newExpanded.delete(accKey);
+                              } else {
+                                newExpanded.add(accKey);
+                              }
+                              setExpandedMealGroups(newExpanded);
+                            }}
+                          >
+                            <span className="font-bold text-sm">
+                              Accommodation {isExtended && <span className="text-amber-200 ml-1 text-xs font-normal">(Extended)</span>}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              {isPrepaid && (
+                                <span className="text-[9px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">PREPAID</span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSvcAmount(0);
+                                  setIsPrepaid(false);
+                                  flash('✓ Accommodation charge cleared.');
+                                }}
+                                className="text-[#722F37] hover:text-[#722F37]/80 font-bold text-sm"
+                              >
+                                ×
+                              </button>
+                              <span className="font-black text-sm">${String(svcAmount.toFixed(2))}</span>
+                            </div>
                           </div>
+                          {isExpandedState && (
+                            <div className="mt-2 pl-2 border-l-2 border-white/20 ml-2">
+                              <div className="flex justify-between items-center text-sm">
+                                <span className="font-medium text-slate-300">
+                                  {(() => {
+                                    const nights = sel.nights || (sel.check_out && sel.check_in ? Math.max(1, Math.ceil((new Date(sel.check_out).getTime() - new Date(sel.check_in).getTime()) / (1000 * 3600 * 24))) : 1);
+                                    const adults = localAdults || sel?.number_of_adults || 1;
+                                    const children = localChildren || sel?.number_of_children || 0;
+                                    const nightlyRate = svcAmount > 0 ? (svcAmount / nights).toFixed(2) : null;
+
+                                    return (
+                                      <>
+                                        Nights: {nights} × Adults: {adults}{children > 0 ? `, Children: ${children}` : ''}
+                                        {nightlyRate && <span className="ml-2 opacity-60 font-normal">(${nightlyRate}/night)</span>}
+                                      </>
+                                    );
+                                  })()}
+                                </span>
+                                {isPrepaid ? (
+                                  <span className="text-[9px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">PREPAID</span>
+                                ) : (
+                                  <span className="font-black text-sm text-slate-100">${String(svcAmount.toFixed(2))}</span>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       );
                     })()}
@@ -1609,24 +1828,27 @@ export function BookingModal(props: BookingModalProps) {
                       );
                     })()}
                     {(() => {
-                      const acceptedOrders = activeMeals.filter((o: any) => 
-                        (o.status === 'confirmed' || o.status === 'served') && !o.is_paid
+                      const acceptedOrders = activeMeals.filter((o: any) =>
+                        !o.is_paid && (
+                          o.status === 'confirmed' || o.status === 'served' ||
+                          (o.status === 'Pending' && o.is_manual_entry)
+                        )
                       );
-                      
+
                       const individualMeals = acceptedOrders.map((o: any) => {
                         const adultQty = o.adult_qty || 0;
                         const childQty = o.child_qty || 0;
                         const vegAdultQty = o.veg_adults_qty || 0;
                         const vegChildQty = o.veg_children_qty || 0;
-                        
+
                         const adultPrice = o.type === 'lunch' ? (pricing?.lunch_price || 10) : (pricing?.dinner_price || 12);
                         const childPrice = o.type === 'lunch' ? (pricing?.lunch_child_price || 5) : (pricing?.dinner_child_price || 5);
                         const adultTotal = adultQty * adultPrice;
                         const childTotal = childQty * childPrice;
-                        
+
                         const mealType = o.type.charAt(0).toUpperCase() + o.type.slice(1);
                         const mealDate = o.meal_date || 'N/A';
-                        
+
                         const items = [];
                         if (adultQty > 0) {
                           items.push({
@@ -1638,7 +1860,7 @@ export function BookingModal(props: BookingModalProps) {
                             vegQty: vegAdultQty,
                             unitPrice: adultPrice,
                             price: adultTotal,
-                            prepaid: o.prepaid
+                            isManualEntry: !!o.is_manual_entry,
                           });
                         }
                         if (childQty > 0) {
@@ -1651,19 +1873,11 @@ export function BookingModal(props: BookingModalProps) {
                             vegQty: vegChildQty,
                             unitPrice: childPrice,
                             price: childTotal,
-                            prepaid: o.prepaid
+                            isManualEntry: !!o.is_manual_entry,
                           });
                         }
                         return items;
                       }).flat();
-
-                      const pendingGuide = svcGuide && !activeServices.some((s: any) => s.service_type === 'guide') 
-                        ? { name: 'Guide', description: svcGuideNames.filter(n => n.trim()).join(', ') || 'Pending...', price: svcGuidePrice, prepaid: false, pending: true } 
-                        : null;
-
-                      const pendingTransport = svcTransport && !activeServices.some((s: any) => s.service_type === 'transportation') && svcTransList.some((t: any) => t.price > 0)
-                        ? { name: 'Transport', description: svcTransList.map((t: any) => t.name).filter(Boolean).join(', ') || 'Pending...', price: svcTransList.reduce((s: number, t: any) => s + (t.price || 0), 0), prepaid: false, pending: true } 
-                        : null;
 
                       const sItems = [
                         ...individualMeals,
@@ -1673,17 +1887,11 @@ export function BookingModal(props: BookingModalProps) {
                             serviceType: s.service_type,
                             price: s.unit_price * s.quantity,
                             currency: s.currency,
-                            prepaid: s.is_paid,
+
                             details: s.details
                           };
                           
-                          if (s.service_type === 'guide') {
-                            return { ...baseItem, name: 'Guide', description: s.details?.names || '1 guide' };
-                          }
-                          if (s.service_type === 'transportation') {
-                            return { ...baseItem, name: 'Transport', description: s.details?.name || s.details?.destination || '' };
-                          }
-                          if (s.service_type === 'drink') {
+                          if (s.service_type === 'drinks') {
                             return { ...baseItem, name: s.details?.name || 'Drink', description: s.currency };
                           }
                           if (s.service_type === 'extra') {
@@ -1691,9 +1899,7 @@ export function BookingModal(props: BookingModalProps) {
                           }
                           return null;
                         }).filter(Boolean),
-                        pendingGuide,
-                        pendingTransport,
-                        svcDiscount > 0 && { name: 'Discount', price: -svcDiscount, prepaid: false }
+                        svcDiscount > 0 && { name: 'Discount', price: -svcDiscount }
                       ].filter(Boolean) as any[];
 
                       if (sItems.length === 0) return null;
@@ -1702,12 +1908,17 @@ export function BookingModal(props: BookingModalProps) {
                       const foodGroup = individualMeals.reduce((group: any, item: any) => {
                         group.items.push(item);
                         group.totalPrice += item.price;
-                        if (item.prepaid) group.hasPrepaid = true;
                         return group;
-                      }, { items: [], totalPrice: 0, hasPrepaid: false });
+                      }, { items: [], totalPrice: 0 });
+
+                      // Determine if food is fully prepaid (same logic as Food Prepaid toggle)
+                      const activeUnpaidMeals = activeMeals.filter((m: any) =>
+                        !m.is_paid && (m.status === 'confirmed' || m.status === 'served')
+                      );
+                      const isFoodFullyPrepaid = activeUnpaidMeals.length > 0 &&
+                        activeUnpaidMeals.every((m: any) => m.prepaid);
                       
-                      // Update hasPrepaid to also check the isFoodPrepaid toggle
-                      foodGroup.hasPrepaid = foodGroup.hasPrepaid || isFoodPrepaid;
+
 
                       const nonMealItems = sItems.filter((item: any) => !item.mealType);
 
@@ -1732,64 +1943,73 @@ export function BookingModal(props: BookingModalProps) {
                                   }}
                                 >
                                   <span className="font-bold text-sm">Food</span>
-                                  <div className="flex items-center gap-2">
-                                    {foodGroup.hasPrepaid && (
-                                      <span className="text-[9px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">Prepaid</span>
-                                    )}
+                                  {isFoodFullyPrepaid ? (
+                                    <span className="text-[9px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">PREPAID</span>
+                                  ) : (
                                     <span className="font-black text-sm">${foodGroup.totalPrice.toFixed(2)}</span>
-                                  </div>
+                                  )}
                                 </div>
                                 {isExpanded && (
                                   <div className="mt-2 pl-2 border-l-2 border-white/20 ml-2">
                                     {(() => {
-                                      // Group items by date for separator lines
-                                      const itemsByDate = foodGroup.items.reduce((groups: any, item: any) => {
-                                        if (!groups[item.mealDate]) {
-                                          groups[item.mealDate] = [];
-                                        }
-                                        groups[item.mealDate].push(item);
+                                      // Group items by type and date
+                                      const itemsByTypeAndDate = foodGroup.items.reduce((groups: any, item: any) => {
+                                        const key = `${item.mealType}_${item.mealDate}`;
+                                        if (!groups[key]) groups[key] = [];
+                                        groups[key].push(item);
                                         return groups;
                                       }, {});
 
-                                      const dates = Object.keys(itemsByDate);
-                                      return dates.map((date: string, dateIdx: number) => (
-                                        <div key={date}>
-                                          {itemsByDate[date].map((item: any, itemIdx: number) => (
-                                            <div key={itemIdx} className="flex justify-between items-center mb-1 last:mb-0">
-                                              <span className="font-bold text-sm">
-                                                {item.mealType} — {item.mealDate}: Size: {item.category} {item.qty} x ${item.unitPrice.toFixed(2)}{item.vegQty > 0 ? ` (${item.vegQty} veg)` : ''}
-                                              </span>
-                                              <div className="flex items-center gap-2">
-                                                <button
-                                                  type="button"
-                                                  onClick={async () => {
-                                                    const { error } = await supabase
-                                                      .from('meal_requests')
-                                                      .update({ is_paid: !item.is_paid })
-                                                      .eq('id', item.mealId);
-                                                    if (error) {
-                                                      console.error('Failed to update meal prepaid status:', error);
-                                                    }
-                                                  }}
-                                                  className={`relative w-8 h-4 rounded-full transition-colors duration-200 ${item.prepaid ? 'bg-[#0B6E4F]' : 'bg-[#5C4A2E]'}`}
-                                                >
-                                                  <span
-                                                    className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform duration-200 ${item.prepaid ? 'translate-x-4' : 'translate-x-0'}`}
-                                                  />
-                                                </button>
-                                                {item.prepaid ? (
-                                                  <span className="text-[9px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">Prepaid</span>
-                                                ) : (
-                                                  <span className="font-black text-sm">${String(item.price.toFixed(2))}</span>
-                                                )}
+                                      const groups = Object.values(itemsByTypeAndDate) as any[][];
+                                      return groups.map((group: any[], groupIdx: number) => {
+                                        const firstItem = group[0];
+                                        // safely parse YYYY-MM-DD by adding midday time to avoid UTC shift
+                                        const safeDateStr = firstItem.mealDate.length === 10 && firstItem.mealDate.includes('-') 
+                                          ? `${firstItem.mealDate}T12:00:00` 
+                                          : firstItem.mealDate;
+                                        const formattedDate = !isNaN(Date.parse(safeDateStr)) 
+                                          ? new Date(safeDateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                                          : firstItem.mealDate;
+
+                                        return (
+                                          <div key={groupIdx}>
+                                            <div className="mb-1 last:mb-0">
+                                              <div className="font-bold text-sm mb-1.5 text-slate-200">
+                                                {firstItem.mealType} — {formattedDate}
+                                              </div>
+                                              <div className="pl-3 border-l-2 border-white/10 space-y-1.5 mb-2">
+                                                {group.map((item, itemIdx) => (
+                                                  <div key={itemIdx} className="flex justify-between items-center text-sm">
+                                                    <span className="font-medium text-slate-300">
+                                                      Size: {item.category} <span className="ml-1 opacity-60 font-normal">{item.qty} x ${item.unitPrice.toFixed(2)}{item.vegQty > 0 ? ` (${item.vegQty} veg)` : ''}</span>
+                                                    </span>
+                                                    <div className="flex items-center gap-2">
+                                                      {item.isManualEntry && (
+                                                        <button
+                                                          type="button"
+                                                          onClick={async () => {
+                                                            const { error } = await supabase.from('meal_requests').delete().eq('id', item.mealId);
+                                                            if (error) { flash('⚠ Failed to remove item.'); return; }
+                                                            setActiveMeals(activeMeals.filter((m: any) => m.id !== item.mealId));
+                                                            flash('✓ Removed.');
+                                                          }}
+                                                          className="text-[#722F37] hover:text-[#722F37]/80 font-bold text-sm"
+                                                        >
+                                                          ×
+                                                        </button>
+                                                      )}
+                                                      <span className="font-black text-sm text-slate-100">${String(item.price.toFixed(2))}</span>
+                                                    </div>
+                                                  </div>
+                                                ))}
                                               </div>
                                             </div>
-                                          ))}
-                                          {dateIdx < dates.length - 1 && (
-                                            <div className="border-t border-white/10 my-2"></div>
-                                          )}
-                                        </div>
-                                      ));
+                                            {groupIdx < groups.length - 1 && (
+                                              <div className="border-t border-white/10 my-2"></div>
+                                            )}
+                                          </div>
+                                        );
+                                      });
                                     })()}
                                   </div>
                                 )}
@@ -1815,7 +2035,8 @@ export function BookingModal(props: BookingModalProps) {
                                       flash('⚠ Failed to remove service.');
                                       return;
                                     }
-                                    // State will update via realtime subscription
+                                    setActiveServices(activeServices.filter((s: any) => s.id !== item.id));
+                                    flash('✓ Removed.');
                                   }}
                                   className="text-[#722F37] hover:text-[#722F37]/80 font-bold text-sm"
                                 >
@@ -1830,26 +2051,13 @@ export function BookingModal(props: BookingModalProps) {
                     })()}
 
                     {(() => {
-                      const drinkServices = activeServices.filter((s: any) => s.service_type === 'drink');
+                      const drinkServices = activeServices.filter((s: any) => s.service_type === 'drinks');
                       if (drinkServices.length === 0) return null;
                       const drinkTotal = drinkServices.reduce((sum: number, s: any) => sum + (s.unit_price * s.quantity), 0);
                       return (
                         <div className="flex justify-between items-center opacity-90">
                           <span className="font-bold">Drinks Tab</span>
                           <span className="font-black">${String(drinkTotal.toFixed(2))}</span>
-                        </div>
-                      );
-                    })()}
-
-                    {(() => {
-                      const extraServices = activeServices.filter((s: any) => s.service_type === 'extra');
-                      if (extraServices.length === 0) return null;
-                      const eTotal = extraServices.reduce((sum: number, s: any) => sum + (s.unit_price * s.quantity), 0);
-                      if (eTotal <= 0) return null;
-                      return (
-                        <div className="flex justify-between items-center opacity-90">
-                          <span className="font-bold">Extra Services</span>
-                          <span className="font-black">${String(eTotal.toFixed(2))}</span>
                         </div>
                       );
                     })()}
@@ -2223,7 +2431,7 @@ export function BookingModal(props: BookingModalProps) {
                                 const meals = selectedReceipt.items?.meals || {};
                                 return Object.entries(meals).map(([type, count]: [string, any]) => {
                                   if (type.startsWith('is') || type === 'mealDetails' || type === 'lunchCharged' || type === 'dinnerCharged' || !count) return null;
-                                  const isMealPrepaid = type === 'lunch' ? meals.isLunchPrepaid : meals.isDinnerPrepaid;
+                                  const isMealPrepaid = false;
                                   const price = type === 'lunch' ? (pricing?.lunch_price || 10) : (pricing?.dinner_price || 10);
                                   const charged = type === 'lunch' ? meals.lunchCharged : meals.dinnerCharged;
                                   const displayPrice = charged !== undefined ? charged : (count * price);
@@ -2335,27 +2543,21 @@ export function BookingModal(props: BookingModalProps) {
                                 const dinnerTotalQty = dinnerAdultQty + dinnerChildQty;
                                 
                                 const items = [
-                                  lunchTotalQty > 0 && { name: 'Lunch', count: lunchTotalQty, adultQty: lunchAdultQty, childQty: lunchChildQty, price: pricing.lunch_price, childPrice: pricing.lunch_child_price, prepaid: isLunchPrepaid || isFoodPrepaid },
-                                  dinnerTotalQty > 0 && { name: 'Dinner', count: dinnerTotalQty, adultQty: dinnerAdultQty, childQty: dinnerChildQty, price: pricing.dinner_price, childPrice: pricing.dinner_child_price, prepaid: isDinnerPrepaid || isFoodPrepaid },
-                                  svcGuide && { name: 'Guide', price: svcGuidePrice },
-                                  svcTransport && { name: 'Transport', price: svcTransList.reduce((s: number, t: any) => s + (t.price || 0), 0) },
+                                  lunchTotalQty > 0 && { name: 'Lunch', count: lunchTotalQty, adultQty: lunchAdultQty, childQty: lunchChildQty, price: pricing.lunch_price, childPrice: pricing.lunch_child_price },
+                                  dinnerTotalQty > 0 && { name: 'Dinner', count: dinnerTotalQty, adultQty: dinnerAdultQty, childQty: dinnerChildQty, price: pricing.dinner_price, childPrice: pricing.dinner_child_price },
                                   svcDiscount > 0 && { name: 'Discount', price: -svcDiscount }
                                 ].filter(Boolean) as any[];
 
                                 return items.map((item, i) => (
                                   <div key={i} className="flex justify-between items-center text-sm">
                                     <span className="text-slate-400 font-medium">{item.name} {item.count ? `×${item.count}` : ''}</span>
-                                    {item.prepaid ? (
-                                      <span className="text-[9px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">PREPAID</span>
-                                    ) : (
-                                      <span className="text-slate-500 font-bold">${String((item.adultQty !== undefined ? ((item.adultQty * item.price) + (item.childQty * item.childPrice)) : (item.count ? item.count * item.price : item.price)).toFixed(2))}</span>
-                                    )}
+                                    <span className="text-slate-500 font-bold">${String((item.adultQty !== undefined ? ((item.adultQty * item.price) + (item.childQty * item.childPrice)) : (item.count ? item.count * item.price : item.price)).toFixed(2))}</span>
                                   </div>
                                 ));
                               })()}
 
                               {(() => {
-                                const drinkServices = activeServices.filter((s: any) => s.service_type === 'drink');
+                                const drinkServices = activeServices.filter((s: any) => s.service_type === 'drinks');
                                 const extraServices = activeServices.filter((s: any) => s.service_type === 'extra');
                                 
                                 if (drinkServices.length === 0 && extraServices.length === 0) return null;
@@ -2395,18 +2597,31 @@ export function BookingModal(props: BookingModalProps) {
                         </div>
                       )}
 
+                      {(() => {
+                        const hasTabItems = svcAmount > 0 || isPrepaid || activeServices.length > 0 || 
+                          activeMeals.some(m => !m.is_paid && (m.status === 'confirmed' || m.status === 'served'));
+                        if (!hasTabItems) return null;
+                        return (
                       <div className="space-y-4">
                         <button 
                             onClick={async () => {
                               if (finalizeTab) {
-                                const ok = await finalizeTab();
-                                if (ok) {
-                                  // Auto-select the newly created receipt
-                                  const receipts = getSettledReceiptsForSel();
-                                  if (receipts.length > 0) {
-                                    setSelectedReceipt(receipts[receipts.length - 1]);
+                                setLoadingAction('finalize');
+                                try {
+                                  const ok = await finalizeTab();
+                                  if (ok) {
+                                    // Auto-select the newly created receipt
+                                    const receipts = getSettledReceiptsForSel();
+                                    if (receipts.length > 0) {
+                                      setSelectedReceipt(receipts[receipts.length - 1]);
+                                    }
+                                    setShowFinalReceipt(false);
                                   }
-                                  setShowFinalReceipt(false);
+                                } catch (error) {
+                                  console.error('Failed to finalize tab:', error);
+                                  flash('⚠ Error finalizing tab');
+                                } finally {
+                                  setLoadingAction('');
                                 }
                               }
                             }}
@@ -2416,6 +2631,8 @@ export function BookingModal(props: BookingModalProps) {
                             {loadingAction === 'finalize' ? 'PROCESSING...' : gTotal === 0 ? 'SAVE RECEIPT' : isBalanceMatched ? 'SETTLE & CLOSE TAB' : 'BALANCE MISMATCH'}
                           </button>
                       </div>
+                        );
+                      })()}
                     </div>
                   </div>
 
@@ -2516,46 +2733,25 @@ export function BookingModal(props: BookingModalProps) {
                                 {receipt.snapshot.items?.meals && (
                                   <div className="space-y-2 py-2 border-b border-white/10">
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Meals</p>
-                                    {receipt.snapshot.items.meals.lunch > 0 && (
-                                      <div className="flex justify-between items-center">
-                                        <span className="text-sm font-bold">Lunch x{receipt.snapshot.items.meals.lunch}</span>
-                                        <div className="flex items-center gap-2">
-                                          {receipt.snapshot.items.meals.isLunchPrepaid && (
-                                            <span className="text-[9px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">Prepaid</span>
-                                          )}
-                                          <span className="font-mono font-black">${(receipt.snapshot.items.meals.lunch * 10).toFixed(2)}</span>
-                                        </div>
-                                      </div>
-                                    )}
-                                    {receipt.snapshot.items.meals.dinner > 0 && (
-                                      <div className="flex justify-between items-center">
-                                        <span className="text-sm font-bold">Dinner x{receipt.snapshot.items.meals.dinner}</span>
-                                        <div className="flex items-center gap-2">
-                                          {receipt.snapshot.items.meals.isDinnerPrepaid && (
-                                            <span className="text-[9px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">Prepaid</span>
-                                          )}
-                                          <span className="font-mono font-black">${(receipt.snapshot.items.meals.dinner * 10).toFixed(2)}</span>
-                                        </div>
-                                      </div>
-                                    )}
+                                    {(() => {
+                                      const { lineItems } = buildReceiptLineItems(receipt.snapshot, pricing, receipt.total, receipt.id);
+                                      return lineItems
+                                        .filter(item => item.label.includes('Lunch') || item.label.includes('Dinner'))
+                                        .map((item, idx) => (
+                                          <div key={idx} className="flex justify-between items-center">
+                                            <span className="text-sm font-bold">{item.label}</span>
+                                            <div className="flex items-center gap-2">
+                                              <span className="font-mono font-black">${item.amount.toFixed(2)}</span>
+                                            </div>
+                                          </div>
+                                        ));
+                                    })()}
                                   </div>
                                 )}
                                 
                                 {receipt.snapshot.items?.services && (
                                   <div className="space-y-2 py-2 border-b border-white/10">
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Services</p>
-                                    {receipt.snapshot.items.services.guide > 0 && (
-                                      <div className="flex justify-between items-center">
-                                        <span className="text-sm font-bold">Guide Service</span>
-                                        <span className="font-mono font-black">${receipt.snapshot.items.services.guide.toFixed(2)}</span>
-                                      </div>
-                                    )}
-                                    {receipt.snapshot.items.services.transport > 0 && (
-                                      <div className="flex justify-between items-center">
-                                        <span className="text-sm font-bold">Transport</span>
-                                        <span className="font-mono font-black">${receipt.snapshot.items.services.transport.toFixed(2)}</span>
-                                      </div>
-                                    )}
                                   </div>
                                 )}
                                 
@@ -2626,6 +2822,25 @@ export function BookingModal(props: BookingModalProps) {
             <h3 className="text-2xl font-black uppercase tracking-tight text-[#722F37]">Checkout Blocked</h3>
             <p className="text-[#9C9384] text-sm font-medium leading-relaxed">{String(valError)}</p>
             <button onClick={() => setValError(null)} className="w-full py-4 bg-[#0B6E4F] text-[#C9A227] rounded-2xl font-black uppercase hover:bg-[#0B6E4F]/80 transition-all border border-[#0B6E4F]/40">I Understand</button>
+          </div>
+        </div>
+      )}
+
+      {props.checkoutBlockReason && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" onClick={() => props.setCheckoutBlockReason?.(null)}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div className="relative bg-[#1C232E] border border-[#2A2F36] rounded-2xl p-6 shadow-xl w-full max-w-sm animate-in fade-in zoom-in-95" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-2xl">⚠</span>
+              <p className="text-sm font-black text-[#EDE6D6] uppercase tracking-wide">Cannot Check Out</p>
+            </div>
+            <p className="text-sm text-[#9C9384] mb-5">{props.checkoutBlockReason}</p>
+            <button
+              onClick={() => props.setCheckoutBlockReason?.(null)}
+              className="w-full py-3 bg-[#0B6E4F] text-[#C9A227] font-black uppercase text-[11px] tracking-widest rounded-xl hover:bg-[#0B6E4F]/80 transition-all"
+            >
+              OK
+            </button>
           </div>
         </div>
       )}
