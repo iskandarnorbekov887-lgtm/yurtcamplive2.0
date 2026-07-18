@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
-import { formatSpace } from '@/utils/calendar-logic';
+import { formatSpace, isGcCancelled } from '@/utils/calendar-logic';
 import { LockedBookingPanel } from '@/components/LockedBookingPanel';
 import * as htmlToImage from 'html-to-image';
 import { buildReceiptLineItems } from '@/utils/receipt-logic';
@@ -522,6 +522,35 @@ export function BookingModal(props: BookingModalProps) {
   // Calendar-only event (no booking) — show simplified card
   if (!sel && selectedItem?.event) {
     const ev = selectedItem.event;
+
+    // Cancelled event — show read-only cancelled view
+    if (isGcCancelled(ev)) {
+      return (
+        <div className="fixed inset-0 z-[100] flex items-center sm:items-start justify-center p-0 sm:p-4 sm:pt-16 pb-safe" onClick={() => setSelectedItem(null)}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div className="relative bento-card sm:rounded-2xl shadow-2xl w-full sm:max-w-md h-full sm:h-auto sm:max-h-[85vh] overflow-y-auto pb-20 sm:pb-0" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#2A2F36] sticky top-0 bg-red-700 rounded-t-2xl z-10">
+              <p className="text-[10px] font-black uppercase tracking-widest text-white">
+                CANCELLED
+              </p>
+              <button onClick={() => setSelectedItem(null)} className="w-8 h-8 flex items-center justify-center edge-control rounded-xl transition-all text-white font-bold text-xl">×</button>
+            </div>
+            <div className="p-5 space-y-4">
+              <h2 className="text-xl font-black text-[#EDE6D6]">{ev.summary || '(No title)'}</h2>
+              <p className="text-sm text-[#9C9384] mt-0.5 font-data">{ev.start} → {ev.end}</p>
+              {ev.description && (
+                <p className="text-xs text-[#9C9384] mt-2 whitespace-pre-wrap bg-[#1C232E]/50 rounded-xl p-3 border border-[#2A2F36]">{htmlDescriptionToText(ev.description)}</p>
+              )}
+              <div className="bg-red-700/20 border border-red-700/40 rounded-xl p-4">
+                <p className="text-xs text-red-400">This event is cancelled. No booking can be created for it.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Non-cancelled unlinked event — show create booking options
     return (
       <div className="fixed inset-0 z-[100] flex items-center sm:items-start justify-center p-0 sm:p-4 sm:pt-16 pb-safe" onClick={() => setSelectedItem(null)}>
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />

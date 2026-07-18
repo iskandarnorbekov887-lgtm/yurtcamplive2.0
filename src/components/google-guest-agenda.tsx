@@ -1290,7 +1290,7 @@ export function GoogleGuestAgenda({
         <div className="overflow-x-auto pb-4 lg:pb-0">
           <PrivateCalendarView
             bookings={bookings}
-            calendarEvents={unlinkedGcItems.map(gi => ({ id: gi.event!.id, summary: gi.event!.summary, start: gi.start, end: gi.end }))}
+            calendarEvents={[...unlinkedGcItems, ...cancelledGcItems].map(gi => ({ id: gi.event!.id, summary: gi.event!.summary, start: gi.start, end: gi.end }))}
             onDayChange={day => {
               setSelectedCalendarDay(day);
               setShowDayAgenda(true);
