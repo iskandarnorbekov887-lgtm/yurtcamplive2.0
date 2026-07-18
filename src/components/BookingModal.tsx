@@ -1544,8 +1544,13 @@ export function BookingModal(props: BookingModalProps) {
                           const transportEntries = activeServices.filter((s: any) => s.details?.name === 'Transportation');
                           const guideEntries = activeServices.filter((s: any) => s.details?.name === 'Guide Service');
                           return (
-                          <div className="space-y-3">
-                            <div className="bg-[#1C232E]/50 rounded-lg p-3 border border-[#2A2F36]">
+                          <div className="border border-[#2A2F36] rounded-xl p-4 space-y-4 bg-[#1C232E]">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">
+                              Additional Services
+                            </p>
+
+                            <div className="space-y-3">
+                              <div className="bg-[#1C232E]/50 rounded-lg p-3 border border-[#2A2F36]">
                               <div className="text-[10px] font-black uppercase tracking-widest text-[#9C9384] mb-2">Transportation</div>
                               <div className="space-y-2">
                                 <div className="grid grid-cols-2 gap-2">
@@ -1797,21 +1802,8 @@ export function BookingModal(props: BookingModalProps) {
                                 </div>
                               )}
                             </div>
-                          </div>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                    );
-                  })()}
-                </div>
-              )}
 
-              {(canCheckOut || sel.status === 'checked_in') && isStaff && (
-                <div className="border border-[#2A2F36] rounded-xl p-4 space-y-3 bg-[#1C232E]">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Extra Services</p>
-                  
-                  {userRole === 'CEO' && (
+                            {(canCheckOut || sel.status === 'checked_in') && userRole === 'CEO' && (
                     <div className="space-y-2 p-3 bg-[#0B6E4F]/10 rounded-lg border border-[#0B6E4F]/30">
                       <label className="text-[10px] font-black uppercase tracking-widest text-[#0B6E4F] block mb-2">Discount (CEO Only)</label>
                       <div className="flex gap-2">
@@ -1833,6 +1825,14 @@ export function BookingModal(props: BookingModalProps) {
                       />
                     </div>
                   )}
+                            </div>
+                          </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                    );
+                  })()}
                 </div>
               )}
 
