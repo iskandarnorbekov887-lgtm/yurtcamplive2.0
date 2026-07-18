@@ -445,17 +445,27 @@ export function GoogleGuestAgenda({
     return gcItems.filter(gi => !bookings.some(b => (b as any).google_event_id === gi.event?.id) && !isGcCancelled(gi.event!));
   }, [gcItems, bookings]);
 
+  const cancelledGcItems = useMemo(() => {
+    return gcItems.filter(gi =>
+      !bookings.some(b => (b as any).google_event_id === gi.event?.id) &&
+      isGcCancelled(gi.event!) &&
+      gi.start <= D && gi.end > D
+    );
+  }, [gcItems, bookings, D]);
+
   const arrivingItems = useMemo(() => {
     const dbs = bookingItems.filter(i => i.booking!.status === 'confirmed' && i.booking!.check_in === D);
     const gcs = unlinkedGcItems.filter(i => i.start === D && !isGcRedWarning(i.event!));
-    return [...dbs, ...gcs].sort((a, b) => a.start.localeCompare(b.start));
-  }, [bookingItems, unlinkedGcItems, D]);
+    const cancelled = cancelledGcItems.filter(i => i.start === D);
+    return [...dbs, ...gcs, ...cancelled].sort((a, b) => a.start.localeCompare(b.start));
+  }, [bookingItems, unlinkedGcItems, cancelledGcItems, D]);
 
   const stayingItems = useMemo(() => {
     const dbs = bookingItems.filter(i => (i.booking!.status === 'confirmed' || i.booking!.status === 'checked_in') && i.booking!.check_in < D && i.booking!.check_out > D);
     const gcs = unlinkedGcItems.filter(i => i.start < D && i.end > D && !isGcRedWarning(i.event!));
-    return [...dbs, ...gcs].sort((a, b) => a.start.localeCompare(b.start));
-  }, [bookingItems, unlinkedGcItems, D]);
+    const cancelled = cancelledGcItems.filter(i => i.start < D && i.end > D);
+    return [...dbs, ...gcs, ...cancelled].sort((a, b) => a.start.localeCompare(b.start));
+  }, [bookingItems, unlinkedGcItems, cancelledGcItems, D]);
 
   const checkedInItems = useMemo(() => {
     return bookingItems.filter(i => i.booking!.status === 'checked_in' && i.booking!.check_in <= D && i.booking!.check_out > D).sort((a, b) => a.start.localeCompare(b.start));
@@ -478,13 +488,6 @@ export function GoogleGuestAgenda({
     return hoursSince <= 24;
   }).sort((a, b) => b.start.localeCompare(a.start)), [bookingItems, userRole, managerAccessUntil]);
   const cancelledItems = useMemo(() => bookingItems.filter(i => i.booking!.status === 'cancelled' && i.booking!.check_in <= D && i.booking!.check_out > D).sort((a, b) => b.start.localeCompare(a.start)), [bookingItems, D]);
-  const cancelledGcItems = useMemo(() => {
-    return gcItems.filter(gi =>
-      !bookings.some(b => (b as any).google_event_id === gi.event?.id) &&
-      isGcCancelled(gi.event!) &&
-      gi.start <= D && gi.end > D
-    );
-  }, [gcItems, bookings, D]);
 
   useEffect(() => {
     if (selectedItem?.booking) {
@@ -756,6 +759,14 @@ export function GoogleGuestAgenda({
   };
 
   const handleSelect = async (item: ListItem) => {
+    // Prevent selecting cancelled Google events for booking creation
+    if (item.event && isGcCancelled(item.event) && !item.booking) {
+      setSelectedItem(item);
+      setCollectedAmount(''); setActionMsg('');
+      setShowServices(false); setShowFinalReceipt(false); setShowNotes(true);
+      return;
+    }
+
     setSelectedItem(item);
     setCollectedAmount(''); setActionMsg('');
     setShowServices(false); setShowFinalReceipt(false); setShowNotes(true);
@@ -1376,7 +1387,7 @@ export function GoogleGuestAgenda({
                     <span className="w-1.5 h-1.5 rounded-full bg-[#C9A227]/100 animate-pulse" />
                     Arriving · {arrivingItems.length}
                   </p>
-                  {arrivingItems.map(item => renderCard(item as any, false))}
+                  {arrivingItems.map(item => renderCard(item as any, !!(item.event && isGcCancelled(item.event))))}
                 </div>
               )}
               {stayingItems.length > 0 && (
@@ -1385,7 +1396,7 @@ export function GoogleGuestAgenda({
                     <span className="w-1.5 h-1.5 rounded-full bg-[#0B6E4F]/100" />
                     In Stay · {stayingItems.length}
                   </p>
-                  {stayingItems.map(item => renderCard(item as any, false))}
+                  {stayingItems.map(item => renderCard(item as any, !!(item.event && isGcCancelled(item.event))))}
                 </div>
               )}
               {checkedInItems.length > 0 && (
@@ -1415,12 +1426,12 @@ export function GoogleGuestAgenda({
                   {checkedOutItems.map(item => renderCard(item as any, false))}
                 </div>
               )}
-              {[...cancelledItems, ...cancelledGcItems].length > 0 && (
+              {cancelledItems.length > 0 && (
                 <div className="mb-4">
                   <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#722F37] bg-[#722F37]/10 rounded-xl mb-1 flex items-center gap-2">
-                    ✕ Cancelled · {[...cancelledItems, ...cancelledGcItems].length}
+                    ✕ Cancelled · {cancelledItems.length}
                   </p>
-                  {[...cancelledItems, ...cancelledGcItems].map(item => renderCard(item, true))}
+                  {cancelledItems.map(item => renderCard(item, true))}
                 </div>
               )}
             </div>
