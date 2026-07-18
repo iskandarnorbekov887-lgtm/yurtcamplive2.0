@@ -1653,7 +1653,7 @@ export function BookingModal(props: BookingModalProps) {
                                   </div>
                                 );
                               })()}
-                              {transportEntries.length > 0 && (
+                              {transportEntries.some((s: any) => !s.is_paid) && (
                                 <div className="mt-2 border-t border-[#2A2F36] pt-2">
                                   <button
                                     onClick={() => setShowTransportList(!showTransportList)}
@@ -1775,7 +1775,7 @@ export function BookingModal(props: BookingModalProps) {
                                   </div>
                                 );
                               })()}
-                              {guideEntries.length > 0 && (
+                              {guideEntries.some((s: any) => !s.is_paid) && (
                                 <div className="mt-2 border-t border-[#2A2F36] pt-2">
                                   <button
                                     onClick={() => setShowGuideList(!showGuideList)}
@@ -1993,24 +1993,35 @@ export function BookingModal(props: BookingModalProps) {
 
                       const sItems = [
                         ...individualMeals,
-                        ...activeServices.map((s: any) => {
-                          const baseItem = {
-                            id: s.id,
-                            serviceType: s.service_type,
-                            price: s.unit_price * s.quantity,
-                            currency: s.currency,
+                        ...activeServices
+                          .filter((s: any) => {
+                            if (
+                              s.details?.name === 'Transportation' ||
+                              s.details?.name === 'Guide Service'
+                            ) {
+                              return !s.is_paid; // hide from tab summary once paid
+                            }
+                            return true;
+                          })
+                          .map((s: any) => {
+                            const baseItem = {
+                              id: s.id,
+                              serviceType: s.service_type,
+                              price: s.unit_price * s.quantity,
+                              currency: s.currency,
 
-                            details: s.details
-                          };
-                          
-                          if (s.service_type === 'drinks') {
-                            return { ...baseItem, name: s.details?.name || 'Drink', description: s.currency };
-                          }
-                          if (s.service_type === 'extra') {
-                            return { ...baseItem, name: s.details?.name || 'Extra', description: '' };
-                          }
-                          return null;
-                        }).filter(Boolean),
+                              details: s.details
+                            };
+                            
+                            if (s.service_type === 'drinks') {
+                              return { ...baseItem, name: s.details?.name || 'Drink', description: s.currency };
+                            }
+                            if (s.service_type === 'extra') {
+                              return { ...baseItem, name: s.details?.name || 'Extra', description: '' };
+                            }
+                            return null;
+                          })
+                          .filter(Boolean),
                         svcDiscount > 0 && { name: 'Discount', price: -svcDiscount }
                       ].filter(Boolean) as any[];
 
@@ -2702,7 +2713,17 @@ export function BookingModal(props: BookingModalProps) {
                                         )}
                                       </div>
                                     ))}
-                                    {extraServices.map((s: any) => {
+                                    {extraServices
+                                      .filter((s: any) => {
+                                        if (
+                                          s.details?.name === 'Transportation' ||
+                                          s.details?.name === 'Guide Service'
+                                        ) {
+                                          return !s.is_paid;
+                                        }
+                                        return true;
+                                      })
+                                      .map((s: any) => {
                                       const isTransport = s.details?.name === 'Transportation';
                                       const isGuide = s.details?.name === 'Guide Service';
                                       return (
