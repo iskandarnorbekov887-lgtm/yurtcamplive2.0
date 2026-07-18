@@ -662,7 +662,7 @@ export function BookingModal(props: BookingModalProps) {
     <>
       <div className="fixed inset-0 z-[100] flex items-center sm:items-start justify-center p-0 sm:p-4 sm:pt-16 pb-safe" onClick={() => setSelectedItem(null)}>
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-        <div className={"relative bento-card sm:rounded-2xl shadow-2xl w-full sm:max-w-md h-full sm:h-auto sm:max-h-[85vh] overflow-y-auto pb-20 sm:pb-0 " + (userRole === 'CEO' && sel?.source === 'System' ? 'border-4 border-blue-500' : '')} onClick={e => e.stopPropagation()}>
+        <div className={"relative bento-card sm:rounded-2xl shadow-2xl w-full sm:max-w-md h-full sm:h-auto sm:max-h-[85vh] overflow-y-auto scrollbar-thin scrollbar-track-[#1C232E] scrollbar-thumb-[#2A2F36] hover:scrollbar-thumb-[#5C4A2E] pb-20 sm:pb-0 " + (userRole === 'CEO' && sel?.source === 'System' ? 'border-4 border-blue-500' : '')} onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-between px-5 py-4 border-b border-[#2A2F36] sticky top-0 bg-[#1C232E] rounded-t-2xl z-10">
             <p className="text-[10px] font-black uppercase tracking-widest text-[#0B6E4F]">
               Booking Details
