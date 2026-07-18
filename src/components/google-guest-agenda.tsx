@@ -512,6 +512,7 @@ export function GoogleGuestAgenda({
     const showApprove = !!booking && booking.status === 'checked_in' && syncWarnings[booking.id] === 'dates_changed' && userRole === 'Manager';
     const isRedWarning = item.event && isGcRedWarning(item.event);
     const isActuallyCancelled = isCancelled || (item.event && isGcCancelled(item.event));
+    const isSameDay = item.start === item.end;
     
     return (
       <div key={item.key} className={`w-full px-4 py-3 transition-all border-l-4 ${
@@ -574,9 +575,16 @@ export function GoogleGuestAgenda({
                       })()}
                     </div>
                   ) : (
-                    <span className="text-[10px] font-bold px-2 py-0.5 border border-[#5C4A2E]/30 text-[#EDE6D6] font-mono uppercase bg-[#1C232E]">
-                      EXTERNAL PENDING
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="text-[10px] font-bold px-2 py-0.5 border border-[#5C4A2E]/30 text-[#EDE6D6] font-mono uppercase bg-[#1C232E]">
+                        {isSameDay ? 'SAME-DAY' : 'EXTERNAL PENDING'}
+                      </span>
+                      {isSameDay && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 border border-[#C9A227] text-[#C9A227] font-mono uppercase bg-[#C9A227]/10">
+                          Arriving & Departing
+                        </span>
+                      )}
+                    </div>
                   )
               }
               {booking && syncWarnings[booking.id] === 'deleted' && (
@@ -1414,15 +1422,20 @@ export function GoogleGuestAgenda({
                   {checkedInItems.map(item => renderCard(item as any, false))}
                 </div>
               )}
-              {checkingOutItems.length > 0 && (
-                <div className="mb-4">
-                  <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#0B6E4F] bg-[#0B6E4F]/10 rounded-xl mb-1 flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#0B6E4F]/100" />
-                    Checking Out · {checkingOutItems.length}
-                  </p>
-                  {checkingOutItems.map(item => renderCard(item as any, false))}
-                </div>
-              )}
+              {(() => {
+                const arrivingKeys = new Set(arrivingItems.map(i => i.key));
+                const checkingOutItemsDeduped = checkingOutItems.filter(i => !arrivingKeys.has(i.key));
+                if (checkingOutItemsDeduped.length === 0) return null;
+                return (
+                  <div className="mb-4">
+                    <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#0B6E4F] bg-[#0B6E4F]/10 rounded-xl mb-1 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#0B6E4F]/100" />
+                      Checking Out · {checkingOutItemsDeduped.length}
+                    </p>
+                    {checkingOutItemsDeduped.map(item => renderCard(item as any, false))}
+                  </div>
+                );
+              })()}
               {checkedOutItems.length > 0 && (
                 <div className="mb-4">
                   <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#9C9384] bg-[#1C232E]/50 rounded-xl mb-1 flex items-center gap-2">
