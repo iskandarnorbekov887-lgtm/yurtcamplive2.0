@@ -290,6 +290,8 @@ function TeamSettingsContent() {
         { onConflict: 'team_id' },
       );
 
+      console.log('[TeamSettings] Saving integration_method:', integrationMethod);
+
       if (error) throw error;
 
       fetch('/api/calendar/invalidate-cache', { method: 'POST' }).catch(() => {});

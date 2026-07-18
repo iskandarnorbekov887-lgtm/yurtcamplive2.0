@@ -197,6 +197,8 @@ export function TeamIntegrationSettings() {
         google_ical_url: icalUrl.trim(),
       };
 
+      console.log('[TeamIntegrationSettings] Saving integration_method:', integrationMethod);
+
       const { error } = await supabase
         .from('team_settings')
         .upsert(payload, { onConflict: 'team_id' });
