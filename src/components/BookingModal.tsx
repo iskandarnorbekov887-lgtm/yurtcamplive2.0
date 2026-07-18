@@ -6,6 +6,23 @@ import { LockedBookingPanel } from '@/components/LockedBookingPanel';
 import * as htmlToImage from 'html-to-image';
 import { buildReceiptLineItems } from '@/utils/receipt-logic';
 
+function htmlDescriptionToText(html: string): string {
+  if (!html) return '';
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')           // <br> and <br/> → newline
+    .replace(/<\/p>/gi, '\n')                // closing </p> → newline
+    .replace(/<u>(.*?)<\/u>/gi, '$1')         // strip <u>...</u>, keep text
+    .replace(/<b>(.*?)<\/b>/gi, '$1')         // strip <b>...</b>, keep text
+    .replace(/<i>(.*?)<\/i>/gi, '$1')         // strip <i>...</i>, keep text
+    .replace(/<[^>]+>/g, '')                  // strip any remaining tags
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .trim();
+}
+
 interface BookingModalProps {
   selectedItem: any;
   setSelectedItem: (item: any) => void;
@@ -520,7 +537,7 @@ export function BookingModal(props: BookingModalProps) {
               <h2 className="text-xl font-black text-[#EDE6D6]">{ev.summary || '(No title)'}</h2>
               <p className="text-sm text-[#9C9384] mt-0.5 font-data">{ev.start} → {ev.end}</p>
               {ev.description && (
-                <p className="text-xs text-[#9C9384] mt-2 whitespace-pre-wrap bg-[#1C232E]/50 rounded-xl p-3 border border-[#2A2F36]">{ev.description}</p>
+                <p className="text-xs text-[#9C9384] mt-2 whitespace-pre-wrap bg-[#1C232E]/50 rounded-xl p-3 border border-[#2A2F36]">{htmlDescriptionToText(ev.description)}</p>
               )}
             </div>
             <div className="bg-[#B8860B]/20 border border-[#B8860B]/40 rounded-xl p-4">
@@ -679,7 +696,7 @@ export function BookingModal(props: BookingModalProps) {
                   </div>
                   <p className="text-[10px] font-black uppercase tracking-widest text-[#B8860B]">Booking & Stay Notes</p>
                 </div>
-                <p className="text-sm text-[#EDE6D6] whitespace-pre-wrap leading-relaxed font-medium">{String(sel.notes || sel.description)}</p>
+                <p className="text-sm text-[#EDE6D6] whitespace-pre-wrap leading-relaxed font-medium">{htmlDescriptionToText(String(sel.notes || sel.description))}</p>
               </div>
             )}
 
