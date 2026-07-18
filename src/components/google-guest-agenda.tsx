@@ -322,7 +322,7 @@ export function GoogleGuestAgenda({
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const timeMin = new Date(new Date().getFullYear(), new Date().getMonth() - 2, 1).toISOString();
+        const timeMin = new Date(new Date().getFullYear(), new Date().getMonth() - 12, 1).toISOString();
         const timeMax = new Date(new Date().getFullYear(), new Date().getMonth() + 12, 0).toISOString();
         const params = new URLSearchParams({ timeMin, timeMax });
         const res = await fetch(`/api/calendar/events?${params.toString()}`);
