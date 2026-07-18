@@ -17,7 +17,12 @@ export const formatSpace = (num: number, decimals = 2): string => {
 };
 
 export const isGcCancelled = (ev: any) => {
-  return ev.colorId === '11' || ev.status === 'cancelled';
+  const text = `${ev.summary || ''} ${ev.description || ''}`;
+  return ev.status === 'cancelled' || /cancelled/i.test(text);
+};
+
+export const isGcRedWarning = (ev: any) => {
+  return ev.colorId === '11';
 };
 
 export async function handleApproveDatesLogic({ 

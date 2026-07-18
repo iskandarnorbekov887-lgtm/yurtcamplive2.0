@@ -10,6 +10,7 @@ import {
   formatSpace, 
   sanitizeNotes,
   isGcCancelled,
+  isGcRedWarning,
   handleApproveDatesLogic
 } from '@/utils/calendar-logic';
 import { buildReceiptLineItems } from '@/utils/receipt-logic';
@@ -446,13 +447,13 @@ export function GoogleGuestAgenda({
 
   const arrivingItems = useMemo(() => {
     const dbs = bookingItems.filter(i => i.booking!.status === 'confirmed' && i.booking!.check_in === D);
-    const gcs = unlinkedGcItems.filter(i => i.start === D);
+    const gcs = unlinkedGcItems.filter(i => i.start === D && !isGcRedWarning(i.event!));
     return [...dbs, ...gcs].sort((a, b) => a.start.localeCompare(b.start));
   }, [bookingItems, unlinkedGcItems, D]);
 
   const stayingItems = useMemo(() => {
     const dbs = bookingItems.filter(i => (i.booking!.status === 'confirmed' || i.booking!.status === 'checked_in') && i.booking!.check_in < D && i.booking!.check_out > D);
-    const gcs = unlinkedGcItems.filter(i => i.start < D && i.end > D);
+    const gcs = unlinkedGcItems.filter(i => i.start < D && i.end > D && !isGcRedWarning(i.event!));
     return [...dbs, ...gcs].sort((a, b) => a.start.localeCompare(b.start));
   }, [bookingItems, unlinkedGcItems, D]);
 
@@ -462,7 +463,7 @@ export function GoogleGuestAgenda({
 
   const checkingOutItems = useMemo(() => {
     const dbs = bookingItems.filter(i => i.booking!.status === 'checked_in' && i.booking!.check_out === D);
-    const gcs = unlinkedGcItems.filter(i => i.end === D);
+    const gcs = unlinkedGcItems.filter(i => i.end === D && !isGcRedWarning(i.event!));
     return [...dbs, ...gcs].sort((a, b) => a.start.localeCompare(b.start));
   }, [bookingItems, unlinkedGcItems, D]);
 
@@ -499,10 +500,15 @@ export function GoogleGuestAgenda({
     const isSelected = selectedItem?.key === item.key;
     const booking = item.booking;
     const showApprove = !!booking && booking.status === 'checked_in' && syncWarnings[booking.id] === 'dates_changed' && userRole === 'Manager';
+    const isRedWarning = item.event && isGcRedWarning(item.event);
+    const isActuallyCancelled = isCancelled || (item.event && isGcCancelled(item.event));
+    
     return (
       <div key={item.key} className={`w-full px-4 py-3 transition-all border-l-4 ${
-        isCancelled
+        isActuallyCancelled
           ? 'border-red-300 bg-[#722F37]/10/50'
+          : isRedWarning
+          ? 'border-red-400 bg-[#722F37]/5'
           : isSelected
           ? 'bg-[#0B6E4F]/10 border-[#0B6E4F]/40'
           : booking?.status === 'checked_in'
@@ -519,7 +525,7 @@ export function GoogleGuestAgenda({
         >
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className={`font-bold text-sm truncate ${isCancelled ? 'text-[#722F37] line-through' : 'text-[#EDE6D6]'}`}>
+              <p className={`font-bold text-sm truncate ${isActuallyCancelled ? 'text-[#722F37] line-through' : 'text-[#EDE6D6]'}`}>
                 <span className="text-[#9C9384] font-medium mr-1">{getPrefix(item)}</span>
                 {item.name}
               </p>
@@ -527,8 +533,10 @@ export function GoogleGuestAgenda({
               {booking ? <p className="text-xs text-[#9C9384]">Booking</p> : <p className="text-xs text-[#9C9384]">calendar only</p>}
             </div>
             <div className="flex flex-col items-end gap-1 shrink-0">
-              {isCancelled
+              {isActuallyCancelled
                 ? <span className="text-[10px] font-bold px-2 py-0.5 border border-red-600 text-red-600 font-mono uppercase">cancelled</span>
+                : isRedWarning
+                ? <span className="text-[10px] font-bold px-2 py-0.5 border border-red-500 text-red-500 font-mono uppercase">full occupancy</span>
                 : booking ? (
                     <div className="flex flex-col items-end gap-1">
                       <span className={`text-[10px] font-bold px-2 py-0.5 border border-[#5C4A2E]/30 text-[#EDE6D6] font-mono uppercase ${statusColor(booking.status, booking)}`}>
