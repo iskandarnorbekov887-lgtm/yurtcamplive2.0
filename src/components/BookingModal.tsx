@@ -1643,6 +1643,11 @@ export function BookingModal(props: BookingModalProps) {
                                         <p className="text-[10px] text-[#C9A227] font-black">
                                           ${last.unit_price}
                                         </p>
+                                        {last.is_paid && (
+                                          <span className="text-[9px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded uppercase tracking-wider mt-1 inline-block">
+                                            PAID
+                                          </span>
+                                        )}
                                       </div>
                                     )}
                                   </div>
@@ -1760,6 +1765,11 @@ export function BookingModal(props: BookingModalProps) {
                                         <p className="text-[10px] text-[#C9A227] font-black">
                                           ${last.unit_price}
                                         </p>
+                                        {last.is_paid && (
+                                          <span className="text-[9px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded uppercase tracking-wider mt-1 inline-block">
+                                            PAID
+                                          </span>
+                                        )}
                                       </div>
                                     )}
                                   </div>

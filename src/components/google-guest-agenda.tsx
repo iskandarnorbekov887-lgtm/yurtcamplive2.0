@@ -391,9 +391,16 @@ export function GoogleGuestAgenda({
       if (sel?.id !== fetchedForId) return; // check again after second await
         
       if (dbServices) {
-        // Store all unpaid services for display in BookingModal
-        const unpaidServices = dbServices.filter((s: any) => !s.is_paid);
-        setActiveServices(unpaidServices);
+        // Keep ALL transport and guide services (paid or not) so summary
+        // panels remain visible after tab is settled.
+        // All other service types (drinks, extras) are filtered to unpaid only.
+        const visibleServices = dbServices.filter((s: any) => {
+          if (s.details?.name === 'Transportation' || s.details?.name === 'Guide Service') {
+            return true; // Always show these regardless of paid status
+          }
+          return !s.is_paid; // Other services: unpaid only
+        });
+        setActiveServices(visibleServices);
       } else {
         setActiveServices([]);
       }
