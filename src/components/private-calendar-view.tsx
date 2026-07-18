@@ -243,7 +243,7 @@ export function PrivateCalendarView({ bookings, calendarEvents, onSelectBooking,
         </div>
 
         {moreDay && (() => {
-          const dayBookings = bookings.filter(b => b.status !== 'cancelled' && b.check_in <= moreDay && b.check_out >= moreDay);
+          const dayBookings = bookings.filter(b => b.check_in <= moreDay && b.check_out >= moreDay);
           return (
             <div onClick={() => setMoreDay(null)} className="fixed inset-0 z-50 bg-[#0F1419]/80 backdrop-blur-sm flex items-center justify-center p-4">
               <div onClick={e => e.stopPropagation()} className="bg-[#1C232E] rounded-2xl shadow-2xl border border-[#5C4A2E]/30 w-full max-w-md max-h-[80vh] overflow-y-auto">
@@ -263,11 +263,13 @@ export function PrivateCalendarView({ bookings, calendarEvents, onSelectBooking,
                   {dayBookings.map(b => (
                     <button key={b.id} onClick={() => { onSelectBooking?.(b); setMoreDay(null); }}
                       className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all hover:opacity-80 ${
+                        b.status === 'cancelled' ? 'bg-red-600/20 border-red-600/40' :
                         b.status === 'checked_in' ? 'bg-[#0B6E4F]/20 border-[#0B6E4F]/40' :
                         b.status === 'completed' ? 'bg-[#5C4A2E]/20 border-[#5C4A2E]/40' :
                         'bg-[#B8860B]/20 border-[#B8860B]/40'
                       }`}>
                       <span className={`w-2 h-2 rounded-full shrink-0 ${
+                        b.status === 'cancelled' ? 'bg-red-600' :
                         b.status === 'checked_in' ? 'bg-[#0B6E4F]' :
                         b.status === 'completed' ? 'bg-[#5C4A2E]' :
                         'bg-[#B8860B]'
