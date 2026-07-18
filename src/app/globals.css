@@ -274,21 +274,20 @@ body {
   background: rgba(201, 162, 39, 0.5);
 }
 
-@layer utilities {
-  .scrollbar-thin {
-    scrollbar-width: thin;
-  }
-  .scrollbar-track-[#1C232E]::-webkit-scrollbar-track {
-    background: #1C232E;
-  }
-  .scrollbar-thumb-[#2A2F36]::-webkit-scrollbar-thumb {
-    background: #2A2F36;
-    border-radius: 4px;
-  }
-  .scrollbar-thumb-[#2A2F36]::-webkit-scrollbar-thumb:hover {
-    background: #5C4A2E;
-  }
-  ::-webkit-scrollbar {
-    width: 4px;
-  }
+.modal-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.modal-scroll::-webkit-scrollbar-track {
+  background: #1C232E;
+}
+.modal-scroll::-webkit-scrollbar-thumb {
+  background: #2A2F36;
+  border-radius: 4px;
+}
+.modal-scroll::-webkit-scrollbar-thumb:hover {
+  background: #5C4A2E;
+}
+.modal-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #2A2F36 #1C232E;
 }
