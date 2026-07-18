@@ -49,16 +49,26 @@ export async function GET(request: NextRequest) {
     console.log('[api/calendar/events] DEBUG: Events count:', events.length);
     
     // Map to a cleaner format if needed, but here we return raw for compatibility
-    const formatted = events.map((ev: any) => ({
-      id: ev.id,
-      summary: ev.summary,
-      start: ev.start?.date || ev.start?.dateTime?.split('T')[0],
-      end: ev.end?.date || ev.end?.dateTime?.split('T')[0],
-      description: ev.description,
-      location: ev.location,
-      colorId: ev.colorId,
-      status: ev.status
-    }));
+    const formatted = events.map((ev: any) => {
+      let endDate = ev.end?.date || ev.end?.dateTime?.split('T')[0];
+      if (ev.end?.date) {
+        // Google's all-day end.date is exclusive (day after the real
+        // last day) — subtract 1 day to get the actual checkout date.
+        const d = new Date(ev.end.date + 'T00:00:00Z');
+        d.setUTCDate(d.getUTCDate() - 1);
+        endDate = d.toISOString().split('T')[0];
+      }
+      return {
+        id: ev.id,
+        summary: ev.summary,
+        start: ev.start?.date || ev.start?.dateTime?.split('T')[0],
+        end: endDate,
+        description: ev.description,
+        location: ev.location,
+        colorId: ev.colorId,
+        status: ev.status
+      };
+    });
     
     console.log('[api/calendar/events] DEBUG: Formatted events count:', formatted.length);
     console.log('[api/calendar/events] DEBUG: First formatted event:', formatted[0] || 'No events');
