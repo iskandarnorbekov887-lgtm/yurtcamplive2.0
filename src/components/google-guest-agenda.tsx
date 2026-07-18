@@ -41,7 +41,7 @@ interface ListItem {
   name: string;
   start: string;
   end: string;
-  source: 'both' | 'calendar' | 'db';
+  source: 'both' | 'calendar' | 'db' | 'google';
   booking: Booking | null;
   event: CalEvent | null;
 }
@@ -478,6 +478,13 @@ export function GoogleGuestAgenda({
     return hoursSince <= 24;
   }).sort((a, b) => b.start.localeCompare(a.start)), [bookingItems, userRole, managerAccessUntil]);
   const cancelledItems = useMemo(() => bookingItems.filter(i => i.booking!.status === 'cancelled' && i.booking!.check_in <= D && i.booking!.check_out > D).sort((a, b) => b.start.localeCompare(a.start)), [bookingItems, D]);
+  const cancelledGcItems = useMemo(() => {
+    return gcItems.filter(gi =>
+      !bookings.some(b => (b as any).google_event_id === gi.event?.id) &&
+      isGcCancelled(gi.event!) &&
+      gi.start <= D && gi.end > D
+    );
+  }, [gcItems, bookings, D]);
 
   useEffect(() => {
     if (selectedItem?.booking) {
@@ -1408,12 +1415,12 @@ export function GoogleGuestAgenda({
                   {checkedOutItems.map(item => renderCard(item as any, false))}
                 </div>
               )}
-              {cancelledItems.length > 0 && (
+              {[...cancelledItems, ...cancelledGcItems].length > 0 && (
                 <div className="mb-4">
                   <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#722F37] bg-[#722F37]/10 rounded-xl mb-1 flex items-center gap-2">
-                    ✕ Cancelled · {cancelledItems.length}
+                    ✕ Cancelled · {[...cancelledItems, ...cancelledGcItems].length}
                   </p>
-                  {cancelledItems.map(item => renderCard(item, true))}
+                  {[...cancelledItems, ...cancelledGcItems].map(item => renderCard(item, true))}
                 </div>
               )}
             </div>
