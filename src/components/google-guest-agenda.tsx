@@ -134,7 +134,6 @@ export function GoogleGuestAgenda({
 
   const finalizingRef = useRef(false);
   const creatingFromEventRef = useRef(false);
-  const idempotencyKeyRef = useRef<string>(crypto.randomUUID());
 
   // Fetch settled receipts from booking_receipts table when booking changes
   useEffect(() => {
@@ -762,7 +761,7 @@ export function GoogleGuestAgenda({
         created_by: String(currentUserId),
         team_id: teamId,
         notes: sanitizeNotes(ev.description),
-        idempotency_key: idempotencyKeyRef.current,
+        idempotency_key: crypto.randomUUID(),
       };
 
       const { data: inserted, error: insertErr } = await supabase.from('bookings').insert(payload).select().single();
@@ -839,11 +838,6 @@ export function GoogleGuestAgenda({
     setSelectedItem(item);
     setCollectedAmount(''); setActionMsg('');
     setShowServices(false); setShowFinalReceipt(false); setShowNotes(true);
-
-    // Regenerate idempotency key when selecting a different calendar event
-    if (item.event && item.event.id !== selectedItem?.event?.id) {
-      idempotencyKeyRef.current = crypto.randomUUID();
-    }
 
     if (item.booking) {
       const b = item.booking;
