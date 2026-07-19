@@ -1549,9 +1549,8 @@ export function BookingModal(props: BookingModalProps) {
                               Additional Services
                             </p>
 
-                            <div className="space-y-3">
-                              <div className="bg-[#1C232E]/50 rounded-lg p-3 border border-[#2A2F36]">
-                              <div className="text-[10px] font-black uppercase tracking-widest text-[#9C9384] mb-2">Transportation</div>
+                            <div className="space-y-2">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Transportation</p>
                               <div className="space-y-2">
                                 <div className="grid grid-cols-2 gap-2">
                                   <input
@@ -1625,7 +1624,6 @@ export function BookingModal(props: BookingModalProps) {
                                     {addingTransport ? 'Adding...' : transportEntries.length > 0 ? '+ Add' : 'Add'}
                                   </button>
                                 </div>
-                              </div>
                               {transportEntries.length > 0 && (() => {
                                 const last = transportEntries[transportEntries.length - 1];
                                 return (
@@ -1681,8 +1679,8 @@ export function BookingModal(props: BookingModalProps) {
                               )}
                             </div>
 
-                            <div className="bg-[#1C232E]/50 rounded-lg p-3 border border-[#2A2F36]">
-                              <div className="text-[10px] font-black uppercase tracking-widest text-[#9C9384] mb-2">Guide Service</div>
+                            <div className="space-y-2 pt-3 border-t border-[#2A2F36]">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Guide Service</p>
                               <div className="space-y-2">
                                 <input
                                   type="text"
@@ -1747,7 +1745,6 @@ export function BookingModal(props: BookingModalProps) {
                                 >
                                   {addingGuide ? 'Adding...' : guideEntries.length > 0 ? '+ Add' : 'Add'}
                                 </button>
-                              </div>
                               {guideEntries.length > 0 && (() => {
                                 const last = guideEntries[guideEntries.length - 1];
                                 return (
@@ -1804,8 +1801,8 @@ export function BookingModal(props: BookingModalProps) {
                             </div>
 
                             {(canCheckOut || sel.status === 'checked_in') && userRole === 'CEO' && (
-                    <div className="space-y-2 p-3 bg-[#0B6E4F]/10 rounded-lg border border-[#0B6E4F]/30">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-[#0B6E4F] block mb-2">Discount (CEO Only)</label>
+                    <div className="space-y-2 pt-3 border-t border-[#2A2F36]">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Discount (CEO Only)</p>
                       <div className="flex gap-2">
                         <input 
                           type="number" 
