@@ -1703,8 +1703,8 @@ export function BookingModal(props: BookingModalProps) {
                                     type="number"
                                     value={guidePrice}
                                     onChange={(e) => setGuidePrice(e.target.value)}
-                                    placeholder="Price (USD)"
-                                    className="flex-1 px-3 py-2 bg-[#1C232E] border border-[#2A2F36] rounded-lg text-sm text-[#EDE6D6] placeholder:text-[#9C9384] focus:outline-none focus:border-[#0B6E4F]"
+                                    placeholder="$"
+                                    className="w-20 px-3 py-2 bg-[#1C232E] border border-[#2A2F36] rounded-lg text-sm text-[#EDE6D6] placeholder:text-[#9C9384] focus:outline-none focus:border-[#0B6E4F]"
                                   />
                                 </div>
                                 <button
