@@ -1012,6 +1012,7 @@ export function GoogleGuestAgenda({
   const finalizeTab = async (): Promise<boolean> => {
     // INVARIANT: This is the ONLY function permitted to add settled costs to bookings.total_price, and it must only run once per tab.
     // Guarded by marking meal_requests/booking_services is_paid=true (which happens in STEP 6/6b below).
+    console.log('[finalizeTab] guard check:', { sel: !!sel, onCheckOut: !!onCheckOut });
     if (!sel || !onCheckOut) return false;
     const receipts = getSettledReceiptsForSel();
     const hasSettled = receipts.length > 0 || (sel.collected_amount || 0) > 0;
@@ -1084,6 +1085,13 @@ export function GoogleGuestAgenda({
         pricing
       );
       
+      // ── Calculate is_prepaid correctly: true if entire tab has zero outstanding balance ──
+      // is_prepaid = (food is prepaid OR no food charges) AND (accommodation is prepaid OR stay_price = 0)
+      const hasFoodCharges = activeMeals.some((m: any) => !m.prepaid && (m.status === 'confirmed' || m.status === 'served'));
+      const hasAccommodationCharges = (sel.total_price || 0) > 0;
+      const calculatedIsPrepaid = (!hasFoodCharges || activeMeals.every((m: any) => m.prepaid)) && 
+                                   (!hasAccommodationCharges || isPrepaid);
+
       const snapshot = {
         id: receiptId,
         date: now.toISOString(),
@@ -1130,7 +1138,8 @@ export function GoogleGuestAgenda({
           discount: svcDiscount > 0 ? { amount: svcDiscount, reason: svcDiscountReason } : null
         },
         total: receiptTotals.grandTotal,
-        payments: receiptTotals.grandTotal === 0 ? [] : svcPayList.filter(p => parseFloat(p.amount) !== 0)
+        payments: receiptTotals.grandTotal === 0 ? [] : svcPayList.filter(p => parseFloat(p.amount) !== 0),
+        isPrepaid: calculatedIsPrepaid
       };
 
       // ── Pre-insert duplicate check ──
@@ -1228,11 +1237,11 @@ export function GoogleGuestAgenda({
       }
 
       const updates = {
-        collected_amount: isPrepaid ? (sel.collected_amount || 0) : Math.max(0, totalPaidUsd),
+        collected_amount: calculatedIsPrepaid ? (sel.collected_amount || 0) : Math.max(0, totalPaidUsd),
         total_price: hasSettled ? ((sel.total_price || 0) + svcDateAdjustment) : (svcAmount + svcDateAdjustment),
-        payment_status: (gTotal === 0) || isPrepaid ? 'Prepaid' : 'Paid',
+        payment_status: (gTotal === 0) || calculatedIsPrepaid ? 'Prepaid' : 'Paid',
         payment_method: svcPayList.length > 0 ? svcPayList[svcPayList.length - 1].method : 'Cash',
-        is_prepaid: isPrepaid,
+        is_prepaid: calculatedIsPrepaid,
         is_accommodation_prepaid: isPrepaid,
 
         meta: updatedMeta
