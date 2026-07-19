@@ -1952,15 +1952,10 @@ export function BookingModal(props: BookingModalProps) {
                       const sItems = [
                         ...individualMeals,
                         ...activeServices
-                          .filter((s: any) => {
-                            if (
-                              s.details?.name === 'Transportation' ||
-                              s.details?.name === 'Guide Service'
-                            ) {
-                              return !s.is_paid; // hide from tab summary once paid
-                            }
-                            return true;
-                          })
+                          .filter((s: any) =>
+                            s.details?.name !== 'Transportation' &&
+                            s.details?.name !== 'Guide Service'
+                          )
                           .map((s: any) => {
                             const baseItem = {
                               id: s.id,
@@ -2533,7 +2528,11 @@ export function BookingModal(props: BookingModalProps) {
                               {(() => {
                                 const svcs = selectedReceipt.items?.services || {};
                                 const svcDetails = selectedReceipt.items?.service_details || {};
-                                return Object.entries(svcs).map(([name, price]: [string, any]) => {
+                                return Object.entries(svcs)
+                                  .filter(([name]) =>
+                                    name !== 'Transportation' && name !== 'Guide Service'
+                                  )
+                                  .map(([name, price]: [string, any]) => {
                                   if (!price) return null;
                                   const detail = svcDetails[name];
                                   return (
