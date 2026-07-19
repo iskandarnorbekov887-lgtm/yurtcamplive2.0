@@ -293,12 +293,12 @@ function CEOFinancialCalendar() {
                       )}
                       {dayCounts.arriving > 0 && (
                         <div className="text-[10px] font-data font-bold text-[#0B6E4F] bg-[#0B6E4F]/20 px-1.5 py-0.5 rounded border border-[#0B6E4F]/40">
-                          ↓{dayCounts.arriving}
+                          👤{dayCounts.arriving}
                         </div>
                       )}
                       {dayCounts.departing > 0 && (
                         <div className="text-[10px] font-data font-bold text-[#F97316] bg-[#F97316]/20 px-1.5 py-0.5 rounded border border-[#F97316]/40">
-                          ↑{dayCounts.departing}
+                          👤{dayCounts.departing}
                         </div>
                       )}
                     </div>
