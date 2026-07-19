@@ -905,7 +905,8 @@ export function GoogleGuestAgenda({
       setSvcDiscount(0);
 
       // ── Prepaid flags from DB columns ──
-      setIsPrepaid(hasSettled ? (b.payment_status === 'Prepaid' || b.is_prepaid || b.is_accommodation_prepaid || false) : (b.payment_status === 'Prepaid' || b.payment_note?.includes('Accommodation') || b.is_accommodation_prepaid || false));
+      // isPrepaid now comes directly from booking.is_prepaid (maintained by database triggers)
+      setIsPrepaid(b.is_prepaid || false);
 
       
       // ── Services will be fetched via useEffect syncData ──
