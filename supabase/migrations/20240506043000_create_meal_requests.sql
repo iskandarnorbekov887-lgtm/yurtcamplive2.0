@@ -23,6 +23,7 @@ CREATE INDEX IF NOT EXISTS idx_meal_requests_date ON meal_requests(meal_date);
 CREATE INDEX IF NOT EXISTS idx_meal_requests_status ON meal_requests(status);
 
 ALTER TABLE meal_requests ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "meal_requests_all" ON meal_requests;
 CREATE POLICY "meal_requests_all" ON meal_requests FOR ALL USING (true) WITH CHECK (true);
 
 -- Auto-update trigger

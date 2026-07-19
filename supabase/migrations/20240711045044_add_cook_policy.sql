@@ -1,6 +1,7 @@
 -- Migration: Cook can view team notifications
 DROP POLICY IF EXISTS "Cook can view notifications" ON notifications;
 
+DROP POLICY IF EXISTS "Cook can view team notifications" ON notifications;
 CREATE POLICY "Cook can view team notifications"
   ON notifications
   FOR SELECT

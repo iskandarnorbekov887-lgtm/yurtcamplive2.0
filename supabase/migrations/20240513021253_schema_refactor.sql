@@ -76,9 +76,16 @@ ALTER TABLE procurement_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE procurement_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE usage_logs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow all for auth" ON inventory;
 CREATE POLICY "Allow all for auth" ON inventory FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow all for auth 2" ON procurement_requests;
 CREATE POLICY "Allow all for auth 2" ON procurement_requests FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow all for auth 3" ON procurement_items;
 CREATE POLICY "Allow all for auth 3" ON procurement_items FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow all for auth 4" ON usage_logs;
 CREATE POLICY "Allow all for auth 4" ON usage_logs FOR ALL USING (true) WITH CHECK (true);
 
 -- 8. Enable Realtime

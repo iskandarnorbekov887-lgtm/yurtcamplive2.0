@@ -9,7 +9,8 @@ interface UnifiedFolioProps {
 
 export function UnifiedFolio({ booking, pricing }: UnifiedFolioProps) {
   // 1. Live Tab Calculation
-  const accommodation = booking.total_price || 0;
+  // total_price is accommodation-only until settlement; meal/service costs are always summed live from meal_requests/booking_services below.
+  const accommodationBase = booking.total_price || 0;
   const collected = booking.collected_amount || 0;
   
   // Sum up all meal requests that are 'Accepted' or 'Served'
@@ -17,13 +18,13 @@ export function UnifiedFolio({ booking, pricing }: UnifiedFolioProps) {
   const mealPrice = pricing?.lunch_price || 10;
   
   const mealsBill = (booking.meal_requests || []).reduce((sum, m) => {
-    if (['Accepted', 'Served', 'confirmed', 'served'].includes(m.status)) {
+    if (['Accepted', 'Served'].includes(m.status)) {
        return sum + ((m.adult_qty || 0) + (m.child_qty || 0)) * mealPrice;
     }
     return sum;
   }, 0);
 
-  const totalBill = accommodation + mealsBill;
+  const totalBill = accommodationBase + mealsBill;
   const liveTab = totalBill - collected;
   const isPrepaid = booking.payment_status === 'Prepaid';
 
@@ -58,7 +59,7 @@ export function UnifiedFolio({ booking, pricing }: UnifiedFolioProps) {
             <div className="space-y-3">
               <div className="flex justify-between items-center text-xs">
                 <span className="font-black text-[#EDE6D6] uppercase tracking-tight">Accommodation</span>
-                <span className="font-mono font-black text-[#C9A227]">${accommodation.toFixed(2)}</span>
+                <span className="font-mono font-black text-[#C9A227]">${accommodationBase.toFixed(2)}</span>
               </div>
               <div className="flex justify-between items-center text-xs">
                 <span className="font-black text-[#EDE6D6] uppercase tracking-tight">Catering (Accepted)</span>
@@ -106,13 +107,13 @@ export function UnifiedFolio({ booking, pricing }: UnifiedFolioProps) {
             (booking.meal_requests || []).map((m: any, i: number) => (
               <div key={i} className="flex justify-between items-center p-3 bg-[#0F1419] border border-[#5C4A2E]/20 hover:border-[#5C4A2E] transition-colors group">
                 <div className="flex items-center gap-3">
-                  <div className={`w-2 h-2 rounded-full ${m.status === 'Served' || m.status === 'served' ? 'bg-[#0B6E4F]' : 'bg-[#C9A227]'}`} />
+                  <div className={`w-2 h-2 rounded-full ${m.status === 'Served' ? 'bg-[#0B6E4F]' : 'bg-[#C9A227]'}`} />
                   <span className="text-[10px] font-black text-[#EDE6D6] uppercase tracking-tight">
                     {m.meal_type} · {m.meal_date} <span className="text-[#9C9384] ml-2 font-mono">({m.adult_qty}A / {m.child_qty}C)</span>
                   </span>
                 </div>
                 <span className={`font-mono text-[9px] font-black px-2 py-0.5 border border-[#5C4A2E]/30 uppercase transition-colors ${
-                  ['Served', 'served'].includes(m.status) ? 'bg-[#0B6E4F] text-[#C9A227]' : 'bg-[#1C232E] text-[#EDE6D6] group-hover:bg-[#2A1518]'
+                  m.status === 'Served' ? 'bg-[#0B6E4F] text-[#C9A227]' : 'bg-[#1C232E] text-[#EDE6D6] group-hover:bg-[#2A1518]'
                 }`}>
                   {m.status.toUpperCase()}
                 </span>

@@ -12,18 +12,22 @@ CREATE TABLE IF NOT EXISTS profiles (
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
 -- Allow all authenticated users full access to profiles (internal app, staff-only)
+DROP POLICY IF EXISTS "Authenticated users can view profiles" ON profiles;
 CREATE POLICY "Authenticated users can view profiles"
   ON profiles FOR SELECT
   USING (true);
 
+DROP POLICY IF EXISTS "Authenticated users can insert profiles" ON profiles;
 CREATE POLICY "Authenticated users can insert profiles"
   ON profiles FOR INSERT
   WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Authenticated users can update profiles" ON profiles;
 CREATE POLICY "Authenticated users can update profiles"
   ON profiles FOR UPDATE
   USING (true);
 
+DROP POLICY IF EXISTS "Authenticated users can delete profiles" ON profiles;
 CREATE POLICY "Authenticated users can delete profiles"
   ON profiles FOR DELETE
   USING (true);

@@ -42,30 +42,7 @@ export async function processMealRequest(mealId: number, orderId?: string) {
     const random = Math.random().toString(36).substring(2, 5).toUpperCase();
     const newOrderId = `ORD-${timestamp}-${random}`;
 
-    // 3. Billing Logic
-    // Requirement: If the booking is NOT marked as "Prepaid," add the cost of the meal
-    const isBookingPrepaid = booking.is_prepaid || booking.payment_status === 'paid';
-
-    if (!isBookingPrepaid) {
-      // Fetch pricing
-      const { data: pricing } = await supabase.from('service_pricing').select('*').eq('id', 1).single();
-      const pricePerMeal = meal.meal_type === 'Lunch' 
-        ? (pricing?.lunch_price || 10) 
-        : (pricing?.dinner_price || 10);
-      
-      const totalCost = (meal.adult_qty + meal.child_qty) * pricePerMeal;
-
-      // Add to guest's tab (total_price)
-      const currentAmount = parseFloat(booking.total_price || 0);
-      const { error: billingErr } = await supabase
-        .from('bookings')
-        .update({ total_price: currentAmount + totalCost })
-        .eq('id', booking.id);
-
-      if (billingErr) console.error('Billing update failed:', billingErr);
-    }
-
-    // 4. Inventory Logic (Recipe Deduction)
+    // 3. Inventory Logic (Recipe Deduction)
     const recipe = MOCK_RECIPES[meal.meal_type] || [];
     const totalPeople = meal.adult_qty + meal.child_qty;
 
@@ -98,7 +75,7 @@ export async function processMealRequest(mealId: number, orderId?: string) {
       }
     }
 
-    // 5. Update Meal Request
+    // 4. Update Meal Request
     const { error: updateErr } = await supabase
       .from('meal_requests')
       .update({ 

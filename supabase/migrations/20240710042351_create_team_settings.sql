@@ -29,12 +29,14 @@ ALTER TABLE team_settings ENABLE ROW LEVEL SECURITY;
 -- Only authenticated users whose team_id matches their own profile id may read.
 -- (Edge Function uses service-role key, bypasses RLS — this protects direct
 --  client queries if they accidentally reach this table.)
+DROP POLICY IF EXISTS "team_settings_select_own" ON team_settings;
 CREATE POLICY "team_settings_select_own"
   ON team_settings
   FOR SELECT
   USING (auth.uid() = team_id);
 
 -- Only CEO role may insert/update credentials.
+DROP POLICY IF EXISTS "team_settings_upsert_ceo" ON team_settings;
 CREATE POLICY "team_settings_upsert_ceo"
   ON team_settings
   FOR ALL

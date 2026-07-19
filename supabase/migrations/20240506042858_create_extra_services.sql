@@ -35,6 +35,7 @@ CREATE INDEX IF NOT EXISTS idx_extra_services_booking ON extra_services(booking_
 CREATE INDEX IF NOT EXISTS idx_extra_services_type   ON extra_services(service_type);
 
 ALTER TABLE extra_services ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "extra_services_all" ON extra_services;
 CREATE POLICY "extra_services_all" ON extra_services FOR ALL USING (true) WITH CHECK (true);
 
 -- Auto-update timestamp

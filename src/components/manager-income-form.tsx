@@ -18,6 +18,8 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
   const currentUserId = user?.id;
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
+  const isSubmittingRef = useRef(false);
+  const idempotencyKeyRef = useRef<string>(crypto.randomUUID());
   
   // Category State
   type MainCategory = 'international' | 'local' | 'pool';
@@ -66,13 +68,17 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!guestName.trim()) { setMessage('Error: Guest Name is required'); return; }
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    
+    if (!guestName.trim()) { setMessage('Error: Guest Name is required'); isSubmittingRef.current = false; return; }
     
     const isFinancial = mainCategory === 'local' || mainCategory === 'pool';
     if (isFinancial) {
       const parsedAmount = parseFloat(amountUZS);
       if (!amountUZS.trim() || isNaN(parsedAmount) || parsedAmount <= 0) {
         setMessage('Error: Payment Amount is required for Local/Pool bookings');
+        isSubmittingRef.current = false;
         return;
       }
     }
@@ -116,6 +122,8 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
         payload.collected_currency = 'UZS';
         payload.payment_method = paymentMethod;
       }
+
+      payload.idempotency_key = idempotencyKeyRef.current;
 
       console.log('Submitting payload:', JSON.stringify(payload, null, 2));
 
@@ -165,11 +173,17 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
         onSuccess();
         onClose();
         resetForm();
+        setSubmitting(false);
+        isSubmittingRef.current = false;
       }, 1000);
     } catch (err: any) {
-      setMessage(`Error: ${err.message}`);
-    } finally {
+      if (err.code === '23505') {
+        setMessage('This booking was already created — check the list before retrying.');
+      } else {
+        setMessage(`Error: ${err.message}`);
+      }
       setSubmitting(false);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -183,6 +197,7 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
     setCheckIn(selectedDate || new Date().toISOString().split('T')[0]);
     setCheckOut('');
     setPaymentMethod('cash');
+    idempotencyKeyRef.current = crypto.randomUUID();
   };
 
   if (!isOpen) return null;

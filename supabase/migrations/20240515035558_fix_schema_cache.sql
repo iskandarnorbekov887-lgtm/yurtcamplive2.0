@@ -44,7 +44,6 @@ GRANT ALL ON public.meal_requests TO anon, authenticated;
 GRANT ALL ON public.payments TO anon, authenticated;
 GRANT ALL ON public.booking_services TO anon, authenticated;
 GRANT ALL ON public.booking_receipts TO anon, authenticated;
-GRANT ALL ON public.yurts TO anon, authenticated;
 GRANT ALL ON public.profiles TO anon, authenticated;
 
 -- Confirm success
@@ -53,5 +52,5 @@ SELECT
   table_type
 FROM information_schema.tables
 WHERE table_schema = 'public'
-  AND table_name IN ('bookings', 'meal_requests', 'payments', 'booking_services', 'yurts', 'profiles')
+  AND table_name IN ('bookings', 'meal_requests', 'payments', 'booking_services', 'profiles')
 ORDER BY table_name;

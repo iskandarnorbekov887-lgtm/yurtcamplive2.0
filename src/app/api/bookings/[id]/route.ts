@@ -43,43 +43,9 @@ export async function PATCH(
 
 
 
-    // Fetch existing booking for price recalculation context
-    let existing: any = null;
+    // Persist services to normalized tables (meal_requests, booking_services)
+    // total_price is NOT modified here - only /api/bookings/finalize is allowed to change it
     if (recalculate) {
-      const { data } = await supabase.from('bookings').select('*').eq('id', bookingId).single();
-      existing = data;
-    }
-
-    // If recalculating, compute new total
-    if (recalculate && existing) {
-      const { data: pricingRow } = await supabase.from('service_pricing').select('*').eq('id', 1).single();
-      const pricing = pricingRow || { lunch_price: 10, dinner_price: 10, guide_price: 40 };
-
-      const isPrepaid = bookingFields.is_prepaid ?? existing.is_prepaid ?? false;
-      const accAmount = existing.total_price ?? 0;
-
-      const sTotal =
-        (services?.lunch && !services.lunch.prepaid ? (services.lunch.count || 0) * (pricing.lunch_price || 10) : 0) +
-        (services?.dinner && !services.dinner.prepaid ? (services.dinner.count || 0) * (pricing.dinner_price || 10) : 0) +
-        (services?.guide ? (services.guide.price || 0) : 0) +
-        (services?.transport ? services.transport.reduce((s: number, t: any) => s + (t.price || 0), 0) : 0) +
-        (services?.laundry ? (services.laundry.price || 0) : 0) +
-        (services?.cooking ? (services.cooking.price || 0) : 0);
-
-      let dTotal = 0;
-      if (drinks?.length > 0) {
-        const drinkIds = drinks.map((d: any) => d.drink_id).filter(Boolean);
-        const { data: drinkData } = await supabase.from('drinks').select('id, sold_price').in('id', drinkIds);
-        const prices: Record<number, number> = {};
-        (drinkData || []).forEach((d: any) => { prices[d.id] = d.sold_price || 0; });
-        dTotal = drinks.reduce((sum: number, d: any) => sum + (d.quantity || 0) * (prices[d.drink_id] || 0), 0);
-      }
-
-      const eTotal = (extra_services || []).reduce((sum: number, s: any) => sum + (parseFloat(s.price) || 0), 0);
-
-      bookingFields.total_price = Math.max(0, (isPrepaid ? 0 : accAmount) + sTotal + dTotal + eTotal - discount);
-
-      // Persist services to normalized tables (not booking columns)
       if (services?.lunch !== undefined && services.lunch.enabled) {
         await supabase.from('meal_requests').insert({
           booking_id: bookingId,

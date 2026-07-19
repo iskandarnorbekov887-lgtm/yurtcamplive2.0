@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS grocery_requests (
 CREATE INDEX IF NOT EXISTS idx_grocery_requests_status ON grocery_requests(status);
 
 ALTER TABLE grocery_requests ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "grocery_requests_all" ON grocery_requests;
 CREATE POLICY "grocery_requests_all" ON grocery_requests FOR ALL USING (true) WITH CHECK (true);
 
 DROP TRIGGER IF EXISTS trg_grocery_requests_updated_at ON grocery_requests;

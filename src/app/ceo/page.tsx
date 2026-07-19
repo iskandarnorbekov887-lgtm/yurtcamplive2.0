@@ -29,6 +29,7 @@ function CEODashboard() {
   const { startImpersonating } = useImpersonation();
   console.log('Current User Role:', user?.role);
   const currentUserId = user?.id;
+  const teamId = user?.team_id;
   const userRole = user?.role as UserRole;
   const { t } = useLanguage();
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -47,6 +48,8 @@ function CEODashboard() {
   const [showAddBookingModal, setShowAddBookingModal] = useState(false);
   const [selectedBookingDate, setSelectedBookingDate] = useState('');
   const [selectedMealBooking, setSelectedMealBooking] = useState<Booking | null>(null);
+  const [managerAccessEnabled, setManagerAccessEnabled] = useState(false);
+  const [managerAccessDuration, setManagerAccessDuration] = useState<number | null>(null);
 
 
   const pollInterval = useRef<NodeJS.Timeout | null>(null);
@@ -94,6 +97,23 @@ function CEODashboard() {
       if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
     };
   }, []);
+
+  // Fetch initial team_settings state for manager access toggle
+  useEffect(() => {
+    const fetchTeamSettings = async () => {
+      if (!teamId) return;
+      const { data } = await supabase.from('team_settings').select('manager_access').eq('team_id', teamId).maybeSingle();
+      if (data?.manager_access) {
+        const access = data.manager_access as { enabled: boolean; expires_at: string | null };
+        setManagerAccessEnabled(access.enabled);
+        if (access.enabled && access.expires_at) {
+          const hours = Math.round((new Date(access.expires_at).getTime() - Date.now()) / 3600000);
+          setManagerAccessDuration(hours > 0 ? hours : null);
+        }
+      }
+    };
+    fetchTeamSettings();
+  }, [teamId]);
 
   const fetchData = async () => {
     if (isStopping.current) return;
@@ -649,7 +669,7 @@ function CEODashboard() {
               bookings={bookings}
               userRole={userRole}
               currentUserId={currentUserId}
-              teamId={user?.team_id}
+              teamId={teamId}
               onCancelBooking={handleCancelBooking}
               onCheckIn={handleCheckIn}
               onCheckOut={handleCheckOut}
@@ -684,6 +704,64 @@ function CEODashboard() {
         )}
         {activeTab === 'team' && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="bg-[#1C232E] rounded-xl shadow-lg border border-[#5C4A2E]/30 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <label className="text-[10px] font-black uppercase tracking-widest text-[#0B6E4F]">
+                  Manager Access to Closed Tabs (CEO Only)
+                </label>
+                <button
+                  onClick={async () => {
+                    const newValue = !managerAccessEnabled;
+                    setManagerAccessEnabled(newValue);
+                    if (!newValue) {
+                      // Turning OFF: read current row, preserve expires_at, only flip enabled to false
+                      const { data } = await supabase.from('team_settings').select('manager_access').eq('team_id', teamId).maybeSingle();
+                      if (data?.manager_access) {
+                        const current = data.manager_access as { enabled: boolean; expires_at: string | null };
+                        await supabase.from('team_settings').upsert({
+                          team_id: teamId,
+                          manager_access: { enabled: false, expires_at: current.expires_at }
+                        });
+                      }
+                    }
+                    // Turning ON: do nothing, just reveal duration buttons
+                  }}
+                  className={`relative w-11 h-6 rounded-full transition-colors ${
+                    managerAccessEnabled ? 'bg-[#0B6E4F]' : 'bg-[#5C4A2E]'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                      managerAccessEnabled ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+              {managerAccessEnabled && (
+                <div className="flex gap-2">
+                  {[2, 12].map(hrs => (
+                    <button
+                      key={hrs}
+                      onClick={async () => {
+                        setManagerAccessDuration(hrs);
+                        const expiresAt = new Date(Date.now() + hrs * 3600000).toISOString();
+                        await supabase.from('team_settings').upsert({
+                          team_id: teamId,
+                          manager_access: { enabled: true, expires_at: expiresAt }
+                        });
+                      }}
+                      className={`flex-1 px-3 py-2 rounded-lg text-xs font-black transition-all ${
+                        managerAccessDuration === hrs
+                          ? 'bg-[#0B6E4F] text-[#C9A227] border-2 border-[#0B6E4F]'
+                          : 'bg-[#1C232E] text-[#EDE6D6] border-2 border-[#5C4A2E]/30 hover:border-[#0B6E4F]'
+                      }`}
+                    >
+                      {hrs}h
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
              <div className="bg-[#1C232E] rounded-xl shadow-lg border border-[#5C4A2E]/30 overflow-hidden">
               <div className="p-8 border-b border-[#5C4A2E]/30 bg-gradient-to-r from-[#1C232E]/50 to-[#1C232E] flex justify-between items-center">
                 <h3 className="text-xl font-black text-[#EDE6D6] flex items-center gap-3 font-heading">
@@ -974,7 +1052,7 @@ function CEODashboard() {
         booking={selectedMealBooking}
         onClose={() => setSelectedMealBooking(null)}
         onSent={fetchData}
-        teamId={user?.team_id}
+        teamId={teamId}
         userRole={user?.role}
       />
 

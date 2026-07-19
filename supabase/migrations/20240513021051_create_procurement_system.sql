@@ -80,8 +80,8 @@ CREATE TABLE IF NOT EXISTS procurement_items (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_procurement_items_procurement_id ON procurement_items(procurement_id);
-CREATE INDEX IF NOT EXISTS idx_procurement_items_product_id ON procurement_items(product_id);
+CREATE INDEX IF NOT EXISTS idx_procurement_items_request_id ON procurement_items(request_id);
+CREATE INDEX IF NOT EXISTS idx_procurement_items_item_id ON procurement_items(item_id);
 
 ALTER TABLE procurement_items ENABLE ROW LEVEL SECURITY;
 -- CREATE POLICY "procurement_items_all" ON procurement_items FOR ALL USING (true) WITH CHECK (true);

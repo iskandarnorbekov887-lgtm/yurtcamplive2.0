@@ -99,11 +99,13 @@ ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE booking_receipts ENABLE ROW LEVEL SECURITY;
 
 -- Allow authenticated users full access
+DROP POLICY IF EXISTS "Authenticated users can manage payments" ON payments;
 CREATE POLICY "Authenticated users can manage payments"
   ON payments FOR ALL
   USING (auth.role() = 'authenticated')
   WITH CHECK (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated users can manage booking_receipts" ON booking_receipts;
 CREATE POLICY "Authenticated users can manage booking_receipts"
   ON booking_receipts FOR ALL
   USING (auth.role() = 'authenticated')

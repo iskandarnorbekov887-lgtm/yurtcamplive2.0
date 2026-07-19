@@ -5,6 +5,7 @@
 DROP POLICY IF EXISTS "Authenticated users can update profiles" ON profiles;
 
 -- Create CEO-only update policy
+DROP POLICY IF EXISTS "CEO can update profiles" ON profiles;
 CREATE POLICY "CEO can update profiles"
   ON profiles FOR UPDATE
   USING (
