@@ -2180,7 +2180,7 @@ export function BookingModal(props: BookingModalProps) {
               {(() => {
                 const hasTabItems = svcAmount > 0 || isPrepaid || activeServices.length > 0 || activeMeals.some(m => !m.is_paid && (m.status === 'confirmed' || m.status === 'served'));
                 const hasUnpaidServices = activeServices.some((s: any) => !s.is_paid);
-                if (!isStaff || sel.status === 'completed' || (Math.abs(gTotalWithPending ?? gTotal) <= 0.01 && !hasUnpaidServices && Math.abs(debtRemaining) <= 0.01)) return null;
+                if (!isStaff || sel.status === 'completed' || (!isPrepaid && Math.abs(gTotalWithPending ?? gTotal) <= 0.01 && !hasUnpaidServices && Math.abs(debtRemaining) <= 0.01)) return null;
                 return (
                     <div className="bg-[#1C232E] border border-[#2A2F36] p-6 space-y-4 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)]">
                       <div className="flex justify-between items-center">
@@ -2375,6 +2375,7 @@ export function BookingModal(props: BookingModalProps) {
                           )}
                           <button
                             onClick={() => {
+                              console.log('🟢 REVIEW BUTTON CLICKED:', { isPrepaid, svcAmount, isBalanceMatched, debtRemaining, tPaidUsd, userRole });
                               const receipts = getSettledReceiptsForSel();
                               const hasSettled = receipts.length > 0 || (sel.collected_amount || 0) > 0;
                               if (!isPrepaid && svcAmount <= 0 && !hasSettled) {
@@ -2440,7 +2441,7 @@ export function BookingModal(props: BookingModalProps) {
               {showFinalReceipt && sel && (
                 <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
                   <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setShowFinalReceipt(false)} />
-                  <div className="relative bg-[#1C232E] rounded-[32px] shadow-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200 border border-[#2A2F36]">
+                  <div className="relative bg-[#1C232E] rounded-[32px] shadow-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200 border border-[#2A2F36]" onClick={e => e.stopPropagation()}>
                     <div ref={receiptRef}>
                       <div className="bg-[#0B6E4F] px-6 py-10 text-[#C9A227] text-center relative overflow-hidden">
                         <div className="absolute top-4 right-4 z-10">
@@ -2731,10 +2732,12 @@ export function BookingModal(props: BookingModalProps) {
                           activeMeals.some(m => !m.is_paid && (m.status === 'confirmed' || m.status === 'served'));
                         if (!hasTabItems) return null;
                         console.log('TAB DEBUG:', { gTotal, isBalanceMatched, debtRemaining, tPaidUsd, isPrepaid, svcAmount, svcPayList });
+                        console.log('🔵 BUTTON STATE:', { loadingAction, isBalanceMatched, gTotal, isPrepaid });
                         return (
                       <div className="space-y-4">
-                        <button 
+                        <button
                             onClick={async () => {
+                              console.log('🔴 BUTTON CLICKED');
                               if (finalizeTab) {
                                 setLoadingAction('finalize');
                                 try {
@@ -2758,7 +2761,7 @@ export function BookingModal(props: BookingModalProps) {
                             disabled={loadingAction === 'finalize' || (!isBalanceMatched && gTotal > 0)}
                             className={`w-full py-4 rounded-2xl font-black uppercase text-[11px] tracking-widest transition-all shadow-lg active:scale-95 ${(isBalanceMatched || gTotal === 0) ? 'bg-[#0B6E4F] text-[#C9A227] shadow-[#0B6E4F]/30 hover:bg-[#0B6E4F]/80' : 'bg-[#1C232E]/50 text-[#9C9384] cursor-not-allowed'}`}
                           >
-                            {loadingAction === 'finalize' ? 'PROCESSING...' : gTotal === 0 ? 'SAVE RECEIPT' : isBalanceMatched ? 'SETTLE & CLOSE TAB' : 'BALANCE MISMATCH'}
+                            {loadingAction === 'finalize' ? 'PROCESSING...' : gTotal === 0 ? 'CLOSE & SETTLE TAB' : isBalanceMatched ? 'SETTLE & CLOSE TAB' : 'BALANCE MISMATCH'}
                           </button>
                       </div>
                         );

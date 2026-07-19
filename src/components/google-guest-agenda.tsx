@@ -1012,6 +1012,7 @@ export function GoogleGuestAgenda({
   const finalizeTab = async (): Promise<boolean> => {
     // INVARIANT: This is the ONLY function permitted to add settled costs to bookings.total_price, and it must only run once per tab.
     // Guarded by marking meal_requests/booking_services is_paid=true (which happens in STEP 6/6b below).
+    console.log('[finalizeTab] guard check:', { sel: !!sel, onCheckOut: !!onCheckOut });
     if (!sel || !onCheckOut) return false;
     const receipts = getSettledReceiptsForSel();
     const hasSettled = receipts.length > 0 || (sel.collected_amount || 0) > 0;
@@ -1276,7 +1277,8 @@ export function GoogleGuestAgenda({
     const isAccommodationSettled = getSettledReceiptsForSel().length > 0 ||
       (sel.collected_amount || 0) > 0 ||
       sel.is_prepaid ||
-      sel.is_accommodation_prepaid;
+      sel.is_accommodation_prepaid ||
+      isPrepaid;
 
     const hasUnpaidMeals = activeMeals.some((m: any) =>
       !m.is_paid && (m.status === 'confirmed' || m.status === 'served')
