@@ -77,7 +77,7 @@ function CEOFinancialCalendar() {
           // Count for each day of the stay
           const current = new Date(checkIn);
           const end = new Date(checkOut);
-          while (current <= end) {
+          while (current < end) {
             const dateStr = current.toISOString().split('T')[0];
             counts[dateStr] = (counts[dateStr] || 0) + people;
             current.setDate(current.getDate() + 1);
