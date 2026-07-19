@@ -359,7 +359,6 @@ export function BookingModal(props: BookingModalProps) {
       // 1. Prepare the standard fields
       const data: any = {
         guest_count_confirmed: true,
-        is_prepaid: isPrepaid,
         is_accommodation_prepaid: isPrepaid,
 
         guest_category: category,

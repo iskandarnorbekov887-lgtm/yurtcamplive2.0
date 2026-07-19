@@ -1234,7 +1234,6 @@ export function GoogleGuestAgenda({
         total_price: hasSettled ? ((sel.total_price || 0) + svcDateAdjustment) : (svcAmount + svcDateAdjustment),
         payment_status: (gTotal === 0) || calculatedIsPrepaid ? 'Prepaid' : 'Paid',
         payment_method: svcPayList.length > 0 ? svcPayList[svcPayList.length - 1].method : 'Cash',
-        is_prepaid: calculatedIsPrepaid,
         is_accommodation_prepaid: isPrepaid,
 
         meta: updatedMeta
