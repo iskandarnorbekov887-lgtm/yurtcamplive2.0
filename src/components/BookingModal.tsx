@@ -1952,25 +1952,27 @@ export function BookingModal(props: BookingModalProps) {
                       const sItems = [
                         ...individualMeals,
                         ...activeServices
-                          .filter((s: any) =>
-                            s.details?.name !== 'Transportation' &&
-                            s.details?.name !== 'Guide Service'
-                          )
+                          .filter((s: any) => !s.is_paid)
                           .map((s: any) => {
                             const baseItem = {
                               id: s.id,
                               serviceType: s.service_type,
                               price: s.unit_price * s.quantity,
                               currency: s.currency,
-
                               details: s.details
                             };
-                            
+
                             if (s.service_type === 'drinks') {
                               return { ...baseItem, name: s.details?.name || 'Drink', description: s.currency };
                             }
                             if (s.service_type === 'extra') {
                               return { ...baseItem, name: s.details?.name || 'Extra', description: '' };
+                            }
+                            if (s.details?.name === 'Transportation') {
+                              return { ...baseItem, name: 'Transportation', description: s.details?.from && s.details?.to ? `${s.details.from} → ${s.details.to}` : '' };
+                            }
+                            if (s.details?.name === 'Guide Service') {
+                              return { ...baseItem, name: 'Guide Service', description: s.details?.guide_name || '' };
                             }
                             return null;
                           })
@@ -2401,7 +2403,7 @@ export function BookingModal(props: BookingModalProps) {
               {isStaff && !isPOS && sel.status !== 'completed' && (() => {
                 const receipts = getSettledReceiptsForSel();
                 const tabCount = receipts.length;
-                if (tabCount === 0 && gTotal <= 0.01 && (sel.collected_amount || 0) === 0 && !hasPendingUnsavedServices) return null;
+                if (!isPrepaid && tabCount === 0 && gTotal <= 0.01 && (sel.collected_amount || 0) === 0 && !hasPendingUnsavedServices) return null;
                 return (
                   <div className="border border-[#2A2F36] rounded-2xl p-4 bg-[#1C232E]/50 space-y-3">
                     <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Guest Folio</p>
@@ -2728,6 +2730,7 @@ export function BookingModal(props: BookingModalProps) {
                         const hasTabItems = svcAmount > 0 || isPrepaid || activeServices.length > 0 || 
                           activeMeals.some(m => !m.is_paid && (m.status === 'confirmed' || m.status === 'served'));
                         if (!hasTabItems) return null;
+                        console.log('TAB DEBUG:', { gTotal, isBalanceMatched, debtRemaining, tPaidUsd, isPrepaid, svcAmount, svcPayList });
                         return (
                       <div className="space-y-4">
                         <button 
