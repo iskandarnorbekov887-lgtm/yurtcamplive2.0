@@ -29,7 +29,7 @@ function CEOFinancialCalendar() {
   const [dayReceipts, setDayReceipts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [cashBox, setCashBox] = useState<{ USD: number; UZS: number; EUR: number }>({ USD: 0, UZS: 0, EUR: 0 });
-  const [checkedInCounts, setCheckedInCounts] = useState<Record<string, number>>({});
+  const [checkedInCounts, setCheckedInCounts] = useState<Record<string, { arriving: number; departing: number }>>({});
 
   useEffect(() => {
     fetchCashBox();
@@ -68,20 +68,19 @@ function CEOFinancialCalendar() {
         .in('status', ['checked_in', 'completed']);
 
       if (data) {
-        const counts: Record<string, number> = {};
+        const counts: Record<string, { arriving: number; departing: number }> = {};
         (data as CheckedInBookingRow[]).forEach((booking) => {
-          const checkIn = booking.check_in;
-          const checkOut = booking.check_out;
+          const checkInDateStr = booking.check_in.split('T')[0];
+          const checkOutDateStr = booking.check_out.split('T')[0];
           const people = (booking.number_of_adults || 0) + (booking.number_of_children || 0) || 1;
           
-          // Count for each day of the stay
-          const current = new Date(checkIn);
-          const end = new Date(checkOut);
-          while (current < end) {
-            const dateStr = current.toISOString().split('T')[0];
-            counts[dateStr] = (counts[dateStr] || 0) + people;
-            current.setDate(current.getDate() + 1);
-          }
+          // Mark check-in day as arriving
+          if (!counts[checkInDateStr]) counts[checkInDateStr] = { arriving: 0, departing: 0 };
+          counts[checkInDateStr].arriving += people;
+          
+          // Mark check-out day as departing
+          if (!counts[checkOutDateStr]) counts[checkOutDateStr] = { arriving: 0, departing: 0 };
+          counts[checkOutDateStr].departing += people;
         });
         setCheckedInCounts(counts);
       }
@@ -181,15 +180,6 @@ function CEOFinancialCalendar() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.push('/ceo-financials/pricing')}
-              className="px-4 py-2 bg-[#C9A227] text-[#1C232E] rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-[#C9A227]/80 transition-all shadow-sm active:scale-95 flex items-center gap-2"
-            >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Pricing
-            </button>
             <LanguageSwitcher variant="dark" />
             <button
               onClick={signOut}
@@ -270,7 +260,7 @@ function CEOFinancialCalendar() {
             {Array.from({ length: daysInMonth }).map((_, i) => {
               const day = i + 1;
               const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-              const peopleCount = checkedInCounts[dateStr] || 0;
+              const dayCounts = checkedInCounts[dateStr] || { arriving: 0, departing: 0 };
               const isToday = new Date().toDateString() === new Date(year, month, day).toDateString();
               return (
                 <button
@@ -283,9 +273,18 @@ function CEOFinancialCalendar() {
                   }`}
                 >
                   <span className={`text-xs font-bold ${isToday ? 'text-[#0B6E4F]' : 'text-[#EDE6D6]'}`}>{day}</span>
-                  {peopleCount > 0 && (
-                    <div className="text-[10px] font-data font-bold text-[#0B6E4F] bg-[#0B6E4F]/20 px-1.5 py-0.5 rounded border border-[#0B6E4F]/40 self-end">
-                      {peopleCount}👤
+                  {(dayCounts.arriving > 0 || dayCounts.departing > 0) && (
+                    <div className="flex gap-1 self-end">
+                      {dayCounts.arriving > 0 && (
+                        <div className="text-[10px] font-data font-bold text-[#0B6E4F] bg-[#0B6E4F]/20 px-1.5 py-0.5 rounded border border-[#0B6E4F]/40">
+                          ↓{dayCounts.arriving}
+                        </div>
+                      )}
+                      {dayCounts.departing > 0 && (
+                        <div className="text-[10px] font-data font-bold text-[#F97316] bg-[#F97316]/20 px-1.5 py-0.5 rounded border border-[#F97316]/40">
+                          ↑{dayCounts.departing}
+                        </div>
+                      )}
                     </div>
                   )}
                 </button>
