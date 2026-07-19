@@ -1745,6 +1745,7 @@ export function BookingModal(props: BookingModalProps) {
                                 >
                                   {addingGuide ? 'Adding...' : guideEntries.length > 0 ? '+ Add' : 'Add'}
                                 </button>
+                                </div>
                               {guideEntries.length > 0 && (() => {
                                 const last = guideEntries[guideEntries.length - 1];
                                 return (
