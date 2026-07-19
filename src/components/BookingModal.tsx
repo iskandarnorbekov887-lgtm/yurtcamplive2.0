@@ -2180,7 +2180,8 @@ export function BookingModal(props: BookingModalProps) {
               {(() => {
                 const hasTabItems = svcAmount > 0 || isPrepaid || activeServices.length > 0 || activeMeals.some(m => !m.is_paid && (m.status === 'confirmed' || m.status === 'served'));
                 const hasUnpaidServices = activeServices.some((s: any) => !s.is_paid);
-                if (!isStaff || sel.status === 'completed' || (!isPrepaid && Math.abs(gTotalWithPending ?? gTotal) <= 0.01 && !hasUnpaidServices && Math.abs(debtRemaining) <= 0.01)) return null;
+                const hasAnyPrepaidItems = isPrepaid || activeMeals.some((m: any) => m.is_paid) || activeServices.some((s: any) => s.is_paid);
+                if (!isStaff || sel.status === 'completed' || (!hasAnyPrepaidItems && Math.abs(gTotalWithPending ?? gTotal) <= 0.01 && !hasUnpaidServices && Math.abs(debtRemaining) <= 0.01)) return null;
                 return (
                     <div className="bg-[#1C232E] border border-[#2A2F36] p-6 space-y-4 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)]">
                       <div className="flex justify-between items-center">
@@ -2404,7 +2405,8 @@ export function BookingModal(props: BookingModalProps) {
               {isStaff && !isPOS && sel.status !== 'completed' && (() => {
                 const receipts = getSettledReceiptsForSel();
                 const tabCount = receipts.length;
-                if (!isPrepaid && tabCount === 0 && gTotal <= 0.01 && (sel.collected_amount || 0) === 0 && !hasPendingUnsavedServices) return null;
+                const hasAnyPrepaidItems = isPrepaid || activeMeals.some((m: any) => m.is_paid) || activeServices.some((s: any) => s.is_paid);
+                if (!hasAnyPrepaidItems && tabCount === 0 && gTotal <= 0.01 && (sel.collected_amount || 0) === 0 && !hasPendingUnsavedServices) return null;
                 return (
                   <div className="border border-[#2A2F36] rounded-2xl p-4 bg-[#1C232E]/50 space-y-3">
                     <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Guest Folio</p>
