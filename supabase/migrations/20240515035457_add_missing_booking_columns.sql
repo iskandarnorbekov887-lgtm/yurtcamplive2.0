@@ -40,8 +40,7 @@ ALTER TABLE bookings
   ADD COLUMN IF NOT EXISTS stay_paid              BOOLEAN DEFAULT FALSE,
   ADD COLUMN IF NOT EXISTS is_system_only         BOOLEAN DEFAULT FALSE,
   ADD COLUMN IF NOT EXISTS is_prepaid             BOOLEAN DEFAULT FALSE,
-  ADD COLUMN IF NOT EXISTS lunch_prepaid          BOOLEAN DEFAULT FALSE,
-  ADD COLUMN IF NOT EXISTS dinner_prepaid         BOOLEAN DEFAULT FALSE,
+  -- lunch_prepaid and dinner_prepaid removed - unused, replaced by meal_requests.prepaid
   ADD COLUMN IF NOT EXISTS drinks_tab             JSONB DEFAULT '[]',
   ADD COLUMN IF NOT EXISTS extra_services         JSONB DEFAULT '[]',
   ADD COLUMN IF NOT EXISTS collected_currency     TEXT DEFAULT 'USD',
