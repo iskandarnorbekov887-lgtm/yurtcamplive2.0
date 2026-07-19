@@ -1092,7 +1092,7 @@ export function GoogleGuestAgenda({
         settled_at: now.toISOString(),
         items: {
           accommodation: svcAmount,
-          isPrepaid: isPrepaid,
+          isPrepaid: calculatedIsPrepaid,
           settled_meal_ids: mealIds,
           meals: {
             lunch: lunchTotal,
@@ -1132,8 +1132,7 @@ export function GoogleGuestAgenda({
           discount: svcDiscount > 0 ? { amount: svcDiscount, reason: svcDiscountReason } : null
         },
         total: receiptTotals.grandTotal,
-        payments: receiptTotals.grandTotal === 0 ? [] : svcPayList.filter(p => parseFloat(p.amount) !== 0),
-        isPrepaid: calculatedIsPrepaid
+        payments: receiptTotals.grandTotal === 0 ? [] : svcPayList.filter(p => parseFloat(p.amount) !== 0)
       };
 
       // ── Pre-insert duplicate check ──
