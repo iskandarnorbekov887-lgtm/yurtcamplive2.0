@@ -2379,7 +2379,8 @@ export function BookingModal(props: BookingModalProps) {
                               console.log('🟢 REVIEW BUTTON CLICKED:', { isPrepaid, svcAmount, isBalanceMatched, debtRemaining, tPaidUsd, userRole });
                               const receipts = getSettledReceiptsForSel();
                               const hasSettled = receipts.length > 0 || (sel.collected_amount || 0) > 0;
-                              if (!isPrepaid && svcAmount <= 0 && !hasSettled) {
+                              const hasAnyPrepaidItems = isPrepaid || activeMeals.some((m: any) => m.is_paid) || activeServices.some((s: any) => s.is_paid);
+                              if (!hasAnyPrepaidItems && svcAmount <= 0 && !hasSettled) {
                                 setValError('Stay Price is missing. Please enter the guest\'s accommodation cost before proceeding.');
                                 return;
                               }
