@@ -293,6 +293,24 @@ export function BookingModal(props: BookingModalProps) {
     return meta;
   }, [sel?.meta]);
 
+  // PREPAID PRINCIPLE: Any item marked as prepaid (accommodation, meals, or services)
+  // should allow the tab to be closed/settled even with $0 balance. Use hasAnyPrepaidItems
+  // to check this condition in all gate logic.
+  const hasAnyPrepaidItems = useMemo(() => {
+    const hasPrepaidAccommodation = isPrepaid;
+    const hasPrepaidMeals = activeMeals.some((m: any) => m.prepaid && (m.status === 'confirmed' || m.status === 'served'));
+    const hasPrepaidServices = activeServices.some((s: any) => s.is_paid);
+    return hasPrepaidAccommodation || hasPrepaidMeals || hasPrepaidServices;
+  }, [isPrepaid, activeMeals, activeServices]);
+
+  // Centralized "can close tab" logic - use this everywhere instead of duplicating
+  const canCloseTab = useMemo(() => {
+    const hasBalance = Math.abs(gTotalWithPending ?? gTotal) > 0.01;
+    const hasUnpaidItems = activeServices.some((s: any) => !s.is_paid) ||
+                           activeMeals.some((m: any) => !m.is_paid && !m.prepaid);
+    return hasAnyPrepaidItems || (hasBalance && !hasUnpaidItems);
+  }, [hasAnyPrepaidItems, gTotal, gTotalWithPending, activeServices, activeMeals]);
+
   const isPOS = currentMeta.guest_category === 'local' || currentMeta.guest_category === 'pool';
 
   const [mealAssurance, setMealAssurance] = useState({ accepted: 0, served: 0 });
@@ -1000,7 +1018,7 @@ export function BookingModal(props: BookingModalProps) {
                       <div className="border border-[#2A2F36] p-4 bg-[#1C232E] shadow-[2px_2px_0px_0px_rgba(92,74,46,0.3)] space-y-4">
                         <div className="flex justify-between items-center">
                           <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Stay Configuration</p>
-                          {isPrepaid && (
+                          {hasAnyPrepaidItems && (
                             <span className="px-2 py-0.5 text-[8px] font-black bg-emerald-100 text-emerald-700 rounded uppercase border border-emerald-300">
                               ✓ Original Stay Prepaid
                             </span>
@@ -1105,7 +1123,7 @@ export function BookingModal(props: BookingModalProps) {
                               <div className="flex items-center justify-between">
                                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Accommodation</label>
                                 <div className="flex items-center gap-3">
-                                  {isPrepaid && (
+                                  {hasAnyPrepaidItems && (
                                     <span className="text-[10px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">Prepaid</span>
                                   )}
                                   <button
@@ -1804,7 +1822,7 @@ export function BookingModal(props: BookingModalProps) {
                     </div>
                   
                   <div className="space-y-2">
-                    {(svcAmount > 0 || (isPrepaid && (sel.collected_amount || 0) === 0)) && (() => {
+                    {(svcAmount > 0 || (hasAnyPrepaidItems && (sel.collected_amount || 0) === 0)) && (() => {
                       const currentMeta: any = Array.isArray(sel.meta) ? { days: sel.meta } : (sel.meta || {});
                       const lastAdjustment = parseFloat(currentMeta.last_adjustment) || 0;
                       const isExtended = lastAdjustment > 0;
@@ -2178,9 +2196,10 @@ export function BookingModal(props: BookingModalProps) {
               })()}
 
               {(() => {
-                const hasTabItems = svcAmount > 0 || isPrepaid || activeServices.length > 0 || activeMeals.some(m => !m.is_paid && (m.status === 'confirmed' || m.status === 'served'));
+                const hasTabItems = svcAmount > 0 || hasAnyPrepaidItems || activeServices.length > 0 || activeMeals.some(m => !m.is_paid && (m.status === 'confirmed' || m.status === 'served'));
                 const hasUnpaidServices = activeServices.some((s: any) => !s.is_paid);
-                if (!isStaff || sel.status === 'completed' || (!isPrepaid && Math.abs(gTotalWithPending ?? gTotal) <= 0.01 && !hasUnpaidServices && Math.abs(debtRemaining) <= 0.01)) return null;
+                console.log('🔍 PAYMENT SECTION DEBUG:', { hasAnyPrepaidItems, gTotal, gTotalWithPending, debtRemaining, hasUnpaidServices, hasTabItems, activeServices: activeServices.length, activeMeals: activeMeals.length });
+                if (!isStaff || sel.status === 'completed' || (!hasAnyPrepaidItems && Math.abs(gTotalWithPending ?? gTotal) <= 0.01 && !hasUnpaidServices && Math.abs(debtRemaining) <= 0.01)) return null;
                 return (
                     <div className="bg-[#1C232E] border border-[#2A2F36] p-6 space-y-4 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)]">
                       <div className="flex justify-between items-center">
@@ -2375,13 +2394,14 @@ export function BookingModal(props: BookingModalProps) {
                           )}
                           <button
                             onClick={() => {
+                              console.log('🟢 REVIEW BUTTON CLICKED:', { isPrepaid, svcAmount, isBalanceMatched, debtRemaining, tPaidUsd, userRole });
                               const receipts = getSettledReceiptsForSel();
                               const hasSettled = receipts.length > 0 || (sel.collected_amount || 0) > 0;
                               if (!isPrepaid && svcAmount <= 0 && !hasSettled) {
                                 setValError('Stay Price is missing. Please enter the guest\'s accommodation cost before proceeding.');
                                 return;
                               }
-                              if (!isBalanceMatched && userRole !== 'CEO' && Math.abs(debtRemaining) > 0.01) {
+                              if (!isBalanceMatched && userRole !== 'CEO') {
                                 setValError(`Payment balance mismatch. You are trying to collect ${tPaidUsd.toFixed(2)} USD, but the debt is ${debtRemaining.toFixed(2)} USD. Please use the "Match Balance" button to even the tab.`);
                                 return;
                               }
@@ -2389,7 +2409,7 @@ export function BookingModal(props: BookingModalProps) {
                               setShowFinalReceipt(true);
                             }}
                             disabled={loadingAction === 'checkout'}
-                            className={`w-full py-4 rounded-2xl font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 shadow-xl ${(!isBalanceMatched && Math.abs(debtRemaining) > 0.01) ? 'bg-[#1C232E]/50 text-[#9C9384] cursor-not-allowed shadow-none' : 'bg-[#0B6E4F] text-[#C9A227] hover:bg-[#0B6E4F]/80 hover:scale-[1.02] active:scale-95 shadow-[#0B6E4F]/20'}`}
+                            className={`w-full py-4 rounded-2xl font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 shadow-xl ${!isBalanceMatched ? 'bg-[#1C232E]/50 text-[#9C9384] cursor-not-allowed shadow-none' : 'bg-[#0B6E4F] text-[#C9A227] hover:bg-[#0B6E4F]/80 hover:scale-[1.02] active:scale-95 shadow-[#0B6E4F]/20'}`}
                           >
                             {loadingAction === 'checkout' ? 'Processing...' : 'Review & Pay Tab'}
                           </button>
@@ -2403,7 +2423,7 @@ export function BookingModal(props: BookingModalProps) {
               {isStaff && !isPOS && sel.status !== 'completed' && (() => {
                 const receipts = getSettledReceiptsForSel();
                 const tabCount = receipts.length;
-                if (!isPrepaid && tabCount === 0 && gTotal <= 0.01 && (sel.collected_amount || 0) === 0 && !hasPendingUnsavedServices) return null;
+                if (!hasAnyPrepaidItems && tabCount === 0 && gTotal <= 0.01 && (sel.collected_amount || 0) === 0 && !hasPendingUnsavedServices) return null;
                 return (
                   <div className="border border-[#2A2F36] rounded-2xl p-4 bg-[#1C232E]/50 space-y-3">
                     <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Guest Folio</p>
@@ -2727,13 +2747,17 @@ export function BookingModal(props: BookingModalProps) {
                       )}
 
                       {(() => {
-                        const hasTabItems = svcAmount > 0 || isPrepaid || activeServices.length > 0 ||
+                        const hasTabItems = svcAmount > 0 || hasAnyPrepaidItems || activeServices.length > 0 ||
                           activeMeals.some(m => !m.is_paid && (m.status === 'confirmed' || m.status === 'served'));
+                        console.log('🔍 SETTLE BUTTON DEBUG:', { hasAnyPrepaidItems, gTotal, hasTabItems });
                         if (!hasTabItems) return null;
+                        console.log('TAB DEBUG:', { gTotal, isBalanceMatched, debtRemaining, tPaidUsd, isPrepaid, svcAmount, svcPayList });
+                        console.log('🔵 BUTTON STATE:', { loadingAction, isBalanceMatched, gTotal, isPrepaid });
                         return (
                       <div className="space-y-4">
                         <button
                             onClick={async () => {
+                              console.log('🔴 BUTTON CLICKED');
                               if (finalizeTab) {
                                 setLoadingAction('finalize');
                                 try {
