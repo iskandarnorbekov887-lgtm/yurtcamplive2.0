@@ -1624,53 +1624,33 @@ export function BookingModal(props: BookingModalProps) {
                                     {addingTransport ? 'Adding...' : transportEntries.length > 0 ? '+ Add' : 'Add'}
                                   </button>
                                 </div>
-                              {transportEntries.length > 0 && (() => {
-                                const last = transportEntries[transportEntries.length - 1];
-                                return (
-                                  <div className="mt-2 border-t border-[#2A2F36] pt-2">
-                                    <button
-                                      onClick={() => setShowTransportSummary(!showTransportSummary)}
-                                      className="flex items-center justify-between w-full text-[10px] font-black uppercase tracking-widest text-[#9C9384] mb-1"
-                                    >
-                                      <span>Last added · {transportEntries.length} total</span>
-                                      <span>{showTransportSummary ? '▲' : '▼'}</span>
-                                    </button>
-                                    {showTransportSummary && (
-                                      <div className="bg-[#1C232E] rounded-lg px-3 py-2 space-y-0.5">
-                                        <p className="text-[11px] text-[#EDE6D6] font-bold">
-                                          {last.details?.from} → {last.details?.to}
-                                        </p>
-                                        <p className="text-[10px] text-[#9C9384]">
-                                          Driver: {last.details?.driver_name}
-                                        </p>
-                                        <p className="text-[10px] text-[#C9A227] font-black">
-                                          ${last.unit_price}
-                                        </p>
-                                        {last.is_paid && (
-                                          <span className="text-[9px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded uppercase tracking-wider mt-1 inline-block">
-                                            PAID
-                                          </span>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })()}
-                              {transportEntries.some((s: any) => !s.is_paid) && (
+                              {transportEntries.length > 0 && (
                                 <div className="mt-2 border-t border-[#2A2F36] pt-2">
                                   <button
-                                    onClick={() => setShowTransportList(!showTransportList)}
-                                    className="flex items-center justify-between w-full text-[10px] font-black uppercase tracking-widest text-[#9C9384]"
+                                    onClick={() => setShowTransportSummary(!showTransportSummary)}
+                                    className="flex items-center justify-between w-full text-[10px] font-black uppercase tracking-widest text-[#9C9384] mb-1"
                                   >
                                     <span>{transportEntries.length} Added</span>
-                                    <span>{showTransportList ? '▲' : '▼'}</span>
+                                    <span>{showTransportSummary ? '▲' : '▼'}</span>
                                   </button>
-                                  {showTransportList && (
-                                    <div className="mt-2 space-y-1.5">
+                                  {showTransportSummary && (
+                                    <div className="space-y-1.5">
                                       {transportEntries.map((s: any, i: number) => (
-                                        <div key={s.id ?? i} className="flex items-center justify-between text-xs text-[#EDE6D6] bg-[#1C232E] rounded-lg px-2 py-1.5">
-                                          <span>{s.details?.from} → {s.details?.to} ({s.details?.driver_name})</span>
-                                          <span className="font-black text-[#C9A227]">${s.unit_price}</span>
+                                        <div key={s.id ?? i} className="bg-[#1C232E] rounded-lg px-3 py-2 space-y-0.5">
+                                          <p className="text-[11px] text-[#EDE6D6] font-bold">
+                                            {s.details?.from} → {s.details?.to}
+                                          </p>
+                                          <p className="text-[10px] text-[#9C9384]">
+                                            Driver: {s.details?.driver_name}
+                                          </p>
+                                          <p className="text-[10px] text-[#C9A227] font-black">
+                                            ${s.unit_price}
+                                          </p>
+                                          {s.is_paid && (
+                                            <span className="text-[9px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded uppercase tracking-wider inline-block">
+                                              PAID
+                                            </span>
+                                          )}
                                         </div>
                                       ))}
                                     </div>
@@ -1746,53 +1726,33 @@ export function BookingModal(props: BookingModalProps) {
                                   {addingGuide ? 'Adding...' : guideEntries.length > 0 ? '+ Add' : 'Add'}
                                 </button>
                                 </div>
-                              {guideEntries.length > 0 && (() => {
-                                const last = guideEntries[guideEntries.length - 1];
-                                return (
-                                  <div className="mt-2 border-t border-[#2A2F36] pt-2">
-                                    <button
-                                      onClick={() => setShowGuideSummary(!showGuideSummary)}
-                                      className="flex items-center justify-between w-full text-[10px] font-black uppercase tracking-widest text-[#9C9384] mb-1"
-                                    >
-                                      <span>Last added · {guideEntries.length} total</span>
-                                      <span>{showGuideSummary ? '▲' : '▼'}</span>
-                                    </button>
-                                    {showGuideSummary && (
-                                      <div className="bg-[#1C232E] rounded-lg px-3 py-2 space-y-0.5">
-                                        <p className="text-[11px] text-[#EDE6D6] font-bold">
-                                          {last.details?.guide_name}
-                                        </p>
-                                        <p className="text-[10px] text-[#9C9384]">
-                                          Tour: {last.details?.paxod_type}
-                                        </p>
-                                        <p className="text-[10px] text-[#C9A227] font-black">
-                                          ${last.unit_price}
-                                        </p>
-                                        {last.is_paid && (
-                                          <span className="text-[9px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded uppercase tracking-wider mt-1 inline-block">
-                                            PAID
-                                          </span>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })()}
-                              {guideEntries.some((s: any) => !s.is_paid) && (
+                              {guideEntries.length > 0 && (
                                 <div className="mt-2 border-t border-[#2A2F36] pt-2">
                                   <button
-                                    onClick={() => setShowGuideList(!showGuideList)}
-                                    className="flex items-center justify-between w-full text-[10px] font-black uppercase tracking-widest text-[#9C9384]"
+                                    onClick={() => setShowGuideSummary(!showGuideSummary)}
+                                    className="flex items-center justify-between w-full text-[10px] font-black uppercase tracking-widest text-[#9C9384] mb-1"
                                   >
                                     <span>{guideEntries.length} Added</span>
-                                    <span>{showGuideList ? '▲' : '▼'}</span>
+                                    <span>{showGuideSummary ? '▲' : '▼'}</span>
                                   </button>
-                                  {showGuideList && (
-                                    <div className="mt-2 space-y-1.5">
+                                  {showGuideSummary && (
+                                    <div className="space-y-1.5">
                                       {guideEntries.map((s: any, i: number) => (
-                                        <div key={s.id ?? i} className="flex items-center justify-between text-xs text-[#EDE6D6] bg-[#1C232E] rounded-lg px-2 py-1.5">
-                                          <span>{s.details?.guide_name} ({s.details?.paxod_type})</span>
-                                          <span className="font-black text-[#C9A227]">${s.unit_price}</span>
+                                        <div key={s.id ?? i} className="bg-[#1C232E] rounded-lg px-3 py-2 space-y-0.5">
+                                          <p className="text-[11px] text-[#EDE6D6] font-bold">
+                                            {s.details?.guide_name}
+                                          </p>
+                                          <p className="text-[10px] text-[#9C9384]">
+                                            Tour: {s.details?.paxod_type}
+                                          </p>
+                                          <p className="text-[10px] text-[#C9A227] font-black">
+                                            ${s.unit_price}
+                                          </p>
+                                          {s.is_paid && (
+                                            <span className="text-[9px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded uppercase tracking-wider inline-block">
+                                              PAID
+                                            </span>
+                                          )}
                                         </div>
                                       ))}
                                     </div>
