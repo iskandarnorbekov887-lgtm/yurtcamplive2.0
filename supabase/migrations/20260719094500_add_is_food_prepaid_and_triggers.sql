@@ -12,6 +12,7 @@ RETURNS TRIGGER AS $$
 BEGIN
   -- For the affected booking, check if ALL meal_requests have prepaid = true
   -- If zero meal requests exist, treat food as satisfied (true)
+  -- Count ALL meal_requests regardless of status (Accepted, Paid, etc.)
   UPDATE bookings
   SET is_food_prepaid = (
     SELECT
@@ -22,10 +23,9 @@ BEGIN
       END
     FROM meal_requests
     WHERE booking_id = COALESCE(NEW.booking_id, OLD.booking_id)
-      AND status IN ('confirmed', 'served')  -- Only count active meals
   )
   WHERE id = COALESCE(NEW.booking_id, OLD.booking_id);
-  
+
   RETURN COALESCE(NEW, OLD);
 END;
 $$ LANGUAGE plpgsql;
@@ -86,7 +86,6 @@ SET is_food_prepaid = (
     END
   FROM meal_requests
   WHERE meal_requests.booking_id = bookings.id
-    AND meal_requests.status IN ('confirmed', 'served')
 );
 
 UPDATE bookings
