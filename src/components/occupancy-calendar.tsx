@@ -275,7 +275,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
   };
 
   const getBookingsForDay = (dayStr: string) => {
-    return bookings.filter(b => b.check_in <= dayStr && b.check_out >= dayStr);
+    return bookings.filter(b => b.check_in <= dayStr && b.check_out > dayStr);
   };
 
   // Store original checkout when a booking is selected
@@ -294,7 +294,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
     const strs  = week.map(dateToStr);
     const wStart = strs[0], wEnd = strs[6];
     const evs: Omit<EventInfo,'lane'>[] = bookings
-      .filter(b => b.check_in <= wEnd && b.check_out >= wStart)
+      .filter(b => b.check_in <= wEnd && b.check_out > wStart)
       .map(b => {
         const es = b.check_in  < wStart ? wStart : b.check_in;
         const ee = b.check_out > wEnd   ? wEnd   : b.check_out;
@@ -423,7 +423,9 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
   const [activeTabIdx, setActiveTabIdx] = useState(-1);
 
   const dayOccupancy = (dayStr: string) =>
-    [...confirmed, ...cancelled].filter(b => b.check_in <= dayStr && b.check_out >= dayStr).length;
+    [...confirmed, ...cancelled]
+      .filter(b => b.check_in <= dayStr && b.check_out > dayStr)
+      .reduce((sum, b) => sum + (b.number_of_adults || 0) + (b.number_of_children || 0), 0);
 
   return (
     <div className="bento-card rounded-2xl overflow-hidden font-sans">
