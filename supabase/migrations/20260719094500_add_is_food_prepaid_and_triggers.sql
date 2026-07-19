@@ -40,22 +40,28 @@ CREATE TRIGGER trg_meal_requests_recalc_food_prepaid
 -- 4. Create function to recalculate is_prepaid from is_food_prepaid, is_accommodation_prepaid, and stay_price
 CREATE OR REPLACE FUNCTION recalculate_is_prepaid()
 RETURNS TRIGGER AS $$
+DECLARE
+  new_is_prepaid BOOLEAN;
 BEGIN
-  -- is_prepaid = true when is_food_prepaid = true AND (is_accommodation_prepaid = true OR stay_price = 0)
-  UPDATE bookings
-  SET is_prepaid = (
-    SELECT
-      CASE
-        WHEN (is_food_prepaid = true OR is_food_prepaid IS NULL) AND
-             (is_accommodation_prepaid = true OR stay_price = 0 OR stay_price IS NULL)
-        THEN true
-        ELSE false
-      END
-    FROM bookings
-    WHERE id = COALESCE(NEW.id, OLD.id)
-  )
+  -- Calculate new is_prepaid value
+  SELECT
+    CASE
+      WHEN (is_food_prepaid = true OR is_food_prepaid IS NULL) AND
+           (is_accommodation_prepaid = true OR stay_price = 0 OR stay_price IS NULL)
+      THEN true
+      ELSE false
+    END
+  INTO new_is_prepaid
+  FROM bookings
   WHERE id = COALESCE(NEW.id, OLD.id);
-  
+
+  -- Only update if the value would actually change (prevents infinite loop)
+  IF COALESCE(NEW.is_prepaid, false) != new_is_prepaid THEN
+    UPDATE bookings
+    SET is_prepaid = new_is_prepaid
+    WHERE id = COALESCE(NEW.id, OLD.id);
+  END IF;
+
   RETURN COALESCE(NEW, OLD);
 END;
 $$ LANGUAGE plpgsql;
