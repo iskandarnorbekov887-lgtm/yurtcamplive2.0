@@ -66,7 +66,7 @@ function CEOFinancialCalendar() {
     // Add camp_finances (income adds, expense subtracts)
     if (financesData) {
       financesData.forEach((f: any) => {
-        const amount = Number(f.amount) || 0;
+        const amount = Number(f.original_amount) || 0;
         const currency = f.currency || 'UZS';
         if (f.type === 'income') {
           summary[currency] = (summary[currency] || 0) + amount;
@@ -149,6 +149,7 @@ function CEOFinancialCalendar() {
     setLoading(true);
 
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    console.log('📅 handleDayClick dateStr:', dateStr);
 
     try {
       // Fetch camp finances (expenses only)
@@ -682,17 +683,25 @@ function CEOFinancialCalendar() {
                           .filter(f => f.type === 'expense')
                           .reduce((acc: any, f) => {
                             const cat = f.category || 'Unassigned';
-                            if (!acc[cat]) acc[cat] = { total: 0, count: 0, items: [] };
-                            acc[cat].total += f.amount_uzs;
-                            acc[cat].count += 1;
-                            acc[cat].items.push(f);
+                            const currency = f.currency || 'UZS';
+                            const key = `${cat}|${currency}`;
+                            if (!acc[key]) acc[key] = { category: cat, currency, total: 0, count: 0, items: [] };
+                            acc[key].total += Number(f.original_amount) || 0;
+                            acc[key].count += 1;
+                            acc[key].items.push(f);
                             return acc;
                           }, {});
 
+                        const formatCurrency = (amount: number, currency: string) => {
+                          if (currency === 'USD') return `$${amount.toLocaleString()}`;
+                          if (currency === 'EUR') return `€${amount.toLocaleString()}`;
+                          return `${amount.toLocaleString()} SUM`;
+                        };
+
                         return Object.keys(expensesByCategory).length > 0 ? (
-                          Object.entries(expensesByCategory).map(([category, data]: any) => (
+                          Object.values(expensesByCategory).map((data: any) => (
                             <button
-                              key={category}
+                              key={`${data.category}-${data.currency}`}
                               onClick={() => {
                                 const expense = data.items[0];
                                 if (expense) handleFinanceClick(expense);
@@ -701,11 +710,11 @@ function CEOFinancialCalendar() {
                             >
                               <div className="flex justify-between items-start">
                                 <div>
-                                  <p className="font-bold text-[#EDE6D6] text-xs">{category}</p>
+                                  <p className="font-bold text-[#EDE6D6] text-xs">{data.category}</p>
                                   <p className="text-[10px] text-[#9C9384] font-medium uppercase mt-0.5">{data.count} line items</p>
                                 </div>
                                 <p className="font-data font-bold text-[#EDE6D6] text-sm">
-                                  ${(data.total / 12500).toFixed(2)}
+                                  {formatCurrency(data.total, data.currency)}
                                 </p>
                               </div>
                             </button>
