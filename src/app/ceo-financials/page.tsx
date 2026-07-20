@@ -151,11 +151,12 @@ function CEOFinancialCalendar() {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
     try {
-      // Fetch camp finances (expenses)
+      // Fetch camp finances (expenses only)
       const { data: finances } = await supabase
         .from('camp_finances')
         .select('*')
         .eq('transaction_date', dateStr)
+        .eq('type', 'expense')
         .order('created_at', { ascending: false });
 
       // Fetch manual income entries
