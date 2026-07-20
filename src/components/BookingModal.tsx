@@ -1830,10 +1830,12 @@ export function BookingModal(props: BookingModalProps) {
 
                       // Check if accommodation was already settled in a previous receipt
                       const settledReceipts = getSettledReceiptsForSel();
-                      const accommodationAlreadySettled = settledReceipts.some((r: any) => {
-                        const accAmount = r.snapshot?.items?.accommodation;
-                        return accAmount && parseFloat(String(accAmount)) > 0;
-                      });
+                      const accommodationAlreadySettled = sel.is_accommodation_prepaid
+                        ? settledReceipts.length > 0
+                        : settledReceipts.some((r: any) => {
+                            const accAmount = r.snapshot?.items?.accommodation;
+                            return accAmount && parseFloat(String(accAmount)) > 0;
+                          });
 
                       // Don't show accommodation if it was already settled and current amount is 0
                       if (accommodationAlreadySettled && svcAmount === 0) return null;
@@ -2035,10 +2037,12 @@ export function BookingModal(props: BookingModalProps) {
 
                             // Check if food was already settled in a previous receipt
                             const settledReceipts = getSettledReceiptsForSel();
-                            const foodAlreadySettled = settledReceipts.some((r: any) => {
-                              const mealDetails = r.snapshot?.items?.meals?.mealDetails;
-                              return mealDetails && mealDetails.length > 0;
-                            });
+                            const foodAlreadySettled = sel.is_food_prepaid
+                              ? settledReceipts.length > 0
+                              : settledReceipts.some((r: any) => {
+                                  const mealDetails = r.snapshot?.items?.meals?.mealDetails;
+                                  return mealDetails && mealDetails.length > 0;
+                                });
 
                             // Don't show food if it was already settled and there are no new unpaid meals
                             if (foodAlreadySettled && foodGroup.items.every((item: any) => {
