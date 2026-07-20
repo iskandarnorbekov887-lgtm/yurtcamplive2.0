@@ -1292,7 +1292,7 @@ export function GoogleGuestAgenda({
     }
     setLoadingAction('guestcheckout');
     try {
-      await onUpdateBooking(sel.id, { status: 'completed', checked_out_at: new Date().toISOString() });
+      await onUpdateBooking(sel.id, { status: 'completed', checked_out_at: sel.check_out });
       flash('✓ Guest checked out.');
       if (onRefresh) await onRefresh();
       return true;

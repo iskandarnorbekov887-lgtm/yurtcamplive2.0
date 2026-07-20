@@ -181,7 +181,7 @@ function CEODashboard() {
 
 
   const handleUpdateBooking = async (id: number, updates: Partial<Booking>) => {
-    const payloadToSave = { ...updates, last_edited_by: currentUserId || '', last_edited_by_role: userRole, last_edited_at: new Date().toISOString() } as any;
+    const payloadToSave = { ...updates, last_edited_by_role: userRole, last_edited_at: new Date().toISOString() } as any;
     delete payloadToSave.meta;
 
 
@@ -191,7 +191,17 @@ function CEODashboard() {
 
     delete payloadToSave.last_edited_by_id;
     delete payloadToSave.days;
-    await supabase.from('bookings').update(payloadToSave).eq('id', id);
+    console.log('?? [CEO handleUpdateBooking] payload:', payloadToSave);
+    
+    const { error } = await supabase.from('bookings').update(payloadToSave).eq('id', id);
+    if (error) {
+      console.error('? [CEO handleUpdateBooking] Bookings update failed:', 
+        error.message, 
+        error.details, 
+        error.hint, 
+        error.code
+      );
+    }
     fetchData();
   };
 
@@ -206,7 +216,17 @@ function CEODashboard() {
 
     delete payloadToSave.last_edited_by_id;
     delete payloadToSave.days;
-    await supabase.from('bookings').update(payloadToSave).eq('id', id);
+    console.log('?? [CEO handleUpdateBooking] payload:', payloadToSave);
+    
+    const { error } = await supabase.from('bookings').update(payloadToSave).eq('id', id);
+    if (error) {
+      console.error('? [CEO handleUpdateBooking] Bookings update failed:', 
+        error.message, 
+        error.details, 
+        error.hint, 
+        error.code
+      );
+    }
     fetchData();
   };
 
@@ -221,7 +241,17 @@ function CEODashboard() {
 
     delete payloadToSave.last_edited_by_id;
     delete payloadToSave.days;
-    await supabase.from('bookings').update(payloadToSave).eq('id', id);
+    console.log('?? [CEO handleUpdateBooking] payload:', payloadToSave);
+    
+    const { error } = await supabase.from('bookings').update(payloadToSave).eq('id', id);
+    if (error) {
+      console.error('? [CEO handleUpdateBooking] Bookings update failed:', 
+        error.message, 
+        error.details, 
+        error.hint, 
+        error.code
+      );
+    }
     fetchData();
   };
 
@@ -266,7 +296,17 @@ function CEODashboard() {
 
     delete payloadToSave.last_edited_by_id;
     delete payloadToSave.days;
-    await supabase.from('bookings').update(payloadToSave).eq('id', id);
+    console.log('?? [CEO handleUpdateBooking] payload:', payloadToSave);
+    
+    const { error } = await supabase.from('bookings').update(payloadToSave).eq('id', id);
+    if (error) {
+      console.error('? [CEO handleUpdateBooking] Bookings update failed:', 
+        error.message, 
+        error.details, 
+        error.hint, 
+        error.code
+      );
+    }
     fetchData();
   };
 

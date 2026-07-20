@@ -67,7 +67,7 @@ function BookingPortal() {
   };
 
   const handleUpdateBooking = async (id: number, updates: Partial<Booking>) => {
-    const payloadToSave = { ...updates, last_edited_by: currentUserId || '', last_edited_at: new Date().toISOString() } as any;
+    const payloadToSave = { ...updates, last_edited_at: new Date().toISOString() } as any;
     delete payloadToSave.meta;
 
 

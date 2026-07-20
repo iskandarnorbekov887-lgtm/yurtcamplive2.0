@@ -78,7 +78,7 @@ function CheckinPortal() {
     const amountUZS = booking.currency === 'UZS' ? amountValue : amountValue * rateValue;
 
     await supabase.from('camp_finances').insert([{
-      date: booking.check_out,
+      transaction_date: booking.check_out,
       type: 'income',
       category: 'Booking',
       currency: booking.currency || 'UZS',
@@ -86,28 +86,31 @@ function CheckinPortal() {
       exchange_rate: rateValue,
       amount_uzs: amountUZS,
       guest_name: booking.guest_name,
-      guest_count: (booking.number_of_adults || 0) + (booking.number_of_children || 0) || booking.guest_count,
-      children_under_12: 0,
-      nights: booking.nights,
-      has_guide: booking.has_guide,
-      has_transportation: booking.has_transportation,
-      transportation_details: booking.transportation_details,
-      payment_method: booking.payment_method,
+      description: `Booking checkout: ${booking.guest_name}`,
       created_by: booking.created_by_role || 'System',
       team_id: user?.team_id,
     }]);
 
     const payloadToSave = { status: 'completed', payment_status: 'paid' } as any;
+    console.log('📤 Bookings update payload:', payloadToSave);
 
-    const { error } = await supabase.from('bookings').update(payloadToSave).eq('id', id);
-    if (error) fetchData();
+    const { error: bookingUpdateError } = await supabase.from('bookings').update(payloadToSave).eq('id', id);
+    if (bookingUpdateError) {
+      console.error('❌ Bookings update failed:', 
+        bookingUpdateError.message, 
+        bookingUpdateError.details, 
+        bookingUpdateError.hint, 
+        bookingUpdateError.code
+      );
+      fetchData();
+    }
   };
 
   const handleUpdateBooking = async (id: number, updates: Partial<Booking>) => {
     // Optimistic UI update
     setBookings(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
     
-    const payloadToSave = { ...updates, last_edited_by: currentUserId || '', last_edited_at: new Date().toISOString() } as any;
+    const payloadToSave = { ...updates, last_edited_at: new Date().toISOString() } as any;
     delete payloadToSave.meta;
 
 

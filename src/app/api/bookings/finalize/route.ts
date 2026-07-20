@@ -17,13 +17,13 @@ export const dynamic = 'force-dynamic';
  *     total: number,
  *     payments: Array<{ amount, currency, method }>
  *   },
- *   last_edited_by?: string
+ *   
  * }
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { booking_id, tab_data, last_edited_by } = body;
+    const { booking_id, tab_data } = body;
 
     if (!booking_id || !tab_data) {
       return NextResponse.json({ error: 'booking_id and tab_data are required' }, { status: 400 });
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
         amount: tab_data.total || 0,
         currency: tab_data.payments?.[0]?.currency || 'USD',
         settled_at: tab_data.date || new Date().toISOString(),
-        created_by: last_edited_by || booking.created_by,
+        created_by: booking.created_by,
         note: JSON.stringify(tab_data),
       }])
       .select()
@@ -92,9 +92,7 @@ export async function POST(request: NextRequest) {
       last_edited_at: new Date().toISOString(),
     };
 
-    if (last_edited_by) {
-      updates.last_edited_by = last_edited_by;
-    }
+    
 
     // Merge settled_receipts directly
     const settledReceipts = booking.settled_receipts || [];
