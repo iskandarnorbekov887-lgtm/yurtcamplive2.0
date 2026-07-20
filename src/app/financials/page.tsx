@@ -33,6 +33,11 @@ function ManagerFinancials() {
   const [amount, setAmount] = useState('');
   const [workerName, setWorkerName] = useState('');
   
+  // Worker names for combobox
+  const [workerNames, setWorkerNames] = useState<string[]>([]);
+  const [workerNameInput, setWorkerNameInput] = useState('');
+  const [showWorkerDropdown, setShowWorkerDropdown] = useState(false);
+  
   // Date - set via calendar selection
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -48,7 +53,23 @@ function ManagerFinancials() {
   // Fetch recent expenses on load
   useEffect(() => {
     fetchRecentExpenses();
+    fetchWorkerNames();
   }, []);
+
+  const fetchWorkerNames = async () => {
+    try {
+      const { data } = await supabase
+        .from('camp_finances')
+        .select('guest_name')
+        .eq('category', 'workers income')
+        .not('guest_name', 'is', null);
+      
+      const names = [...new Set(data?.map(r => r.guest_name).filter(Boolean) || [])].sort();
+      setWorkerNames(names);
+    } catch (error) {
+      console.error('Error fetching worker names:', error);
+    }
+  };
 
   const fetchRecentExpenses = async () => {
     setLoadingRecent(true);
@@ -120,6 +141,7 @@ function ManagerFinancials() {
 
       setMessage('Record saved successfully!');
       fetchRecentExpenses();
+      fetchWorkerNames();
       
       // Reset form
       setCategory('');
@@ -242,16 +264,55 @@ function ManagerFinancials() {
 
             {/* Worker Name - only for workers income category */}
             {type === 'expense' && category === 'workers income' && (
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-black text-[#EDE6D6] mb-2">Worker Name *</label>
                 <input
                   type="text"
                   value={workerName}
-                  onChange={(e) => setWorkerName(e.target.value)}
-                  placeholder="Enter worker name"
+                  onChange={(e) => {
+                    setWorkerName(e.target.value);
+                    setWorkerNameInput(e.target.value);
+                    setShowWorkerDropdown(true);
+                  }}
+                  onFocus={() => setShowWorkerDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowWorkerDropdown(false), 200)}
+                  placeholder="Enter or select worker name"
                   className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#1C232E]"
                   required
                 />
+                {showWorkerDropdown && (
+                  <div className="absolute z-10 w-full mt-1 bg-[#1C232E] border-2 border-[#5C4A2E]/30 rounded-xl shadow-xl max-h-48 overflow-y-auto">
+                    {workerNames
+                      .filter(name => name.toLowerCase().includes(workerName.toLowerCase()))
+                      .map(name => (
+                        <button
+                          key={name}
+                          type="button"
+                          onClick={() => {
+                            setWorkerName(name);
+                            setWorkerNameInput(name);
+                            setShowWorkerDropdown(false);
+                          }}
+                          className="w-full px-4 py-2 text-left text-[#EDE6D6] hover:bg-[#0B6E4F]/20 transition-all font-semibold"
+                        >
+                          {name}
+                        </button>
+                      ))}
+                    {workerName && !workerNames.some(name => name.toLowerCase() === workerName.toLowerCase()) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setWorkerName(workerName);
+                          setWorkerNameInput(workerName);
+                          setShowWorkerDropdown(false);
+                        }}
+                        className="w-full px-4 py-2 text-left text-[#0B6E4F] hover:bg-[#0B6E4F]/20 transition-all font-bold border-t border-[#5C4A2E]/30"
+                      >
+                        Add '{workerName}' as new worker
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

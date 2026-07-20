@@ -51,14 +51,32 @@ function CEOFinancialCalendar() {
   }, [currentDate]);
 
   const fetchCashBox = async () => {
-    const { data } = await supabase.from('payments').select('*').eq('method', 'Cash');
-    if (data) {
-      const summary = data.reduce((acc: any, p: any) => {
-        acc[p.currency_original] = (acc[p.currency_original] || 0) + p.amount_original;
-        return acc;
-      }, { USD: 0, UZS: 0, EUR: 0 });
-      setCashBox(summary);
+    // Fetch cash payments from payments table
+    const { data: paymentsData } = await supabase.from('payments').select('*').eq('method', 'Cash');
+    
+    // Fetch income/expense from camp_finances
+    const { data: financesData } = await supabase.from('camp_finances').select('*');
+    
+    // Start with payments summary
+    const summary = paymentsData?.reduce((acc: any, p: any) => {
+      acc[p.currency_original] = (acc[p.currency_original] || 0) + p.amount_original;
+      return acc;
+    }, { USD: 0, UZS: 0, EUR: 0 }) || { USD: 0, UZS: 0, EUR: 0 };
+    
+    // Add camp_finances (income adds, expense subtracts)
+    if (financesData) {
+      financesData.forEach((f: any) => {
+        const amount = Number(f.amount) || 0;
+        const currency = f.currency || 'UZS';
+        if (f.type === 'income') {
+          summary[currency] = (summary[currency] || 0) + amount;
+        } else if (f.type === 'expense') {
+          summary[currency] = (summary[currency] || 0) - amount;
+        }
+      });
     }
+    
+    setCashBox(summary);
   };
 
   type CheckedInBookingRow = {
