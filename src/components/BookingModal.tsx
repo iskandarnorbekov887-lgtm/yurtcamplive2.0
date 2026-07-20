@@ -1828,6 +1828,16 @@ export function BookingModal(props: BookingModalProps) {
                       const accKey = 'Accommodation';
                       const isExpandedState = expandedMealGroups.has(accKey);
 
+                      // Check if accommodation was already settled in a previous receipt
+                      const settledReceipts = getSettledReceiptsForSel();
+                      const accommodationAlreadySettled = settledReceipts.some((r: any) => {
+                        const accAmount = r.snapshot?.items?.accommodation;
+                        return accAmount && parseFloat(String(accAmount)) > 0;
+                      });
+
+                      // Don't show accommodation if it was already settled and current amount is 0
+                      if (accommodationAlreadySettled && svcAmount === 0) return null;
+
                       return (
                         <div className="py-3 border-b border-white/10 last:border-none">
                           <div 
@@ -2022,7 +2032,20 @@ export function BookingModal(props: BookingModalProps) {
                           {foodGroup.items.length > 0 && (() => {
                             const foodKey = 'Food';
                             const isExpanded = expandedMealGroups.has(foodKey);
-                            
+
+                            // Check if food was already settled in a previous receipt
+                            const settledReceipts = getSettledReceiptsForSel();
+                            const foodAlreadySettled = settledReceipts.some((r: any) => {
+                              const mealDetails = r.snapshot?.items?.meals?.mealDetails;
+                              return mealDetails && mealDetails.length > 0;
+                            });
+
+                            // Don't show food if it was already settled and there are no new unpaid meals
+                            if (foodAlreadySettled && foodGroup.items.every((item: any) => {
+                              const meal = activeMeals.find((m: any) => m.id === item.mealId);
+                              return meal && meal.is_paid;
+                            })) return null;
+
                             return (
                               <div className="py-3 border-b border-white/10 last:border-none">
                                 <div 
