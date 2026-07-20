@@ -148,12 +148,11 @@ function CEOFinancialCalendar() {
         .eq('type', 'income')
         .order('created_at', { ascending: false });
 
-      // Fetch receipts created on this day (revenue from settled tabs)
+      // Fetch receipts for this day (revenue from settled tabs)
       const { data: receipts } = await supabase
         .from('booking_receipts')
         .select('*')
-        .gte('created_at', `${dateStr}T00:00:00`)
-        .lte('created_at', `${dateStr}T23:59:59`)
+        .eq('settled_at', dateStr)
         .order('created_at', { ascending: false });
 
       // Fetch all bookings that have receipts for this day (to get guest names)

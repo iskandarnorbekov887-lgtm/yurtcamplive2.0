@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
         booking_id,
         amount: tab_data.total || 0,
         currency: tab_data.payments?.[0]?.currency || 'USD',
-        settled_at: tab_data.date || new Date().toISOString(),
+        settled_at: booking.check_out?.split('T')[0],
         created_by: booking.created_by,
         note: JSON.stringify(tab_data),
       }])

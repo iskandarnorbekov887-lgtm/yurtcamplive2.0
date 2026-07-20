@@ -139,7 +139,7 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
             amount: price,
             currency: 'UZS',
             total_usd: price / 12500, // Safe generic fallback for USD equivalent
-            settled_at: checkIn,
+            settled_at: bookingData.check_out?.split('T')[0],
             created_by: currentUserId,
             snapshot: { 
               note: mainCategory === 'pool' ? 'Instant Pool Payment' : `Local ${localType} payment`,

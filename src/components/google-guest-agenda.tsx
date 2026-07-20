@@ -1170,7 +1170,7 @@ export function GoogleGuestAgenda({
           receipt_id: receiptId,
           snapshot,
           total_usd: realTotal, // Use real total for revenue/statistics
-          settled_at: now.toISOString(),
+          settled_at: sel.check_out?.split('T')[0],
         });
         // Optimistic add — show immediately without refresh
         setSettledReceipts(prev => [{

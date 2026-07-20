@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
           amount,
           currency,
           total_usd: amount / 12500, // Safe generic fallback for USD equivalent
-          settled_at: check_in,
+          settled_at: booking.check_out?.split('T')[0],
           created_by,
           snapshot: { note: guest_category === 'pool' ? 'Instant Pool Payment' : `Local ${local_stay_type} payment` },
         }]);
