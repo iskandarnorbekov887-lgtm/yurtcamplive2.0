@@ -1274,7 +1274,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                       <svg className="w-8 h-8 text-[#9C9384]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                     </div>
                     <p className="text-lg font-bold text-[#9C9384]">Empty</p>
-                    <p className="text-sm text-[#9C9384]/70">No bookings for this day</p>
+                    <p className="text-sm text-[#9C9384]/70">{t('msg.no_bookings_day')}</p>
                   </div>
                 );
               }

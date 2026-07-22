@@ -238,7 +238,7 @@ export function BookingModal(props: BookingModalProps) {
 
     if (category === 'pool') return { prefix: '🏊', message: 'Instant POS: Settled in UZS' };
     if (category === 'local') return { prefix: '🏠', message: 'Instant POS: Settled in UZS' };
-    return { prefix: '', message: 'Standard Stay Booking' };
+    return { prefix: '', message: t('booking.standard_stay') };
   };
 
   const typeInfo = getBookingTypeInfo();
@@ -579,7 +579,7 @@ export function BookingModal(props: BookingModalProps) {
         <div className="relative bento-card sm:rounded-2xl shadow-2xl w-full sm:max-w-md h-full sm:h-auto sm:max-h-[85vh] overflow-y-auto pb-20 sm:pb-0" onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-between px-5 py-4 border-b border-[#2A2F36] sticky top-0 bg-[#1C232E] rounded-t-2xl z-10">
             <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">
-              📅 Google Calendar Event
+              {t('gcal.event_title')}
             </p>
             <button onClick={() => setSelectedItem(null)} className="w-8 h-8 flex items-center justify-center edge-control rounded-xl transition-all text-[#EDE6D6] font-bold text-xl">×</button>
           </div>
@@ -592,8 +592,8 @@ export function BookingModal(props: BookingModalProps) {
               )}
             </div>
             <div className="bg-[#B8860B]/20 border border-[#B8860B]/40 rounded-xl p-4">
-              <p className="text-[10px] font-black uppercase tracking-widest text-[#B8860B] mb-2">Calendar Only — No Booking Yet</p>
-              <p className="text-xs text-[#B8860B]">Create a booking from this event to manage check-in, services, and payments.</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-[#B8860B] mb-2">{t('gcal.calendar_only')}</p>
+              <p className="text-xs text-[#B8860B]">{t('gcal.calendar_only_desc')}</p>
             </div>
             <div className="flex flex-col gap-2">
                 <button
@@ -602,14 +602,14 @@ export function BookingModal(props: BookingModalProps) {
                   className="w-full py-3 bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2 transition-all disabled:opacity-60 border border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]"
                 >
                   {loadingAction === 'creating' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '→'}
-                  Create Booking & Check In
+                  {t('gcal.create_booking_checkin')}
                 </button>
                 <button
                   onClick={() => setShowCreatePopover('only')}
                   disabled={loadingAction === 'creating'}
                   className="w-full py-3 bg-[#1C232E] hover:bg-[#2A1518] text-[#9C9384] text-[11px] font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2 transition-all disabled:opacity-60 border border-[#2A2F36]"
                 >
-                  Create Booking Only
+                  {t('gcal.create_booking_only')}
                 </button>
             </div>
 
@@ -623,7 +623,7 @@ export function BookingModal(props: BookingModalProps) {
                   </div>
                   <div className="space-y-3">
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Adults *</label>
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t('booking.adults')} *</label>
                       <input
                         type="number"
                         value={newAdults}
@@ -634,7 +634,7 @@ export function BookingModal(props: BookingModalProps) {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Children under 12</label>
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t('booking.children')}</label>
                       <input
                         type="number"
                         value={newChildren}
@@ -685,7 +685,7 @@ export function BookingModal(props: BookingModalProps) {
         <div className={"relative bento-card sm:rounded-2xl shadow-2xl w-full sm:max-w-md h-full sm:h-auto sm:max-h-[85vh] overflow-y-auto modal-scroll pb-20 sm:pb-0 " + (userRole === 'CEO' && sel?.source === 'System' ? 'border-4 border-blue-500' : '')} onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-between px-5 py-4 border-b border-[#2A2F36] sticky top-0 bg-[#1C232E] rounded-t-2xl z-10">
             <p className="text-[10px] font-black uppercase tracking-widest text-[#0B6E4F]">
-              Booking Details
+              {t('booking.details')}
             </p>
             <button onClick={() => setSelectedItem(null)} className="w-8 h-8 flex items-center justify-center edge-control rounded-xl transition-all text-[#EDE6D6] font-bold text-xl">×</button>
           </div>
@@ -711,7 +711,7 @@ export function BookingModal(props: BookingModalProps) {
                     <svg className={`w-3 h-3 transition-transform ${showNotes ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
-                    {showNotes ? 'Hide Notes' : 'View Notes'}
+                    {showNotes ? t('booking.hide_notes') : t('booking.show_notes')}
                   </button>
                 )}
                 {sel && (
@@ -735,7 +735,7 @@ export function BookingModal(props: BookingModalProps) {
                 disabled={loadingAction === 'guestcheckout'}
                 className="w-full py-3 bg-amber-700 hover:bg-amber-800 text-white text-[11px] font-black uppercase tracking-[0.15em] transition-all disabled:opacity-60"
               >
-                {loadingAction === 'guestcheckout' ? 'Checking Out...' : 'Check Out Guest'}
+                {loadingAction === 'guestcheckout' ? 'Checking Out...' : t('booking.check_out_guest')}
               </button>
             )}
 
@@ -745,7 +745,7 @@ export function BookingModal(props: BookingModalProps) {
                   <div className="w-6 h-6 bg-[#B8860B]/30 rounded-lg flex items-center justify-center text-[#B8860B]">
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                   </div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-[#B8860B]">Booking & Stay Notes</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[#B8860B]">{t('booking.stay_notes')}</p>
                 </div>
                 <p className="text-sm text-[#EDE6D6] whitespace-pre-wrap leading-relaxed font-medium">{htmlDescriptionToText(String(sel.notes || sel.description))}</p>
               </div>
@@ -830,7 +830,7 @@ export function BookingModal(props: BookingModalProps) {
                       <div className="flex items-center justify-between">
                         <div className="flex flex-col gap-1.5">
                           <span className="px-4 py-2 bg-[#0B6E4F]/20 text-[#0B6E4F] text-sm font-bold rounded-xl border border-[#0B6E4F]/40 flex items-center gap-2">
-                            ✓ Checked In
+                            ✓ {t('booking.checked_in')}
                           </span>
                         </div>
                         {/* Gate "Edit Dates" behind lock when booking is paid, unless CEO */}
@@ -849,7 +849,7 @@ export function BookingModal(props: BookingModalProps) {
                               setEditCheckOut(sel.check_out); 
                               setDateAdjAmount(currentMeta.last_adjustment || '');
                             }}
-                            className="text-[10px] font-bold text-[#0B6E4F] hover:text-[#0B6E4F] underline underline-offset-2 decoration-[#0B6E4F]/20 transition-all">Edit Dates
+                            className="text-[10px] font-bold text-[#0B6E4F] hover:text-[#0B6E4F] underline underline-offset-2 decoration-[#0B6E4F]/20 transition-all">{t('booking.edit_dates')}
                           </button>
                         )}
                       </div>
@@ -989,8 +989,8 @@ export function BookingModal(props: BookingModalProps) {
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
                     </div>
                     <div>
-                      <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight leading-tight">Add to Tab</h3>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Post new charges for this guest</p>
+                      <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight leading-tight">{t('booking.add_to_tab')}</h3>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('booking.post_new_charges')}</p>
                     </div>
                   </div>
                 </div>
@@ -1362,7 +1362,7 @@ export function BookingModal(props: BookingModalProps) {
                     return (
                       <div className="border border-[#2A2F36] rounded-xl p-4 space-y-3 bg-[#1C232E]">
                         <div className="flex justify-between items-center">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Other Services</p>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">{t('booking.other_services')}</p>
                         </div>
                       <div className="grid grid-cols-1 gap-4">
                         {(() => {
@@ -1379,7 +1379,7 @@ export function BookingModal(props: BookingModalProps) {
 
                           return (
                             <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium text-slate-400">Food Prepaid</span>
+                              <span className="text-sm font-medium text-slate-400">{t('booking.food_prepaid')}</span>
                               <button
                                 onClick={async () => {
                                   const newValue = !isFoodPrepaid;
@@ -1429,10 +1429,10 @@ export function BookingModal(props: BookingModalProps) {
                           <div className="grid grid-cols-2 gap-3">
                             {/* Quick Add Lunch */}
                             <div className="bg-[#1C232E]/50 rounded-lg p-3 border border-[#2A2F36]">
-                              <div className="text-[10px] font-black uppercase tracking-widest text-[#9C9384] mb-2">Quick Add Lunch</div>
+                              <div className="text-[10px] font-black uppercase tracking-widest text-[#9C9384] mb-2">{t('booking.quick_add_lunch')}</div>
                               <div className="space-y-2">
                                 <div className="flex items-center justify-between">
-                                  <span className="text-xs text-slate-400">Adults</span>
+                                  <span className="text-xs text-slate-400">{t('booking.adults')}</span>
                                   <div className="flex items-center gap-2">
                                     <button onClick={() => setBypassLunchAdults(Math.max(0, bypassLunchAdults - 1))} className="w-8 h-8 rounded-lg bg-[#1C232E]/50 text-[#9C9384] text-sm font-black hover:bg-[#2A1518] transition-all border border-[#2A2F36]">－</button>
                                     <span className="text-sm font-black text-[#EDE6D6] min-w-[20px] text-center">{bypassLunchAdults}</span>
@@ -1440,7 +1440,7 @@ export function BookingModal(props: BookingModalProps) {
                                   </div>
                                 </div>
                                 <div className="flex items-center justify-between">
-                                  <span className="text-xs text-slate-400">Children</span>
+                                  <span className="text-xs text-slate-400">{t('booking.children')}</span>
                                   <div className="flex items-center gap-2">
                                     <button onClick={() => setBypassLunchChildren(Math.max(0, bypassLunchChildren - 1))} className="w-8 h-8 rounded-lg bg-[#1C232E]/50 text-[#9C9384] text-sm font-black hover:bg-[#2A1518] transition-all border border-[#2A2F36]">－</button>
                                     <span className="text-sm font-black text-[#EDE6D6] min-w-[20px] text-center">{bypassLunchChildren}</span>
@@ -1487,17 +1487,17 @@ export function BookingModal(props: BookingModalProps) {
                                   disabled={bypassLunchAdults <= 0 && bypassLunchChildren <= 0}
                                   className="w-full py-2 bg-[#0B6E4F] text-[#C9A227] rounded-lg text-xs font-black uppercase tracking-widest hover:bg-[#0B6E4F]/80 transition-all disabled:opacity-50"
                                 >
-                                  Add to Tab
+                                  {t('booking.add')}
                                 </button>
                               </div>
                             </div>
 
                             {/* Quick Add Dinner */}
                             <div className="bg-[#1C232E]/50 rounded-lg p-3 border border-[#2A2F36]">
-                              <div className="text-[10px] font-black uppercase tracking-widest text-[#9C9384] mb-2">Quick Add Dinner</div>
+                              <div className="text-[10px] font-black uppercase tracking-widest text-[#9C9384] mb-2">{t('booking.quick_add_dinner')}</div>
                               <div className="space-y-2">
                                 <div className="flex items-center justify-between">
-                                  <span className="text-xs text-slate-400">Adults</span>
+                                  <span className="text-xs text-slate-400">{t('booking.adults')}</span>
                                   <div className="flex items-center gap-2">
                                     <button onClick={() => setBypassDinnerAdults(Math.max(0, bypassDinnerAdults - 1))} className="w-8 h-8 rounded-lg bg-[#1C232E]/50 text-[#9C9384] text-sm font-black hover:bg-[#2A1518] transition-all border border-[#2A2F36]">－</button>
                                     <span className="text-sm font-black text-[#EDE6D6] min-w-[20px] text-center">{bypassDinnerAdults}</span>
@@ -1505,7 +1505,7 @@ export function BookingModal(props: BookingModalProps) {
                                   </div>
                                 </div>
                                 <div className="flex items-center justify-between">
-                                  <span className="text-xs text-slate-400">Children</span>
+                                  <span className="text-xs text-slate-400">{t('booking.children')}</span>
                                   <div className="flex items-center gap-2">
                                     <button onClick={() => setBypassDinnerChildren(Math.max(0, bypassDinnerChildren - 1))} className="w-8 h-8 rounded-lg bg-[#1C232E]/50 text-[#9C9384] text-sm font-black hover:bg-[#2A1518] transition-all border border-[#2A2F36]">－</button>
                                     <span className="text-sm font-black text-[#EDE6D6] min-w-[20px] text-center">{bypassDinnerChildren}</span>
@@ -1552,7 +1552,7 @@ export function BookingModal(props: BookingModalProps) {
                                   disabled={bypassDinnerAdults <= 0 && bypassDinnerChildren <= 0}
                                   className="w-full py-2 bg-[#0B6E4F] text-[#C9A227] rounded-lg text-xs font-black uppercase tracking-widest hover:bg-[#0B6E4F]/80 transition-all disabled:opacity-50"
                                 >
-                                  Add to Tab
+                                  {t('booking.add')}
                                 </button>
                               </div>
                             </div>
@@ -1566,11 +1566,11 @@ export function BookingModal(props: BookingModalProps) {
                           return (
                           <div className="border border-[#2A2F36] rounded-xl p-4 space-y-4 bg-[#1C232E]">
                             <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">
-                              Additional Services
+                              {t('booking.additional_services')}
                             </p>
 
                             <div className="space-y-2">
-                              <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Transportation</p>
+                              <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">{t('booking.transportation')}</p>
                               <div className="space-y-2">
                                 <div className="grid grid-cols-2 gap-2">
                                   <input
@@ -1680,7 +1680,7 @@ export function BookingModal(props: BookingModalProps) {
                             </div>
 
                             <div className="space-y-2 pt-3 border-t border-[#2A2F36]">
-                              <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Guide Service</p>
+                              <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">{t('booking.guide_service')}</p>
                               <div className="space-y-2">
                                 <input
                                   type="text"
@@ -1819,7 +1819,7 @@ export function BookingModal(props: BookingModalProps) {
                 return (
                   <div className="bg-[#0B6E4F] rounded-2xl p-5 text-[#C9A227] shadow-xl shadow-[#0B6E4F]/20 animate-in fade-in zoom-in duration-500 border border-[#0B6E4F]/40">
                     <div className="flex justify-between items-center mb-4">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-[#C9A227]/80">Tab Summary</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-[#C9A227]/80">{t('booking.tab_summary')}</p>
                       <svg className="w-5 h-5 text-[#C9A227]/60 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
                     </div>
                   
@@ -2035,7 +2035,7 @@ export function BookingModal(props: BookingModalProps) {
                       return (
                         <>
                           {foodGroup.items.length > 0 && (() => {
-                            const foodKey = 'Food';
+                            const foodKey = t('booking.food');
                             const isExpanded = expandedMealGroups.has(foodKey);
 
                             // Check if food was already settled in a previous receipt
@@ -2207,7 +2207,7 @@ export function BookingModal(props: BookingModalProps) {
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <p className="text-[10px] font-black uppercase tracking-widest text-indigo-100">
-                          {(gTotalWithPending ?? gTotal) > 0 ? 'Current Tab Balance' : (gTotalWithPending ?? gTotal) < 0 ? 'Refund Due to Guest' : 'Tab Settled (Zero Balance)'}
+                          {(gTotalWithPending ?? gTotal) > 0 ? t('booking.current_tab_balance') : (gTotalWithPending ?? gTotal) < 0 ? 'Refund Due to Guest' : 'Tab Settled (Zero Balance)'}
                         </p>
                         {sel.payment_status === 'paid' && (
                           <span className="font-mono text-[9px] font-black uppercase tracking-widest border border-[#2A2F36] px-2 py-0.5 bg-[#1C232E] text-[#0B6E4F]">
@@ -2232,14 +2232,14 @@ export function BookingModal(props: BookingModalProps) {
                 return (
                     <div className="bg-[#1C232E] border border-[#2A2F36] p-6 space-y-4 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)]">
                       <div className="flex justify-between items-center">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Payment Collection</p>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">{t('booking.payment_collection')}</p>
                         {isBalanceMatched || (tPaidUsd >= debtRemaining - 1.00) ? (
                           <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200">
                             Paid
                           </span>
                         ) : (
                           <span className="text-[10px] font-black uppercase tracking-widest text-rose-500 bg-rose-50 px-2 py-1 rounded-lg border border-rose-100">
-                            Remaining: ${String((debtRemaining - tPaidUsd).toFixed(2))}
+                            {t('booking.remaining')} ${String((debtRemaining - tPaidUsd).toFixed(2))}
                           </span>
                         )}
                       </div>
@@ -2251,7 +2251,7 @@ export function BookingModal(props: BookingModalProps) {
                           return (
                             <div key={pi} className="space-y-3 p-4 bg-[#1C232E]/50 rounded-2xl border border-[#2A2F36] animate-in slide-in-from-top-2 duration-300">
                               <div className="flex justify-between items-center">
-                                <label className="text-[9px] font-black uppercase tracking-widest text-[#9C9384]">Payment {String(pi + 1)}</label>
+                                <label className="text-[9px] font-black uppercase tracking-widest text-[#9C9384]">{t('booking.payment_n')} {String(pi + 1)}</label>
                                 {svcPayList.length > 1 && (
                                   <button onClick={() => setSvcPayList(svcPayList.filter((_: any, i: number) => i !== pi))} className="text-[10px] font-bold text-rose-500 hover:text-rose-700">✕ Remove</button>
                                 )}
@@ -2259,7 +2259,7 @@ export function BookingModal(props: BookingModalProps) {
 
                               <div className="grid grid-cols-12 gap-4 items-end">
                                 <div className="col-span-12 space-y-1.5">
-                                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Pay in</span>
+                                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">{t('booking.pay_in')}</span>
                                   <select 
                                     value={String(pay.currency)}
                                       onChange={e => {
@@ -2320,9 +2320,9 @@ export function BookingModal(props: BookingModalProps) {
                                 )}
 
                                 <div className="col-span-12 space-y-1.5">
-                                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Method</span>
+                                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">{t('booking.method')}</span>
                                   <div className="flex gap-2">
-                                    {(['Cash', 'Online'] as const).map((m: any) => (
+                                    {[t('booking.cash'), t('booking.online')].map((m: any) => (
                                       <button
                                         key={m}
                                         onClick={() => setSvcPayList(svcPayList.map((p: any, i: number) => i === pi ? { ...p, method: m } : p))}
@@ -2340,7 +2340,7 @@ export function BookingModal(props: BookingModalProps) {
 
                                 <div className="col-span-12 space-y-1.5">
                                   <div className="flex justify-between items-center px-1">
-                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Money to Collect ({String(pay.currency)})</span>
+                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">{t('booking.money_to_collect_usd').replace('(USD)', `(${String(pay.currency)})`)}</span>
                                     <button 
                                       onClick={() => {
                                         const otherRowsPaidUsd = svcPayList
@@ -2357,7 +2357,7 @@ export function BookingModal(props: BookingModalProps) {
                                       }}
                                       className="text-[9px] font-black text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100 transition-all"
                                     >
-                                      MATCH BALANCE
+                                      {t('booking.match_balance')}
                                     </button>
                                   </div>
                                   <div className="relative">
@@ -2392,14 +2392,14 @@ export function BookingModal(props: BookingModalProps) {
                           }}
                           className="w-full py-3 border-2 border-dashed border-[#2A2F36] rounded-2xl text-[10px] font-black text-[#9C9384] uppercase tracking-widest hover:border-[#0B6E4F] hover:text-[#0B6E4F] transition-all bg-[#1C232E]/30"
                         >
-                          + Add Another Currency
+                          + {t('booking.add_another_currency')}
                         </button>
 
                         <div className="sticky bottom-0 left-0 right-0 p-4 bg-[#1C232E]/80 backdrop-blur-md border-t border-[#2A2F36] -mx-4 -mb-4 rounded-b-[24px] z-30 flex flex-col gap-2">
                           {!isBalanceMatched && (
                             <div className="flex items-center justify-between px-2">
                               <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest">
-                                ⚠ Balance Mismatch: ${Math.abs(debtRemaining - tPaidUsd).toFixed(2)}
+                                ⚠ {t('booking.balance_mismatch')} ${Math.abs(debtRemaining - tPaidUsd).toFixed(2)}
                               </p>
                               <button 
                                 onClick={() => {
@@ -2417,7 +2417,7 @@ export function BookingModal(props: BookingModalProps) {
                                 }}
                                 className="text-[9px] font-black text-indigo-600 underline uppercase"
                               >
-                                Auto-Fix
+                                {t('booking.auto_fix')}
                               </button>
                             </div>
                           )}
@@ -2440,7 +2440,7 @@ export function BookingModal(props: BookingModalProps) {
                             disabled={loadingAction === 'checkout'}
                             className={`w-full py-4 rounded-2xl font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 shadow-xl ${!isBalanceMatched ? 'bg-[#1C232E]/50 text-[#9C9384] cursor-not-allowed shadow-none' : 'bg-[#0B6E4F] text-[#C9A227] hover:bg-[#0B6E4F]/80 hover:scale-[1.02] active:scale-95 shadow-[#0B6E4F]/20'}`}
                           >
-                            {loadingAction === 'checkout' ? 'Processing...' : 'Review & Pay Tab'}
+                            {loadingAction === 'checkout' ? 'Processing...' : t('booking.review_pay_tab')}
                           </button>
                         </div>
                       </div>
@@ -2455,7 +2455,7 @@ export function BookingModal(props: BookingModalProps) {
                 if (!hasAnyPrepaidItems && tabCount === 0 && gTotal <= 0.01 && (sel.collected_amount || 0) === 0 && !hasPendingUnsavedServices) return null;
                 return (
                   <div className="border border-[#2A2F36] rounded-2xl p-4 bg-[#1C232E]/50 space-y-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Guest Folio</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">{t('booking.guest_folio')}</p>
                     <div className="flex flex-wrap gap-2">
                       {receipts.map((r: any, idx: number) => (
                         <button
@@ -2464,7 +2464,7 @@ export function BookingModal(props: BookingModalProps) {
                           className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border-2 border-emerald-200 text-emerald-700 text-xs font-black rounded-xl hover:bg-emerald-100 transition-all active:scale-95"
                         >
                           <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-                          Tab {String(idx + 1)} — Settled
+                          {t('booking.tab_active')} {String(idx + 1)} — Settled
                         </button>
                       ))}
                       {sel.status === 'checked_in' && (
@@ -2473,13 +2473,13 @@ export function BookingModal(props: BookingModalProps) {
                           className="flex items-center gap-2 px-3 py-2 bg-indigo-50 border-2 border-indigo-300 text-indigo-700 text-xs font-black rounded-xl hover:bg-indigo-100 transition-all active:scale-95"
                         >
                           <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse shrink-0" />
-                          Tab {String(tabCount + 1)} — Active {gTotal > 0.01 ? <span className="font-mono text-[11px] ml-1">(${gTotal.toFixed(2)})</span> : '(Empty)'}
+                          {t('booking.tab_active')} {String(tabCount + 1)} — {t('booking.active')} {gTotal > 0.01 ? <span className="font-mono text-[11px] ml-1">(${gTotal.toFixed(2)})</span> : '(Empty)'}
                         </button>
                       )}
                     </div>
                     {gTotal > 0.01 && (
                       <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-1">
-                        ⚠ Guest cannot check out until active tab is settled
+                        ⚠ {t('booking.cannot_checkout_unsettled')}
                       </p>
                     )}
                   </div>

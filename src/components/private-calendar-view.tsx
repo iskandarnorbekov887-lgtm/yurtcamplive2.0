@@ -34,9 +34,6 @@ interface Props {
   onDayChange?: (day: string) => void;
 }
 
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-
 function pad(n: number) { return String(n).padStart(2, '0'); }
 function todayString() {
   const t = new Date();
@@ -45,6 +42,8 @@ function todayString() {
 
 export function PrivateCalendarView({ bookings, calendarEvents, onSelectBooking, onSelectCalendarEvent, onDayChange }: Props) {
   const { t, getLocale } = useLanguage();
+  const DAYS = [0, 1, 2, 3, 4, 5, 6].map(i => t(`day.${i}`));
+  const MONTHS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(i => t(`month.${i}`));
   const [currentDate, setCurrentDate] = useState(new Date());
   const todayStr = todayString();
   const [selectedDay, setSelectedDay] = useState<string>(todayStr);
@@ -165,8 +164,8 @@ export function PrivateCalendarView({ bookings, calendarEvents, onSelectBooking,
     <div className="mt-6 bg-[#1C232E] rounded-2xl border border-[#5C4A2E]/30 shadow-lg overflow-hidden">
       <div className="px-5 py-4 border-b border-[#5C4A2E]/30 flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-lg font-black text-[#EDE6D6] font-heading">Calendar View</h2>
-          <p className="text-xs text-[#9C9384]">Private Booking Calendar</p>
+          <h2 className="text-lg font-black text-[#EDE6D6] font-heading">{t('calview.title')}</h2>
+          <p className="text-xs text-[#9C9384]">{t('calview.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setCurrentDate(new Date(year, month - 1, 1))}
@@ -175,7 +174,7 @@ export function PrivateCalendarView({ bookings, calendarEvents, onSelectBooking,
           <button onClick={() => setCurrentDate(new Date(year, month + 1, 1))}
             className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#2A1518] text-[#9C9384] font-bold text-lg transition-all">›</button>
           <button onClick={() => { setCurrentDate(new Date()); setSelectedDay(todayStr); onDayChange?.(todayStr); }}
-            className="px-3 py-1 text-xs font-bold bg-[#0B6E4F]/20 text-[#0B6E4F] rounded-lg hover:bg-[#0B6E4F]/30 transition-all">Today</button>
+            className="px-3 py-1 text-xs font-bold bg-[#0B6E4F]/20 text-[#0B6E4F] rounded-lg hover:bg-[#0B6E4F]/30 transition-all">{t('calview.today')}</button>
         </div>
       </div>
 
@@ -214,7 +213,7 @@ export function PrivateCalendarView({ bookings, calendarEvents, onSelectBooking,
                         <button onClick={e => { e.stopPropagation(); setMoreDay(d); }}
                           style={{ position: 'absolute', bottom: 2, left: 4, right: 4 }}
                           className="text-[10px] font-bold text-[#9C9384] hover:text-[#0B6E4F] hover:bg-[#0B6E4F]/10 rounded px-1 py-0.5 text-left transition-colors z-10">
-                          +{hidden} more
+                          +{hidden} {t('calview.more_suffix')}
                         </button>
                       )}
                     </div>
@@ -252,7 +251,7 @@ export function PrivateCalendarView({ bookings, calendarEvents, onSelectBooking,
               <div onClick={e => e.stopPropagation()} className="bg-[#1C232E] rounded-2xl shadow-2xl border border-[#5C4A2E]/30 w-full max-w-md max-h-[80vh] overflow-y-auto">
                 <div className="px-5 py-4 border-b border-[#5C4A2E]/30 sticky top-0 bg-[#1C232E] flex items-center justify-between rounded-t-2xl">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-[#0B6E4F]">All Bookings</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-[#0B6E4F]">{t('calview.all_bookings')}</p>
                     <h3 className="text-sm font-black text-[#EDE6D6]">
                       {new Date(moreDay + 'T12:00:00').toLocaleDateString(getLocale(), { weekday: 'long', month: 'long', day: 'numeric' })}
                     </h3>
@@ -291,13 +290,13 @@ export function PrivateCalendarView({ bookings, calendarEvents, onSelectBooking,
         })()}
 
         <div className="mt-3 flex gap-4 flex-wrap pt-2 border-t border-[#5C4A2E]/30">
-          <span className="flex items-center gap-1.5 text-[10px] text-[#9C9384]"><span className="w-2 h-2 rounded-sm bg-[#B8860B] inline-block" />Confirmed</span>
-          <span className="flex items-center gap-1.5 text-[10px] text-[#9C9384]"><span className="w-2 h-2 rounded-sm bg-[#0B6E4F] inline-block" />✓ Checked In</span>
-          <span className="flex items-center gap-1.5 text-[10px] text-[#9C9384]"><span className="w-2 h-2 rounded-sm bg-[#5C4A2E] inline-block" />✈ Checked Out</span>
-          <span className="flex items-center gap-1.5 text-[10px] text-[#9C9384]"><span className="w-2 h-2 rounded-sm bg-[#722F37] inline-block" />✕ Cancelled</span>
-          <span className="flex items-center gap-1.5 text-[10px] text-[#9C9384]"><span className="w-2 h-2 rounded-sm bg-[#8B5CF6] inline-block" />🏠 Local</span>
-          <span className="flex items-center gap-1.5 text-[10px] text-[#9C9384]"><span className="w-2 h-2 rounded-sm bg-[#14B8A6] inline-block" />Pool</span>
-          <span className="flex items-center gap-1.5 text-[10px] text-[#9C9384]"><span className="w-2 h-2 rounded-sm bg-[#5C4A2E] inline-block" />📅 Calendar</span>
+          <span className="flex items-center gap-1.5 text-[10px] text-[#9C9384]"><span className="w-2 h-2 rounded-sm bg-[#B8860B] inline-block" />{t('calview.legend_confirmed')}</span>
+          <span className="flex items-center gap-1.5 text-[10px] text-[#9C9384]"><span className="w-2 h-2 rounded-sm bg-[#0B6E4F] inline-block" />{t('calview.legend_checked_in')}</span>
+          <span className="flex items-center gap-1.5 text-[10px] text-[#9C9384]"><span className="w-2 h-2 rounded-sm bg-[#5C4A2E] inline-block" />{t('calview.legend_checked_out')}</span>
+          <span className="flex items-center gap-1.5 text-[10px] text-[#9C9384]"><span className="w-2 h-2 rounded-sm bg-[#722F37] inline-block" />{t('calview.legend_cancelled')}</span>
+          <span className="flex items-center gap-1.5 text-[10px] text-[#9C9384]"><span className="w-2 h-2 rounded-sm bg-[#8B5CF6] inline-block" />{t('calview.legend_local')}</span>
+          <span className="flex items-center gap-1.5 text-[10px] text-[#9C9384]"><span className="w-2 h-2 rounded-sm bg-[#14B8A6] inline-block" />{t('calview.legend_pool')}</span>
+          <span className="flex items-center gap-1.5 text-[10px] text-[#9C9384]"><span className="w-2 h-2 rounded-sm bg-[#5C4A2E] inline-block" />{t('calview.legend_calendar')}</span>
         </div>
       </div>
     </div>

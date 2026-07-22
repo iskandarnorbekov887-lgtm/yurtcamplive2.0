@@ -64,7 +64,7 @@ interface Props {
 export function GoogleGuestAgenda({
   bookings, userRole, currentUserId, teamId, onCheckIn, onCheckOut, onUpdateBooking, onCancelBooking, onAddNewBooking, onRefresh,
 }: Props) {
-  const { getLocale } = useLanguage();
+  const { t, getLocale } = useLanguage();
   const [selectedItem, setSelectedItem] = useState<ListItem | null>(null);
   const sel = selectedItem?.booking ?? null;
 
@@ -1357,7 +1357,7 @@ export function GoogleGuestAgenda({
     <div className="space-y-4 pb-24 lg:pb-8">
       <div className="flex flex-wrap items-center justify-between gap-3 bg-[#1C232E] rounded-2xl border border-[#5C4A2E]/30 px-5 py-4 shadow-sm">
         <div>
-          <h2 className="text-lg font-black text-[#EDE6D6]">Guest Agenda</h2>
+          <h2 className="text-lg font-black text-[#EDE6D6]">{t('agenda.title')}</h2>
           <p className="text-xs text-[#9C9384]">Today’s guest management portal</p>
         </div>
         <div className="flex items-center gap-2">
@@ -1367,7 +1367,7 @@ export function GoogleGuestAgenda({
               className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center gap-2"
             >
               <span>+</span>
-              Add Booking
+              {t('agenda.add_booking')}
             </button>
           )}
         </div>
@@ -1409,14 +1409,14 @@ export function GoogleGuestAgenda({
             <div className="px-5 py-4 border-b border-[#5C4A2E]/30">
               <h3 className="text-sm font-black text-[#EDE6D6] flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#B8860B] animate-pulse" />
-                Upcoming & Active
+                {t('agenda.upcoming_active')}
               </h3>
               <p className="text-[10px] text-[#9C9384] mt-0.5">Next 7 days · Bookings & Google Calendar</p>
             </div>
             <div className="divide-y divide-[#5C4A2E]/20">
               {checkedIn.length > 0 && (
                 <div className="px-4 py-2">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-[#0B6E4F] mb-1 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#0B6E4F]" />Checked In · {checkedIn.length}</p>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-[#0B6E4F] mb-1 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#0B6E4F]" />{t('agenda.checked_in')} · {checkedIn.length}</p>
                   {checkedIn.map(item => (
                     <button key={item.key} onClick={() => handleSelect(item)} className="w-full text-left flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[#0B6E4F]/10 transition-all group">
                       <div className="min-w-0">
@@ -1430,7 +1430,7 @@ export function GoogleGuestAgenda({
               )}
               {upcoming.length > 0 && (
                 <div className="px-4 py-2">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-amber-600 mb-1 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#C9A227]/100 animate-pulse" />Arriving Soon · {upcoming.length}</p>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-amber-600 mb-1 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#C9A227]/100 animate-pulse" />{t('agenda.arriving_soon')} · {upcoming.length}</p>
                   {upcoming.map(item => (
                     <button key={item.key} onClick={() => {
                       if (item.booking) { handleSelect(item); }
@@ -1481,7 +1481,7 @@ export function GoogleGuestAgenda({
                 <div className="mb-4">
                   <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#C9A227] bg-[#C9A227]/10 rounded-xl mb-1 flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#C9A227]/100 animate-pulse" />
-                    Arriving · {arrivingGuestTotal} guests ({arrivingItems.length} bookings)
+                    {t('agenda.arriving')} · {arrivingGuestTotal} guests ({arrivingItems.length} bookings)
                   </p>
                   {arrivingItems.map(item => renderCard(item as any, !!(item.event && isGcCancelled(item.event))))}
                 </div>
@@ -1490,7 +1490,7 @@ export function GoogleGuestAgenda({
                 <div className="mb-4">
                   <p className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#0B6E4F] bg-[#0B6E4F]/10 rounded-xl mb-1 flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#0B6E4F]/100" />
-                    In Stay · {stayingGuestTotal} guests ({stayingItems.length} bookings)
+                    {t('agenda.in_stay')} · {stayingGuestTotal} guests ({stayingItems.length} bookings)
                   </p>
                   {stayingItems.map(item => renderCard(item as any, !!(item.event && isGcCancelled(item.event))))}
                 </div>

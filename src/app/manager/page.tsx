@@ -122,10 +122,10 @@ function ManagerPortal() {
 
           <nav className="space-y-1">
             {[
-              { id: 'checkin', label: 'Calendar', icon: Calendar },
-              { id: 'meals', label: 'Meals', icon: Utensils },
-              { id: 'procurement', label: 'Logistics', icon: ShoppingBag },
-              { id: 'inventory', label: 'Stores', icon: Box },
+              { id: 'checkin', label: t('nav.calendar'), icon: Calendar },
+              { id: 'meals', label: t('nav.meals'), icon: Utensils },
+              { id: 'procurement', label: t('nav.logistics'), icon: ShoppingBag },
+              { id: 'inventory', label: t('nav.stores'), icon: Box },
             ].map((item) => (
               <button
                 key={item.id}
@@ -153,7 +153,7 @@ function ManagerPortal() {
                 <LayoutDashboard size={18} className="text-[#C9A227] flex-shrink-0" />
                 {!isCollapsed && (
                   <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="whitespace-nowrap text-[10px]">
-                    CEO Executive
+                    {t('nav.ceo_executive')}
                   </motion.span>
                 )}
               </a>
@@ -164,10 +164,10 @@ function ManagerPortal() {
         <div className={`mt-auto p-6 border-t border-[#5C4A2E]/30 space-y-3 ${isCollapsed ? 'items-center flex flex-col' : ''}`}>
            <a 
              href="/financials" 
-             title={isCollapsed ? "Fiscal Recording" : undefined}
+             title={isCollapsed ? t('nav.fiscal_recording') : undefined}
              className={`block p-3 rounded-lg text-[10px] font-bold uppercase tracking-widest text-[#0B6E4F] bg-[#0B6E4F]/10 border border-[#0B6E4F]/30 hover:bg-[#0B6E4F]/20 transition-all text-center ${isCollapsed ? 'w-full flex justify-center' : ''}`}
            >
-             {isCollapsed ? "💰" : "💰 Fiscal Recording"}
+             {isCollapsed ? "💰" : `💰 ${t('nav.fiscal_recording')}`}
            </a>
            <button 
              onClick={signOut} 
@@ -186,7 +186,7 @@ function ManagerPortal() {
         {/* Top Bar */}
         <div className="sticky top-0 z-30 px-8 py-4 flex justify-between items-center bg-[#1C232E] backdrop-blur-sm border-b border-[#5C4A2E]/30">
           <div className="text-xs font-bold text-[#9C9384] uppercase tracking-widest">
-            {activeTab === 'checkin' ? 'Guest Calendar' : activeTab === 'meals' ? 'Catering' : activeTab === 'procurement' ? 'Logistics' : 'Stores'}
+            {activeTab === 'checkin' ? t('nav.guest_calendar') : activeTab === 'meals' ? t('nav.catering') : activeTab === 'procurement' ? t('nav.logistics') : t('nav.stores')}
           </div>
 
           <div className="flex items-center gap-3">
