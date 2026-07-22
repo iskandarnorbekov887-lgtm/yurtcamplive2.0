@@ -99,6 +99,13 @@ const translations = {
     'form.enter_worker_name': 'Enter or select worker name',
     'form.selected_date': 'Selected Date',
     'form.select_date_from_calendar': 'Select date from calendar below',
+    'form.meal_notes_example': 'e.g., No peanuts, Extra spicy',
+    'form.transport_from': 'From',
+    'form.transport_to': 'To',
+    'form.driver_name': 'Driver Name',
+    'form.price_usd': 'Price (USD)',
+    'form.guide_name': 'Guide Name',
+    'form.discount_reason': 'Reason for discount',
     
     // Status
     'status.confirmed': 'Confirmed',
@@ -125,6 +132,13 @@ const translations = {
     'msg.eur_total': 'EUR Total',
     'msg.burn_expenditure': 'Burn Expenditure',
     'msg.line_items': 'line items',
+    'msg.receipt_saved_image': 'Receipt saved as image!',
+    'msg.failed_save_image': 'Failed to save image. Try the "Print PDF" button instead.',
+    'msg.stay_dates_updated': 'Stay dates and adjustment updated.',
+    'msg.error_adjustment': 'Error executing adjustment',
+    'msg.sync_kitchen_failed': 'Saved locally but failed to sync to kitchen',
+    'msg.failed_add_tab': 'Failed to add to tab.',
+    'msg.failed_add_service': 'Failed to add service.',
 
     // Manager Specific
     'manager.checkin': 'Check-in / Check-out',
@@ -242,6 +256,13 @@ const translations = {
     'form.enter_worker_name': 'Ishchi nomini kiriting yoki tanlang',
     'form.selected_date': 'Tanlangan sana',
     'form.select_date_from_calendar': 'Quyidagi kalendaridan sanani tanlang',
+    'form.meal_notes_example': 'masalan, yongʻoqsiz, qoʻshimcha achchiq',
+    'form.transport_from': 'Qayerdan',
+    'form.transport_to': 'Qayerga',
+    'form.driver_name': 'Haydovchi ismi',
+    'form.price_usd': 'Narxi (USD)',
+    'form.guide_name': 'Gid ismi',
+    'form.discount_reason': 'Chegirma sababi',
     
     // Status
     'status.confirmed': 'Tasdiqlangan',
@@ -268,6 +289,13 @@ const translations = {
     'msg.eur_total': 'EUR jami',
     'msg.burn_expenditure': 'Xarajatlar',
     'msg.line_items': 'bandlar',
+    'msg.receipt_saved_image': 'Chek rasm sifatida saqlandi!',
+    'msg.failed_save_image': 'Rasmni saqlash muvaffaqiyatsiz. Buning oʻrniga "PDF chop etish" tugmasini sinib koʻring.',
+    'msg.stay_dates_updated': 'Qolish sanalari va tuzatish yangilandi.',
+    'msg.error_adjustment': 'Tuzatishni bajarishda xato',
+    'msg.sync_kitchen_failed': 'Mahalliy saqlandi, lekin oshxona bilan sinxronizatsiya qilinmadi',
+    'msg.failed_add_tab': 'Qoʻshish muvaffaqiyatsiz.',
+    'msg.failed_add_service': 'Xizmatni qoʻshish muvaffaqiyatsiz.',
 
     // Manager Specific
     'manager.checkin': 'Kelish / Ketish',

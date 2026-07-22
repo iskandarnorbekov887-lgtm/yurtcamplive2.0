@@ -5,6 +5,7 @@ import { formatSpace, isGcCancelled } from '@/utils/calendar-logic';
 import { LockedBookingPanel } from '@/components/LockedBookingPanel';
 import * as htmlToImage from 'html-to-image';
 import { buildReceiptLineItems } from '@/utils/receipt-logic';
+import { useLanguage } from '@/lib/language-context';
 
 function htmlDescriptionToText(html: string): string {
   if (!html) return '';
@@ -139,6 +140,8 @@ export function BookingModal(props: BookingModalProps) {
     fetchCbuRate, gTotal, gTotalWithPending, hasPendingUnsavedServices, debtRemaining, tPaidUsd, isBalanceMatched, today,
     dayEntries, finalizeTab, activeMeals, setActiveMeals, activeServices, setActiveServices
   } = props;
+
+  const { t } = useLanguage();
 
   console.trace('BookingModal render, svcAdults:', svcAdults);
 
@@ -494,10 +497,10 @@ export function BookingModal(props: BookingModalProps) {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      flash('✓ Receipt saved as image!');
+      flash('✓ ' + t('msg.receipt_saved_image'));
     } catch (err) {
       console.error('Export error:', err);
-      flash('⚠ Failed to save image. Try the "Print PDF" button instead.');
+      flash('⚠ ' + t('msg.failed_save_image'));
     } finally {
       setLoadingAction('');
     }
@@ -934,9 +937,9 @@ export function BookingModal(props: BookingModalProps) {
 
                               setEditingDates(false);
                               if (onRefresh) onRefresh();
-                              flash('✓ Stay dates and adjustment updated.');
+                              flash('✓ ' + t('msg.stay_dates_updated'));
                             } catch (e: any) {
-                              flash(`⚠ Error executing adjustment: ${e.message}`);
+                              flash(`⚠ ${t('msg.error_adjustment')}: ${e.message}`);
                             } finally {
                               setLoadingAction('');
                             }
@@ -1256,7 +1259,7 @@ export function BookingModal(props: BookingModalProps) {
                                 value={mealRequestNotes}
                                 onChange={(e) => setMealRequestNotes(e.target.value)}
                                 className="w-full px-4 py-3 bg-[#1C232E] border border-[#2A2F36] rounded-xl text-sm font-black text-[#EDE6D6] outline-none focus:border-[#0B6E4F] transition-all"
-                                placeholder="e.g., No peanuts, Extra spicy"
+                                placeholder={t('form.meal_notes_example')}
                               />
                             </div>
                           </div>
@@ -1295,7 +1298,7 @@ export function BookingModal(props: BookingModalProps) {
 
                               if (mealErr) {
                                 console.error('meal_requests insert failed:', mealErr);
-                                flash('⚠ Saved locally but failed to sync to kitchen: ' + mealErr.message);
+                                flash('⚠ ' + t('msg.sync_kitchen_failed') + ' ' + mealErr.message);
                                 setShowMealRequestModal(false);
                                 return;
                               }
@@ -1574,14 +1577,14 @@ export function BookingModal(props: BookingModalProps) {
                                     type="text"
                                     value={transportFrom}
                                     onChange={(e) => setTransportFrom(e.target.value)}
-                                    placeholder="From"
+                                    placeholder={t('form.transport_from')}
                                     className="px-3 py-2 bg-[#1C232E] border border-[#2A2F36] rounded-lg text-sm text-[#EDE6D6] placeholder:text-[#9C9384] focus:outline-none focus:border-[#0B6E4F]"
                                   />
                                   <input
                                     type="text"
                                     value={transportTo}
                                     onChange={(e) => setTransportTo(e.target.value)}
-                                    placeholder="To"
+                                    placeholder={t('form.transport_to')}
                                     className="px-3 py-2 bg-[#1C232E] border border-[#2A2F36] rounded-lg text-sm text-[#EDE6D6] placeholder:text-[#9C9384] focus:outline-none focus:border-[#0B6E4F]"
                                   />
                                 </div>
@@ -1589,7 +1592,7 @@ export function BookingModal(props: BookingModalProps) {
                                   type="text"
                                   value={transportDriver}
                                   onChange={(e) => setTransportDriver(e.target.value)}
-                                  placeholder="Driver Name"
+                                  placeholder={t('form.driver_name')}
                                   className="w-full px-3 py-2 bg-[#1C232E] border border-[#2A2F36] rounded-lg text-sm text-[#EDE6D6] placeholder:text-[#9C9384] focus:outline-none focus:border-[#0B6E4F]"
                                 />
                                 <div className="flex gap-2">
@@ -1597,7 +1600,7 @@ export function BookingModal(props: BookingModalProps) {
                                     type="number"
                                     value={transportPrice}
                                     onChange={(e) => setTransportPrice(e.target.value)}
-                                    placeholder="Price (USD)"
+                                    placeholder={t('form.price_usd')}
                                     className="flex-1 px-3 py-2 bg-[#1C232E] border border-[#2A2F36] rounded-lg text-sm text-[#EDE6D6] placeholder:text-[#9C9384] focus:outline-none focus:border-[#0B6E4F]"
                                   />
                                   <button
@@ -1622,7 +1625,7 @@ export function BookingModal(props: BookingModalProps) {
                                           team_id: teamId,
                                         }).select().single();
                                         if (error) {
-                                          flash('⚠ Failed to add service.');
+                                          flash('⚠ ' + t('msg.failed_add_service'));
                                           return;
                                         }
                                         setActiveServices([...activeServices, insertedRow]);
@@ -1683,7 +1686,7 @@ export function BookingModal(props: BookingModalProps) {
                                   type="text"
                                   value={guideName}
                                   onChange={(e) => setGuideName(e.target.value)}
-                                  placeholder="Guide Name"
+                                  placeholder={t('form.guide_name')}
                                   className="w-full px-3 py-2 bg-[#1C232E] border border-[#2A2F36] rounded-lg text-sm text-[#EDE6D6] placeholder:text-[#9C9384] focus:outline-none focus:border-[#0B6E4F]"
                                 />
                                 <div className="flex gap-2">
@@ -1795,7 +1798,7 @@ export function BookingModal(props: BookingModalProps) {
                         type="text"
                         value={svcDiscountReason}
                         onChange={e => setSvcDiscountReason(e.target.value)}
-                        placeholder="Reason for discount"
+                        placeholder={t('form.discount_reason')}
                         className="w-full px-3 py-2 bg-[#1C232E] border-2 border-[#0B6E4F]/40 rounded-lg text-sm font-bold text-[#EDE6D6] outline-none focus:border-[#0B6E4F]"
                       />
                     </div>
