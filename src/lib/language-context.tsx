@@ -151,6 +151,38 @@ const translations = {
     'msg.no_bookings': 'No bookings',
     'msg.no_bookings_day': 'No bookings for this day',
 
+    // Manager Notifications
+    'notif.title': 'Notifications',
+    'notif.none': 'No notifications',
+    'notif.show_more': 'Show More',
+    'notif.more_suffix': 'more',
+
+    // Manager Grocery
+    'grocery.purchase_mode': 'Grocery Purchase Mode',
+    'grocery.review_subtitle': 'Review and update the list from the Kitchen',
+    'grocery.new_request': 'New Request',
+    'grocery.no_active': 'No active grocery requests',
+    'grocery.mark_purchased': 'Mark as Purchased',
+    'grocery.waiting_verification': 'Waiting for Kitchen Verification...',
+
+    // Unified Folio
+    'folio.title': 'Unified Guest Folio',
+    'folio.fiscal_status': 'Fiscal Status',
+    'folio.prepaid_office': '[ PREPAID - OFFICE ]',
+    'folio.open_camp': '[ OPEN - CAMP ]',
+    'folio.service_breakdown': 'Service Breakdown',
+    'folio.accommodation': 'Accommodation',
+    'folio.catering_accepted': 'Catering (Accepted)',
+    'folio.gross_total': 'Gross Total',
+    'folio.balance_sheet': 'Balance Sheet',
+    'folio.settled_amount': 'Settled Amount',
+    'folio.current_live_tab': 'Current Live Tab',
+    'folio.prepaid': 'PREPAID',
+    'folio.pending_settlement': '⚠ Pending Settlement at Camp',
+    'folio.audit_trail': 'Audit Trail: Kitchen & Services',
+    'folio.live_sync': 'Live Sync',
+    'folio.no_kitchen_activity': 'No kitchen activity recorded.',
+
     // Manager Specific
     'manager.checkin': 'Check-in / Check-out',
     'manager.expenses': 'Log Expenses',
@@ -317,6 +349,38 @@ const translations = {
     'msg.confirm_extension': 'Uzaytirishni tasdiqlash',
     'msg.no_bookings': 'Band qilishlar yoʻq',
     'msg.no_bookings_day': 'Bu kun uchun band qilishlar yoʻq',
+
+    // Manager Notifications
+    'notif.title': 'Bildirishnomalar',
+    'notif.none': 'Bildirishnomalar yoʻq',
+    'notif.show_more': 'Koʻproq koʻrsatish',
+    'notif.more_suffix': 'ta',
+
+    // Manager Grocery
+    'grocery.purchase_mode': 'Mahsulot xarid rejimi',
+    'grocery.review_subtitle': 'Oshxonadan kelgan roʻyxatni koʻrib chiqing va yangilang',
+    'grocery.new_request': 'Yangi soʻrov',
+    'grocery.no_active': 'Faol mahsulot soʻrovlari yoʻq',
+    'grocery.mark_purchased': 'Xarid qilindi deb belgilash',
+    'grocery.waiting_verification': 'Oshxona tasdigʻini kutmoqda...',
+
+    // Unified Folio
+    'folio.title': 'Yagona mehmon hisobi',
+    'folio.fiscal_status': 'Moliyaviy holat',
+    'folio.prepaid_office': '[ OLDINDAN TOʻLANGAN - OFIS ]',
+    'folio.open_camp': '[ OCHIQ - LAGER ]',
+    'folio.service_breakdown': 'Xizmatlar tafsiloti',
+    'folio.accommodation': 'Turar joy',
+    'folio.catering_accepted': 'Ovqatlanish (Qabul qilingan)',
+    'folio.gross_total': 'Umumiy summa',
+    'folio.balance_sheet': 'Balans varaqasi',
+    'folio.settled_amount': 'Toʻlangan summa',
+    'folio.current_live_tab': 'Joriy hisob',
+    'folio.prepaid': 'OLDINDAN TOʻLANGAN',
+    'folio.pending_settlement': '⚠ Lagerda hisob-kitob kutilmoqda',
+    'folio.audit_trail': 'Tekshiruv jurnali: Oshxona va xizmatlar',
+    'folio.live_sync': 'Jonli sinxronizatsiya',
+    'folio.no_kitchen_activity': 'Oshxona faoliyati qayd etilmagan.',
 
     // Manager Specific
     'manager.checkin': 'Kelish / Ketish',

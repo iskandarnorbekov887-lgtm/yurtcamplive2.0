@@ -1,6 +1,7 @@
 'use client';
 
 import { Booking } from '@/lib/supabase';
+import { useLanguage } from '@/lib/language-context';
 
 interface UnifiedFolioProps {
   booking: Booking;
@@ -8,6 +9,7 @@ interface UnifiedFolioProps {
 }
 
 export function UnifiedFolio({ booking, pricing }: UnifiedFolioProps) {
+  const { t } = useLanguage();
   // 1. Live Tab Calculation
   // total_price is accommodation-only until settlement; meal/service costs are always summed live from meal_requests/booking_services below.
   const accommodationBase = booking.total_price || 0;
@@ -32,7 +34,7 @@ export function UnifiedFolio({ booking, pricing }: UnifiedFolioProps) {
     <div className="bg-[#1C232E] border border-[#5C4A2E]/30 p-6 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)] animate-in fade-in duration-300">
       <div className="flex justify-between items-start mb-6">
         <div>
-          <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-[0.2em]">Unified Guest Folio</p>
+          <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-[0.2em]">{t('folio.title')}</p>
           <h3 className="text-2xl font-black text-[#EDE6D6] uppercase tracking-tighter leading-none mt-1">
             {booking.guest_name}
           </h3>
@@ -43,11 +45,11 @@ export function UnifiedFolio({ booking, pricing }: UnifiedFolioProps) {
         </div>
         
         <div className="text-right">
-          <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest mb-1">Fiscal Status</p>
+          <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest mb-1">{t('folio.fiscal_status')}</p>
           <span className={`px-4 py-1.5 text-[10px] font-black uppercase border-2 border-[#5C4A2E]/30 shadow-[2px_2px_0px_0px_rgba(92,74,46,0.3)] ${
             isPrepaid ? 'bg-[#0B6E4F] text-[#C9A227]' : 'bg-[#1C232E] text-[#EDE6D6]'
           }`}>
-            {isPrepaid ? '[ PREPAID - OFFICE ]' : '[ OPEN - CAMP ]'}
+            {isPrepaid ? t('folio.prepaid_office') : t('folio.open_camp')}
           </span>
         </div>
       </div>
@@ -55,18 +57,18 @@ export function UnifiedFolio({ booking, pricing }: UnifiedFolioProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-y border-[#5C4A2E]/30 py-8 my-6">
         <div className="space-y-6">
           <div>
-            <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest mb-2">Service Breakdown</p>
+            <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest mb-2">{t('folio.service_breakdown')}</p>
             <div className="space-y-3">
               <div className="flex justify-between items-center text-xs">
-                <span className="font-black text-[#EDE6D6] uppercase tracking-tight">Accommodation</span>
+                <span className="font-black text-[#EDE6D6] uppercase tracking-tight">{t('folio.accommodation')}</span>
                 <span className="font-mono font-black text-[#C9A227]">${accommodationBase.toFixed(2)}</span>
               </div>
               <div className="flex justify-between items-center text-xs">
-                <span className="font-black text-[#EDE6D6] uppercase tracking-tight">Catering (Accepted)</span>
+                <span className="font-black text-[#EDE6D6] uppercase tracking-tight">{t('folio.catering_accepted')}</span>
                 <span className="font-mono font-black text-[#C9A227]">${mealsBill.toFixed(2)}</span>
               </div>
               <div className="pt-2 border-t border-[#5C4A2E]/20 flex justify-between items-center text-sm font-black">
-                <span className="uppercase tracking-tight text-[#EDE6D6]">Gross Total</span>
+                <span className="uppercase tracking-tight text-[#EDE6D6]">{t('folio.gross_total')}</span>
                 <span className="font-mono text-[#C9A227]">${totalBill.toFixed(2)}</span>
               </div>
             </div>
@@ -75,20 +77,20 @@ export function UnifiedFolio({ booking, pricing }: UnifiedFolioProps) {
         
         <div className="bg-[#0F1419]/50 p-6 border border-[#5C4A2E]/30 flex flex-col justify-between">
           <div>
-            <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest mb-4">Balance Sheet</p>
+            <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest mb-4">{t('folio.balance_sheet')}</p>
             <div className="flex justify-between items-center mb-2">
-              <span className="text-[10px] font-black text-[#9C9384] uppercase">Settled Amount</span>
+              <span className="text-[10px] font-black text-[#9C9384] uppercase">{t('folio.settled_amount')}</span>
               <span className="font-mono text-sm font-black text-[#0B6E4F]">${collected.toFixed(2)}</span>
             </div>
           </div>
           
           <div className="pt-4 border-t-2 border-[#5C4A2E]/30 border-dashed">
-            <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest mb-1">Current Live Tab</p>
+            <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest mb-1">{t('folio.current_live_tab')}</p>
             <p className={`text-4xl font-mono font-black tracking-tighter ${isPrepaid ? 'text-[#9C9384] italic' : 'text-[#EDE6D6]'}`}>
-              {isPrepaid ? 'PREPAID' : `$${liveTab.toFixed(2)}`}
+              {isPrepaid ? t('folio.prepaid') : `$${liveTab.toFixed(2)}`}
             </p>
             {!isPrepaid && liveTab > 0 && (
-              <p className="text-[9px] font-black text-[#722F37] uppercase tracking-widest mt-2 animate-pulse">⚠ Pending Settlement at Camp</p>
+              <p className="text-[9px] font-black text-[#722F37] uppercase tracking-widest mt-2 animate-pulse">{t('folio.pending_settlement')}</p>
             )}
           </div>
         </div>
@@ -97,12 +99,12 @@ export function UnifiedFolio({ booking, pricing }: UnifiedFolioProps) {
       {/* Transaction Log */}
       <div className="space-y-3">
         <div className="flex justify-between items-center">
-          <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Audit Trail: Kitchen & Services</p>
-          <span className="text-[8px] font-black bg-[#0B6E4F] text-[#C9A227] px-2 py-0.5 uppercase tracking-tighter">Live Sync</span>
+          <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">{t('folio.audit_trail')}</p>
+          <span className="text-[8px] font-black bg-[#0B6E4F] text-[#C9A227] px-2 py-0.5 uppercase tracking-tighter">{t('folio.live_sync')}</span>
         </div>
         <div className="grid gap-2">
           {(booking.meal_requests || []).length === 0 ? (
-            <p className="text-[10px] text-[#9C9384] italic">No kitchen activity recorded.</p>
+            <p className="text-[10px] text-[#9C9384] italic">{t('folio.no_kitchen_activity')}</p>
           ) : (
             (booking.meal_requests || []).map((m: any, i: number) => (
               <div key={i} className="flex justify-between items-center p-3 bg-[#0F1419] border border-[#5C4A2E]/20 hover:border-[#5C4A2E] transition-colors group">

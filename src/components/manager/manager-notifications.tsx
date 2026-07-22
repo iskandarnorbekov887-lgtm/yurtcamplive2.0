@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { supabase, type Booking, type Notification } from '@/lib/supabase';
+import { useLanguage } from '@/lib/language-context';
 
 interface ManagerNotificationsProps {
   notifications: Notification[];
@@ -20,16 +21,17 @@ export function ManagerNotifications({
   onRefresh,
   onClose,
 }: ManagerNotificationsProps) {
+  const { t } = useLanguage();
   const [showAll, setShowAll] = useState(false);
 
   return (
     <div className="absolute right-0 top-12 w-96 bg-[#1C232E] rounded-2xl shadow-2xl border border-[#5C4A2E]/30 z-50 max-h-[28rem] overflow-y-auto">
       <div className="p-4 border-b border-[#5C4A2E]/30 flex items-center justify-between">
-        <h3 className="font-black text-[#EDE6D6] font-heading">Notifications</h3>
+        <h3 className="font-black text-[#EDE6D6] font-heading">{t('notif.title')}</h3>
         <button onClick={onClose} className="text-[#9C9384] hover:text-[#EDE6D6] text-lg font-bold">×</button>
       </div>
       {notifications.length === 0 ? (
-        <p className="p-6 text-[#9C9384] text-sm text-center">No notifications</p>
+        <p className="p-6 text-[#9C9384] text-sm text-center">{t('notif.none')}</p>
       ) : (
         <div className="divide-y divide-[#5C4A2E]/20">
           {(showAll ? notifications : notifications.slice(0, 5)).map((notification) => (
@@ -84,7 +86,7 @@ export function ManagerNotifications({
               onClick={() => setShowAll(true)}
               className="w-full py-3 text-sm font-bold text-[#0B6E4F] hover:bg-[#0B6E4F]/10 transition-all"
             >
-              Show More ({notifications.length - 5} more)
+              {t('notif.show_more')} ({notifications.length - 5} {t('notif.more_suffix')})
             </button>
           )}
         </div>
