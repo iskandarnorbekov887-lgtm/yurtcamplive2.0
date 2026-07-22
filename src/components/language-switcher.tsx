@@ -37,18 +37,6 @@ export function LanguageSwitcher({ variant = 'dark' }: { variant?: 'light' | 'da
       >
         UZ
       </button>
-      <button
-        onClick={() => setLanguage('ru')}
-        className={`px-3 py-1.5 rounded-lg text-[11px] font-black transition-all ${
-          language === 'ru' 
-            ? 'bg-[#0B6E4F] text-[#C9A227] shadow-lg' 
-            : isDark 
-              ? 'text-[#9C9384] hover:bg-[#2A1518]' 
-              : 'text-[#9C9384] hover:bg-[#2A1518]'
-        }`}
-      >
-        RU
-      </button>
     </div>
   );
 }

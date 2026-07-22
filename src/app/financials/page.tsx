@@ -111,14 +111,14 @@ function ManagerFinancials() {
     try {
       // Validate worker name for workers income category
       if (type === 'expense' && category === 'workers income' && !workerName.trim()) {
-        setMessage('Please enter a worker name for workers income');
+        setMessage(t('msg.please_enter_worker_name'));
         setSubmitting(false);
         return;
       }
 
       const amountValue = parseFloat(amount);
       if (isNaN(amountValue) || amountValue <= 0) {
-        setMessage('Please enter a valid amount');
+        setMessage(t('msg.please_enter_valid_amount'));
         setSubmitting(false);
         return;
       }
@@ -139,7 +139,7 @@ function ManagerFinancials() {
 
       if (insertError) throw insertError;
 
-      setMessage('Record saved successfully!');
+      setMessage(t('msg.record_saved'));
       fetchRecentExpenses();
       fetchWorkerNames();
       
@@ -149,7 +149,7 @@ function ManagerFinancials() {
       setAmount('');
       setWorkerName('');
     } catch (err: any) {
-      setMessage(`Error: ${err.message}`);
+      setMessage(`${t('msg.error')}: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -198,7 +198,7 @@ function ManagerFinancials() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Form Section */}
           <div className="bg-[#1C232E] rounded-2xl shadow-xl border border-[#5C4A2E]/30 p-8">
-          <h2 className="text-2xl font-black text-[#EDE6D6] mb-6 font-heading">Record Transaction</h2>
+          <h2 className="text-2xl font-black text-[#EDE6D6] mb-6 font-heading">{t('btn.record_transaction')}</h2>
           
           {message && (
             <div className={`mb-4 p-4 rounded-xl ${
@@ -237,11 +237,11 @@ function ManagerFinancials() {
 
             {/* Selected Date Display */}
             <div>
-              <label className="block text-sm font-black text-[#EDE6D6] mb-2">Selected Date</label>
+              <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('form.selected_date')}</label>
               <div className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl bg-[#0B6E4F]/10 text-[#C9A227] font-black">
                 {new Date(date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
               </div>
-              <p className="text-xs text-[#9C9384] mt-1 font-semibold">Select date from calendar below</p>
+              <p className="text-xs text-[#9C9384] mt-1 font-semibold">{t('form.select_date_from_calendar')}</p>
             </div>
 
             {/* Category */}
@@ -254,7 +254,7 @@ function ManagerFinancials() {
                   className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#1C232E]"
                   required
                 >
-                  <option value="">Select category</option>
+                  <option value="">{t('form.select_category')}</option>
                   {expenseCategories.map((cat) => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
@@ -265,7 +265,7 @@ function ManagerFinancials() {
             {/* Worker Name - only for workers income category */}
             {type === 'expense' && category === 'workers income' && (
               <div className="relative">
-                <label className="block text-sm font-black text-[#EDE6D6] mb-2">Worker Name *</label>
+                <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('form.guest_name')} *</label>
                 <input
                   type="text"
                   value={workerName}
@@ -276,7 +276,7 @@ function ManagerFinancials() {
                   }}
                   onFocus={() => setShowWorkerDropdown(true)}
                   onBlur={() => setTimeout(() => setShowWorkerDropdown(false), 200)}
-                  placeholder="Enter or select worker name"
+                  placeholder={t('form.enter_worker_name')}
                   className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#1C232E]"
                   required
                 />
@@ -324,7 +324,7 @@ function ManagerFinancials() {
                 step="0.01"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                placeholder="Enter amount in UZS"
+                placeholder={t('form.enter_amount_uzs')}
                 className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#1C232E]"
                 required
               />
@@ -336,7 +336,7 @@ function ManagerFinancials() {
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe the transaction..."
+                placeholder={t('form.describe_transaction')}
                 rows={3}
                 className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#1C232E]"
                 required
@@ -348,7 +348,7 @@ function ManagerFinancials() {
               disabled={submitting}
               className="w-full py-4 bg-[#0B6E4F] text-[#C9A227] rounded-xl font-black uppercase tracking-widest hover:bg-[#0B6E4F] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-[#0B6E4F]/30"
             >
-              {submitting ? 'Saving...' : 'Save Record'}
+              {submitting ? t('btn.saving') : t('btn.save_record')}
             </button>
           </form>
           </div>

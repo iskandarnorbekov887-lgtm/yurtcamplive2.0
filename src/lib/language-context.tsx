@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-type Language = 'en' | 'uz' | 'ru';
+type Language = 'en' | 'uz';
 
 interface LanguageContextType {
   language: Language;
@@ -39,6 +39,9 @@ const translations = {
     'btn.reset_data': 'Reset All Data',
     'btn.check_in': 'Check In',
     'btn.check_out': 'Check Out',
+    'btn.save_record': 'Save Record',
+    'btn.saving': 'Saving...',
+    'btn.record_transaction': 'Record Transaction',
     
     // Calendar
     'cal.beds': 'BEDS',
@@ -89,6 +92,13 @@ const translations = {
     'form.guide_required': 'Guide Required',
     'form.special_requests': 'Special Requests',
     'form.payment.partial': 'Partial',
+    'form.select_category': 'Select category',
+    'form.enter_amount': 'Enter amount',
+    'form.enter_amount_uzs': 'Enter amount in UZS',
+    'form.describe_transaction': 'Describe the transaction...',
+    'form.enter_worker_name': 'Enter or select worker name',
+    'form.selected_date': 'Selected Date',
+    'form.select_date_from_calendar': 'Select date from calendar below',
     
     // Status
     'status.confirmed': 'Confirmed',
@@ -98,6 +108,23 @@ const translations = {
     'status.unpaid': 'Unpaid',
     'status.checked_in': 'Checked In',
     'status.completed': 'Completed',
+    
+    // Messages
+    'msg.record_saved': 'Record saved successfully!',
+    'msg.please_enter_valid_amount': 'Please enter a valid amount',
+    'msg.please_enter_worker_name': 'Please enter a worker name for workers income',
+    'msg.error': 'Error',
+    'msg.no_transactions_for_date': 'No transactions for this date',
+    'msg.zero_burn_logged': 'Zero Burn Logged',
+    'msg.collected_today': 'Collected Today',
+    'msg.uzs_collected_today': 'UZS Collected Today',
+    'msg.cash_box': 'Camp Cash Box',
+    'msg.physical_drawer_contents': 'Physical drawer contents',
+    'msg.usd_total': 'USD Total',
+    'msg.uzs_total': 'UZS (Sum)',
+    'msg.eur_total': 'EUR Total',
+    'msg.burn_expenditure': 'Burn Expenditure',
+    'msg.line_items': 'line items',
 
     // Manager Specific
     'manager.checkin': 'Check-in / Check-out',
@@ -155,6 +182,9 @@ const translations = {
     'btn.reset_data': "Ma'lumotlarni tozalash",
     'btn.check_in': 'Kelish',
     'btn.check_out': 'Ketish',
+    'btn.save_record': 'Saqlash',
+    'btn.saving': 'Saqlanmoqda...',
+    'btn.record_transaction': 'Tranzaksiyani yozish',
     
     // Calendar
     'cal.beds': 'OʻRINLAR',
@@ -205,6 +235,13 @@ const translations = {
     'form.guide_required': 'Gid kerak',
     'form.special_requests': 'Maxsus soʻrovlar',
     'form.payment.partial': 'Qisman toʻlangan',
+    'form.select_category': 'Kategoriyani tanlang',
+    'form.enter_amount': 'Summani kiriting',
+    'form.enter_amount_uzs': 'Summani UZS da kiriting',
+    'form.describe_transaction': 'Tranzaksiyani tasvirlang...',
+    'form.enter_worker_name': 'Ishchi nomini kiriting yoki tanlang',
+    'form.selected_date': 'Tanlangan sana',
+    'form.select_date_from_calendar': 'Quyidagi kalendaridan sanani tanlang',
     
     // Status
     'status.confirmed': 'Tasdiqlangan',
@@ -214,6 +251,23 @@ const translations = {
     'status.unpaid': "To'lanmagan",
     'status.checked_in': 'Kelgan',
     'status.completed': 'Tugallangan',
+    
+    // Messages
+    'msg.record_saved': 'Yozuv muvaffaqiyatli saqlandi!',
+    'msg.please_enter_valid_amount': 'Iltimos, toʻgʻri summani kiriting',
+    'msg.please_enter_worker_name': 'Iltimos, ishchi nomini kiriting',
+    'msg.error': 'Xato',
+    'msg.no_transactions_for_date': 'Bu sana uchun tranzaksiyalar yoʻq',
+    'msg.zero_burn_logged': 'Xarajatlar yoʻq',
+    'msg.collected_today': 'Bugun yigʻilgan',
+    'msg.uzs_collected_today': 'Bugun yigʻilgan UZS',
+    'msg.cash_box': 'Kassa qutisi',
+    'msg.physical_drawer_contents': 'Jismoniy quti mazmuni',
+    'msg.usd_total': 'USD jami',
+    'msg.uzs_total': 'UZS (soʻm)',
+    'msg.eur_total': 'EUR jami',
+    'msg.burn_expenditure': 'Xarajatlar',
+    'msg.line_items': 'bandlar',
 
     // Manager Specific
     'manager.checkin': 'Kelish / Ketish',
@@ -242,122 +296,6 @@ const translations = {
     'month.4': 'May', 'month.5': 'Iyun', 'month.6': 'Iyul', 'month.7': 'Avgust',
     'month.8': 'Sentabr', 'month.9': 'Oktabr', 'month.10': 'Noyabr', 'month.11': 'Dekabr',
     'day.0': 'YAK', 'day.1': 'DUSH', 'day.2': 'SESH', 'day.3': 'CHOR', 'day.4': 'PAY', 'day.5': 'JUM', 'day.6': 'SHA',
-  },
-  ru: {
-    // Auth
-    'login.title': 'Isky Camp Поток',
-    'login.subtitle': 'Управление Isky Camp нового поколения',
-    'login.email': 'Электронная почта',
-    'login.password': 'Пароль',
-    'login.signin': 'Войти',
-    'login.signup': 'Регистрация',
-    'login.no_account': 'Нет аккаунта? Зарегистрируйтесь',
-    'login.has_account': 'Уже есть аккаунт? Войдите',
-    'login.manager_default': 'Новые аккаунты по умолчанию имеют роль Менеджера.',
-    
-    // Portals
-    'portal.ceo': 'Центр управления CEO',
-    'portal.manager': 'Портал Менеджера',
-    'portal.cook': 'Портал Повара',
-    
-    // Tabs
-    'tab.occupancy': 'Заезд / Выезд',
-    'tab.finance': 'Финансы',
-    'tab.team': 'Команда',
-    
-    // Buttons
-    'btn.logout': 'Выйти',
-    'btn.new_booking': 'Новое бронирование',
-    'btn.reset_data': 'Сбросить данные',
-    'btn.check_in': 'Заехать',
-    'btn.check_out': 'Выехать',
-    
-    // Calendar
-    'cal.beds': 'МЕСТА',
-    'cal.camps': 'ISKY CAMPS',
-    'cal.total_capacity': 'ОБЩАЯ ВМЕСТИМОСТЬ',
-    'cal.available': 'ДОСТУПНО',
-    'cal.partial': 'ЧАСТИЧНО',
-    'cal.full': 'ПОЛНОСТЬЮ',
-    'cal.occupancy': 'ЗАПОЛНЕННОСТЬ',
-    'cal.fiscal_ledger': 'Финансовая книга',
-    'cal.monthly_expenditure': 'МЕСЯЧНЫЕ РАСХОДЫ',
-    'cal.spent': 'ПОТРАЧЕНО',
-    'cal.no_expenses': 'Нет расходов',
-    
-    // Manifests
-    'manifest.guest': 'СПИСОК ГОСТЕЙ',
-    'manifest.financial': 'ФИНАНСОВЫЙ ОТЧЕТ',
-    'manifest.total_spent': 'ОБЩИЕ РАСХОДЫ',
-    'manifest.groceries': 'ПРОДУКТЫ',
-    'manifest.party_size': 'КОЛИЧЕСТВО ЛЮДЕЙ',
-    'manifest.total_rate': 'ОБЩАЯ СТАВКА',
-    
-    // Tables
-    'table.name': 'ИМЯ',
-    'table.email': 'EMAIL',
-    'table.role': 'РОЛЬ',
-    'table.item': 'НАИМЕНОВАНИЕ',
-    'table.valuation': 'СТОИМОСТЬ',
-    'table.category': 'КАТЕГОРИЯ',
-    'table.date': 'ДАТА',
-    'table.camp': 'ISKY CAMP',
-    'table.dates': 'ДАТЫ',
-    'table.status': 'СТАТУС',
-    'table.price': 'ЦЕНА',
-    
-    // Forms
-    'form.guest_name': 'Имя гостя',
-    'form.check_in': 'Дата заезда',
-    'form.check_out': 'Дата выезда',
-    'form.total_price': 'Общая цена',
-    'form.camp_select': 'Выберите Isky Camp',
-    'form.source': 'Источник',
-    'form.notes': 'Особые примечания',
-    'form.meal_notes': 'Диетические требования',
-    'form.num_people': 'Количество людей',
-    'form.transportation': 'Детали транспорта',
-    'form.meal_preference': 'Предпочтения по еде',
-    'form.guide_required': 'Нужен гид',
-    'form.special_requests': 'Особые запросы',
-    'form.payment.partial': 'Частично оплачено',
-    
-    // Status
-    'status.confirmed': 'Подтверждено',
-    'status.pending': 'Ожидает',
-    'status.cancelled': 'Отменено',
-    'status.paid': 'Оплачено',
-    'status.unpaid': 'Не оплачено',
-    'status.checked_in': 'Заехал',
-    'status.completed': 'Завершено',
-
-    // Manager Specific
-    'manager.checkin': 'Заезд / Выезд',
-    'manager.expenses': 'Внести расходы',
-    'manager.bookings': 'Требует внимания',
-    'manager.today_checkins': 'Заезды сегодня',
-    'manager.today_checkouts': 'Выезды сегодня',
-    'manager.camp_overview': 'Обзор статуса Isky Camp',
-    'manager.no_checkins': 'Нет заездов сегодня',
-    'manager.no_checkouts': 'Нет выездов сегодня',
-    'manager.mark_checked_in': 'Отметить как заехавший',
-    'manager.needs_cleaning': 'Требует уборки',
-    'manager.cleaned': 'Убрано',
-    
-    // Cook Specific
-    'cook.meal_orders': 'Заказы еды',
-    'cook.grocery_list': 'Список продуктов',
-    'cook.current_meal': 'Текущая еда',
-    'cook.special_instructions': 'Особые инструкции по еде',
-    'cook.no_guests': 'Нет гостей в настоящее время',
-    'cook.meals_to_prepare': 'еды приготовить',
-    'cook.send_to_manager': 'Отправить менеджеру',
-    
-    // Dates
-    'month.0': 'Январь', 'month.1': 'Февраль', 'month.2': 'Март', 'month.3': 'Апрель',
-    'month.4': 'Май', 'month.5': 'Июнь', 'month.6': 'Июль', 'month.7': 'Август',
-    'month.8': 'Сентябрь', 'month.9': 'Октябрь', 'month.10': 'Ноябрь', 'month.11': 'Декабрь',
-    'day.0': 'ВОС', 'day.1': 'ПОН', 'day.2': 'ВТО', 'day.3': 'СРЕ', 'day.4': 'ЧЕТ', 'day.5': 'ПЯТ', 'day.6': 'СУБ',
   }
 };
 
@@ -367,8 +305,12 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguage] = useState<Language>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('language') as Language;
-      if (saved && (saved === 'en' || saved === 'uz' || saved === 'ru')) {
+      if (saved === 'en' || saved === 'uz') {
         return saved;
+      }
+      // Fallback for invalid or 'ru' values
+      if (saved === 'ru') {
+        localStorage.removeItem('language');
       }
     }
     return 'en';

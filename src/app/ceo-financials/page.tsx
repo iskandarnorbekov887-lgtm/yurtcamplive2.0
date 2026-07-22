@@ -333,21 +333,21 @@ function CEOFinancialCalendar() {
               <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
             </div>
             <div>
-              <h2 className="text-sm font-bold uppercase tracking-widest">Camp Cash Box</h2>
-              <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest mt-0.5">Physical drawer contents</p>
+              <h2 className="text-sm font-bold uppercase tracking-widest">{t('msg.cash_box')}</h2>
+              <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest mt-0.5">{t('msg.physical_drawer_contents')}</p>
             </div>
           </div>
           <div className="grid grid-cols-3 gap-8">
             <div className="space-y-1">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">USD Total</p>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('msg.usd_total')}</p>
               <p className="text-2xl font-data font-bold tracking-tight text-white">${cashBox.USD.toLocaleString()}</p>
             </div>
             <div className="space-y-1 border-x border-white/5 px-8">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">UZS (Sum)</p>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('msg.uzs_total')}</p>
               <p className="text-2xl font-data font-bold tracking-tight text-white">{cashBox.UZS.toLocaleString()} <span className="text-[10px] text-slate-500 font-medium">SUM</span></p>
             </div>
             <div className="space-y-1">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">EUR Total</p>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('msg.eur_total')}</p>
               <p className="text-2xl font-data font-bold tracking-tight text-white">€{cashBox.EUR.toLocaleString()}</p>
             </div>
           </div>
@@ -441,7 +441,7 @@ function CEOFinancialCalendar() {
                   className="px-3 py-1.5 bg-[#0B6E4F] text-[#C9A227] rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-[#0B6E4F]/80 transition-all flex items-center gap-1"
                 >
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                  Record Transaction
+                  {t('btn.record_transaction')}
                 </button>
                 <button
                   onClick={() => setSelectedDay(null)}
@@ -490,7 +490,7 @@ function CEOFinancialCalendar() {
                   </div>
                   <div className="bg-[#1C232E]/50 rounded-lg p-6 border border-[#5C4A2E]/30 shadow-sm flex items-center justify-between">
                     <div>
-                      <p className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest mb-1">UZS Collected Today</p>
+                      <p className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest mb-1">{t('msg.uzs_collected_today')}</p>
                       <p className="text-4xl font-data font-bold text-[#EDE6D6] tracking-tighter">
                         {(() => {
                           const uzsCollected = dayReceipts
@@ -676,7 +676,7 @@ function CEOFinancialCalendar() {
 
                   {/* Right: Expenses by Category */}
                   <div>
-                    <h4 className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest mb-4">Burn Expenditure</h4>
+                    <h4 className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest mb-4">{t('msg.burn_expenditure')}</h4>
                     <div className="space-y-4">
                       {(() => {
                         const expensesByCategory = dayFinances
@@ -711,7 +711,7 @@ function CEOFinancialCalendar() {
                               <div className="flex justify-between items-start">
                                 <div>
                                   <p className="font-bold text-[#EDE6D6] text-xs">{data.category}</p>
-                                  <p className="text-[10px] text-[#9C9384] font-medium uppercase mt-0.5">{data.count} line items</p>
+                                  <p className="text-[10px] text-[#9C9384] font-medium uppercase mt-0.5">{data.count} {t('msg.line_items')}</p>
                                 </div>
                                 <p className="font-data font-bold text-[#EDE6D6] text-sm">
                                   {formatCurrency(data.total, data.currency)}
@@ -721,7 +721,7 @@ function CEOFinancialCalendar() {
                           ))
                         ) : (
                           <div className="py-12 border-2 border-dashed border-[#5C4A2E]/30 rounded-lg text-center">
-                            <p className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest">Zero Burn Logged</p>
+                            <p className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest">{t('msg.zero_burn_logged')}</p>
                           </div>
                         );
                       })()}
@@ -743,7 +743,7 @@ function CEOFinancialCalendar() {
             >
               <div className="p-6 h-full flex flex-col">
                 <div className="flex justify-between items-center mb-6 pb-4 border-b border-[#5C4A2E]/30">
-                  <h3 className="text-lg font-bold text-[#EDE6D6] uppercase tracking-widest">Record Transaction</h3>
+                  <h3 className="text-lg font-bold text-[#EDE6D6] uppercase tracking-widest">{t('btn.record_transaction')}</h3>
                   <button
                     onClick={() => setSlideOutOpen(false)}
                     className="p-1.5 hover:bg-[#2A1518] rounded-md transition-all text-[#9C9384] hover:text-[#EDE6D6]"
@@ -808,7 +808,7 @@ function CEOFinancialCalendar() {
                         className="w-full px-3 py-2 border border-[#5C4A2E]/30 rounded-lg bg-[#0F1419] text-[#EDE6D6] text-sm focus:border-[#0B6E4F] focus:ring-1 focus:ring-[#0B6E4F]/20 transition-all"
                         required
                       >
-                        <option value="">Select category</option>
+                        <option value="">{t('form.select_category')}</option>
                         {expenseCategories.map((cat) => (
                           <option key={cat} value={cat}>{cat}</option>
                         ))}
@@ -839,7 +839,7 @@ function CEOFinancialCalendar() {
                       step="0.01"
                       value={transactionAmount}
                       onChange={(e) => setTransactionAmount(e.target.value)}
-                      placeholder="Enter amount in UZS"
+                      placeholder={t('form.enter_amount_uzs')}
                       className="w-full px-3 py-2 border border-[#5C4A2E]/30 rounded-lg bg-[#0F1419] text-[#EDE6D6] text-sm focus:border-[#0B6E4F] focus:ring-1 focus:ring-[#0B6E4F]/20 transition-all"
                       required
                     />
