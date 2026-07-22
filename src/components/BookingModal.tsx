@@ -143,8 +143,6 @@ export function BookingModal(props: BookingModalProps) {
 
   const { t, getLocale } = useLanguage();
 
-  console.trace('BookingModal render, svcAdults:', svcAdults);
-
   const isStaff = userRole === 'Manager' || userRole === 'CEO';
   const sel = selectedItem?.booking;
 
@@ -177,7 +175,7 @@ export function BookingModal(props: BookingModalProps) {
   const [showTransportSummary, setShowTransportSummary] = useState(true);
   const [showGuideSummary, setShowGuideSummary] = useState(true);
 
-  const [showCreatePopover, setShowCreatePopover] = useState<false | 'checkin' | 'only'>(false);
+  const [showCreatePopover, setShowCreatePopover] = useState(false);
   const [newAdults, setNewAdults] = useState<string | number>(1);
   const [newChildren, setNewChildren] = useState<string | number>(0);
 
@@ -458,11 +456,11 @@ export function BookingModal(props: BookingModalProps) {
         </head>
         <body>
           <div class="receipt-header">
-            <h1 style="margin: 0; font-weight: 900; text-transform: uppercase;">Final Receipt</h1>
+            <h1 style="margin: 0; font-weight: 900; text-transform: uppercase;">${t('receipt.title')}</h1>
             <p style="font-size: 12px; color: #64748b; margin-top: 8px;">ID: ${selectedReceipt?.id || 'PENDING'}</p>
           </div>
-          <div class="row"><span class="label">Guest</span> <strong>${sel.guest_name}</strong></div>
-          <div class="row"><span class="label">Stay</span> <strong>${sel.check_in} — ${sel.check_out}</strong></div>
+          <div class="row"><span class="label">${t('receipt.guest')}</span> <strong>${sel.guest_name}</strong></div>
+          <div class="row"><span class="label">${t('receipt.stay_period')}</span> <strong>${sel.check_in} — ${sel.check_out}</strong></div>
           <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 20px 0;">
           <div id="items-content">
             ${printContent.querySelector('.space-y-4')?.innerHTML || ''}
@@ -482,7 +480,6 @@ export function BookingModal(props: BookingModalProps) {
       return;
     }
     setLoadingAction('exporting');
-    console.log('Starting receipt export with html-to-image...');
     try {
       const dataUrl = await htmlToImage.toPng(receiptRef.current, {
         backgroundColor: '#ffffff',
@@ -490,7 +487,6 @@ export function BookingModal(props: BookingModalProps) {
         pixelRatio: 2,
         skipFonts: true, // Speeds up generation
       });
-      console.log('Image generated successfully');
       const link = document.createElement('a');
       link.download = `receipt-${selectedReceipt?.id || 'pending'}.png`;
       link.href = dataUrl;
@@ -597,19 +593,12 @@ export function BookingModal(props: BookingModalProps) {
             </div>
             <div className="flex flex-col gap-2">
                 <button
-                  onClick={() => setShowCreatePopover('checkin')}
+                  onClick={() => setShowCreatePopover(true)}
                   disabled={loadingAction === 'creating'}
                   className="w-full py-3 bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2 transition-all disabled:opacity-60 border border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]"
                 >
                   {loadingAction === 'creating' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '→'}
                   {t('gcal.create_booking_checkin')}
-                </button>
-                <button
-                  onClick={() => setShowCreatePopover('only')}
-                  disabled={loadingAction === 'creating'}
-                  className="w-full py-3 bg-[#1C232E] hover:bg-[#2A1518] text-[#9C9384] text-[11px] font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2 transition-all disabled:opacity-60 border border-[#2A2F36]"
-                >
-                  {t('gcal.create_booking_only')}
                 </button>
             </div>
 
@@ -649,7 +638,7 @@ export function BookingModal(props: BookingModalProps) {
                         const adultsFinal = Math.max(1, parseInt(String(newAdults)) || 1);
                         const childrenFinal = Math.max(0, parseInt(String(newChildren)) || 0);
                         props.handleCreateFromEvent(
-                          showCreatePopover === 'checkin',
+                          true,
                           adultsFinal,
                           childrenFinal
                         );
@@ -726,10 +715,8 @@ export function BookingModal(props: BookingModalProps) {
             {isCheckoutDay && isStaff && (
               <button
                 onClick={async () => {
-                  console.log('[Check Out Guest button] clicked, handleGuestCheckOut exists:', !!props.handleGuestCheckOut);
                   if (props.handleGuestCheckOut) {
                     const result = await props.handleGuestCheckOut();
-                    console.log('[Check Out Guest button] result:', result);
                   }
                 }}
                 disabled={loadingAction === 'guestcheckout'}
@@ -894,7 +881,7 @@ export function BookingModal(props: BookingModalProps) {
                               // total_price represents accommodation base price + date adjustments only.
                               // Service/meal costs are never included here - they live in meal_requests/booking_services.
                               const settledReceipts = getSettledReceiptsForSel ? getSettledReceiptsForSel() : [];
-                              const isTab1Closed = settledReceipts.length > 0 || (sel.collected_amount || 0) > 0 || sel.is_prepaid || sel.is_accommodation_prepaid;
+                              const isTab1Closed = settledReceipts.length > 0 || (sel.collected_amount || 0) > 0 || sel.is_accommodation_prepaid;
                               
                               const currentMeta: any = Array.isArray(sel.meta) ? { days: sel.meta } : (sel.meta || {});
 
@@ -1011,7 +998,7 @@ export function BookingModal(props: BookingModalProps) {
                     }
 
                     // ── NORMAL editable Stay Configuration ──────────────────────────────────
-                    const isTab1Closed = getSettledReceiptsForSel().length > 0 || (sel.collected_amount || 0) > 0 || sel.is_prepaid || sel.is_accommodation_prepaid;
+                    const isTab1Closed = getSettledReceiptsForSel().length > 0 || (sel.collected_amount || 0) > 0 || sel.is_accommodation_prepaid;
                     const isDatesChanged = editCheckOut !== sel.check_out;
                     const isExtended = editCheckOut > sel.check_out;
                     const isShortened = editCheckOut < sel.check_out;
@@ -1019,10 +1006,10 @@ export function BookingModal(props: BookingModalProps) {
                     return (
                       <div className="border border-[#2A2F36] p-4 bg-[#1C232E] shadow-[2px_2px_0px_0px_rgba(92,74,46,0.3)] space-y-4">
                         <div className="flex justify-between items-center">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Stay Configuration</p>
-                          {hasAnyPrepaidItems && (
+                          <p className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">{t('stay.config_title')}</p>
+                          {isPrepaid && (
                             <span className="px-2 py-0.5 text-[8px] font-black bg-emerald-100 text-emerald-700 rounded uppercase border border-emerald-300">
-                              ✓ Original Stay Prepaid
+                              ✓ {t('stay.original_prepaid')}
                             </span>
                           )}
                         </div>
@@ -1031,7 +1018,7 @@ export function BookingModal(props: BookingModalProps) {
                         <div className="grid grid-cols-2 gap-4 pb-4 border-b border-slate-100">
                           <div className="space-y-1.5">
                             <div className="flex items-center justify-between">
-                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Adults *</label>
+                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t('booking.adults')} *</label>
                               {adultsChildrenLocked && !isTab1Closed && (
                                 <button
                                   onClick={() => {
@@ -1041,7 +1028,7 @@ export function BookingModal(props: BookingModalProps) {
                                   }}
                                   className="text-[9px] font-black text-[#0B6E4F] uppercase tracking-wider hover:text-[#0B6E4F]/80"
                                 >
-                                  Edit
+                                  {t('stay.edit')}
                                 </button>
                               )}
                             </div>
@@ -1058,7 +1045,7 @@ export function BookingModal(props: BookingModalProps) {
                             />
                           </div>
                           <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Children under 12</label>
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t('stay.children_under_12')}</label>
                             <input 
                               type="number" 
                               value={loadingGuestCounts ? '' : (localChildren ?? '')} 
@@ -1079,7 +1066,7 @@ export function BookingModal(props: BookingModalProps) {
                             disabled={loadingAction === 'save'}
                             className="w-full py-2 px-4 bg-[#0B6E4F] text-[#C9A227] text-[10px] font-black uppercase tracking-wider border border-[#0B6E4F]/40 hover:bg-[#0B6E4F]/80 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            {loadingAction === 'save' ? 'Saving...' : 'Save Guest Count'}
+                            {loadingAction === 'save' ? 'Saving...' : t('stay.save_guest_count')}
                           </button>
                         )}
 
@@ -1087,12 +1074,12 @@ export function BookingModal(props: BookingModalProps) {
                           <div className="space-y-4">
                             <div className="space-y-1.5">
                               <div className="flex items-center justify-between">
-                                <label className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">Accommodation</label>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">{t('stay.accommodation_label')}</label>
                                 <div className="flex items-center gap-3">
                                   {sel.is_accommodation_prepaid ? (
-                                    <span className="text-[10px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">Prepaid</span>
+                                    <span className="text-[10px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">{t('folio.prepaid')}</span>
                                   ) : (
-                                    <span className="text-[10px] font-black bg-emerald-500 text-white px-2 py-0.5 rounded-md uppercase tracking-wider">✓ Paid</span>
+                                    <span className="text-[10px] font-black bg-emerald-500 text-white px-2 py-0.5 rounded-md uppercase tracking-wider">✓ {t('stay.paid_badge')}</span>
                                   )}
                                 </div>
                               </div>
@@ -1103,7 +1090,7 @@ export function BookingModal(props: BookingModalProps) {
 
                             {isExtended && (
                               <div className="animate-in fade-in slide-in-from-top-2 duration-200">
-                                <label className="text-[10px] font-black uppercase tracking-widest text-indigo-600">Extension Fee (USD)</label>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-indigo-600">{t('stay.extension_fee')}</label>
                                 <div className="relative mt-1.5">
                                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-400 font-mono text-xs">+$</span>
                                   <input 
@@ -1123,10 +1110,10 @@ export function BookingModal(props: BookingModalProps) {
                           <div className="space-y-4">
                             <div className="space-y-1.5">
                               <div className="flex items-center justify-between">
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Accommodation</label>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t('stay.accommodation_label')}</label>
                                 <div className="flex items-center gap-3">
-                                  {hasAnyPrepaidItems && (
-                                    <span className="text-[10px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">Prepaid</span>
+                                  {isPrepaid && (
+                                    <span className="text-[10px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">{t('folio.prepaid')}</span>
                                   )}
                                   <button
                                     type="button"
@@ -1293,7 +1280,6 @@ export function BookingModal(props: BookingModalProps) {
                                 status: 'Pending',
                                 team_id: teamId,
                               };
-                              console.log('Inserting into meal_requests:', mealRow);
                               const { data: insertedMeal, error: mealErr } = await supabase.from('meal_requests').insert(mealRow).select().single();
 
                               if (mealErr) {
@@ -1358,7 +1344,7 @@ export function BookingModal(props: BookingModalProps) {
                   )}
 
                   {isRoomStay && (() => {
-                    const isTab1Closed = getSettledReceiptsForSel().length > 0 || (sel.collected_amount || 0) > 0 || sel.is_prepaid || sel.is_accommodation_prepaid;
+                    const isTab1Closed = getSettledReceiptsForSel().length > 0 || (sel.collected_amount || 0) > 0 || sel.is_accommodation_prepaid;
                     return (
                       <div className="border border-[#2A2F36] rounded-xl p-4 space-y-3 bg-[#1C232E]">
                         <div className="flex justify-between items-center">
@@ -1384,7 +1370,6 @@ export function BookingModal(props: BookingModalProps) {
                                 onClick={async () => {
                                   const newValue = !isFoodPrepaid;
                                   const idsToUpdate = activeUnpaidMeals.map((m: any) => m.meal_id || m.id);
-                                  console.log('[FoodPrepaid] idsToUpdate:', idsToUpdate, 'types:', idsToUpdate.map(id => typeof id));
                                   if (idsToUpdate.length === 0) return;
 
                                   // Optimistic update — flip immediately, matches accommodation's
@@ -1400,7 +1385,6 @@ export function BookingModal(props: BookingModalProps) {
                                     .in('id', idsToUpdate);
 
                                   if (error) {
-                                    console.error('[FoodPrepaid] Update failed:', JSON.stringify(error, null, 2));
                                     // Roll back on failure
                                     setActiveMeals(activeMeals.map((m: any) =>
                                       idSet.has(m.meal_id || m.id) ? { ...m, prepaid: !newValue } : m
@@ -1815,7 +1799,7 @@ export function BookingModal(props: BookingModalProps) {
               )}
 
               {isStaff && !isPOS && sel.status !== 'completed' && (() => {
-                const isTab1Closed = getSettledReceiptsForSel().length > 0 || (sel.collected_amount || 0) > 0 || sel.is_prepaid || sel.is_accommodation_prepaid;
+                const isTab1Closed = getSettledReceiptsForSel().length > 0 || (sel.collected_amount || 0) > 0 || sel.is_accommodation_prepaid;
                 return (
                   <div className="bg-[#0B6E4F] rounded-2xl p-5 text-[#C9A227] shadow-xl shadow-[#0B6E4F]/20 animate-in fade-in zoom-in duration-500 border border-[#0B6E4F]/40">
                     <div className="flex justify-between items-center mb-4">
@@ -1824,7 +1808,7 @@ export function BookingModal(props: BookingModalProps) {
                     </div>
                   
                   <div className="space-y-2">
-                    {(svcAmount > 0 || (hasAnyPrepaidItems && (sel.collected_amount || 0) === 0)) && (() => {
+                    {(svcAmount > 0 || (isPrepaid && (sel.collected_amount || 0) === 0)) && (() => {
                       const currentMeta: any = Array.isArray(sel.meta) ? { days: sel.meta } : (sel.meta || {});
                       const lastAdjustment = parseFloat(currentMeta.last_adjustment) || 0;
                       const isExtended = lastAdjustment > 0;
@@ -1891,14 +1875,14 @@ export function BookingModal(props: BookingModalProps) {
 
                                     return (
                                       <>
-                                        Nights: {nights} × Adults: {adults}{children > 0 ? `, Children: ${children}` : ''}
+                                        {t('folio.nights_label')}: {nights} × {t('folio.adults_label')}: {adults}{children > 0 ? `, ${t('booking.children')}: ${children}` : ''}
                                         {nightlyRate && <span className="ml-2 opacity-60 font-normal">(${nightlyRate}/night)</span>}
                                       </>
                                     );
                                   })()}
                                 </span>
                                 {isPrepaid ? (
-                                  <span className="text-[9px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">PREPAID</span>
+                                  <span className="text-[9px] font-black bg-emerald-400 text-emerald-900 px-2 py-0.5 rounded-md uppercase tracking-wider">{t('folio.prepaid')}</span>
                                 ) : (
                                   <span className="font-black text-sm text-slate-100">${String(svcAmount.toFixed(2))}</span>
                                 )}
@@ -2100,13 +2084,13 @@ export function BookingModal(props: BookingModalProps) {
                                           <div key={groupIdx}>
                                             <div className="mb-1 last:mb-0">
                                               <div className="font-bold text-sm mb-1.5 text-slate-200">
-                                                {firstItem.mealType} — {formattedDate}
+                                                {firstItem.mealType === 'Lunch' ? t('folio.lunch') : t('folio.dinner')} — {formattedDate}
                                               </div>
                                               <div className="pl-3 border-l-2 border-white/10 space-y-1.5 mb-2">
                                                 {group.map((item, itemIdx) => (
                                                   <div key={itemIdx} className="flex justify-between items-center text-sm">
                                                     <span className="font-medium text-slate-300">
-                                                      Size: {item.category} <span className="ml-1 opacity-60 font-normal">{item.qty} x ${item.unitPrice.toFixed(2)}{item.vegQty > 0 ? ` (${item.vegQty} veg)` : ''}</span>
+                                                      {t('folio.size_label')}: {item.category} <span className="ml-1 opacity-60 font-normal">{item.qty} x ${item.unitPrice.toFixed(2)}{item.vegQty > 0 ? ` (${item.vegQty} veg)` : ''}</span>
                                                     </span>
                                                     <div className="flex items-center gap-2">
                                                       {item.isManualEntry && (
@@ -2207,7 +2191,7 @@ export function BookingModal(props: BookingModalProps) {
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <p className="text-[10px] font-black uppercase tracking-widest text-indigo-100">
-                          {(gTotalWithPending ?? gTotal) > 0 ? t('booking.current_tab_balance') : (gTotalWithPending ?? gTotal) < 0 ? 'Refund Due to Guest' : 'Tab Settled (Zero Balance)'}
+                          {(gTotalWithPending ?? gTotal) > 0 ? t('booking.current_tab_balance') : (gTotalWithPending ?? gTotal) < 0 ? t('folio.refund_due_to_guest') : t('folio.tab_settled')}
                         </p>
                         {sel.payment_status === 'paid' && (
                           <span className="font-mono text-[9px] font-black uppercase tracking-widest border border-[#2A2F36] px-2 py-0.5 bg-[#1C232E] text-[#0B6E4F]">
@@ -2227,7 +2211,6 @@ export function BookingModal(props: BookingModalProps) {
               {(() => {
                 const hasTabItems = svcAmount > 0 || hasAnyPrepaidItems || activeServices.length > 0 || activeMeals.some(m => !m.is_paid && (m.status === 'confirmed' || m.status === 'served'));
                 const hasUnpaidServices = activeServices.some((s: any) => !s.is_paid);
-                console.log('🔍 PAYMENT SECTION DEBUG:', { hasAnyPrepaidItems, gTotal, gTotalWithPending, debtRemaining, hasUnpaidServices, hasTabItems, activeServices: activeServices.length, activeMeals: activeMeals.length });
                 if (!isStaff || sel.status === 'completed' || (!hasAnyPrepaidItems && Math.abs(gTotalWithPending ?? gTotal) <= 0.01 && !hasUnpaidServices && Math.abs(debtRemaining) <= 0.01)) return null;
                 return (
                     <div className="bg-[#1C232E] border border-[#2A2F36] p-6 space-y-4 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)]">
@@ -2423,7 +2406,6 @@ export function BookingModal(props: BookingModalProps) {
                           )}
                           <button
                             onClick={() => {
-                              console.log('🟢 REVIEW BUTTON CLICKED:', { isPrepaid, svcAmount, isBalanceMatched, debtRemaining, tPaidUsd, userRole });
                               const receipts = getSettledReceiptsForSel();
                               const hasSettled = receipts.length > 0 || (sel.collected_amount || 0) > 0;
                               if (!isPrepaid && svcAmount <= 0 && !hasSettled) {
@@ -2503,12 +2485,12 @@ export function BookingModal(props: BookingModalProps) {
                             </svg>
                           </div>
                           
-                          <h3 className="text-2xl font-black uppercase tracking-tight mb-2">Final Receipt</h3>
+                          <h3 className="text-2xl font-black uppercase tracking-tight mb-2">{t('receipt.title')}</h3>
                           
                           
                           {selectedReceipt && (
                             <div className="bg-[#1C232E]/20 backdrop-blur-md border border-[#2A2F36] rounded-lg px-3 py-1.5 text-[9px] font-black uppercase tracking-widest">
-                              Settled: {new Date(selectedReceipt.settled_at || selectedReceipt.date || Date.now()).toLocaleString()}
+                              {t('receipt.settled')}: {new Date(selectedReceipt.settled_at || selectedReceipt.date || Date.now()).toLocaleString()}
                             </div>
                           )}
                         </div>
@@ -2517,11 +2499,11 @@ export function BookingModal(props: BookingModalProps) {
                     <div className="p-6 space-y-6">
                       <div className="space-y-4">
                         <div className="pb-4 border-b border-[#2A2F36]">
-                          <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest mb-1">Guest</p>
+                          <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest mb-1">{t('receipt.guest')}</p>
                           <p className="text-xl font-black text-[#EDE6D6] leading-tight">{String(sel.guest_name)}</p>
                         </div>
                         <div className="flex justify-between items-center pt-2">
-                          <span className="text-[11px] font-black text-[#9C9384] uppercase tracking-widest">Stay Period</span>
+                          <span className="text-[11px] font-black text-[#9C9384] uppercase tracking-widest">{t('receipt.stay_period')}</span>
                           <span className="text-base font-black text-[#EDE6D6] flex items-center gap-2">
                             {String(sel.check_in)}
                             <svg className="w-4 h-4 text-[#9C9384]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2539,16 +2521,17 @@ export function BookingModal(props: BookingModalProps) {
                               {(() => {
                                 const all = getSettledReceiptsForSel();
                                 const idx = [...all].reverse().findIndex(r => r.id === selectedReceipt.id);
-                                return `Tab #${idx !== -1 ? idx + 1 : '?'}`;
-                              })()} — {String(selectedReceipt.id)}
+                                const tabNum = idx !== -1 ? idx + 1 : '?';
+                                return `${t('receipt.tab_breakdown').replace('{n}', String(tabNum))} — ${String(selectedReceipt.id)}`;
+                              })()}
                             </p>
                             
                             <div className="space-y-3">
                               {((selectedReceipt.items?.accommodation || 0) > 0 || selectedReceipt.items?.isPrepaid) && (
                                 <div className="flex justify-between items-center text-sm">
-                                  <span className="text-slate-400 font-medium">Accommodation ×1</span>
+                                  <span className="text-slate-400 font-medium">{t('folio.accommodation_label')} {t('receipt.qty_suffix')}1</span>
                                   {selectedReceipt.items?.isPrepaid ? (
-                                    <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">PREPAID</span>
+                                    <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">{t('folio.prepaid')}</span>
                                   ) : (
                                     <span className="text-slate-500 font-bold">${String((selectedReceipt.items.accommodation || 0).toFixed(2))}</span>
                                   )}
@@ -2565,7 +2548,7 @@ export function BookingModal(props: BookingModalProps) {
                                   const displayPrice = charged !== undefined ? charged : (count * price);
                                   return (
                                     <div key={type} className="flex justify-between items-center text-sm">
-                                      <span className="text-slate-400 font-medium capitalize">{type} ×{String(count)}</span>
+                                      <span className="text-slate-400 font-medium capitalize">{type === 'lunch' ? t('folio.lunch') : type === 'dinner' ? t('folio.dinner') : type} {t('receipt.qty_suffix')}{String(count)}</span>
                                       {isMealPrepaid ? (
                                         <span className="text-[9px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">PREPAID</span>
                                       ) : (
@@ -2611,27 +2594,27 @@ export function BookingModal(props: BookingModalProps) {
 
                               {(selectedReceipt.items?.stay_adjustment > 0) && (
                                 <div className="flex justify-between items-center text-sm">
-                                  <span className="text-slate-400 font-medium">Stay Extension Fee</span>
+                                  <span className="text-slate-400 font-medium">{t('stay.extension_fee')}</span>
                                   <span className="text-slate-500 font-bold">${String(selectedReceipt.items.stay_adjustment.toFixed(2))}</span>
                                 </div>
                               )}
 
                               {(selectedReceipt.items?.drinks?.length > 0) && (
                                 <div className="flex justify-between items-center text-sm">
-                                  <span className="text-slate-400 font-medium">Drinks</span>
+                                  <span className="text-slate-400 font-medium">{t('receipt.drinks')}</span>
                                   <span className="text-slate-500 font-bold">${String(selectedReceipt.items.drinks.reduce((s: number, d: any) => s + (d.price * d.quantity), 0).toFixed(2))}</span>
                                 </div>
                               )}
 
                               <div className="flex justify-between items-center pt-4 border-t border-slate-100 mt-2">
-                                <span className="text-base font-black text-slate-400">Tab Total</span>
+                                <span className="text-base font-black text-slate-400">{t('receipt.tab_total')}</span>
                                 <span className="text-lg font-black text-[#6366f1]">${String((selectedReceipt.total || 0).toFixed(2))}</span>
                               </div>
                             </div>
                           </div>
 
                           <div className="bg-[#f0fdf4] rounded-[24px] p-5 border border-emerald-100/50 space-y-4">
-                            <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em]">Payments Received</p>
+                            <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em]">{t('receipt.payments_received')}</p>
                             <div className="space-y-2">
                               {selectedReceipt.payments?.map((p: any, i: number) => (
                                 <div key={i} className="flex justify-between items-center text-sm">
@@ -2640,7 +2623,7 @@ export function BookingModal(props: BookingModalProps) {
                                 </div>
                               ))}
                               <div className="flex justify-between items-center pt-3 border-t border-emerald-200/50 mt-1">
-                                <span className="text-sm font-black text-emerald-700">Total Paid (USD Equiv.)</span>
+                                <span className="text-sm font-black text-emerald-700">{t('receipt.total_paid_usd')}</span>
                                 <span className="text-base font-black text-emerald-600">${String((selectedReceipt.total || 0).toFixed(2))}</span>
                               </div>
                             </div>
@@ -2652,7 +2635,7 @@ export function BookingModal(props: BookingModalProps) {
                           <div className="space-y-4">
                             <div className="flex justify-between items-center">
                               <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-2.5 py-1 rounded-md w-fit border border-indigo-100">
-                                Tab #{getSettledReceiptsForSel().length + 1} Breakdown
+                                {`Tab #${getSettledReceiptsForSel().length + 1} ${t('receipt.tab_breakdown').replace('#{n}', String(getSettledReceiptsForSel().length + 1))}`}
                               </p>
                               <button 
                                 onClick={handleSaveServices}
@@ -2660,15 +2643,15 @@ export function BookingModal(props: BookingModalProps) {
                                 className="text-[10px] font-black text-emerald-600 hover:text-emerald-700 flex items-center gap-1 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100 transition-all active:scale-95 disabled:opacity-50"
                               >
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
-                                {loadingAction === 'save' ? 'SAVING...' : 'SAVE CHOICES'}
+                                {loadingAction === 'save' ? 'SAVING...' : t('receipt.save_choices')}
                               </button>
                             </div>
                             <div className="space-y-3 bg-[#1C232E]/50 rounded-2xl p-4 border border-[#2A2F36]">
                               {(svcAmount > 0 || (isPrepaid && (sel.collected_amount || 0) === 0)) && (
                                 <div className="flex justify-between items-center text-sm">
-                                  <span className="text-slate-400 font-medium">Accommodation ×1</span>
+                                  <span className="text-slate-400 font-medium">{t('folio.accommodation_label')} {t('receipt.qty_suffix')}1</span>
                                   {isPrepaid && (sel.collected_amount || 0) === 0 ? (
-                                    <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">PREPAID</span>
+                                    <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">{t('folio.prepaid')}</span>
                                   ) : (
                                     <span className="text-slate-500 font-bold">${String(svcAmount.toFixed(2))}</span>
                                   )}
@@ -2691,14 +2674,14 @@ export function BookingModal(props: BookingModalProps) {
                                 const dinnerTotalQty = dinnerAdultQty + dinnerChildQty;
                                 
                                 const items = [
-                                  lunchTotalQty > 0 && { name: 'Lunch', count: lunchTotalQty, adultQty: lunchAdultQty, childQty: lunchChildQty, price: pricing.lunch_price, childPrice: pricing.lunch_child_price },
-                                  dinnerTotalQty > 0 && { name: 'Dinner', count: dinnerTotalQty, adultQty: dinnerAdultQty, childQty: dinnerChildQty, price: pricing.dinner_price, childPrice: pricing.dinner_child_price },
-                                  svcDiscount > 0 && { name: 'Discount', price: -svcDiscount }
+                                  lunchTotalQty > 0 && { name: t('folio.lunch'), count: lunchTotalQty, adultQty: lunchAdultQty, childQty: lunchChildQty, price: pricing.lunch_price, childPrice: pricing.lunch_child_price },
+                                  dinnerTotalQty > 0 && { name: t('folio.dinner'), count: dinnerTotalQty, adultQty: dinnerAdultQty, childQty: dinnerChildQty, price: pricing.dinner_price, childPrice: pricing.dinner_child_price },
+                                  svcDiscount > 0 && { name: t('receipt.discount'), price: -svcDiscount }
                                 ].filter(Boolean) as any[];
 
                                 return items.map((item, i) => (
                                   <div key={i} className="flex justify-between items-center text-sm">
-                                    <span className="text-slate-400 font-medium">{item.name} {item.count ? `×${item.count}` : ''}</span>
+                                    <span className="text-slate-400 font-medium">{item.name} {item.count ? `${t('receipt.qty_suffix')}${item.count}` : ''}</span>
                                     <span className="text-slate-500 font-bold">${String((item.adultQty !== undefined ? ((item.adultQty * item.price) + (item.childQty * item.childPrice)) : (item.count ? item.count * item.price : item.price)).toFixed(2))}</span>
                                   </div>
                                 ));
@@ -2714,7 +2697,7 @@ export function BookingModal(props: BookingModalProps) {
                                   <>
                                     {drinkServices.map((s: any) => (
                                       <div key={s.id} className="flex justify-between items-center text-sm">
-                                        <span className="text-slate-400 font-medium">{s.details?.name || 'Drink'} ({s.currency})</span>
+                                        <span className="text-slate-400 font-medium">{s.details?.name || t('receipt.drink')} ({s.currency})</span>
                                         {s.is_paid ? (
                                           <span className="text-[9px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">PREPAID</span>
                                         ) : (
@@ -2739,7 +2722,7 @@ export function BookingModal(props: BookingModalProps) {
                                         <div key={s.id} className="flex justify-between items-start text-sm">
                                           <div className="flex flex-col">
                                             <span className="text-slate-400 font-medium">
-                                              {s.details?.name || 'Extra'}
+                                              {s.details?.name || t('receipt.extra')}
                                             </span>
                                             {isTransport && s.details?.from && (
                                               <span className="text-[10px] text-[#9C9384]">
@@ -2767,7 +2750,7 @@ export function BookingModal(props: BookingModalProps) {
                               })()}
 
                               <div className="flex justify-between items-center pt-3 border-t border-slate-200 mt-1">
-                                <span className="text-sm font-black text-slate-400">Current Total</span>
+                                <span className="text-sm font-black text-slate-400">{t('receipt.current_total')}</span>
                                 <span className="text-base font-black text-[#6366f1]">${String((gTotalWithPending ?? gTotal).toFixed(2))}</span>
                               </div>
                             </div>
@@ -2778,15 +2761,11 @@ export function BookingModal(props: BookingModalProps) {
                       {(() => {
                         const hasTabItems = svcAmount > 0 || hasAnyPrepaidItems || activeServices.length > 0 ||
                           activeMeals.some(m => !m.is_paid && (m.status === 'confirmed' || m.status === 'served'));
-                        console.log('🔍 SETTLE BUTTON DEBUG:', { hasAnyPrepaidItems, gTotal, hasTabItems });
                         if (!hasTabItems) return null;
-                        console.log('TAB DEBUG:', { gTotal, isBalanceMatched, debtRemaining, tPaidUsd, isPrepaid, svcAmount, svcPayList });
-                        console.log('🔵 BUTTON STATE:', { loadingAction, isBalanceMatched, gTotal, isPrepaid });
                         return (
                       <div className="space-y-4">
                         <button
                             onClick={async () => {
-                              console.log('🔴 BUTTON CLICKED');
                               if (finalizeTab) {
                                 setLoadingAction('finalize');
                                 try {
@@ -2810,7 +2789,7 @@ export function BookingModal(props: BookingModalProps) {
                             disabled={loadingAction === 'finalize' || (!isBalanceMatched && gTotal > 0)}
                             className={`w-full py-4 rounded-2xl font-black uppercase text-[11px] tracking-widest transition-all shadow-lg active:scale-95 ${(isBalanceMatched || gTotal === 0) ? 'bg-[#0B6E4F] text-[#C9A227] shadow-[#0B6E4F]/30 hover:bg-[#0B6E4F]/80' : 'bg-[#1C232E]/50 text-[#9C9384] cursor-not-allowed'}`}
                           >
-                            {loadingAction === 'finalize' ? 'PROCESSING...' : gTotal === 0 ? 'CLOSE & SETTLE TAB' : isBalanceMatched ? 'SETTLE & CLOSE TAB' : 'BALANCE MISMATCH'}
+                            {loadingAction === 'finalize' ? 'PROCESSING...' : gTotal === 0 ? 'CLOSE & SETTLE TAB' : isBalanceMatched ? t('receipt.settle_close_tab') : 'BALANCE MISMATCH'}
                           </button>
                       </div>
                         );

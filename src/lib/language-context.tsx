@@ -100,6 +100,11 @@ const translations = {
     'form.enter_worker_name': 'Enter or select worker name',
     'form.selected_date': 'Selected Date',
     'form.select_date_from_calendar': 'Select date from calendar below',
+    'form.expense': 'Expense',
+    'form.income': 'Income',
+    'form.transactions': 'Transactions',
+    'form.financial_tracker': 'Financial Tracker',
+    'form.manager_recording': 'Manager Recording',
     'form.meal_notes_example': 'e.g., No peanuts, Extra spicy',
     'form.transport_from': 'From',
     'form.transport_to': 'To',
@@ -182,6 +187,13 @@ const translations = {
     'folio.audit_trail': 'Audit Trail: Kitchen & Services',
     'folio.live_sync': 'Live Sync',
     'folio.no_kitchen_activity': 'No kitchen activity recorded.',
+    'folio.nights_label': 'Nights',
+    'folio.adults_label': 'Adults',
+    'folio.lunch': 'Lunch',
+    'folio.dinner': 'Dinner',
+    'folio.size_label': 'Size',
+    'folio.tab_settled': 'TAB SETTLED (ZERO BALANCE)',
+    'folio.refund_due_to_guest': 'Refund Due to Guest',
 
     // Navigation
     'nav.calendar': 'Calendar',
@@ -269,6 +281,47 @@ const translations = {
     'booking.tab_active': 'Tab',
     'booking.active': 'Active',
     'booking.cannot_checkout_unsettled': 'GUEST CANNOT CHECK OUT UNTIL ACTIVE TAB IS SETTLED',
+
+    // Stay Configuration
+    'stay.config_title': 'STAY CONFIGURATION',
+    'stay.original_prepaid': 'ORIGINAL STAY PREPAID',
+    'stay.children_under_12': 'CHILDREN UNDER 12',
+    'stay.accommodation_label': 'ACCOMMODATION',
+    'stay.paid_badge': 'PAID',
+    'stay.extension_fee': 'Extension Fee (USD)',
+    'stay.save_guest_count': 'Save Guest Count',
+    'stay.edit': 'Edit',
+
+    // Receipt
+    'receipt.title': 'FINAL RECEIPT',
+    'receipt.guest': 'GUEST',
+    'receipt.stay_period': 'STAY PERIOD',
+    'receipt.tab_breakdown': 'TAB #{n} BREAKDOWN',
+    'receipt.save_choices': 'SAVE CHOICES',
+    'receipt.current_total': 'Current Total',
+    'receipt.settle_close_tab': 'SETTLE & CLOSE TAB',
+    'receipt.save_image': 'SAVE IMAGE',
+    'receipt.print_pdf': 'PRINT PDF',
+    'receipt.qty_suffix': '×',
+    'receipt.settled': 'Settled',
+    'receipt.tab_total': 'Tab Total',
+    'receipt.payments_received': 'Payments Received',
+    'receipt.total_paid_usd': 'Total Paid (USD Equiv.)',
+    'receipt.drinks': 'Drinks',
+    'receipt.discount': 'Discount',
+    'receipt.drink': 'Drink',
+    'receipt.extra': 'Extra',
+
+    // Transaction Categories
+    'txn.category_groceries': 'Groceries',
+    'txn.category_workers_income': 'Workers Income',
+    'txn.category_gas': 'Gas for Car',
+    'txn.category_other_expenses': 'Other Expenses',
+    'txn.date_format_month_short': 'M',
+
+    // Calendar
+    'calendar.today': 'Today',
+    'calendar.title': 'Calendar',
 
     // Manager Specific
     'manager.checkin': 'Check-in / Check-out',
@@ -386,6 +439,11 @@ const translations = {
     'form.enter_worker_name': 'Ishchi nomini kiriting yoki tanlang',
     'form.selected_date': 'Tanlangan sana',
     'form.select_date_from_calendar': 'Quyidagi kalendaridan sanani tanlang',
+    'form.expense': 'Xarajat',
+    'form.income': 'Daromad',
+    'form.transactions': 'Tranzaksiyalar',
+    'form.financial_tracker': 'Moliyaviy kuzatuv',
+    'form.manager_recording': 'Menejer yozuvi',
     'form.meal_notes_example': 'masalan, yongʻoqsiz, qoʻshimcha achchiq',
     'form.transport_from': 'Qayerdan',
     'form.transport_to': 'Qayerga',
@@ -468,6 +526,13 @@ const translations = {
     'folio.audit_trail': 'Tekshiruv jurnali: Oshxona va xizmatlar',
     'folio.live_sync': 'Jonli sinxronizatsiya',
     'folio.no_kitchen_activity': 'Oshxona faoliyati qayd etilmagan.',
+    'folio.nights_label': 'Kechalar',
+    'folio.adults_label': 'Kattalar',
+    'folio.lunch': 'Tushlik',
+    'folio.dinner': 'Kechki ovqat',
+    'folio.size_label': 'Hajmi',
+    'folio.tab_settled': 'HISOB YOPILDI (NOL BALANS)',
+    'folio.refund_due_to_guest': 'Mehmonga qaytariladigan summa',
 
     // Navigation
     'nav.calendar': 'Kalendar',
@@ -555,6 +620,47 @@ const translations = {
     'booking.tab_active': 'Hisob',
     'booking.active': 'Faol',
     'booking.cannot_checkout_unsettled': 'FAOL HISOB TOʻLANMAGUNCHA MEHMON CHIQA OLMAYDI',
+
+    // Stay Configuration
+    'stay.config_title': 'YASHASH SOZLAMALARI',
+    'stay.original_prepaid': 'ASOSIY YASHASH OLDINDAN TOʻLANGAN',
+    'stay.children_under_12': '12 YOSHGACHA BOLALAR',
+    'stay.accommodation_label': 'TURAR JOY',
+    'stay.paid_badge': 'TOʻLANGAN',
+    'stay.extension_fee': 'Uzaytirish toʻlovi (USD)',
+    'stay.save_guest_count': 'Mehmon sonini saqlash',
+    'stay.edit': 'Tahrirlash',
+
+    // Receipt
+    'receipt.title': 'YAKUNIY CHEK',
+    'receipt.guest': 'MEHMON',
+    'receipt.stay_period': 'YASHASH MUDDATI',
+    'receipt.tab_breakdown': '#{n}-HISOB TAFSILOTI',
+    'receipt.save_choices': 'TANLOVLARNI SAQLASH',
+    'receipt.current_total': 'Joriy summa',
+    'receipt.settle_close_tab': 'HISOBNI YOPISH VA TOʻLASH',
+    'receipt.save_image': 'RASM SIFATIDA SAQLASH',
+    'receipt.print_pdf': 'PDF CHOP ETISH',
+    'receipt.qty_suffix': 'x',
+    'receipt.settled': 'Toʻlangan',
+    'receipt.tab_total': 'Hisob jami',
+    'receipt.payments_received': 'Qabul qilingan toʻlovlar',
+    'receipt.total_paid_usd': 'Jami toʻlangan (USD ekvivalenti)',
+    'receipt.drinks': 'Ichimliklar',
+    'receipt.discount': 'Chegirma',
+    'receipt.drink': 'Ichimlik',
+    'receipt.extra': 'Qoʻshimcha',
+
+    // Transaction Categories
+    'txn.category_groceries': 'Oziq-ovqat',
+    'txn.category_workers_income': 'Ishchilar maoshi',
+    'txn.category_gas': 'Mashina uchun yoqilgʻi',
+    'txn.category_other_expenses': 'Boshqa xarajatlar',
+    'txn.date_format_month_short': 'oy',
+
+    // Calendar
+    'calendar.today': 'Bugun',
+    'calendar.title': 'Kalendar',
 
     // Manager Specific
     'manager.checkin': 'Kelish / Ketish',

@@ -901,8 +901,8 @@ export function GoogleGuestAgenda({
       setSvcDiscount(0);
 
       // ── Prepaid flags from DB columns ──
-      // isPrepaid now comes directly from booking.is_prepaid (maintained by database triggers)
-      setIsPrepaid(b.is_prepaid || false);
+      // isPrepaid comes from booking.is_accommodation_sepaid (accommodation-specific)
+      setIsPrepaid(b.is_accommodation_prepaid || false);
 
       
       // ── Services will be fetched via useEffect syncData ──
@@ -914,7 +914,7 @@ export function GoogleGuestAgenda({
 
       // Calculate initial total for payment line
       const initialGTotal = Math.max(0, 
-        (b.payment_status === 'Prepaid' || b.is_prepaid ? 0 : stayPrice)
+        (b.payment_status === 'Prepaid' || b.is_accommodation_prepaid ? 0 : stayPrice)
       );
 
       setSvcPayList([{ 

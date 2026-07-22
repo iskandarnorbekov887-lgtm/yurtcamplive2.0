@@ -94,11 +94,11 @@ function ManagerFinancials() {
   };
 
   const expenseCategories = [
-    'groceries',
-    'workers income',
-    'gas for car',
-    'shezod akaga berildi',
-    'other expenses'
+    { value: 'groceries', label: t('txn.category_groceries') },
+    { value: 'workers income', label: t('txn.category_workers_income') },
+    { value: 'gas for car', label: t('txn.category_gas') },
+    { value: 'shezod akaga berildi', label: 'shezod akaga berildi' },
+    { value: 'other expenses', label: t('txn.category_other_expenses') }
   ];
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -175,8 +175,8 @@ function ManagerFinancials() {
               </svg>
             </div>
             <div>
-              <h1 className="text-2xl font-black tracking-tight text-[#EDE6D6] font-heading">Financial Tracker</h1>
-              <p className="text-xs text-[#9C9384] font-bold tracking-widest uppercase opacity-80">Manager Recording</p>
+              <h1 className="text-2xl font-black tracking-tight text-[#EDE6D6] font-heading">{t('form.financial_tracker')}</h1>
+              <p className="text-xs text-[#9C9384] font-bold tracking-widest uppercase opacity-80">{t('form.manager_recording')}</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -188,7 +188,7 @@ function ManagerFinancials() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
               </svg>
-              Logout
+              {t('btn.logout')}
             </button>
           </div>
         </div>
@@ -220,7 +220,7 @@ function ManagerFinancials() {
                     : 'bg-[#1C232E] text-[#9C9384] hover:bg-[#2A1518]'
                 }`}
               >
-                Expense
+                {t('form.expense')}
               </button>
               <button
                 type="button"
@@ -231,7 +231,7 @@ function ManagerFinancials() {
                     : 'bg-[#1C232E] text-[#9C9384] hover:bg-[#2A1518]'
                 }`}
               >
-                Income
+                {t('form.income')}
               </button>
             </div>
 
@@ -247,7 +247,7 @@ function ManagerFinancials() {
             {/* Category */}
             {type === 'expense' && (
               <div>
-                <label className="block text-sm font-black text-[#EDE6D6] mb-2">Category</label>
+                <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('form.select_category')}</label>
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
@@ -256,7 +256,7 @@ function ManagerFinancials() {
                 >
                   <option value="">{t('form.select_category')}</option>
                   {expenseCategories.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
+                    <option key={cat.value} value={cat.value}>{cat.label}</option>
                   ))}
                 </select>
               </div>
@@ -318,7 +318,7 @@ function ManagerFinancials() {
 
             {/* Amount */}
             <div>
-              <label className="block text-sm font-black text-[#EDE6D6] mb-2">Amount (UZS) *</label>
+              <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('form.enter_amount_uzs')} *</label>
               <input
                 type="number"
                 step="0.01"
@@ -332,7 +332,7 @@ function ManagerFinancials() {
 
             {/* Description */}
             <div>
-              <label className="block text-sm font-black text-[#EDE6D6] mb-2">Description *</label>
+              <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('form.describe_transaction')} *</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -356,7 +356,7 @@ function ManagerFinancials() {
           {/* Calendar Section */}
           <div className="bg-[#1C232E] rounded-2xl shadow-xl border border-[#5C4A2E]/30 p-8">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-2xl font-black text-[#EDE6D6] font-heading">Calendar</h3>
+              <h3 className="text-2xl font-black text-[#EDE6D6] font-heading">{t('calendar.title')}</h3>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => {
@@ -400,7 +400,7 @@ function ManagerFinancials() {
                   }}
                   className="px-3 py-2 bg-[#0B6E4F] text-[#C9A227] rounded-lg font-bold hover:bg-[#0B6E4F]/80 transition-all"
                 >
-                  Today
+                  {t('calendar.today')}
                 </button>
               </div>
             </div>
@@ -408,7 +408,7 @@ function ManagerFinancials() {
             {/* Calendar Grid */}
             <div className="grid grid-cols-7 gap-2">
               {/* Day Headers */}
-              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+              {[t('day.1'), t('day.2'), t('day.3'), t('day.4'), t('day.5'), t('day.6'), t('day.0')].map((day, i) => (
                 <div key={day} className="text-center text-sm font-black text-[#9C9384] py-2">
                   {day}
                 </div>
@@ -471,7 +471,7 @@ function ManagerFinancials() {
           {/* Selected Date Transactions */}
           <div className="lg:col-span-2 mt-6 bg-[#1C232E] rounded-2xl shadow-xl border border-[#5C4A2E]/30 p-8">
             <h3 className="text-2xl font-black text-[#EDE6D6] font-heading mb-6">
-              {date === new Date().toISOString().split('T')[0] ? 'Today' : date} Transactions
+              {date === new Date().toISOString().split('T')[0] ? t('calendar.today') : date} {t('form.transactions')}
             </h3>
             
             {loadingRecent ? (
@@ -483,7 +483,7 @@ function ManagerFinancials() {
                 const dayFinances = recentExpenses.filter(f => f.date === date);
                 
                 if (dayFinances.length === 0) {
-                  return <p className="text-[#9C9384] italic text-sm">No transactions for this date</p>;
+                  return <p className="text-[#9C9384] italic text-sm">{t('msg.no_transactions_for_date')}</p>;
                 }
 
                 return (
