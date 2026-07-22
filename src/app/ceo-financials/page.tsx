@@ -20,7 +20,7 @@ export default function CEOFinancialsPage() {
 
 function CEOFinancialCalendar() {
   const { user, signOut } = useAuth();
-  const { t } = useLanguage();
+  const { t, getLocale } = useLanguage();
   const router = useRouter();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
@@ -433,7 +433,7 @@ function CEOFinancialCalendar() {
           <div className="mt-8 bg-[#1C232E] rounded-lg border border-[#5C4A2E]/30 shadow-sm p-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div className="flex justify-between items-center mb-8 pb-4 border-b border-[#5C4A2E]/30">
               <h3 className="text-sm font-bold text-[#EDE6D6] uppercase tracking-widest">
-                {selectedDay.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                {selectedDay.toLocaleDateString(getLocale(), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
               </h3>
               <div className="flex items-center gap-2">
                 <button
@@ -758,7 +758,7 @@ function CEOFinancialCalendar() {
                   <div className="mb-6 p-3 bg-[#0F1419] rounded-lg border border-[#5C4A2E]/30">
                     <p className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest mb-1">Recording for</p>
                     <p className="text-sm font-bold text-[#C9A227]">
-                      {selectedDay.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                      {selectedDay.toLocaleDateString(getLocale(), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                     </p>
                   </div>
                 )}

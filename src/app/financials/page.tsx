@@ -21,7 +21,7 @@ export default function FinancialsPage() {
 
 function ManagerFinancials() {
   const { user, signOut } = useAuth();
-  const { t } = useLanguage();
+  const { t, getLocale } = useLanguage();
   const router = useRouter();
   const [type, setType] = useState<'expense' | 'income'>('expense');
   const [submitting, setSubmitting] = useState(false);
@@ -239,7 +239,7 @@ function ManagerFinancials() {
             <div>
               <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('form.selected_date')}</label>
               <div className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl bg-[#0B6E4F]/10 text-[#C9A227] font-black">
-                {new Date(date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                {new Date(date).toLocaleDateString(getLocale(), { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
               </div>
               <p className="text-xs text-[#9C9384] mt-1 font-semibold">{t('form.select_date_from_calendar')}</p>
             </div>
@@ -374,7 +374,7 @@ function ManagerFinancials() {
                   </svg>
                 </button>
                 <span className="text-lg font-black text-[#EDE6D6] min-w-[140px] text-center">
-                  {new Date(currentYear, currentMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                  {new Date(currentYear, currentMonth).toLocaleDateString(getLocale(), { month: 'long', year: 'numeric' })}
                 </span>
                 <button
                   onClick={() => {

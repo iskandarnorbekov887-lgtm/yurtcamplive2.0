@@ -19,7 +19,7 @@ export default function CEOFinancialDetailPage() {
 
 function CEOFinancialDetail() {
   const { user, signOut } = useAuth();
-  const { t } = useLanguage();
+  const { t, getLocale } = useLanguage();
   const router = useRouter();
   const params = useParams();
   const financeId = params.id as string;
@@ -142,7 +142,7 @@ function CEOFinancialDetail() {
             <div className="space-y-6">
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest text-[#9C9384] mb-2">Date</p>
-                <p className="text-lg font-semibold text-[#EDE6D6]">{new Date(finance.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                <p className="text-lg font-semibold text-[#EDE6D6]">{new Date(finance.date).toLocaleDateString(getLocale(), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
               </div>
 
               <div>

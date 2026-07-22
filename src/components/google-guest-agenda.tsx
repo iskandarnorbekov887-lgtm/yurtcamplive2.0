@@ -14,6 +14,7 @@ import {
   handleApproveDatesLogic
 } from '@/utils/calendar-logic';
 import { buildReceiptLineItems } from '@/utils/receipt-logic';
+import { useLanguage } from '@/lib/language-context';
 
 import { ManagerIncomeForm } from '@/components/manager-income-form';
 
@@ -63,6 +64,7 @@ interface Props {
 export function GoogleGuestAgenda({
   bookings, userRole, currentUserId, teamId, onCheckIn, onCheckOut, onUpdateBooking, onCancelBooking, onAddNewBooking, onRefresh,
 }: Props) {
+  const { getLocale } = useLanguage();
   const [selectedItem, setSelectedItem] = useState<ListItem | null>(null);
   const sel = selectedItem?.booking ?? null;
 
@@ -1463,7 +1465,7 @@ export function GoogleGuestAgenda({
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#0B6E4F] mb-1">{D === today ? 'Today’s Operations' : 'Daily Schedule'}</p>
                 <h3 className="text-lg font-black text-[#EDE6D6] hc-mono">
-                  {new Date(D + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                  {new Date(D + 'T12:00:00').toLocaleDateString(getLocale(), { weekday: 'long', month: 'long', day: 'numeric' })}
                 </h3>
               </div>
               <button 

@@ -8,6 +8,7 @@ interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
   t: (key: string) => string;
+  getLocale: () => string;
 }
 
 const translations = {
@@ -147,6 +148,8 @@ const translations = {
     'msg.meal_request_for': 'request for',
     'msg.saving': 'Saving...',
     'msg.confirm_extension': 'Confirm Extension',
+    'msg.no_bookings': 'No bookings',
+    'msg.no_bookings_day': 'No bookings for this day',
 
     // Manager Specific
     'manager.checkin': 'Check-in / Check-out',
@@ -312,6 +315,8 @@ const translations = {
     'msg.meal_request_for': 'uchun soʻrov',
     'msg.saving': 'Saqlanmoqda...',
     'msg.confirm_extension': 'Uzaytirishni tasdiqlash',
+    'msg.no_bookings': 'Band qilishlar yoʻq',
+    'msg.no_bookings_day': 'Bu kun uchun band qilishlar yoʻq',
 
     // Manager Specific
     'manager.checkin': 'Kelish / Ketish',
@@ -371,8 +376,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     return translations[language][key as keyof typeof translations['en']] || key;
   };
 
+  const getLocale = () => language === 'uz' ? 'uz-UZ' : 'en-US';
+
   return (
-    <LanguageContext.Provider value={{ language, setLanguage: handleSetLanguage, t }}>
+    <LanguageContext.Provider value={{ language, setLanguage: handleSetLanguage, t, getLocale }}>
       {children}
     </LanguageContext.Provider>
   );

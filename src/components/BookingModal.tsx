@@ -141,7 +141,7 @@ export function BookingModal(props: BookingModalProps) {
     dayEntries, finalizeTab, activeMeals, setActiveMeals, activeServices, setActiveServices
   } = props;
 
-  const { t } = useLanguage();
+  const { t, getLocale } = useLanguage();
 
   console.trace('BookingModal render, svcAdults:', svcAdults);
 
@@ -2093,7 +2093,7 @@ export function BookingModal(props: BookingModalProps) {
                                           ? `${firstItem.mealDate}T12:00:00` 
                                           : firstItem.mealDate;
                                         const formattedDate = !isNaN(Date.parse(safeDateStr)) 
-                                          ? new Date(safeDateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                                          ? new Date(safeDateStr).toLocaleDateString(getLocale(), { month: 'short', day: 'numeric' })
                                           : firstItem.mealDate;
 
                                         return (

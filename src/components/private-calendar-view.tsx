@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import type { Booking } from '@/lib/supabase';
+import { useLanguage } from '@/lib/language-context';
 
 interface CalendarEventItem {
   id: string;
@@ -43,6 +44,7 @@ function todayString() {
 }
 
 export function PrivateCalendarView({ bookings, calendarEvents, onSelectBooking, onSelectCalendarEvent, onDayChange }: Props) {
+  const { t, getLocale } = useLanguage();
   const [currentDate, setCurrentDate] = useState(new Date());
   const todayStr = todayString();
   const [selectedDay, setSelectedDay] = useState<string>(todayStr);
@@ -252,14 +254,14 @@ export function PrivateCalendarView({ bookings, calendarEvents, onSelectBooking,
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-widest text-[#0B6E4F]">All Bookings</p>
                     <h3 className="text-sm font-black text-[#EDE6D6]">
-                      {new Date(moreDay + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                      {new Date(moreDay + 'T12:00:00').toLocaleDateString(getLocale(), { weekday: 'long', month: 'long', day: 'numeric' })}
                     </h3>
                   </div>
                   <button onClick={() => setMoreDay(null)} className="w-8 h-8 hover:bg-[#2A1518] rounded-xl text-[#9C9384] font-bold text-xl">×</button>
                 </div>
                 <div className="p-3 space-y-1.5">
                   {dayBookings.length === 0 && (
-                    <p className="text-sm text-[#9C9384] text-center py-6">No bookings</p>
+                    <p className="text-sm text-[#9C9384] text-center py-6">{t('msg.no_bookings')}</p>
                   )}
                   {dayBookings.map(b => (
                     <button key={b.id} onClick={() => { onSelectBooking?.(b); setMoreDay(null); }}
