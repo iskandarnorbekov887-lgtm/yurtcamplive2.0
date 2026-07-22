@@ -6,6 +6,7 @@ import useSWR from 'swr';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Utensils, Send, X, Bell, Zap, ChefHat, CheckCircle2 } from 'lucide-react';
 import { RecipeDisplay } from '@/components/RecipeDisplay';
+import { useLanguage } from '@/lib/language-context';
 
 interface MealDraft {
   meal_date: string;
@@ -46,6 +47,7 @@ const fetchMealStats = async (bookingId: number) => {
 };
 
 export function ManagerMealRequests({ booking, onClose, onSent, teamId, userRole }: ManagerMealRequestsProps) {
+  const { t } = useLanguage();
   const [mealRequests, setMealRequests] = useState<MealRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [flashMessage, setFlashMessage] = useState<string | null>(null);
@@ -221,7 +223,7 @@ export function ManagerMealRequests({ booking, onClose, onSent, teamId, userRole
 
   const handleCancel = async (meal: MealRequest) => {
     if (!booking) return;
-    const confirmed = confirm(`Cancel this ${meal.meal_type} request for ${booking.guest_name}?`);
+    const confirmed = confirm(t('msg.cancel_meal_request') + ' ' + meal.meal_type + ' ' + t('msg.meal_request_for') + ' ' + booking.guest_name + '?');
     if (!confirmed) return;
 
     const { error } = await supabase

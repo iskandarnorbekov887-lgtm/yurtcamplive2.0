@@ -139,6 +139,14 @@ const translations = {
     'msg.sync_kitchen_failed': 'Saved locally but failed to sync to kitchen',
     'msg.failed_add_tab': 'Failed to add to tab.',
     'msg.failed_add_service': 'Failed to add service.',
+    'msg.confirm_cancel_trip': 'Are you sure you want to cancel this trip?',
+    'msg.confirm_checkout': 'Are you sure you want to check out',
+    'msg.confirm_checkin': 'Confirm Check In',
+    'msg.upcoming_guest': 'Upcoming Guest',
+    'msg.cancel_meal_request': 'Cancel this',
+    'msg.meal_request_for': 'request for',
+    'msg.saving': 'Saving...',
+    'msg.confirm_extension': 'Confirm Extension',
 
     // Manager Specific
     'manager.checkin': 'Check-in / Check-out',
@@ -296,6 +304,14 @@ const translations = {
     'msg.sync_kitchen_failed': 'Mahalliy saqlandi, lekin oshxona bilan sinxronizatsiya qilinmadi',
     'msg.failed_add_tab': 'Qoʻshish muvaffaqiyatsiz.',
     'msg.failed_add_service': 'Xizmatni qoʻshish muvaffaqiyatsiz.',
+    'msg.confirm_cancel_trip': 'Bu sayrni bekor qilishga ishonchingiz komilmi?',
+    'msg.confirm_checkout': 'Chiqishga ishonchingiz komilmi',
+    'msg.confirm_checkin': 'Kelishni tasdiqlash',
+    'msg.upcoming_guest': 'Kelayotgan mehmon',
+    'msg.cancel_meal_request': 'Bekor qilish',
+    'msg.meal_request_for': 'uchun soʻrov',
+    'msg.saving': 'Saqlanmoqda...',
+    'msg.confirm_extension': 'Uzaytirishni tasdiqlash',
 
     // Manager Specific
     'manager.checkin': 'Kelish / Ketish',

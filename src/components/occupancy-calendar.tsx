@@ -306,7 +306,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
 
   const handleCancel = async () => {
     if (!sel || !onCancelBooking) return;
-    if (confirm('Are you sure you want to cancel this trip?')) {
+    if (confirm(t('msg.confirm_cancel_trip'))) {
       const id = sel.id;
       setSel(null); 
       try {
@@ -356,7 +356,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
 
   const handleCheckOut = async () => {
     if (!sel || !onCheckOut) return;
-    if (!confirm('Are you sure you want to check out ' + String(sel.guest_name) + '?')) return;
+    if (!confirm(t('msg.confirm_checkout') + ' ' + String(sel.guest_name) + '?')) return;
     const id = sel.id;
     setSel({ ...sel, status: 'completed', payment_status: 'paid' });
     try {
@@ -850,7 +850,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                                 : 'bg-[#1C232E]/50 text-[#9C9384]/40 border border-[#5C4A2E]/10 cursor-not-allowed'
                             }`}
                           >
-                            {loadingAction === 'checkin' ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'Confirm Check In'}
+                            {loadingAction === 'checkin' ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : t('msg.confirm_checkin')}
                           </button>
                         </div>
                       </div>
@@ -868,7 +868,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                       )}
                       {onCheckIn && sel.status === 'confirmed' && sel.check_in !== today && (
                         <div className="flex-1 min-h-[48px] py-3 text-sm bg-[#B8860B]/10 text-[#B8860B] border border-[#B8860B]/30 rounded-xl font-bold text-center flex items-center justify-center">
-                          Upcoming Guest
+                          {t('msg.upcoming_guest')}
                         </div>
                       )}
                       {onCheckOut && sel?.status === 'checked_in' && (

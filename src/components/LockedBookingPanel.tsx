@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { BookingEditRequest, BookingExtension } from '@/lib/supabase';
+import { useLanguage } from '@/lib/language-context';
 
 interface LockedFieldProps {
   label: string;
@@ -18,6 +19,7 @@ function LockedField({
   label, fieldName, currentValue, displayValue,
   bookingId, teamId, requestedBy, onRequestSent,
 }: LockedFieldProps) {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [requestedValue, setRequestedValue] = useState('');
   const [reason, setReason] = useState('');
@@ -120,6 +122,7 @@ interface ExtendStayFormProps {
 }
 
 function ExtendStayForm({ booking, currentUserId, onSuccess, onCancel }: ExtendStayFormProps) {
+  const { t } = useLanguage();
   const [daysAdded, setDaysAdded] = useState('');
   const [amountAdded, setAmountAdded] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -228,7 +231,7 @@ function ExtendStayForm({ booking, currentUserId, onSuccess, onCancel }: ExtendS
           disabled={submitting || !daysAdded || parseInt(daysAdded) <= 0}
           className="flex-1 py-2.5 bg-[#0B6E4F] text-[#C9A227] text-[10px] font-black uppercase tracking-widest rounded transition-all disabled:opacity-50 hover:bg-[#0B6E4F]/80 active:scale-95"
         >
-          {submitting ? 'Saving...' : 'Confirm Extension'}
+          {submitting ? t('msg.saving') : t('msg.confirm_extension')}
         </button>
         <button
           onClick={onCancel}
@@ -248,6 +251,7 @@ interface LockedBookingPanelProps {
 }
 
 export function LockedBookingPanel({ booking, currentUserId, onRefresh }: LockedBookingPanelProps) {
+  const { t } = useLanguage();
   const [extensions, setExtensions] = useState<BookingExtension[]>([]);
   const [showExtendForm, setShowExtendForm] = useState(false);
   const [loadingExt, setLoadingExt] = useState(true);
