@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { ProtectedRoute } from '@/components/protected-route';
 import { supabase, type Booking, type Notification } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -13,7 +14,7 @@ import { ManagerProcurement } from '@/components/procurement/manager-procurement
 import { InventoryDashboard } from '@/components/procurement/inventory-dashboard';
 import { ManagerMealRequests } from '@/components/manager/manager-meal-requests';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, ShoppingBag, Box, Bell, LogOut, Utensils, Calendar } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Box, Bell, LogOut, Utensils, Calendar, Menu, X } from 'lucide-react';
 
 import type { UserRole } from '@/lib/supabase';
 
@@ -32,6 +33,7 @@ function ManagerPortal() {
   const currentUserId = user?.id;
   const userRole = user?.role as UserRole;
   const { t } = useLanguage();
+  const searchParams = useSearchParams();
 
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -42,6 +44,22 @@ function ManagerPortal() {
   const [selectedMealBooking, setSelectedMealBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Initialize activeTab from URL query param on mount
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && ['checkin', 'meals', 'procurement', 'inventory'].includes(tabParam)) {
+      setActiveTab(tabParam as 'checkin' | 'meals' | 'procurement' | 'inventory');
+    }
+  }, [searchParams]);
+
+  // Update URL when activeTab changes
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', activeTab);
+    window.history.replaceState({}, '', url.toString());
+  }, [activeTab]);
 
   const fetchData = async (): Promise<void> => {
     try {
@@ -95,27 +113,27 @@ function ManagerPortal() {
       {/* ── Sidebar ── */}
       <motion.aside 
         initial={false}
-        animate={{ width: isCollapsed ? 80 : 256 }}
+        animate={{ width: isCollapsed ? 64 : 256 }}
         className="hidden md:flex flex-col bg-[#1C232E] border-r border-[#5C4A2E]/30 shadow-lg relative transition-all duration-300 ease-in-out"
       >
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="absolute -right-3 top-20 w-6 h-6 bg-[#1C232E] border border-[#5C4A2E]/30 rounded-full flex items-center justify-center text-[#9C9384] hover:text-[#C9A227] hover:border-[#C9A227] transition-all z-50 shadow-lg"
+          className="absolute -right-3 top-20 w-5 h-5 md:w-6 md:h-6 bg-[#1C232E] border border-[#5C4A2E]/30 rounded-full flex items-center justify-center text-[#9C9384] hover:text-[#C9A227] hover:border-[#C9A227] transition-all z-50 shadow-lg"
         >
           <motion.div animate={{ rotate: isCollapsed ? 180 : 0 }}>
-            <Calendar size={12} className="rotate-90" />
+            <Calendar size={10} className="rotate-90" />
           </motion.div>
         </button>
 
-        <div className="p-6">
-          <div className="flex items-center gap-4 mb-8 overflow-hidden">
-            <div className="w-10 h-10 bg-[#0B6E4F]/20 rounded-xl flex-shrink-0 flex items-center justify-center border border-[#0B6E4F]/40">
-              <LayoutDashboard className="text-[#0B6E4F]" size={20} />
+        <div className="p-4 md:p-6">
+          <div className="flex items-center gap-3 md:gap-4 mb-6 md:mb-8 overflow-hidden">
+            <div className="w-8 h-8 md:w-10 md:h-10 bg-[#0B6E4F]/20 rounded-xl flex-shrink-0 flex items-center justify-center border border-[#0B6E4F]/40">
+              <LayoutDashboard className="text-[#0B6E4F]" size={16} />
             </div>
             {!isCollapsed && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <h1 className="text-sm font-bold uppercase tracking-tight text-[#EDE6D6] whitespace-nowrap font-heading">{t('portal.manager')}</h1>
-                <p className="text-[10px] text-[#9C9384] font-medium tracking-widest uppercase whitespace-nowrap">Operations HUD</p>
+                <h1 className="text-xs md:text-sm font-bold uppercase tracking-tight text-[#EDE6D6] whitespace-nowrap font-heading">{t('portal.manager')}</h1>
+                <p className="text-[9px] md:text-[10px] text-[#9C9384] font-medium tracking-widest uppercase whitespace-nowrap">Operations HUD</p>
               </motion.div>
             )}
           </div>
@@ -169,6 +187,20 @@ function ManagerPortal() {
            >
              {isCollapsed ? "💰" : `💰 ${t('nav.fiscal_recording')}`}
            </a>
+           <a 
+             href="/financials/storage" 
+             title={isCollapsed ? t('storage.title') : undefined}
+             className={`block p-3 rounded-lg text-[10px] font-bold uppercase tracking-widest text-[#C9A227] bg-[#C9A227]/10 border border-[#C9A227]/30 hover:bg-[#C9A227]/20 transition-all text-center ${isCollapsed ? 'w-full flex justify-center' : ''}`}
+           >
+             {isCollapsed ? "📦" : `📦 ${t('storage.title')}`}
+           </a>
+           <a 
+             href="/financials/pos" 
+             title={isCollapsed ? t('pos.title') : undefined}
+             className={`block p-3 rounded-lg text-[10px] font-bold uppercase tracking-widest text-[#0B6E4F] bg-[#0B6E4F]/10 border border-[#0B6E4F]/30 hover:bg-[#0B6E4F]/20 transition-all text-center ${isCollapsed ? 'w-full flex justify-center' : ''}`}
+           >
+             {isCollapsed ? "🛒" : `🛒 ${t('pos.title')}`}
+           </a>
            <button 
              onClick={signOut} 
              title={isCollapsed ? t('btn.logout') : undefined}
@@ -180,26 +212,125 @@ function ManagerPortal() {
         </div>
       </motion.aside>
 
+      {/* Mobile Drawer */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMobileMenuOpen(false)}
+              className="fixed inset-0 bg-black/50 z-40 md:hidden"
+            />
+            <motion.div
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed top-0 left-0 h-full w-64 bg-[#1C232E] border-r border-[#5C4A2E]/30 z-50 md:hidden flex flex-col"
+            >
+              <div className="p-4 border-b border-[#5C4A2E]/30 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-[#0B6E4F]/20 rounded-xl flex items-center justify-center border border-[#0B6E4F]/40">
+                    <LayoutDashboard className="text-[#0B6E4F]" size={16} />
+                  </div>
+                  <h1 className="text-xs font-bold uppercase tracking-tight text-[#EDE6D6]">{t('portal.manager')}</h1>
+                </div>
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2 rounded-lg text-[#9C9384] hover:text-[#EDE6D6]"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <nav className="flex-1 p-4 space-y-2">
+                {[
+                  { id: 'checkin', label: t('nav.calendar'), icon: Calendar },
+                  { id: 'meals', label: t('nav.meals'), icon: Utensils },
+                  { id: 'procurement', label: t('nav.logistics'), icon: ShoppingBag },
+                  { id: 'inventory', label: t('nav.stores'), icon: Box },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setActiveTab(item.id as any);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 p-3 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
+                      activeTab === item.id 
+                        ? 'bg-[#0B6E4F] text-[#C9A227] shadow-lg' 
+                        : 'text-[#9C9384] hover:bg-[#2A1518] hover:text-[#EDE6D6]'
+                    }`}
+                  >
+                    <item.icon size={18} className="flex-shrink-0" />
+                    {item.label}
+                  </button>
+                ))}
+                <div className="pt-4 border-t border-[#5C4A2E]/30 space-y-2">
+                  <a 
+                    href="/financials" 
+                    className="block p-3 rounded-lg text-[10px] font-bold uppercase tracking-widest text-[#0B6E4F] bg-[#0B6E4F]/10 border border-[#0B6E4F]/30 hover:bg-[#0B6E4F]/20 transition-all text-center"
+                  >
+                    💰 {t('nav.fiscal_recording')}
+                  </a>
+                  <a 
+                    href="/financials/storage" 
+                    className="block p-3 rounded-lg text-[10px] font-bold uppercase tracking-widest text-[#C9A227] bg-[#C9A227]/10 border border-[#C9A227]/30 hover:bg-[#C9A227]/20 transition-all text-center"
+                  >
+                    📦 {t('storage.title')}
+                  </a>
+                  <a 
+                    href="/financials/pos" 
+                    className="block p-3 rounded-lg text-[10px] font-bold uppercase tracking-widest text-[#0B6E4F] bg-[#0B6E4F]/10 border border-[#0B6E4F]/30 hover:bg-[#0B6E4F]/20 transition-all text-center"
+                  >
+                    🛒 {t('pos.title')}
+                  </a>
+                  <button 
+                    onClick={() => {
+                      signOut();
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full flex items-center justify-center gap-2 p-3 bg-[#2A1518]/50 border border-[#5C4A2E]/30 text-[#9C9384] rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-[#2A1518] hover:text-[#EDE6D6] hover:border-[#C9A227] transition-all"
+                  >
+                    <LogOut size={16} />
+                    {t('btn.logout')}
+                  </button>
+                </div>
+              </nav>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* ── Main Content ── */}
       <main className="flex-1 relative overflow-y-auto bg-[#0F1419]">
         
         {/* Top Bar */}
-        <div className="sticky top-0 z-30 px-8 py-4 flex justify-between items-center bg-[#1C232E] backdrop-blur-sm border-b border-[#5C4A2E]/30">
-          <div className="text-xs font-bold text-[#9C9384] uppercase tracking-widest">
-            {activeTab === 'checkin' ? t('nav.guest_calendar') : activeTab === 'meals' ? t('nav.catering') : activeTab === 'procurement' ? t('nav.logistics') : t('nav.stores')}
+        <div className="sticky top-0 z-30 px-4 md:px-8 py-3 md:py-4 flex justify-between items-center bg-[#1C232E] backdrop-blur-sm border-b border-[#5C4A2E]/30">
+          <div className="flex items-center gap-2 md:gap-3">
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2 rounded-lg bg-[#1C232E] border border-[#5C4A2E]/30 text-[#9C9384] hover:text-[#C9A227]"
+            >
+              <Menu size={20} />
+            </button>
+            <div className="text-xs font-bold text-[#9C9384] uppercase tracking-widest">
+              {activeTab === 'checkin' ? t('nav.guest_calendar') : activeTab === 'meals' ? t('nav.catering') : activeTab === 'procurement' ? t('nav.logistics') : t('nav.stores')}
+            </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
             <LanguageSwitcher variant="light" />
             
             <div className="relative">
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="w-9 h-9 flex items-center justify-center rounded-lg bg-[#1C232E] border border-[#5C4A2E]/30 hover:bg-[#2A1518] shadow-lg transition-all relative"
+                className="w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-lg bg-[#1C232E] border border-[#5C4A2E]/30 hover:bg-[#2A1518] shadow-lg transition-all relative"
               >
-                <Bell size={16} className="text-[#9C9384]" />
+                <Bell size={14} className="text-[#9C9384]" />
                 {notifications.filter(n => !n.read).length > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#722F37] text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 w-3 h-3 md:w-4 md:h-4 bg-[#722F37] text-white text-[8px] md:text-[9px] font-bold rounded-full flex items-center justify-center">
                     {notifications.filter(n => !n.read).length}
                   </span>
                 )}
@@ -232,7 +363,7 @@ function ManagerPortal() {
           </div>
         </div>
 
-        <div className="max-w-[1400px] mx-auto px-8 py-8">
+        <div className="max-w-full md:max-w-[1400px] mx-auto px-4 md:px-8 py-6 md:py-8">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}

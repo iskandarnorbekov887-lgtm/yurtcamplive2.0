@@ -155,6 +155,9 @@ const translations = {
     'msg.confirm_extension': 'Confirm Extension',
     'msg.no_bookings': 'No bookings',
     'msg.no_bookings_day': 'No bookings for this day',
+    'msg.please_fill_all_drink_fields': 'Please fill all drink fields',
+    'msg.drink_purchase_saved': 'Drink purchase saved successfully!',
+    'msg.drink_tab_closed': 'Drink tab closed successfully!',
 
     // Manager Notifications
     'notif.title': 'Notifications',
@@ -312,11 +315,105 @@ const translations = {
     'receipt.drink': 'Drink',
     'receipt.extra': 'Extra',
 
+    // Drinks
+    'drinks.title': 'Drink Inventory',
+    'drinks.subtitle': 'Manage drink stock and pricing',
+    'drinks.add_drink': 'Add Drink',
+    'drinks.name': 'Name',
+    'drinks.icon': 'Icon',
+    'drinks.price': 'Price',
+    'drinks.quantity': 'Quantity',
+    'drinks.stock': 'Stock',
+    'drinks.edit_drink': 'Edit Drink',
+    'drinks.add_new_drink': 'Add New Drink',
+    'drinks.update': 'Update',
+    'drinks.add': 'Add',
+    'drinks.cancel': 'Cancel',
+    'drinks.no_drinks': 'No drinks in inventory',
+    'drinks.edit': 'Edit',
+    'drinks.delete': 'Delete',
+    'drinks.confirm_delete': 'Are you sure you want to delete this drink?',
+    'drinks.loading': 'Loading drinks...',
+    'drinks.pos_title': 'Drinks Point of Sale',
+    'drinks.pos_subtitle': 'Sell drinks to walk-in customers',
+    'drinks.select_drink': 'Select Drink',
+    'drinks.sell': 'Sell',
+    'drinks.selling': 'Selling...',
+    'drinks.sale_error': 'Failed to complete sale',
+    'drinks.out_of_stock': 'Not enough stock available',
+    'drinks.total': 'Total',
+    'drinks.recent_sales': 'Recent Sales',
+    'drinks.no_sales': 'No sales today',
+    'drinks.add_to_tab': 'Add Drink to Tab',
+    'drinks.select': 'Select',
+    'drinks.close': 'Close',
+    'drinks.inventory_tab': 'Inventory',
+    'drinks.pos_tab': 'Point of Sale',
+    'drinks.current_tab': 'Current Tab',
+    'drinks.tab_empty': 'Tab is empty',
+    'drinks.closing': 'Closing...',
+    'drinks.close_tab': 'Close Tab',
+    'drinks.register_purchase': 'Register Drink Purchase',
+    'drinks.unit_type': 'Unit Type',
+    'drinks.unit_glass': 'Glass',
+    'drinks.unit_half_liter': '0.5L',
+    'drinks.unit_liter': '1L',
+    'drinks.unit_bottle': 'Bottle',
+    'drinks.unit_can': 'Can',
+    'drinks.buy_price': 'Buy Price',
+    'drinks.sell_price': 'Sell Price',
+    'drinks.add_purchase': 'Add Purchase',
+    'drinks.sell_drinks': 'Sell Drinks',
+    'drinks.select_existing': 'Select Existing Drink',
+    'drinks.add_new': 'Add New Drink',
+    'drinks.current_stock': 'Current Stock',
+    'drinks.existing_drinks': 'Existing Drinks',
+    'drinks.restock_button': 'Restock',
+    'drinks.quantity_to_add': 'Quantity to Add',
+    'drinks.category': 'Category',
+    'drinks.category_non_alcoholic': 'Non-alcoholic',
+    'drinks.category_alcoholic': 'Alcoholic',
+    'drinks.category_saqlangan_ichimliklar': 'Soft Drinks',
+    'drinks.category_piva': 'Beer',
+    'drinks.category_vino': 'Wine',
+    'drinks.category_aroq': 'Vodka',
+    'drinks.unit': 'Unit',
+    'drinks.unit_custom': 'Custom',
+    'drinks.unit_0_3l_banka': '0.3L banka',
+    'drinks.unit_0_5L': '0.5L',
+    'drinks.unit_1L': '1L',
+    'drinks.unit_1_5L': '1.5L',
+    'drinks.unit_2L': '2L',
+    'drinks.unit_shisha': 'shisha/bottle',
+
+    // POS
+    'pos.title': 'Point of Sale',
+    'pos.cart': 'Cart',
+    'pos.empty_cart': 'Cart is empty',
+    'pos.total': 'Total',
+    'pos.checkout': 'Checkout',
+    'pos.payments': 'Payments',
+    'pos.add_payment': 'Add Payment',
+    'pos.payments_total': 'Payments Total',
+    'pos.confirm_checkout': 'Confirm Checkout',
+    'pos.sale_success': 'Sale completed successfully!',
+    'pos.price_not_set': 'Price not set',
+    'pos.sales_history': 'Sales History',
+    'pos.no_sales': 'No sales yet',
+
+    // Storage/Inventory
+    'storage.title': 'Storage / Inventory',
+    'storage.low_stock': 'Low Stock',
+
+    // Navigation
+    'nav.drinks': 'Drinks',
+
     // Transaction Categories
     'txn.category_groceries': 'Groceries',
     'txn.category_workers_income': 'Workers Income',
     'txn.category_gas': 'Gas for Car',
     'txn.category_other_expenses': 'Other Expenses',
+    'txn.tab_drinks': 'Drinks',
     'txn.date_format_month_short': 'M',
 
     // Calendar
@@ -494,6 +591,9 @@ const translations = {
     'msg.confirm_extension': 'Uzaytirishni tasdiqlash',
     'msg.no_bookings': 'Band qilishlar yoʻq',
     'msg.no_bookings_day': 'Bu kun uchun band qilishlar yoʻq',
+    'msg.please_fill_all_drink_fields': 'Iltimos, barcha ichimlik maydonlarini toʻldiring',
+    'msg.drink_purchase_saved': 'Ichimlik xaridi muvaffaqiyatli saqlandi!',
+    'msg.drink_tab_closed': 'Ichimlik hisobi muvaffaqiyatli yopildi!',
 
     // Manager Notifications
     'notif.title': 'Bildirishnomalar',
@@ -651,11 +751,105 @@ const translations = {
     'receipt.drink': 'Ichimlik',
     'receipt.extra': 'Qoʻshimcha',
 
+    // Drinks
+    'drinks.title': 'Ichimliklar ombori',
+    'drinks.subtitle': 'Ichimliklar zaxirasi va narxlarini boshqarish',
+    'drinks.add_drink': 'Ichimlik qo\'shish',
+    'drinks.name': 'Nomi',
+    'drinks.icon': 'Belgi',
+    'drinks.price': 'Narx',
+    'drinks.quantity': 'Miqdor',
+    'drinks.stock': 'Zaxira',
+    'drinks.edit_drink': 'Ichimlikni tahrirlash',
+    'drinks.add_new_drink': 'Yangi ichimlik qo\'shish',
+    'drinks.update': 'Yangilash',
+    'drinks.add': 'Qo\'shish',
+    'drinks.cancel': 'Bekor qilish',
+    'drinks.no_drinks': 'Omborda ichimliklar yo\'q',
+    'drinks.edit': 'Tahrirlash',
+    'drinks.delete': 'O\'chirish',
+    'drinks.confirm_delete': 'Bu ichimlikni o\'chirmoqchimisiz?',
+    'drinks.loading': 'Ichimliklar yuklanmoqda...',
+    'drinks.pos_title': 'Ichimliklar savdo punkti',
+    'drinks.pos_subtitle': 'Yurib kelgan mijozlarga ichimlik sotish',
+    'drinks.select_drink': 'Ichimlikni tanlang',
+    'drinks.sell': 'Sotish',
+    'drinks.selling': 'Sotilmoqda...',
+    'drinks.sale_error': 'Sotishni tugatish muvaffaqiyatsiz',
+    'drinks.out_of_stock': 'Yetarli zaxira yo\'q',
+    'drinks.total': 'Jami',
+    'drinks.recent_sales': 'So\'nggi sotuvlar',
+    'drinks.no_sales': 'Bugun sotuvlar yo\'q',
+    'drinks.add_to_tab': 'Ichimlikni hisobga qo\'shish',
+    'drinks.select': 'Tanlash',
+    'drinks.close': 'Yopish',
+    'drinks.inventory_tab': 'Ombor',
+    'drinks.pos_tab': 'Savdo punkti',
+    'drinks.current_tab': 'Hozirgi hisob',
+    'drinks.tab_empty': 'Hisob bo\'sh',
+    'drinks.closing': 'Yopilmoqda...',
+    'drinks.close_tab': 'Hisobni yopish',
+    'drinks.register_purchase': 'Ichimlik xaridini ro\'yxatga olish',
+    'drinks.unit_type': 'Birlik turi',
+    'drinks.unit_glass': 'Stakan',
+    'drinks.unit_half_liter': '0.5L',
+    'drinks.unit_liter': '1L',
+    'drinks.unit_bottle': 'Shisha',
+    'drinks.unit_can': 'Banka',
+    'drinks.buy_price': 'Sotib olish narxi',
+    'drinks.sell_price': 'Sotish narxi',
+    'drinks.add_purchase': 'Xaridni qo\'shish',
+    'drinks.sell_drinks': 'Ichimliklarni sotish',
+    'drinks.select_existing': 'Mavjud ichimlikni tanlang',
+    'drinks.add_new': 'Yangi ichimlik qo\'shish',
+    'drinks.current_stock': 'Hozirgi zaxira',
+    'drinks.existing_drinks': 'Mavjud ichimliklar',
+    'drinks.restock_button': 'Qayta to\'ldirish',
+    'drinks.quantity_to_add': 'Qo\'shiladigan miqdor',
+    'drinks.category': 'Kategoriya',
+    'drinks.category_non_alcoholic': 'Alkogolsiz',
+    'drinks.category_alcoholic': 'Alkogolli',
+    'drinks.category_saqlangan_ichimliklar': 'Saqlangan ichimliklar',
+    'drinks.category_piva': 'Piva',
+    'drinks.category_vino': 'Vino',
+    'drinks.category_aroq': 'Aroq',
+    'drinks.unit': 'Birlik',
+    'drinks.unit_custom': 'Boshqa',
+    'drinks.unit_0_3l_banka': '0.3L banka',
+    'drinks.unit_0_5L': '0.5L',
+    'drinks.unit_1L': '1L',
+    'drinks.unit_1_5L': '1.5L',
+    'drinks.unit_2L': '2L',
+    'drinks.unit_shisha': 'shisha/bottle',
+
+    // POS
+    'pos.title': 'Sotish nuqtasi',
+    'pos.cart': 'Savat',
+    'pos.empty_cart': 'Savat bo\'sh',
+    'pos.total': 'Jami',
+    'pos.checkout': 'To\'lov',
+    'pos.payments': 'To\'lovlar',
+    'pos.add_payment': 'To\'lov qo\'shish',
+    'pos.payments_total': 'To\'lovlar jami',
+    'pos.confirm_checkout': 'To\'lovni tasdiqlash',
+    'pos.sale_success': 'Sotish muvaffaqiyatli yakunlandi!',
+    'pos.price_not_set': 'Narx belgilanmagan',
+    'pos.sales_history': 'Sotilganlar tarixi',
+    'pos.no_sales': 'Hozircha sotilmagan',
+
+    // Storage/Inventory
+    'storage.title': 'Ombor / Zaxira',
+    'storage.low_stock': 'Kam zaxira',
+
+    // Navigation
+    'nav.drinks': 'Ichimliklar',
+
     // Transaction Categories
     'txn.category_groceries': 'Oziq-ovqat',
     'txn.category_workers_income': 'Ishchilar maoshi',
     'txn.category_gas': 'Mashina uchun yoqilgʻi',
     'txn.category_other_expenses': 'Boshqa xarajatlar',
+    'txn.tab_drinks': 'Ichimliklar',
     'txn.date_format_month_short': 'oy',
 
     // Calendar
@@ -706,7 +900,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem('language');
       }
     }
-    return 'en';
+    return 'uz';
   });
 
   const handleSetLanguage = (lang: Language) => {
@@ -717,7 +911,20 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   };
 
   const t = (key: string) => {
-    return translations[language][key as keyof typeof translations['en']] || key;
+    // Try current language first
+    const currentLangValue = translations[language][key as keyof typeof translations['en']];
+    if (currentLangValue) return currentLangValue;
+    
+    // Fallback to English if current language is missing the key
+    const englishValue = translations['en'][key as keyof typeof translations['en']];
+    if (englishValue) {
+      console.warn(`Translation key "${key}" missing in ${language}, using English fallback`);
+      return englishValue;
+    }
+    
+    // Both languages missing - log warning and return placeholder
+    console.warn(`Translation key "${key}" missing in both ${language} and English`);
+    return `[MISSING: ${key}]`;
   };
 
   const getLocale = () => language === 'uz' ? 'uz-UZ' : 'en-US';

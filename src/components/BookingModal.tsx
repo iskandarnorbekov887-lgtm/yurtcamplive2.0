@@ -175,6 +175,12 @@ export function BookingModal(props: BookingModalProps) {
   const [showTransportSummary, setShowTransportSummary] = useState(true);
   const [showGuideSummary, setShowGuideSummary] = useState(true);
 
+  // Drinks state
+  const [drinks, setDrinks] = useState<any[]>([]);
+  const [selectedDrink, setSelectedDrink] = useState<any>(null);
+  const [drinkQuantity, setDrinkQuantity] = useState(1);
+  const [showDrinkSelector, setShowDrinkSelector] = useState(false);
+
   const [showCreatePopover, setShowCreatePopover] = useState(false);
   const [newAdults, setNewAdults] = useState<string | number>(1);
   const [newChildren, setNewChildren] = useState<string | number>(0);
@@ -185,6 +191,13 @@ export function BookingModal(props: BookingModalProps) {
   };
 
   // Use svcDiscountReason from props instead of local state
+
+  useEffect(() => {
+    // Fetch drinks for the drink selector
+    supabase.from('drinks').select('*').order('name').then(({ data }) => {
+      setDrinks(data || []);
+    });
+  }, []);
 
   useEffect(() => {
     if (sel?.id) {
@@ -1543,6 +1556,107 @@ export function BookingModal(props: BookingModalProps) {
                           </div>
                         )}
 
+                        {/* Drinks - Add to Tab */}
+                        {isStaff && (
+                          <div className="bg-[#1C232E]/50 rounded-lg p-3 border border-[#2A2F36]">
+                            <div className="flex justify-between items-center mb-2">
+                              <div className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">{t('drinks.add_to_tab')}</div>
+                              <button
+                                onClick={() => setShowDrinkSelector(!showDrinkSelector)}
+                                className="px-3 py-1.5 bg-[#0B6E4F]/20 rounded-lg text-[10px] font-bold uppercase hover:bg-[#0B6E4F]/30 transition-all border border-[#0B6E4F]/40 text-[#0B6E4F]"
+                              >
+                                {showDrinkSelector ? t('drinks.close') : t('drinks.select')}
+                              </button>
+                            </div>
+                            
+                            {showDrinkSelector && (
+                              <div className="space-y-3">
+                                <div className="space-y-2">
+                                  {drinks.map((drink) => (
+                                    <button
+                                      key={drink.id}
+                                      onClick={() => setSelectedDrink(drink)}
+                                      disabled={drink.quantity_in_stock === 0}
+                                      className={`w-full p-3 rounded-lg border text-left transition-all flex justify-between items-center ${
+                                        selectedDrink?.id === drink.id
+                                          ? 'bg-[#0B6E4F] border-[#0B6E4F] text-[#C9A227]'
+                                          : drink.quantity_in_stock === 0
+                                          ? 'bg-[#2A1518]/30 border-[#5C4A2E]/20 text-[#9C9384] opacity-50 cursor-not-allowed'
+                                          : 'bg-[#1C232E] border-[#5C4A2E]/30 text-[#EDE6D6] hover:bg-[#2A1518] hover:border-[#C9A227]'
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <span className="text-2xl">{drink.icon}</span>
+                                        <div>
+                                          <div className="text-sm font-bold uppercase">{drink.name}</div>
+                                          <div className="text-[10px] text-[#9C9384]">${drink.sell_price?.toFixed(2) || '0.00'}</div>
+                                        </div>
+                                      </div>
+                                      <div className={`text-[10px] font-bold ${drink.quantity_in_stock < 5 ? 'text-[#722F37]' : 'text-[#9C9384]'}`}>
+                                        {t('drinks.stock')}: {drink.quantity_in_stock}
+                                      </div>
+                                    </button>
+                                  ))}
+                                </div>
+                                
+                                {selectedDrink && (
+                                  <div className="space-y-2 pt-2 border-t border-[#2A2F36]">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs text-slate-400">{t('drinks.quantity')}:</span>
+                                      <button
+                                        onClick={() => setDrinkQuantity(Math.max(1, drinkQuantity - 1))}
+                                        className="w-8 h-8 bg-[#1C232E]/50 rounded-lg text-[#EDE6D6] text-sm font-bold hover:bg-[#2A1518] border border-[#2A2F36]"
+                                      >
+                                        -
+                                      </button>
+                                      <span className="text-sm font-bold text-[#EDE6D6] min-w-[20px] text-center">{drinkQuantity}</span>
+                                      <button
+                                        onClick={() => setDrinkQuantity(Math.min(selectedDrink.quantity_in_stock, drinkQuantity + 1))}
+                                        className="w-8 h-8 bg-[#0B6E4F]/20 rounded-lg text-[#0B6E4F] text-sm font-bold hover:bg-[#0B6E4F]/30 border border-[#0B6E4F]/40"
+                                      >
+                                        +
+                                      </button>
+                                    </div>
+                                    <div className="flex justify-between items-center text-xs">
+                                      <span className="text-slate-400">{t('drinks.total')}:</span>
+                                      <span className="font-bold text-[#C9A227]">${((selectedDrink.sell_price || 0) * drinkQuantity).toFixed(2)}</span>
+                                    </div>
+                                    <button
+                                      onClick={async () => {
+                                        if (!selectedDrink) return;
+                                        
+                                        // Add to active services following the same pattern as transportation/guide
+                                        const newService = {
+                                          id: `drink-${Date.now()}`,
+                                          service_type: 'drinks',
+                                          unit_price: selectedDrink.sell_price || 0,
+                                          quantity: drinkQuantity,
+                                          is_paid: false,
+                                          details: {
+                                            name: selectedDrink.name,
+                                            icon: selectedDrink.icon,
+                                            drink_id: selectedDrink.id
+                                          }
+                                        };
+                                        
+                                        setActiveServices([...activeServices, newService]);
+                                        setSelectedDrink(null);
+                                        setDrinkQuantity(1);
+                                        setShowDrinkSelector(false);
+                                        flash(`✓ Added ${selectedDrink.name} x${drinkQuantity} to tab`);
+                                      }}
+                                      disabled={drinkQuantity > selectedDrink.quantity_in_stock}
+                                      className="w-full py-2 bg-[#0B6E4F] text-[#C9A227] rounded-lg text-xs font-black uppercase tracking-widest hover:bg-[#0B6E4F]/80 transition-all disabled:opacity-50"
+                                    >
+                                      {t('drinks.add')}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         {/* Transportation & Guide Services */}
                         {isStaff && (() => {
                           const transportEntries = activeServices.filter((s: any) => s.details?.name === 'Transportation');
@@ -2529,7 +2643,7 @@ export function BookingModal(props: BookingModalProps) {
                             <div className="space-y-3">
                               {((selectedReceipt.items?.accommodation || 0) > 0 || selectedReceipt.items?.isPrepaid) && (
                                 <div className="flex justify-between items-center text-sm">
-                                  <span className="text-slate-400 font-medium">{t('folio.accommodation_label')} {t('receipt.qty_suffix')}1</span>
+                                  <span className="text-slate-400 font-medium">{t('stay.accommodation_label')} {t('receipt.qty_suffix')}1</span>
                                   {selectedReceipt.items?.isPrepaid ? (
                                     <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">{t('folio.prepaid')}</span>
                                   ) : (
@@ -2649,7 +2763,7 @@ export function BookingModal(props: BookingModalProps) {
                             <div className="space-y-3 bg-[#1C232E]/50 rounded-2xl p-4 border border-[#2A2F36]">
                               {(svcAmount > 0 || (isPrepaid && (sel.collected_amount || 0) === 0)) && (
                                 <div className="flex justify-between items-center text-sm">
-                                  <span className="text-slate-400 font-medium">{t('folio.accommodation_label')} {t('receipt.qty_suffix')}1</span>
+                                  <span className="text-slate-400 font-medium">{t('stay.accommodation_label')} {t('receipt.qty_suffix')}1</span>
                                   {isPrepaid && (sel.collected_amount || 0) === 0 ? (
                                     <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-wider">{t('folio.prepaid')}</span>
                                   ) : (

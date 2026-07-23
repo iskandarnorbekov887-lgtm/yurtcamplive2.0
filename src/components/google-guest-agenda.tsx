@@ -1208,6 +1208,41 @@ export function GoogleGuestAgenda({
           .in('id', unpaidServiceIds);
       }
 
+      // ── STEP 6c: Process drinks - decrement stock and log sales ──
+      const drinkServices = activeServices.filter((s: any) => s.service_type === 'drinks' && !s.is_paid);
+      for (const drinkService of drinkServices) {
+        const drinkId = drinkService.details?.drink_id;
+        const quantity = drinkService.quantity || 1;
+        const price = drinkService.unit_price || 0;
+        
+        if (drinkId) {
+          // Get current stock
+          const { data: drinkData } = await supabase
+            .from('drinks')
+            .select('quantity_in_stock')
+            .eq('id', drinkId)
+            .single();
+          
+          if (drinkData) {
+            // Decrement stock
+            await supabase
+              .from('drinks')
+              .update({ quantity_in_stock: Math.max(0, drinkData.quantity_in_stock - quantity) })
+              .eq('id', drinkId);
+          }
+          
+          // Log sale
+          await supabase
+            .from('drink_sales')
+            .insert({
+              drink_id: drinkId,
+              booking_id: sel.id,
+              quantity: quantity,
+              price_at_sale: price
+            });
+        }
+      }
+
       // ── Append to booking.meta.settled_receipts for legacy/compat views (occupancy-calendar) ──
       let updatedMeta = sel.meta || {};
       try {

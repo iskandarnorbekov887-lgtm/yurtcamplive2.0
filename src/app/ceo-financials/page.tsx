@@ -337,7 +337,7 @@ function CEOFinancialCalendar() {
               <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest mt-0.5">{t('msg.physical_drawer_contents')}</p>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-8">
             <div className="space-y-1">
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('msg.usd_total')}</p>
               <p className="text-2xl font-data font-bold tracking-tight text-white">${cashBox.USD.toLocaleString()}</p>
@@ -376,15 +376,15 @@ function CEOFinancialCalendar() {
             </button>
           </div>
 
-          <div className="grid grid-cols-7 gap-3 mb-3">
+          <div className="grid grid-cols-7 gap-1 md:gap-3 mb-3">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-              <div key={day} className="text-center text-[10px] font-bold text-[#9C9384] uppercase tracking-widest py-2">
+              <div key={day} className="text-center text-[8px] md:text-[10px] font-bold text-[#9C9384] uppercase tracking-widest py-2">
                 {day}
               </div>
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-3">
+          <div className="grid grid-cols-7 gap-1 md:gap-3">
             {Array.from({ length: firstDay }).map((_, i) => (
               <div key={`empty-${i}`} className="min-h-[80px] bg-[#1C232E]/30 rounded-lg border border-transparent" />
             ))}
@@ -461,7 +461,7 @@ function CEOFinancialCalendar() {
             ) : (
               <>
                 {/* Net Profit Summary */}
-                <div className="grid grid-cols-2 gap-6 mb-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6 mb-8">
                   <div className="bg-[#1C232E]/50 rounded-lg p-6 border border-[#5C4A2E]/30 shadow-sm">
                     <p className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest mb-1">Collected Today</p>
                     <div className="space-y-2">
@@ -506,7 +506,7 @@ function CEOFinancialCalendar() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
                   {/* Left: Guest Payments (Revenue) */}
                   <div>
                     <h4 className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest mb-4">Live Revenue Pipeline</h4>

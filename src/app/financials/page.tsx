@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { ProtectedRoute } from '@/components/protected-route';
 import { supabase, type Finance } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -23,9 +24,25 @@ function ManagerFinancials() {
   const { user, signOut } = useAuth();
   const { t, getLocale } = useLanguage();
   const router = useRouter();
-  const [type, setType] = useState<'expense' | 'income'>('expense');
+  const searchParams = useSearchParams();
+  const [type, setType] = useState<'expense' | 'income' | 'drinks'>('expense');
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
+  
+  // Initialize type from URL query param on mount
+  useEffect(() => {
+    const typeParam = searchParams.get('type');
+    if (typeParam && ['expense', 'income', 'drinks'].includes(typeParam)) {
+      setType(typeParam as 'expense' | 'income' | 'drinks');
+    }
+  }, [searchParams]);
+
+  // Update URL when type changes
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('type', type);
+    window.history.replaceState({}, '', url.toString());
+  }, [type]);
   
   // Form fields
   const [category, setCategory] = useState('');
@@ -50,11 +67,65 @@ function ManagerFinancials() {
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
+  // Drinks state - new normalized structure
+  const [drinks, setDrinks] = useState<any[]>([]);
+  const [drinkVariants, setDrinkVariants] = useState<any[]>([]);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [expandedBrands, setExpandedBrands] = useState<Set<string>>(new Set());
+  const [showAddDrinkModal, setShowAddDrinkModal] = useState(false);
+  const [showRestockModal, setShowRestockModal] = useState(false);
+  const [restockingVariant, setRestockingVariant] = useState<any>(null);
+  const [lockCategory, setLockCategory] = useState(false);
+  const [drinkForm, setDrinkForm] = useState({
+    name: '',
+    category: 'saqlangan_ichimliklar',
+    unit: '0.5L',
+    quantity: '',
+    buy_price: '',
+    sell_price: ''
+  });
+
+  // Unit presets per category
+  const unitPresets: Record<string, string[]> = {
+    saqlangan_ichimliklar: ['0.25L banka', '0.33L banka', '0.5L', '1L', '1.5L', '2L'],
+    piva: ['0.5L banka', '0.5L shisha', '1L'],
+    vino: ['shisha', '0.75L'],
+    aroq: ['0.25L shisha', '0.5L shisha', '0.7L shisha', '1L shisha']
+  };
+
   // Fetch recent expenses on load
   useEffect(() => {
     fetchRecentExpenses();
     fetchWorkerNames();
+    fetchDrinks();
   }, []);
+
+  const fetchDrinks = async () => {
+    try {
+      // Fetch drink_variants joined with drinks for name/category
+      const { data: variantsData } = await supabase
+        .from('drink_variants')
+        .select('*, drinks!inner(name, category)')
+        .order('drinks(name)');
+      
+      // Extract unique drinks from variants
+      const drinksMap = new Map();
+      (variantsData || []).forEach(v => {
+        if (!drinksMap.has(v.drink_id)) {
+          drinksMap.set(v.drink_id, {
+            id: v.drink_id,
+            name: v.drinks.name,
+            category: v.drinks.category
+          });
+        }
+      });
+      
+      setDrinks(Array.from(drinksMap.values()));
+      setDrinkVariants(variantsData || []);
+    } catch (error) {
+      console.error('Error fetching drinks:', error);
+    }
+  };
 
   const fetchWorkerNames = async () => {
     try {
@@ -103,6 +174,13 @@ function ManagerFinancials() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Route to drink purchase handler if drinks tab
+    if (type === 'drinks') {
+      handleDrinkPurchase(e);
+      return;
+    }
+    
     if (!user) return;
 
     setSubmitting(true);
@@ -148,6 +226,100 @@ function ManagerFinancials() {
       setDescription('');
       setAmount('');
       setWorkerName('');
+    } catch (err: any) {
+      setMessage(`${t('msg.error')}: ${err.message}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDrinkPurchase = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setMessage('');
+
+    try {
+      const quantity = parseInt(drinkForm.quantity);
+      const buyPrice = parseFloat(drinkForm.buy_price);
+      const sellPrice = parseFloat(drinkForm.sell_price);
+
+      if (isNaN(quantity) || isNaN(buyPrice) || isNaN(sellPrice)) {
+        setMessage(t('msg.please_fill_all_drink_fields'));
+        setSubmitting(false);
+        return;
+      }
+
+      if (restockingVariant) {
+        // Restock existing variant - increment stock and optionally update prices
+        const existingVariant = drinkVariants.find(v => v.id === restockingVariant.id);
+        if (existingVariant) {
+          await supabase
+            .from('drink_variants')
+            .update({
+              quantity_in_stock: existingVariant.quantity_in_stock + quantity,
+              unit: drinkForm.unit || existingVariant.unit,
+              buy_price: buyPrice || existingVariant.buy_price,
+              sell_price: sellPrice || existingVariant.sell_price
+            })
+            .eq('id', restockingVariant.id);
+        }
+      } else {
+        // Create new drink or variant
+        if (!drinkForm.name) {
+          setMessage(t('msg.please_fill_all_drink_fields'));
+          setSubmitting(false);
+          return;
+        }
+
+        // Check if drink already exists by name
+        const { data: existingDrink } = await supabase
+          .from('drinks')
+          .select('*')
+          .eq('name', drinkForm.name)
+          .eq('category', drinkForm.category)
+          .single();
+
+        if (existingDrink) {
+          // Add as new variant to existing drink
+          await supabase
+            .from('drink_variants')
+            .insert({
+              drink_id: existingDrink.id,
+              unit: drinkForm.unit,
+              quantity_in_stock: quantity,
+              buy_price: buyPrice,
+              sell_price: sellPrice
+            });
+        } else {
+          // Create new drink and first variant
+          const { data: newDrink } = await supabase
+            .from('drinks')
+            .insert({
+              name: drinkForm.name,
+              category: drinkForm.category
+            })
+            .select()
+            .single();
+
+          if (newDrink) {
+            await supabase
+              .from('drink_variants')
+              .insert({
+                drink_id: newDrink.id,
+                unit: drinkForm.unit,
+                quantity_in_stock: quantity,
+                buy_price: buyPrice,
+                sell_price: sellPrice
+              });
+          }
+        }
+      }
+
+      setMessage(t('msg.drink_purchase_saved'));
+      setDrinkForm({ name: '', category: 'saqlangan_ichimliklar', unit: '0.5L', quantity: '', buy_price: '', sell_price: '' });
+      setRestockingVariant(null);
+      setShowRestockModal(false);
+      fetchDrinks();
     } catch (err: any) {
       setMessage(`${t('msg.error')}: ${err.message}`);
     } finally {
@@ -233,18 +405,53 @@ function ManagerFinancials() {
               >
                 {t('form.income')}
               </button>
+              <button
+                type="button"
+                onClick={() => router.push('/financials/pos')}
+                className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all ${
+                  false 
+                    ? 'bg-[#C9A227] text-[#0F1419] shadow-lg shadow-[#C9A227]/30' 
+                    : 'bg-[#1C232E] text-[#9C9384] hover:bg-[#2A1518]'
+                }`}
+              >
+                {t('pos.title')}
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push('/financials/storage')}
+                className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all ${
+                  false 
+                    ? 'bg-[#C9A227] text-[#0F1419] shadow-lg shadow-[#C9A227]/30' 
+                    : 'bg-[#1C232E] text-[#9C9384] hover:bg-[#2A1518]'
+                }`}
+              >
+                {t('storage.title')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setType('drinks')}
+                className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all ${
+                  type === 'drinks' 
+                    ? 'bg-[#C9A227] text-[#0F1419] shadow-lg shadow-[#C9A227]/30' 
+                    : 'bg-[#1C232E] text-[#9C9384] hover:bg-[#2A1518]'
+                }`}
+              >
+                {t('txn.tab_drinks')}
+              </button>
             </div>
 
-            {/* Selected Date Display */}
-            <div>
-              <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('form.selected_date')}</label>
-              <div className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl bg-[#0B6E4F]/10 text-[#C9A227] font-black">
-                {new Date(date).toLocaleDateString(getLocale(), { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+            {/* Selected Date Display - only for expense/income */}
+            {type !== 'drinks' && (
+              <div>
+                <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('form.selected_date')}</label>
+                <div className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl bg-[#0B6E4F]/10 text-[#C9A227] font-black">
+                  {new Date(date).toLocaleDateString(getLocale(), { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                </div>
+                <p className="text-xs text-[#9C9384] mt-1 font-semibold">{t('form.select_date_from_calendar')}</p>
               </div>
-              <p className="text-xs text-[#9C9384] mt-1 font-semibold">{t('form.select_date_from_calendar')}</p>
-            </div>
+            )}
 
-            {/* Category */}
+            {/* Category - only for expense/income */}
             {type === 'expense' && (
               <div>
                 <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('form.select_category')}</label>
@@ -316,44 +523,344 @@ function ManagerFinancials() {
               </div>
             )}
 
-            {/* Amount */}
-            <div>
-              <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('form.enter_amount_uzs')} *</label>
-              <input
-                type="number"
-                step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder={t('form.enter_amount_uzs')}
-                className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#1C232E]"
-                required
-              />
-            </div>
+            {/* Amount - only for expense/income */}
+            {type !== 'drinks' && (
+              <div>
+                <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('form.enter_amount_uzs')} *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder={t('form.enter_amount_uzs')}
+                  className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#1C232E]"
+                  required
+                />
+              </div>
+            )}
 
-            {/* Description */}
-            <div>
-              <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('form.describe_transaction')} *</label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder={t('form.describe_transaction')}
-                rows={3}
-                className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#1C232E]"
-                required
-              />
-            </div>
+            {/* Description - only for expense/income */}
+            {type !== 'drinks' && (
+              <div>
+                <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('form.describe_transaction')} *</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder={t('form.describe_transaction')}
+                  rows={3}
+                  className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#1C232E]"
+                  required
+                />
+              </div>
+            )}
 
+            {/* Drink Inventory - 3-level accordion */}
+            {type === 'drinks' && (
+              <div className="space-y-4 md:space-y-6">
+                <h4 className="text-sm md:text-base font-black text-[#EDE6D6]">{t('drinks.existing_drinks')}</h4>
+                {drinkVariants.length === 0 ? (
+                  <p className="text-xs text-[#9C9384]">{t('drinks.no_drinks')}</p>
+                ) : (
+                  <div className="space-y-2 md:space-y-3">
+                    {['saqlangan_ichimliklar', 'piva', 'vino', 'aroq'].map(category => {
+                      const categoryDrinks = drinks.filter(d => d.category === category);
+                      const categoryVariants = drinkVariants.filter(v => categoryDrinks.some(d => d.id === v.drink_id));
+                      const categoryStock = categoryVariants.reduce((sum, v) => sum + (v.quantity_in_stock || 0), 0);
+                      const isExpanded = expandedCategories.has(category);
+
+                      return (
+                        <div key={category} className="bg-[#0F1419] rounded-xl border border-[#5C4A2E]/30">
+                          <div className="flex items-center justify-between px-3 md:px-4 py-2 md:py-3">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newExpanded = new Set(expandedCategories);
+                                if (newExpanded.has(category)) {
+                                  newExpanded.delete(category);
+                                } else {
+                                  newExpanded.add(category);
+                                }
+                                setExpandedCategories(newExpanded);
+                              }}
+                              className="flex items-center gap-2 flex-1 hover:bg-[#1C232E]/50 transition-all rounded-xl px-2 py-1"
+                            >
+                              <span className="text-xs md:text-sm font-bold text-[#EDE6D6]">{t(`drinks.category_${category}`)}</span>
+                              <span className="text-xs text-[#9C9384]">{t('drinks.stock')}: {categoryStock}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowAddDrinkModal(true);
+                                setLockCategory(true);
+                                setDrinkForm({ name: '', category: category as any, unit: unitPresets[category][0], quantity: '', buy_price: '', sell_price: '' });
+                              }}
+                              className="px-3 py-1 bg-[#0B6E4F] text-[#C9A227] rounded-lg font-bold hover:bg-[#0B6E4F]/80 transition-all text-sm"
+                              aria-label={t('drinks.add_new_drink')}
+                            >
+                              +
+                            </button>
+                          </div>
+                          {isExpanded && (
+                            <div className="px-3 md:px-4 pb-3 md:pb-4 space-y-1 md:space-y-2">
+                              {categoryDrinks.map(drink => {
+                                const drinkVariantsList = drinkVariants.filter(v => v.drink_id === drink.id);
+                                const drinkStock = drinkVariantsList.reduce((sum, v) => sum + (v.quantity_in_stock || 0), 0);
+                                const isBrandExpanded = expandedBrands.has(drink.id);
+
+                                return (
+                                  <div key={drink.id} className="ml-2 md:ml-4 bg-[#1C232E]/50 rounded-lg border border-[#5C4A2E]/20">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const newExpanded = new Set(expandedBrands);
+                                        if (newExpanded.has(drink.id)) {
+                                          newExpanded.delete(drink.id);
+                                        } else {
+                                          newExpanded.add(drink.id);
+                                        }
+                                        setExpandedBrands(newExpanded);
+                                      }}
+                                      className="w-full px-2 md:px-3 py-2 flex items-center justify-between hover:bg-[#1C232E] transition-all rounded-lg"
+                                    >
+                                      <span className="text-xs font-bold text-[#EDE6D6]">{drink.name}</span>
+                                      <span className="text-xs text-[#9C9384]">{t('drinks.stock')}: {drinkStock}</span>
+                                    </button>
+                                    {isBrandExpanded && (
+                                      <div className="px-2 md:px-3 pb-2 md:pb-3 space-y-1">
+                                        {drinkVariantsList.map(variant => (
+                                          <div key={variant.id} className="flex items-center justify-between bg-[#0F1419] p-2 rounded border border-[#5C4A2E]/20">
+                                            <div>
+                                              <p className="text-xs text-[#EDE6D6]">{variant.unit}</p>
+                                              <p className={`text-xs font-bold ${variant.quantity_in_stock < 5 ? 'text-[#DC2626]' : 'text-[#9C9384]'}`}>
+                                                {t('drinks.stock')}: {variant.quantity_in_stock} · {variant.sell_price?.toLocaleString() || '0'} so'm
+                                              </p>
+                                            </div>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setRestockingVariant(variant);
+                                                setDrinkForm({
+                                                  name: drink.name,
+                                                  category: drink.category,
+                                                  unit: variant.unit,
+                                                  quantity: '',
+                                                  buy_price: variant.buy_price?.toString() || '',
+                                                  sell_price: variant.sell_price?.toString() || ''
+                                                });
+                                                setShowRestockModal(true);
+                                              }}
+                                              className="px-2 py-1 bg-[#0B6E4F]/20 text-[#0B6E4F] rounded font-bold uppercase text-xs hover:bg-[#0B6E4F]/30 transition-all border border-[#0B6E4F]/40"
+                                            >
+                                              {t('drinks.restock_button')}
+                                            </button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Submit Button */}
             <button
               type="submit"
               disabled={submitting}
               className="w-full py-4 bg-[#0B6E4F] text-[#C9A227] rounded-xl font-black uppercase tracking-widest hover:bg-[#0B6E4F] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-[#0B6E4F]/30"
             >
-              {submitting ? t('btn.saving') : t('btn.save_record')}
+              {submitting ? t('btn.saving') : (type === 'drinks' ? t('drinks.add_purchase') : t('btn.save_record'))}
             </button>
           </form>
           </div>
 
-          {/* Calendar Section */}
+          {/* Add Drink Modal */}
+          {showAddDrinkModal && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-[#1C232E] rounded-2xl p-6 max-w-md w-full border border-[#5C4A2E]/30">
+                <h3 className="text-lg font-black text-[#EDE6D6] mb-4">{t('drinks.add_new_drink')}</h3>
+                <form onSubmit={handleDrinkPurchase} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('drinks.category')}</label>
+                    <select
+                      value={drinkForm.category}
+                      onChange={(e) => {
+                        setDrinkForm({ ...drinkForm, category: e.target.value, unit: unitPresets[e.target.value][0] });
+                      }}
+                      disabled={lockCategory}
+                      className={`w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#0F1419] ${lockCategory ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <option value="saqlangan_ichimliklar">{t('drinks.category_saqlangan_ichimliklar')}</option>
+                      <option value="piva">{t('drinks.category_piva')}</option>
+                      <option value="vino">{t('drinks.category_vino')}</option>
+                      <option value="aroq">{t('drinks.category_aroq')}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('drinks.name')}</label>
+                    <input
+                      type="text"
+                      value={drinkForm.name}
+                      onChange={(e) => setDrinkForm({ ...drinkForm, name: e.target.value })}
+                      className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#0F1419]"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('drinks.unit')}</label>
+                    <select
+                      value={drinkForm.unit}
+                      onChange={(e) => setDrinkForm({ ...drinkForm, unit: e.target.value })}
+                      className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#0F1419]"
+                    >
+                      {unitPresets[drinkForm.category]?.map(unit => (
+                        <option key={unit} value={unit}>{unit}</option>
+                      ))}
+                      <option value="custom">{t('drinks.unit_custom')}</option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('drinks.quantity')}</label>
+                      <input
+                        type="number"
+                        value={drinkForm.quantity}
+                        onChange={(e) => setDrinkForm({ ...drinkForm, quantity: e.target.value })}
+                        className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#0F1419]"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('drinks.buy_price')}</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={drinkForm.buy_price}
+                        onChange={(e) => setDrinkForm({ ...drinkForm, buy_price: e.target.value })}
+                        className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#0F1419]"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('drinks.sell_price')}</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={drinkForm.sell_price}
+                        onChange={(e) => setDrinkForm({ ...drinkForm, sell_price: e.target.value })}
+                        className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#0F1419]"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAddDrinkModal(false);
+                        setLockCategory(false);
+                        setDrinkForm({ name: '', category: 'saqlangan_ichimliklar', unit: '0.5L', quantity: '', buy_price: '', sell_price: '' });
+                      }}
+                      className="flex-1 py-3 bg-[#2A1518] text-[#9C9384] rounded-xl font-bold uppercase text-xs hover:bg-[#2A1518]/80 transition-all border border-[#5C4A2E]/30"
+                    >
+                      {t('drinks.cancel')}
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="flex-1 py-3 bg-[#0B6E4F] text-[#C9A227] rounded-xl font-bold uppercase text-xs hover:bg-[#0B6E4F]/80 transition-all disabled:opacity-50"
+                    >
+                      {submitting ? t('btn.saving') : t('drinks.add')}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Restock Modal */}
+          {showRestockModal && restockingVariant && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-[#1C232E] rounded-2xl p-6 max-w-md w-full border border-[#5C4A2E]/30">
+                <h3 className="text-lg font-black text-[#EDE6D6] mb-4">{t('drinks.restock_button')}</h3>
+                <form onSubmit={handleDrinkPurchase} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('drinks.unit')}</label>
+                    <select
+                      value={drinkForm.unit}
+                      onChange={(e) => setDrinkForm({ ...drinkForm, unit: e.target.value })}
+                      className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#0F1419]"
+                    >
+                      {unitPresets[drinkForm.category]?.map(unit => (
+                        <option key={unit} value={unit}>{unit}</option>
+                      ))}
+                      <option value="custom">{t('drinks.unit_custom')}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('drinks.quantity_to_add')}</label>
+                    <input
+                      type="number"
+                      value={drinkForm.quantity}
+                      onChange={(e) => setDrinkForm({ ...drinkForm, quantity: e.target.value })}
+                      className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#0F1419]"
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('drinks.buy_price')}</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={drinkForm.buy_price}
+                        onChange={(e) => setDrinkForm({ ...drinkForm, buy_price: e.target.value })}
+                        className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#0F1419]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('drinks.sell_price')}</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={drinkForm.sell_price}
+                        onChange={(e) => setDrinkForm({ ...drinkForm, sell_price: e.target.value })}
+                        className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#0F1419]"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowRestockModal(false);
+                        setRestockingVariant(null);
+                        setDrinkForm({ name: '', category: 'saqlangan_ichimliklar', unit: '0.5L', quantity: '', buy_price: '', sell_price: '' });
+                      }}
+                      className="flex-1 py-3 bg-[#2A1518] text-[#9C9384] rounded-xl font-bold uppercase text-xs hover:bg-[#2A1518]/80 transition-all border border-[#5C4A2E]/30"
+                    >
+                      {t('drinks.cancel')}
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="flex-1 py-3 bg-[#0B6E4F] text-[#C9A227] rounded-xl font-bold uppercase text-xs hover:bg-[#0B6E4F]/80 transition-all disabled:opacity-50"
+                    >
+                      {submitting ? t('btn.saving') : t('drinks.restock_button')}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+            )}
+          {type !== 'drinks' && (
           <div className="bg-[#1C232E] rounded-2xl shadow-xl border border-[#5C4A2E]/30 p-8">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-2xl font-black text-[#EDE6D6] font-heading">{t('calendar.title')}</h3>
@@ -373,7 +880,7 @@ function ManagerFinancials() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7m0 0l7-7m-7 7h18" />
                   </svg>
                 </button>
-                <span className="text-lg font-black text-[#EDE6D6] min-w-[140px] text-center">
+                <span className="text-sm md:text-lg font-black text-[#EDE6D6] min-w-[100px] md:min-w-[140px] text-center">
                   {new Date(currentYear, currentMonth).toLocaleDateString(getLocale(), { month: 'long', year: 'numeric' })}
                 </span>
                 <button
@@ -467,8 +974,10 @@ function ManagerFinancials() {
               })()}
             </div>
           </div>
+          )}
 
-          {/* Selected Date Transactions */}
+          {/* Selected Date Transactions - only for expense/income */}
+          {type !== 'drinks' && (
           <div className="lg:col-span-2 mt-6 bg-[#1C232E] rounded-2xl shadow-xl border border-[#5C4A2E]/30 p-8">
             <h3 className="text-2xl font-black text-[#EDE6D6] font-heading mb-6">
               {date === new Date().toISOString().split('T')[0] ? t('calendar.today') : date} {t('form.transactions')}
@@ -512,6 +1021,7 @@ function ManagerFinancials() {
               })()
             )}
           </div>
+          )}
         </div>
       </main>
     </div>

@@ -80,7 +80,7 @@ export function ManagerMealRequests({ booking, onClose, onSent, teamId, userRole
   }, [booking]);
 
   useEffect(() => {
-    supabase.from('drinks').select('*').eq('available', true).then(({ data }) => setDrinks(data || []));
+    supabase.from('drinks').select('*').then(({ data }) => setDrinks(data || []));
   }, []);
 
   const fetchMeals = async () => {

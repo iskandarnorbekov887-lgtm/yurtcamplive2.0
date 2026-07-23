@@ -233,7 +233,7 @@ function ManagerFinancialDetail() {
 
         <div className="bg-[#1C232E] rounded-2xl shadow-xl p-8 space-y-6 border border-[#5C4A2E]/30">
           {/* Basic Info */}
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div>
               <p className="text-xs font-bold uppercase tracking-widest text-[#9C9384] mb-2">Date</p>
               <p className="text-lg font-semibold text-[#EDE6D6]">{finance.date}</p>

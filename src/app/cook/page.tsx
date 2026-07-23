@@ -10,8 +10,9 @@ import { PrivateCalendarView } from '@/components/private-calendar-view';
 import { CookProcurement } from '@/components/procurement/cook-procurement';
 import { CookUsage } from '@/components/procurement/cook-usage';
 import { InventoryDashboard } from '@/components/procurement/inventory-dashboard';
+import { DrinksPOS } from '@/components/DrinksPOS';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Utensils, ShoppingBag, Scale, Box, Calendar, LogOut, Bell, Zap, ChefHat } from 'lucide-react';
+import { Utensils, ShoppingBag, Scale, Box, Calendar, LogOut, Bell, Zap, ChefHat, Wine } from 'lucide-react';
 import { processMealRequest } from '@/app/actions/meal-actions';
 import { RecipeDisplay } from '@/components/RecipeDisplay';
 
@@ -30,7 +31,7 @@ function CookPortal() {
   const { t } = useLanguage();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [mealRequests, setMealRequests] = useState<MealRequest[]>([]);
-  const [activeTab, setActiveTab] = useState<'orders' | 'procurement' | 'usage' | 'inventory' | 'schedule'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'procurement' | 'usage' | 'inventory' | 'schedule' | 'pos'>('orders');
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [drinks, setDrinks] = useState<any[]>([]);
   const [showDrinkSelector, setShowDrinkSelector] = useState(false);
@@ -111,7 +112,7 @@ function CookPortal() {
       });
       setMealRequests(filteredMeals);
 
-      const { data: drinkData } = await supabase.from('drinks').select('*').eq('available', true);
+      const { data: drinkData } = await supabase.from('drinks').select('*').order('name');
       setDrinks(drinkData || []);
     } catch (err) {
       console.error('Fetch failed:', err);
@@ -210,6 +211,7 @@ function CookPortal() {
               { id: 'procurement', label: 'Requests', icon: ShoppingBag },
               { id: 'usage', label: 'Weighing', icon: Scale },
               { id: 'inventory', label: 'Stores', icon: Box },
+              { id: 'pos', label: 'Drinks POS', icon: Wine },
               { id: 'schedule', label: 'Calendar', icon: Calendar },
             ].map((item) => (
               <button
@@ -252,7 +254,7 @@ function CookPortal() {
         {/* Top Bar */}
         <div className="sticky top-0 z-30 px-8 py-4 flex justify-between items-center bg-[#1C232E]/80 backdrop-blur-sm border-b border-[#5C4A2E]/30">
           <div className="text-xs font-bold text-[#9C9384] uppercase tracking-widest">
-            {activeTab === 'orders' ? 'Kitchen Queue' : activeTab === 'procurement' ? 'Supply Requests' : activeTab === 'usage' ? 'Weighing Station' : activeTab === 'inventory' ? 'Stores' : 'Calendar'}
+            {activeTab === 'orders' ? 'Kitchen Queue' : activeTab === 'procurement' ? 'Supply Requests' : activeTab === 'usage' ? 'Weighing Station' : activeTab === 'inventory' ? 'Stores' : activeTab === 'pos' ? 'Drinks POS' : 'Calendar'}
           </div>
           <div className="flex items-center gap-3">
             <LanguageSwitcher variant="dark" />
@@ -262,7 +264,7 @@ function CookPortal() {
           </div>
         </div>
 
-        <div className="max-w-[1400px] mx-auto px-8 py-8">
+        <div className="max-w-full md:max-w-[1400px] mx-auto px-4 md:px-8 py-6 md:py-8">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -450,6 +452,7 @@ function CookPortal() {
                   <InventoryDashboard />
                 </div>
               )}
+              {activeTab === 'pos' && <DrinksPOS drinks={drinks} onSale={fetchData} />}
             </motion.div>
           </AnimatePresence>
         </div>
@@ -470,7 +473,7 @@ function CookPortal() {
               </div>
               
               <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {['lunch', 'dinner'].map((meal) => {
                     const order = mealRequests.find((m) => m.booking_id === selectedBooking.id && (m.meal_type || '').toLowerCase() === meal);
                     const isConfirmed = order?.status === 'Accepted' || order?.status === 'Served';
@@ -495,7 +498,7 @@ function CookPortal() {
                   </div>
 
                   {showDrinkSelector ? (
-                    <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-40 overflow-y-auto">
                       {drinks.map(d => (
                         <button key={d.id} onClick={() => handleAddDrink(d)} className="p-3 bg-[#1C232E] hover:bg-[#0B6E4F]/20 border border-[#5C4A2E]/30 hover:border-[#0B6E4F]/40 rounded-lg text-left transition-all group">
                           <p className="text-xs font-bold text-[#EDE6D6] group-hover:text-[#0B6E4F] transition-colors">{d.name}</p>

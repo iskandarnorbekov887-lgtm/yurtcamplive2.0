@@ -92,23 +92,23 @@ function BookingPortal() {
   return (
     <div className="min-h-screen bg-[#0F1419] font-sans">
       <header className="bg-[#1C232E] border-b border-[#5C4A2E]/30 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 py-3 md:py-4 flex justify-between items-center">
+          <div className="flex items-center gap-2 md:gap-3">
             <div className="p-2 bg-[#0B6E4F]/20 border border-[#0B6E4F]/30 rounded-lg text-[#0B6E4F]">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+              <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
             </div>
-            <h1 className="text-lg font-bold text-[#EDE6D6] uppercase tracking-tight">Booking Portal</h1>
+            <h1 className="text-sm md:text-lg font-bold text-[#EDE6D6] uppercase tracking-tight">Booking Portal</h1>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
             <LanguageSwitcher variant="dark" />
-            <button onClick={signOut} className="px-4 py-2 text-[#9C9384] hover:text-[#722F37] font-bold text-[10px] uppercase tracking-widest transition-all flex items-center gap-2">
+            <button onClick={signOut} className="px-3 py-2 md:px-4 md:py-2 text-[#9C9384] hover:text-[#722F37] font-bold text-[10px] uppercase tracking-widest transition-all flex items-center gap-2">
               {t('btn.logout')}
             </button>
           </div>
         </div>
       </header>
 
-      <main className="p-8 max-w-7xl mx-auto w-full space-y-8">
+      <main className="p-4 md:p-8 max-w-7xl mx-auto w-full space-y-4 md:space-y-8">
         <OccupancyCalendar 
           bookings={bookings} 
           userRole={userRole}

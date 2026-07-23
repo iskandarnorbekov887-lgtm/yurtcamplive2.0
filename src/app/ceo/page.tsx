@@ -1045,7 +1045,7 @@ function CEODashboard() {
                   return <p className="text-[#9C9384]">No active stays</p>;
                 }
                 return (
-                  <div className="grid md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {activeBookings.map((booking) => {
                       const meals = booking.meal_requests || [];
                       const pendingMeals = meals.filter(m => m.status === 'Pending').length;
