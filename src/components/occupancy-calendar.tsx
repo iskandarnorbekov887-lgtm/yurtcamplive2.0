@@ -462,7 +462,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
 
       <div className="grid grid-cols-7 border-b border-black">
         {[0,1,2,3,4,5,6].map(d => (
-          <div key={d} className="py-3 text-center text-xs sm:text-sm font-semibold hc-body uppercase tracking-wider">
+          <div key={d} className="py-2 md:py-3 text-center text-[10px] sm:text-xs md:text-sm font-semibold hc-body uppercase tracking-wider">
             {t(`day.${d}`)}
           </div>
         ))}
@@ -485,7 +485,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                 return (
                   <div 
                     key={di} 
-                    className={`min-h-[56px] sm:min-h-[64px] px-2 sm:px-3 pt-2 sm:pt-3 border-r border-[#5C4A2E]/30 last:border-r-0 cursor-pointer transition-colors ${!isCurrentMonth ? 'bg-[#1C232E]/40' : ''}`}
+                    className={`min-h-[48px] sm:min-h-[56px] md:min-h-[64px] px-1.5 sm:px-2 md:px-3 pt-1.5 sm:pt-2 md:pt-3 border-r border-[#5C4A2E]/30 last:border-r-0 cursor-pointer transition-colors ${!isCurrentMonth ? 'bg-[#1C232E]/40' : ''}`}
                     onClick={() => {
                       if (onDayClick) {
                         onDayClick(ds);
@@ -499,12 +499,12 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                     }}
                   >
                     <div className="flex items-center justify-between">
-                      <span className={`text-base sm:text-lg font-semibold w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full
+                      <span className={`text-sm sm:text-base md:text-lg font-semibold w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 flex items-center justify-center rounded-full
                         ${isToday ? 'bg-indigo-600 text-white' : isCurrentMonth ? 'text-slate-700' : 'text-slate-300'}`}>
                         {day.getDate()}
                       </span>
                       {full && (
-                        <span className="text-[10px] sm:text-xs font-black text-red-600 bg-red-50 px-1.5 py-0.5 rounded">FULL</span>
+                        <span className="text-[8px] sm:text-[10px] md:text-xs font-black text-red-600 bg-red-50 px-1 py-0.5 rounded">FULL</span>
                       )}
                     </div>
                   </div>

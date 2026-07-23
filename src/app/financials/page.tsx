@@ -913,10 +913,10 @@ function ManagerFinancials() {
             </div>
 
             {/* Calendar Grid */}
-            <div className="grid grid-cols-7 gap-2">
+            <div className="grid grid-cols-7 gap-1 md:gap-2">
               {/* Day Headers */}
               {[t('day.1'), t('day.2'), t('day.3'), t('day.4'), t('day.5'), t('day.6'), t('day.0')].map((day, i) => (
-                <div key={day} className="text-center text-sm font-black text-[#9C9384] py-2">
+                <div key={day} className="text-center text-xs md:text-sm font-black text-[#9C9384] py-1 md:py-2">
                   {day}
                 </div>
               ))}
@@ -955,9 +955,9 @@ function ManagerFinancials() {
                         ${netExpense > 0 ? 'bg-[#722F37]/10' : ''}
                       `}
                     >
-                      <span className="text-sm font-black text-[#EDE6D6]">{day}</span>
+                      <span className="text-xs sm:text-sm font-black text-[#EDE6D6]">{day}</span>
                       {(netIncome > 0 || netExpense > 0) && (
-                        <div className="text-xs mt-1">
+                        <div className="text-[10px] sm:text-xs mt-0.5 sm:mt-1 truncate w-full text-center">
                           {netIncome > 0 && (
                             <span className="text-[#0B6E4F] font-bold">+{(netIncome / 1000000).toFixed(1)}M</span>
                           )}

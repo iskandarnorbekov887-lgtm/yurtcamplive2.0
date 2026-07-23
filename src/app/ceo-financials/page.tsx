@@ -386,7 +386,7 @@ function CEOFinancialCalendar() {
 
           <div className="grid grid-cols-7 gap-1 md:gap-3">
             {Array.from({ length: firstDay }).map((_, i) => (
-              <div key={`empty-${i}`} className="min-h-[80px] bg-[#1C232E]/30 rounded-lg border border-transparent" />
+              <div key={`empty-${i}`} className="min-h-[60px] md:min-h-[80px] bg-[#1C232E]/30 rounded-lg border border-transparent" />
             ))}
             {Array.from({ length: daysInMonth }).map((_, i) => {
               const day = i + 1;
@@ -397,27 +397,27 @@ function CEOFinancialCalendar() {
                 <button
                   key={day}
                   onClick={() => handleDayClick(day)}
-                  className={`min-h-[90px] p-3 rounded-lg border transition-all flex flex-col justify-between group ${
+                  className={`min-h-[70px] md:min-h-[90px] p-2 md:p-3 rounded-lg border transition-all flex flex-col justify-between group ${
                     isToday
                       ? 'border-[#0B6E4F] bg-[#0B6E4F]/20 shadow-sm'
                       : 'border-[#5C4A2E]/30 hover:border-[#0B6E4F] hover:bg-[#1C232E]/50'
                   }`}
                 >
-                  <span className={`text-xs font-bold ${isToday ? 'text-[#0B6E4F]' : 'text-[#EDE6D6]'}`}>{day}</span>
+                  <span className={`text-[10px] sm:text-xs font-bold ${isToday ? 'text-[#0B6E4F]' : 'text-[#EDE6D6]'}`}>{day}</span>
                   {(dayCounts.inHouse > 0 || dayCounts.arriving > 0 || dayCounts.departing > 0) && (
-                    <div className="flex gap-1 self-end">
+                    <div className="flex gap-0.5 sm:gap-1 self-end flex-wrap">
                       {dayCounts.inHouse > 0 && (
-                        <div className="text-[10px] font-data font-bold text-[#3B82F6] bg-[#3B82F6]/20 px-1.5 py-0.5 rounded border border-[#3B82F6]/40">
+                        <div className="text-[8px] sm:text-[10px] font-data font-bold text-[#3B82F6] bg-[#3B82F6]/20 px-1 sm:px-1.5 py-0.5 rounded border border-[#3B82F6]/40">
                           👤{dayCounts.inHouse}
                         </div>
                       )}
                       {dayCounts.arriving > 0 && (
-                        <div className="text-[10px] font-data font-bold text-[#0B6E4F] bg-[#0B6E4F]/20 px-1.5 py-0.5 rounded border border-[#0B6E4F]/40">
+                        <div className="text-[8px] sm:text-[10px] font-data font-bold text-[#0B6E4F] bg-[#0B6E4F]/20 px-1 sm:px-1.5 py-0.5 rounded border border-[#0B6E4F]/40">
                           👤{dayCounts.arriving}
                         </div>
                       )}
                       {dayCounts.departing > 0 && (
-                        <div className="text-[10px] font-data font-bold text-[#F97316] bg-[#F97316]/20 px-1.5 py-0.5 rounded border border-[#F97316]/40">
+                        <div className="text-[8px] sm:text-[10px] font-data font-bold text-[#F97316] bg-[#F97316]/20 px-1 sm:px-1.5 py-0.5 rounded border border-[#F97316]/40">
                           👤{dayCounts.departing}
                         </div>
                       )}
