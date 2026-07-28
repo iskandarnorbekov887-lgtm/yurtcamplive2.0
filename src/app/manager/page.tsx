@@ -11,10 +11,11 @@ import { GoogleGuestAgenda } from '@/components/google-guest-agenda';
 import { ManagerIncomeForm } from '@/components/manager-income-form';
 import { ManagerNotifications } from '@/components/manager/manager-notifications';
 import { ManagerProcurement } from '@/components/procurement/manager-procurement';
-import { InventoryDashboard } from '@/components/procurement/inventory-dashboard';
 import { ManagerMealRequests } from '@/components/manager/manager-meal-requests';
+import { DrinksPOS } from '@/components/DrinksPOS';
+import StoragePage from '@/app/financials/storage/page';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, ShoppingBag, Box, Bell, LogOut, Utensils, Calendar, Menu, X } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Box, Bell, LogOut, Utensils, Calendar, Menu, X, ShoppingCart } from 'lucide-react';
 
 import type { UserRole } from '@/lib/supabase';
 
@@ -37,7 +38,7 @@ function ManagerPortal() {
 
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [activeTab, setActiveTab] = useState<'checkin' | 'meals' | 'procurement' | 'inventory'>('checkin');
+  const [activeTab, setActiveTab] = useState<'checkin' | 'meals' | 'procurement' | 'inventory' | 'pos'>('checkin');
   const [showNotifications, setShowNotifications] = useState(false);
   const [showIncomeForm, setShowIncomeForm] = useState(false);
   const [selectedBookingDate, setSelectedBookingDate] = useState('');
@@ -49,8 +50,8 @@ function ManagerPortal() {
   // Initialize activeTab from URL query param on mount
   useEffect(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam && ['checkin', 'meals', 'procurement', 'inventory'].includes(tabParam)) {
-      setActiveTab(tabParam as 'checkin' | 'meals' | 'procurement' | 'inventory');
+    if (tabParam && ['checkin', 'meals', 'procurement', 'inventory', 'pos'].includes(tabParam)) {
+      setActiveTab(tabParam as 'checkin' | 'meals' | 'procurement' | 'inventory' | 'pos');
     }
   }, [searchParams]);
 
@@ -144,6 +145,7 @@ function ManagerPortal() {
               { id: 'meals', label: t('nav.meals'), icon: Utensils },
               { id: 'procurement', label: t('nav.logistics'), icon: ShoppingBag },
               { id: 'inventory', label: t('nav.stores'), icon: Box },
+              { id: 'pos', label: t('pos.title'), icon: ShoppingCart },
             ].map((item) => (
               <button
                 key={item.id}
@@ -186,20 +188,6 @@ function ManagerPortal() {
              className={`block p-3 rounded-lg text-[10px] font-bold uppercase tracking-widest text-[#0B6E4F] bg-[#0B6E4F]/10 border border-[#0B6E4F]/30 hover:bg-[#0B6E4F]/20 transition-all text-center ${isCollapsed ? 'w-full flex justify-center' : ''}`}
            >
              {isCollapsed ? "💰" : `💰 ${t('nav.fiscal_recording')}`}
-           </a>
-           <a 
-             href="/financials/storage" 
-             title={isCollapsed ? t('storage.title') : undefined}
-             className={`block p-3 rounded-lg text-[10px] font-bold uppercase tracking-widest text-[#C9A227] bg-[#C9A227]/10 border border-[#C9A227]/30 hover:bg-[#C9A227]/20 transition-all text-center ${isCollapsed ? 'w-full flex justify-center' : ''}`}
-           >
-             {isCollapsed ? "📦" : `📦 ${t('storage.title')}`}
-           </a>
-           <a 
-             href="/financials/pos" 
-             title={isCollapsed ? t('pos.title') : undefined}
-             className={`block p-3 rounded-lg text-[10px] font-bold uppercase tracking-widest text-[#0B6E4F] bg-[#0B6E4F]/10 border border-[#0B6E4F]/30 hover:bg-[#0B6E4F]/20 transition-all text-center ${isCollapsed ? 'w-full flex justify-center' : ''}`}
-           >
-             {isCollapsed ? "🛒" : `🛒 ${t('pos.title')}`}
            </a>
            <button 
              onClick={signOut} 
@@ -250,6 +238,7 @@ function ManagerPortal() {
                   { id: 'meals', label: t('nav.meals'), icon: Utensils },
                   { id: 'procurement', label: t('nav.logistics'), icon: ShoppingBag },
                   { id: 'inventory', label: t('nav.stores'), icon: Box },
+                  { id: 'pos', label: t('pos.title'), icon: ShoppingCart },
                 ].map((item) => (
                   <button
                     key={item.id}
@@ -273,12 +262,6 @@ function ManagerPortal() {
                     className="block p-3 rounded-lg text-[10px] font-bold uppercase tracking-widest text-[#0B6E4F] bg-[#0B6E4F]/10 border border-[#0B6E4F]/30 hover:bg-[#0B6E4F]/20 transition-all text-center"
                   >
                     💰 {t('nav.fiscal_recording')}
-                  </a>
-                  <a 
-                    href="/financials/storage" 
-                    className="block p-3 rounded-lg text-[10px] font-bold uppercase tracking-widest text-[#C9A227] bg-[#C9A227]/10 border border-[#C9A227]/30 hover:bg-[#C9A227]/20 transition-all text-center"
-                  >
-                    📦 {t('storage.title')}
                   </a>
                   <a 
                     href="/financials/pos" 
@@ -471,7 +454,8 @@ function ManagerPortal() {
               )}
 
               {activeTab === 'procurement' && <ManagerProcurement />}
-              {activeTab === 'inventory' && <InventoryDashboard />}
+              {activeTab === 'inventory' && <StoragePage />}
+              {activeTab === 'pos' && <DrinksPOS />}
             </motion.div>
           </AnimatePresence>
         </div>

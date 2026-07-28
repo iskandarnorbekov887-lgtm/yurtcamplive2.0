@@ -35,17 +35,22 @@ function Storage() {
 
   // Fetch drinks with realtime sync
   useEffect(() => {
+    let isMounted = true;
+    
     fetchDrinks();
     
     // Subscribe to realtime changes
     const channel = supabase
-      .channel('drinks-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'drinks' }, () => {
-        fetchDrinks();
+      .channel('storage-drinks-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'drink_variants' }, () => {
+        if (isMounted) {
+          fetchDrinks();
+        }
       })
       .subscribe();
 
     return () => {
+      isMounted = false;
       supabase.removeChannel(channel);
     };
   }, []);
@@ -79,15 +84,6 @@ function Storage() {
       <header className="bg-[#1C232E] border-b border-[#5C4A2E]/30">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <h1 className="text-2xl font-black text-[#C9A227]">{t('storage.title')}</h1>
-          <div className="flex items-center gap-4">
-            <LanguageSwitcher />
-            <button
-              onClick={() => signOut()}
-              className="px-4 py-2 bg-[#722F37] text-[#EDE6D6] rounded-lg font-bold hover:bg-[#722F37]/80 transition-all"
-            >
-              {t('nav.logout')}
-            </button>
-          </div>
         </div>
       </header>
 
@@ -112,14 +108,14 @@ function Storage() {
               }, {} as Record<string, typeof categoryDrinks>);
 
               return (
-                <div key={category} className="bg-[#1C232E] rounded-2xl shadow-xl border border-[#5C4A2E]/30 p-4 md:p-6">
-                  <h2 className="text-lg md:text-xl font-black text-[#C9A227] mb-4">{t(`drinks.category_${category}`)}</h2>
+                <div key={category} className="bg-[#1C232E] rounded-xl shadow-lg border border-[#5C4A2E]/30 p-2 md:p-3">
+                  <h2 className="text-sm md:text-base font-black text-[#C9A227] mb-2 md:mb-3">{t(`drinks.category_${category}`)}</h2>
                   
-                  <div className="space-y-3 md:space-y-4">
+                  <div className="space-y-1.5 md:space-y-2">
                     {Object.entries(groupedByBrand).map(([brandName, variants]) => (
-                      <div key={brandName} className="bg-[#0F1419] rounded-lg border border-[#5C4A2E]/30 p-3 md:p-4">
-                        <h3 className="font-bold text-[#EDE6D6] mb-2 md:mb-3 text-sm md:text-base">{brandName}</h3>
-                        <div className="space-y-1 md:space-y-2">
+                      <div key={brandName} className="bg-[#0F1419] rounded-lg border border-[#5C4A2E]/30 p-2 md:p-3">
+                        <h3 className="font-bold text-[#EDE6D6] mb-1 md:mb-2 text-xs md:text-sm">{brandName}</h3>
+                        <div className="space-y-0.5 md:space-y-1">
                           {variants
                             .sort((a, b) => {
                               // Simple numeric sort for unit sizes
@@ -130,9 +126,9 @@ function Storage() {
                               return getNumericValue(a.unit) - getNumericValue(b.unit);
                             })
                             .map(variant => (
-                              <div key={variant.id} className="flex items-center justify-between pl-4 border-l-2 border-[#5C4A2E]/30">
-                                <span className="text-xs md:text-sm text-[#9C9384]">{variant.unit}</span>
-                                <span className={`font-black text-xs md:text-sm ${variant.quantity_in_stock === 0 ? 'text-[#DC2626]' : variant.quantity_in_stock < 5 ? 'text-[#DC2626]' : 'text-[#0B6E4F]'}`}>
+                              <div key={variant.id} className="flex items-center justify-between pl-3 md:pl-4 border-l-2 border-[#5C4A2E]/30">
+                                <span className="text-[10px] md:text-xs text-[#9C9384]">{variant.unit}</span>
+                                <span className={`font-black text-[10px] md:text-xs ${variant.quantity_in_stock === 0 ? 'text-[#DC2626]' : variant.quantity_in_stock < 5 ? 'text-[#DC2626]' : 'text-[#0B6E4F]'}`}>
                                   {variant.quantity_in_stock}
                                 </span>
                               </div>

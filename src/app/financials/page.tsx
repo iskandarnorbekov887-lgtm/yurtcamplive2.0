@@ -75,7 +75,11 @@ function ManagerFinancials() {
   const [showAddDrinkModal, setShowAddDrinkModal] = useState(false);
   const [showRestockModal, setShowRestockModal] = useState(false);
   const [restockingVariant, setRestockingVariant] = useState<any>(null);
+  const [drinkFormMode, setDrinkFormMode] = useState<'add' | 'restock'>('add');
   const [lockCategory, setLockCategory] = useState(false);
+  const [selectedBrandId, setSelectedBrandId] = useState<string>('');
+  const [showNewBrandInput, setShowNewBrandInput] = useState(false);
+  const [lockBrandAndUnit, setLockBrandAndUnit] = useState(false);
   const [drinkForm, setDrinkForm] = useState({
     name: '',
     category: 'saqlangan_ichimliklar',
@@ -249,19 +253,19 @@ function ManagerFinancials() {
         return;
       }
 
-      if (restockingVariant) {
+      if (drinkFormMode === 'restock' && restockingVariant) {
         // Restock existing variant - increment stock and optionally update prices
         const existingVariant = drinkVariants.find(v => v.id === restockingVariant.id);
         if (existingVariant) {
-          await supabase
+          const { error: updateError } = await supabase
             .from('drink_variants')
             .update({
               quantity_in_stock: existingVariant.quantity_in_stock + quantity,
-              unit: drinkForm.unit || existingVariant.unit,
               buy_price: buyPrice || existingVariant.buy_price,
               sell_price: sellPrice || existingVariant.sell_price
             })
             .eq('id', restockingVariant.id);
+          if (updateError) throw updateError;
         }
       } else {
         // Create new drink or variant
@@ -271,54 +275,92 @@ function ManagerFinancials() {
           return;
         }
 
-        // Check if drink already exists by name
-        const { data: existingDrink } = await supabase
-          .from('drinks')
-          .select('*')
-          .eq('name', drinkForm.name)
-          .eq('category', drinkForm.category)
-          .single();
+        let drinkId: string;
 
-        if (existingDrink) {
-          // Add as new variant to existing drink
-          await supabase
+        if (selectedBrandId && selectedBrandId !== 'new') {
+          // Existing brand selected from dropdown - use its id directly
+          drinkId = selectedBrandId;
+        } else {
+          // New brand - normalize the drink name (trim whitespace)
+          const normalizedName = drinkForm.name.trim();
+
+          // Check if drink already exists by name (case-insensitive, trimmed) - safety net
+          const { data: existingDrink, error: fetchErr } = await supabase
+            .from('drinks')
+            .select('*')
+            .ilike('name', normalizedName)
+            .eq('category', drinkForm.category)
+            .maybeSingle();
+          if (fetchErr) throw fetchErr;
+
+          if (existingDrink) {
+            // Use existing drink's canonical name (preserve original casing)
+            drinkId = existingDrink.id;
+          } else {
+            // Create new drink with normalized name
+            const { data: newDrink, error: insertDrinkErr } = await supabase
+              .from('drinks')
+              .insert({
+                name: normalizedName,
+                category: drinkForm.category
+              })
+              .select()
+              .single();
+            if (insertDrinkErr) throw insertDrinkErr;
+
+            if (!newDrink) {
+              throw new Error('Failed to create drink');
+            }
+            drinkId = newDrink.id;
+          }
+        }
+
+        // Check if variant with same unit already exists for this drink
+        const { data: existingVariant, error: fetchVariantErr } = await supabase
+          .from('drink_variants')
+          .select('*')
+          .eq('drink_id', drinkId)
+          .eq('unit', drinkForm.unit)
+          .maybeSingle();
+        if (fetchVariantErr) throw fetchVariantErr;
+
+        if (existingVariant) {
+          // Restock existing variant
+          const { error: restockError } = await supabase
+            .from('drink_variants')
+            .update({
+              quantity_in_stock: existingVariant.quantity_in_stock + quantity,
+              buy_price: buyPrice,
+              sell_price: sellPrice
+            })
+            .eq('id', existingVariant.id);
+          if (restockError) throw restockError;
+          setMessage(t('msg.variant_restocked'));
+        } else {
+          // Insert new variant
+          const { error: insertVariantError } = await supabase
             .from('drink_variants')
             .insert({
-              drink_id: existingDrink.id,
+              drink_id: drinkId,
               unit: drinkForm.unit,
               quantity_in_stock: quantity,
               buy_price: buyPrice,
               sell_price: sellPrice
             });
-        } else {
-          // Create new drink and first variant
-          const { data: newDrink } = await supabase
-            .from('drinks')
-            .insert({
-              name: drinkForm.name,
-              category: drinkForm.category
-            })
-            .select()
-            .single();
-
-          if (newDrink) {
-            await supabase
-              .from('drink_variants')
-              .insert({
-                drink_id: newDrink.id,
-                unit: drinkForm.unit,
-                quantity_in_stock: quantity,
-                buy_price: buyPrice,
-                sell_price: sellPrice
-              });
-          }
+          if (insertVariantError) throw insertVariantError;
+          setMessage(t('msg.drink_purchase_saved'));
         }
       }
 
-      setMessage(t('msg.drink_purchase_saved'));
       setDrinkForm({ name: '', category: 'saqlangan_ichimliklar', unit: '0.5L', quantity: '', buy_price: '', sell_price: '' });
       setRestockingVariant(null);
+      setDrinkFormMode('add');
+      setSelectedBrandId('');
+      setShowNewBrandInput(false);
+      setLockBrandAndUnit(false);
       setShowRestockModal(false);
+      setShowAddDrinkModal(false);
+      setLockCategory(false);
       fetchDrinks();
     } catch (err: any) {
       setMessage(`${t('msg.error')}: ${err.message}`);
@@ -404,28 +446,6 @@ function ManagerFinancials() {
                 }`}
               >
                 {t('form.income')}
-              </button>
-              <button
-                type="button"
-                onClick={() => router.push('/financials/pos')}
-                className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all ${
-                  false 
-                    ? 'bg-[#C9A227] text-[#0F1419] shadow-lg shadow-[#C9A227]/30' 
-                    : 'bg-[#1C232E] text-[#9C9384] hover:bg-[#2A1518]'
-                }`}
-              >
-                {t('pos.title')}
-              </button>
-              <button
-                type="button"
-                onClick={() => router.push('/financials/storage')}
-                className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all ${
-                  false 
-                    ? 'bg-[#C9A227] text-[#0F1419] shadow-lg shadow-[#C9A227]/30' 
-                    : 'bg-[#1C232E] text-[#9C9384] hover:bg-[#2A1518]'
-                }`}
-              >
-                {t('storage.title')}
               </button>
               <button
                 type="button"
@@ -590,6 +610,11 @@ function ManagerFinancials() {
                             <button
                               type="button"
                               onClick={() => {
+                                setRestockingVariant(null);
+                                setDrinkFormMode('add');
+                                setSelectedBrandId('');
+                                setShowNewBrandInput(false);
+                                setLockBrandAndUnit(false);
                                 setShowAddDrinkModal(true);
                                 setLockCategory(true);
                                 setDrinkForm({ name: '', category: category as any, unit: unitPresets[category][0], quantity: '', buy_price: '', sell_price: '' });
@@ -627,34 +652,66 @@ function ManagerFinancials() {
                                     </button>
                                     {isBrandExpanded && (
                                       <div className="px-2 md:px-3 pb-2 md:pb-3 space-y-1">
-                                        {drinkVariantsList.map(variant => (
-                                          <div key={variant.id} className="flex items-center justify-between bg-[#0F1419] p-2 rounded border border-[#5C4A2E]/20">
-                                            <div>
-                                              <p className="text-xs text-[#EDE6D6]">{variant.unit}</p>
-                                              <p className={`text-xs font-bold ${variant.quantity_in_stock < 5 ? 'text-[#DC2626]' : 'text-[#9C9384]'}`}>
-                                                {t('drinks.stock')}: {variant.quantity_in_stock} · {variant.sell_price?.toLocaleString() || '0'} so'm
-                                              </p>
+                                        {unitPresets[drink.category]?.map(unit => {
+                                          const existingVariant = drinkVariantsList.find(v => v.unit === unit);
+                                          const displayVariant = existingVariant || {
+                                            id: `virtual-${drink.id}-${unit}`,
+                                            drink_id: drink.id,
+                                            unit: unit,
+                                            quantity_in_stock: 0,
+                                            sell_price: null,
+                                            buy_price: null,
+                                            isVirtual: true
+                                          };
+
+                                          return (
+                                            <div key={unit} className="flex items-center justify-between bg-[#0F1419] p-2 rounded border border-[#5C4A2E]/20">
+                                              <div>
+                                                <p className="text-xs text-[#EDE6D6]">{unit}</p>
+                                                <p className={`text-xs font-bold ${displayVariant.quantity_in_stock < 5 ? 'text-[#DC2626]' : 'text-[#9C9384]'}`}>
+                                                  {t('drinks.stock')}: {displayVariant.quantity_in_stock} · {displayVariant.sell_price?.toLocaleString() || (displayVariant.isVirtual ? t('pos.price_not_set') : '0')} so'm
+                                                </p>
+                                              </div>
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  if (displayVariant.isVirtual) {
+                                                    // Virtual row - open Add drink modal with locked brand/unit
+                                                    setSelectedBrandId(drink.id);
+                                                    setLockBrandAndUnit(true);
+                                                    setDrinkFormMode('add');
+                                                    setDrinkForm({
+                                                      name: drink.name,
+                                                      category: drink.category,
+                                                      unit: unit,
+                                                      quantity: '',
+                                                      buy_price: '',
+                                                      sell_price: ''
+                                                    });
+                                                    setShowAddDrinkModal(true);
+                                                  } else {
+                                                    // Real variant - open Restock modal
+                                                    setRestockingVariant(displayVariant);
+                                                    setDrinkFormMode('restock');
+                                                    setSelectedBrandId(drink.id);
+                                                    setDrinkForm({
+                                                      name: drink.name,
+                                                      category: drink.category,
+                                                      unit: unit,
+                                                      quantity: '',
+                                                      buy_price: displayVariant.buy_price?.toString() || '',
+                                                      sell_price: displayVariant.sell_price?.toString() || ''
+                                                    });
+                                                    setShowRestockModal(true);
+                                                  }
+                                                }}
+                                                className={`px-2 py-1 ${displayVariant.isVirtual ? 'bg-[#0B6E4F] text-[#C9A227]' : 'bg-[#0B6E4F]/20 text-[#0B6E4F]'} rounded font-bold uppercase text-xs hover:opacity-80 transition-all border border-[#0B6E4F]/40`}
+                                              >
+                                                {displayVariant.isVirtual ? '+' : t('drinks.restock_button')}
+                                              </button>
                                             </div>
-                                            <button
-                                              type="button"
-                                              onClick={() => {
-                                                setRestockingVariant(variant);
-                                                setDrinkForm({
-                                                  name: drink.name,
-                                                  category: drink.category,
-                                                  unit: variant.unit,
-                                                  quantity: '',
-                                                  buy_price: variant.buy_price?.toString() || '',
-                                                  sell_price: variant.sell_price?.toString() || ''
-                                                });
-                                                setShowRestockModal(true);
-                                              }}
-                                              className="px-2 py-1 bg-[#0B6E4F]/20 text-[#0B6E4F] rounded font-bold uppercase text-xs hover:bg-[#0B6E4F]/30 transition-all border border-[#0B6E4F]/40"
-                                            >
-                                              {t('drinks.restock_button')}
-                                            </button>
-                                          </div>
-                                        ))}
+                                          );
+                                        })}
                                       </div>
                                     )}
                                   </div>
@@ -688,43 +745,110 @@ function ManagerFinancials() {
                 <h3 className="text-lg font-black text-[#EDE6D6] mb-4">{t('drinks.add_new_drink')}</h3>
                 <form onSubmit={handleDrinkPurchase} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('drinks.category')}</label>
-                    <select
-                      value={drinkForm.category}
-                      onChange={(e) => {
-                        setDrinkForm({ ...drinkForm, category: e.target.value, unit: unitPresets[e.target.value][0] });
-                      }}
-                      disabled={lockCategory}
-                      className={`w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#0F1419] ${lockCategory ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      <option value="saqlangan_ichimliklar">{t('drinks.category_saqlangan_ichimliklar')}</option>
-                      <option value="piva">{t('drinks.category_piva')}</option>
-                      <option value="vino">{t('drinks.category_vino')}</option>
-                      <option value="aroq">{t('drinks.category_aroq')}</option>
-                    </select>
+                    <label className="block text-sm font-black text-[#EDE6D6] mb-2 flex items-center gap-2">
+                      {t('drinks.category')}
+                      {(lockCategory || lockBrandAndUnit) && (
+                        <svg className="w-4 h-4 text-[#9C9384]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                      )}
+                    </label>
+                    {!(lockCategory || lockBrandAndUnit) ? (
+                      <select
+                        value={drinkForm.category}
+                        onChange={(e) => {
+                          setDrinkForm({ ...drinkForm, category: e.target.value, unit: unitPresets[e.target.value][0] });
+                        }}
+                        className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#0F1419]"
+                      >
+                        <option value="saqlangan_ichimliklar">{t('drinks.category_saqlangan_ichimliklar')}</option>
+                        <option value="piva">{t('drinks.category_piva')}</option>
+                        <option value="vino">{t('drinks.category_vino')}</option>
+                        <option value="aroq">{t('drinks.category_aroq')}</option>
+                      </select>
+                    ) : (
+                      <div className="w-full px-4 py-3 border-2 border-[#5C4A2E]/20 rounded-xl bg-[#1C232E] text-[#9C9384] font-semibold cursor-not-allowed">
+                        {t(`drinks.category_${drinkForm.category}`)}
+                      </div>
+                    )}
                   </div>
+                  {!lockBrandAndUnit && (
+                    <div>
+                      <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('drinks.name')}</label>
+                      <select
+                        value={selectedBrandId}
+                        onChange={(e) => {
+                          setSelectedBrandId(e.target.value);
+                          if (e.target.value === 'new') {
+                            setShowNewBrandInput(true);
+                            setDrinkForm({ ...drinkForm, name: '' });
+                          } else {
+                            setShowNewBrandInput(false);
+                            const selectedDrink = drinks.find(d => d.id === e.target.value);
+                            setDrinkForm({ ...drinkForm, name: selectedDrink?.name || '' });
+                          }
+                        }}
+                        className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#0F1419]"
+                        required
+                      >
+                        <option value="">{t('drinks.select_brand')}</option>
+                        {drinks.filter(d => d.category === drinkForm.category).map(drink => (
+                          <option key={drink.id} value={drink.id}>{drink.name}</option>
+                        ))}
+                        <option value="new">+ Yangi brend</option>
+                      </select>
+                    </div>
+                  )}
+                  {showNewBrandInput && !lockBrandAndUnit && (
+                    <div>
+                      <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('drinks.new_brand_name')}</label>
+                      <input
+                        type="text"
+                        value={drinkForm.name}
+                        onChange={(e) => setDrinkForm({ ...drinkForm, name: e.target.value })}
+                        className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#0F1419]"
+                        required
+                      />
+                    </div>
+                  )}
+                  {lockBrandAndUnit && (
+                    <div>
+                      <label className="block text-sm font-black text-[#EDE6D6] mb-2 flex items-center gap-2">
+                        {t('drinks.name')}
+                        <svg className="w-4 h-4 text-[#9C9384]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                      </label>
+                      <div className="w-full px-4 py-3 border-2 border-[#5C4A2E]/20 rounded-xl bg-[#1C232E] text-[#9C9384] font-semibold cursor-not-allowed">
+                        {drinkForm.name}
+                      </div>
+                    </div>
+                  )}
                   <div>
-                    <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('drinks.name')}</label>
-                    <input
-                      type="text"
-                      value={drinkForm.name}
-                      onChange={(e) => setDrinkForm({ ...drinkForm, name: e.target.value })}
-                      className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#0F1419]"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('drinks.unit')}</label>
-                    <select
-                      value={drinkForm.unit}
-                      onChange={(e) => setDrinkForm({ ...drinkForm, unit: e.target.value })}
-                      className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#0F1419]"
-                    >
-                      {unitPresets[drinkForm.category]?.map(unit => (
-                        <option key={unit} value={unit}>{unit}</option>
-                      ))}
-                      <option value="custom">{t('drinks.unit_custom')}</option>
-                    </select>
+                    <label className="block text-sm font-black text-[#EDE6D6] mb-2 flex items-center gap-2">
+                      {t('drinks.unit')}
+                      {lockBrandAndUnit && (
+                        <svg className="w-4 h-4 text-[#9C9384]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                      )}
+                    </label>
+                    {!lockBrandAndUnit ? (
+                      <select
+                        value={drinkForm.unit}
+                        onChange={(e) => setDrinkForm({ ...drinkForm, unit: e.target.value })}
+                        className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#0F1419]"
+                      >
+                        {unitPresets[drinkForm.category]?.map(unit => (
+                          <option key={unit} value={unit}>{unit}</option>
+                        ))}
+                        <option value="custom">{t('drinks.unit_custom')}</option>
+                      </select>
+                    ) : (
+                      <div className="w-full px-4 py-3 border-2 border-[#5C4A2E]/20 rounded-xl bg-[#1C232E] text-[#9C9384] font-semibold cursor-not-allowed">
+                        {drinkForm.unit}
+                      </div>
+                    )}
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
@@ -766,6 +890,11 @@ function ManagerFinancials() {
                       onClick={() => {
                         setShowAddDrinkModal(false);
                         setLockCategory(false);
+                        setDrinkFormMode('add');
+                        setRestockingVariant(null);
+                        setSelectedBrandId('');
+                        setShowNewBrandInput(false);
+                        setLockBrandAndUnit(false);
                         setDrinkForm({ name: '', category: 'saqlangan_ichimliklar', unit: '0.5L', quantity: '', buy_price: '', sell_price: '' });
                       }}
                       className="flex-1 py-3 bg-[#2A1518] text-[#9C9384] rounded-xl font-bold uppercase text-xs hover:bg-[#2A1518]/80 transition-all border border-[#5C4A2E]/30"
@@ -793,16 +922,12 @@ function ManagerFinancials() {
                 <form onSubmit={handleDrinkPurchase} className="space-y-4">
                   <div>
                     <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('drinks.unit')}</label>
-                    <select
+                    <input
+                      type="text"
                       value={drinkForm.unit}
-                      onChange={(e) => setDrinkForm({ ...drinkForm, unit: e.target.value })}
-                      className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#0F1419]"
-                    >
-                      {unitPresets[drinkForm.category]?.map(unit => (
-                        <option key={unit} value={unit}>{unit}</option>
-                      ))}
-                      <option value="custom">{t('drinks.unit_custom')}</option>
-                    </select>
+                      disabled
+                      className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl text-[#9C9384] font-semibold bg-[#0F1419] opacity-60 cursor-not-allowed"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('drinks.quantity_to_add')}</label>
@@ -841,6 +966,7 @@ function ManagerFinancials() {
                       type="button"
                       onClick={() => {
                         setShowRestockModal(false);
+                        setDrinkFormMode('add');
                         setRestockingVariant(null);
                         setDrinkForm({ name: '', category: 'saqlangan_ichimliklar', unit: '0.5L', quantity: '', buy_price: '', sell_price: '' });
                       }}

@@ -452,7 +452,7 @@ function CookPortal() {
                   <InventoryDashboard />
                 </div>
               )}
-              {activeTab === 'pos' && <DrinksPOS drinks={drinks} onSale={fetchData} />}
+              {activeTab === 'pos' && <DrinksPOS />}
             </motion.div>
           </AnimatePresence>
         </div>

@@ -158,6 +158,7 @@ const translations = {
     'msg.please_fill_all_drink_fields': 'Please fill all drink fields',
     'msg.drink_purchase_saved': 'Drink purchase saved successfully!',
     'msg.drink_tab_closed': 'Drink tab closed successfully!',
+    'msg.variant_restocked': 'Variant restocked successfully!',
 
     // Manager Notifications
     'notif.title': 'Notifications',
@@ -385,9 +386,12 @@ const translations = {
     'drinks.unit_1_5L': '1.5L',
     'drinks.unit_2L': '2L',
     'drinks.unit_shisha': 'shisha/bottle',
+    'drinks.select_brand': 'Select brand',
+    'drinks.new_brand_name': 'New brand name',
 
     // POS
     'pos.title': 'Point of Sale',
+    'pos.subtitle': 'Sell drinks',
     'pos.cart': 'Cart',
     'pos.empty_cart': 'Cart is empty',
     'pos.total': 'Total',
@@ -594,6 +598,7 @@ const translations = {
     'msg.please_fill_all_drink_fields': 'Iltimos, barcha ichimlik maydonlarini toʻldiring',
     'msg.drink_purchase_saved': 'Ichimlik xaridi muvaffaqiyatli saqlandi!',
     'msg.drink_tab_closed': 'Ichimlik hisobi muvaffaqiyatli yopildi!',
+    'msg.variant_restocked': 'Variant muvaffaqiyatli qayta toʻldirildi!',
 
     // Manager Notifications
     'notif.title': 'Bildirishnomalar',
@@ -821,9 +826,12 @@ const translations = {
     'drinks.unit_1_5L': '1.5L',
     'drinks.unit_2L': '2L',
     'drinks.unit_shisha': 'shisha/bottle',
+    'drinks.select_brand': 'Brendni tanlang',
+    'drinks.new_brand_name': 'Yangi brend nomi',
 
     // POS
     'pos.title': 'Sotish nuqtasi',
+    'pos.subtitle': 'Ichimliklarni soting',
     'pos.cart': 'Savat',
     'pos.empty_cart': 'Savat bo\'sh',
     'pos.total': 'Jami',

@@ -63,14 +63,14 @@ function POS() {
     
     // Subscribe to realtime changes
     const drinksChannel = supabase
-      .channel('drinks-changes')
+      .channel('pos-drinks-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'drink_variants' }, () => {
         fetchDrinks();
       })
       .subscribe();
 
     const salesChannel = supabase
-      .channel('sales-changes')
+      .channel('pos-sales-changes')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'drink_sales' }, () => {
         fetchSalesHistory();
       })
