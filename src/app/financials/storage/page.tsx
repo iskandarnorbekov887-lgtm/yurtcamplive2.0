@@ -5,7 +5,7 @@ import { ProtectedRoute } from '@/components/protected-route';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
-import { LanguageSwitcher } from '@/components/language-switcher';
+import { ChevronDown } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,6 +32,7 @@ function Storage() {
   const { user, signOut } = useAuth();
   const { t } = useLanguage();
   const [drinks, setDrinks] = useState<DrinkVariant[]>([]);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
   // Fetch drinks with realtime sync
   useEffect(() => {
@@ -93,50 +94,65 @@ function Storage() {
           <p className="text-[#9C9384] italic">{t('drinks.no_drinks')}</p>
         ) : (
           <div className="space-y-6">
-            {['saqlangan_ichimliklar', 'piva', 'vino', 'aroq'].map(category => {
-              const categoryDrinks = drinks.filter(d => d.category === category);
+            {['salqin_ichimliklar', 'piva', 'vino', 'aroq'].map(category => {
+              // Filter to only variants with stock > 0
+              const categoryDrinks = drinks.filter(d => d.category === category && d.quantity_in_stock > 0);
               
+              // Hide category if no variants available
               if (categoryDrinks.length === 0) return null;
 
-              // Group by brand name
-              const groupedByBrand = categoryDrinks.reduce((acc, variant) => {
-                if (!acc[variant.drink_name]) {
-                  acc[variant.drink_name] = [];
-                }
-                acc[variant.drink_name].push(variant);
-                return acc;
-              }, {} as Record<string, typeof categoryDrinks>);
+              const categoryStock = categoryDrinks.reduce((sum, v) => sum + v.quantity_in_stock, 0);
+              const isCategoryExpanded = expandedCategories.has(category);
 
               return (
                 <div key={category} className="bg-[#1C232E] rounded-xl shadow-lg border border-[#5C4A2E]/30 p-2 md:p-3">
-                  <h2 className="text-sm md:text-base font-black text-[#C9A227] mb-2 md:mb-3">{t(`drinks.category_${category}`)}</h2>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newExpanded = new Set(expandedCategories);
+                      if (newExpanded.has(category)) {
+                        newExpanded.delete(category);
+                      } else {
+                        newExpanded.add(category);
+                      }
+                      setExpandedCategories(newExpanded);
+                    }}
+                    className="w-full flex items-center justify-between mb-2 md:mb-3 hover:bg-[#1C232E]/50 transition-all rounded-lg p-1"
+                  >
+                    <div className="flex items-center gap-2">
+                      <ChevronDown 
+                        size={16} 
+                        className={`text-[#C9A227] transition-transform ${isCategoryExpanded ? 'rotate-180' : ''}`} 
+                      />
+                      <h2 className="text-sm md:text-base font-black text-[#C9A227]">{t(`drinks.category_${category}`)}</h2>
+                    </div>
+                    <span className="text-xs text-[#9C9384]">{categoryStock}</span>
+                  </button>
                   
-                  <div className="space-y-1.5 md:space-y-2">
-                    {Object.entries(groupedByBrand).map(([brandName, variants]) => (
-                      <div key={brandName} className="bg-[#0F1419] rounded-lg border border-[#5C4A2E]/30 p-2 md:p-3">
-                        <h3 className="font-bold text-[#EDE6D6] mb-1 md:mb-2 text-xs md:text-sm">{brandName}</h3>
-                        <div className="space-y-0.5 md:space-y-1">
-                          {variants
-                            .sort((a, b) => {
-                              // Simple numeric sort for unit sizes
-                              const getNumericValue = (unit: string) => {
-                                const match = unit.match(/(\d+\.?\d*)/);
-                                return match ? parseFloat(match[1]) : 0;
-                              };
-                              return getNumericValue(a.unit) - getNumericValue(b.unit);
-                            })
-                            .map(variant => (
-                              <div key={variant.id} className="flex items-center justify-between pl-3 md:pl-4 border-l-2 border-[#5C4A2E]/30">
-                                <span className="text-[10px] md:text-xs text-[#9C9384]">{variant.unit}</span>
-                                <span className={`font-black text-[10px] md:text-xs ${variant.quantity_in_stock === 0 ? 'text-[#DC2626]' : variant.quantity_in_stock < 5 ? 'text-[#DC2626]' : 'text-[#0B6E4F]'}`}>
-                                  {variant.quantity_in_stock}
-                                </span>
-                              </div>
-                            ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  {isCategoryExpanded && (
+                    <div className="space-y-0.5 md:space-y-1">
+                      {categoryDrinks
+                        .sort((a, b) => {
+                          // Sort by brand name first, then by unit size
+                          if (a.drink_name !== b.drink_name) {
+                            return a.drink_name.localeCompare(b.drink_name);
+                          }
+                          const getNumericValue = (unit: string) => {
+                            const match = unit.match(/(\d+\.?\d*)/);
+                            return match ? parseFloat(match[1]) : 0;
+                          };
+                          return getNumericValue(a.unit) - getNumericValue(b.unit);
+                        })
+                        .map(variant => (
+                          <div key={variant.id} className="flex items-center justify-between pl-3 md:pl-4 border-l-2 border-[#5C4A2E]/30">
+                            <span className="text-[10px] md:text-xs text-[#9C9384]">{variant.drink_name} — {variant.unit}</span>
+                            <span className={`font-black text-[10px] md:text-xs ${variant.quantity_in_stock < 5 ? 'text-[#DC2626]' : 'text-[#0B6E4F]'}`}>
+                              {variant.quantity_in_stock}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  )}
                 </div>
               );
             })}

@@ -1433,11 +1433,19 @@ export function GoogleGuestAgenda({
       </div>
 
       {(() => {
-        const upcoming = [...bookingItems.filter(i => i.booking!.status === 'confirmed' && i.booking!.check_in >= today && i.booking!.check_in <= localDateStr(new Date(Date.now() + 7 * 86400000))),
-          ...unlinkedGcItems.filter(i => i.start >= today && i.start <= localDateStr(new Date(Date.now() + 7 * 86400000))),
-          ...cancelledGcItems.filter(i => i.start >= today && i.start <= localDateStr(new Date(Date.now() + 7 * 86400000)))
+        const targetDay = selectedCalendarDay;
+        // Filter bookings for the selected day: arriving, departing, or staying
+        const upcoming = [...bookingItems.filter(i => {
+          const b = i.booking!;
+          const isArriving = b.status === 'confirmed' && b.check_in === targetDay;
+          const isDeparting = b.status === 'checked_in' && b.check_out === targetDay;
+          const isStaying = b.status === 'checked_in' && b.check_in < targetDay && b.check_out > targetDay;
+          return isArriving || isDeparting || isStaying;
+        }),
+          ...unlinkedGcItems.filter(i => i.start === targetDay),
+          ...cancelledGcItems.filter(i => i.start === targetDay)
         ].sort((a, b) => a.start.localeCompare(b.start));
-        const checkedIn = bookingItems.filter(i => i.booking!.status === 'checked_in').sort((a, b) => a.start.localeCompare(b.start));
+        const checkedIn = bookingItems.filter(i => i.booking!.status === 'checked_in' && i.booking!.check_in <= targetDay && i.booking!.check_out > targetDay).sort((a, b) => a.start.localeCompare(b.start));
         if (upcoming.length === 0 && checkedIn.length === 0) return null;
         return (
           <div className="bg-[#1C232E] rounded-2xl border border-[#5C4A2E]/30 shadow-lg overflow-hidden">
@@ -1446,7 +1454,7 @@ export function GoogleGuestAgenda({
                 <span className="w-1.5 h-1.5 rounded-full bg-[#B8860B] animate-pulse" />
                 {t('agenda.upcoming_active')}
               </h3>
-              <p className="text-[10px] text-[#9C9384] mt-0.5">Next 7 days · Bookings & Google Calendar</p>
+              <p className="text-[10px] text-[#9C9384] mt-0.5">{targetDay} · Bookings & Google Calendar</p>
             </div>
             <div className="divide-y divide-[#5C4A2E]/20">
               {checkedIn.length > 0 && (

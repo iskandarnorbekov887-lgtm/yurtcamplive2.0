@@ -28,9 +28,11 @@ function CEOFinancialCalendar() {
   const [dayBookings, setDayBookings] = useState<Booking[]>([]);
   const [dayReceipts, setDayReceipts] = useState<any[]>([]);
   const [dayIncome, setDayIncome] = useState<Finance[]>([]);
+  const [dayPayments, setDayPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [cashBox, setCashBox] = useState<{ USD: number; UZS: number; EUR: number }>({ USD: 0, UZS: 0, EUR: 0 });
   const [checkedInCounts, setCheckedInCounts] = useState<Record<string, { inHouse: number; arriving: number; departing: number }>>({});
+  const [dayFinancials, setDayFinancials] = useState<Record<string, { netIncome: number; netExpense: number; netProfit: number }>>({});
   
   // Slide-out panel state
   const [slideOutOpen, setSlideOutOpen] = useState(false);
@@ -48,6 +50,7 @@ function CEOFinancialCalendar() {
   useEffect(() => {
     fetchCashBox();
     fetchCheckedInCounts();
+    fetchDayFinancials();
   }, [currentDate]);
 
   const fetchCashBox = async () => {
@@ -57,9 +60,16 @@ function CEOFinancialCalendar() {
     // Fetch income/expense from camp_finances
     const { data: financesData } = await supabase.from('camp_finances').select('*');
     
-    // Start with payments summary
+    // Start with payments summary (sale adds, expense subtracts)
     const summary = paymentsData?.reduce((acc: any, p: any) => {
-      acc[p.currency_original] = (acc[p.currency_original] || 0) + p.amount_original;
+      const amount = Number(p.amount_original) || 0;
+      const currency = p.currency_original || 'USD';
+      if (p.type === 'expense') {
+        acc[currency] = (acc[currency] || 0) - amount;
+      } else {
+        // Default to 'sale' or treat as income
+        acc[currency] = (acc[currency] || 0) + amount;
+      }
       return acc;
     }, { USD: 0, UZS: 0, EUR: 0 }) || { USD: 0, UZS: 0, EUR: 0 };
     
@@ -77,6 +87,85 @@ function CEOFinancialCalendar() {
     }
     
     setCashBox(summary);
+  };
+
+  const formatCurrency = (value: number) => {
+    const absValue = Math.abs(value);
+    if (absValue >= 1000000) {
+      return `${(value / 1000000).toFixed(1)}M`;
+    } else if (absValue >= 1000) {
+      return `${(value / 1000).toFixed(0)}K`;
+    } else {
+      return value.toFixed(0);
+    }
+  };
+
+  const fetchDayFinancials = async () => {
+    try {
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      
+      // Fetch camp_finances for the month
+      const { data: financesData } = await supabase
+        .from('camp_finances')
+        .select('*')
+        .gte('transaction_date', `${year}-${String(month + 1).padStart(2, '0')}-01`)
+        .lte('transaction_date', `${year}-${String(month + 1).padStart(2, '0')}-${daysInMonth}`);
+
+      // Fetch payments for the month
+      const { data: paymentsData } = await supabase
+        .from('payments')
+        .select('*')
+        .gte('created_at', `${year}-${String(month + 1).padStart(2, '0')}-01T00:00:00`)
+        .lte('created_at', `${year}-${String(month + 1).padStart(2, '0')}-${daysInMonth}T23:59:59`);
+
+      const financialsByDay: Record<string, { netIncome: number; netExpense: number; netProfit: number }> = {};
+
+      // Initialize all days
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        financialsByDay[dateStr] = { netIncome: 0, netExpense: 0, netProfit: 0 };
+      }
+
+      // Process camp_finances
+      (financesData || []).forEach((item: any) => {
+        const dateStr = item.transaction_date || item.created_at?.split('T')[0];
+        if (financialsByDay[dateStr]) {
+          const amount = Number(item.amount_uzs) || 0;
+          if (item.type === 'income') {
+            financialsByDay[dateStr].netIncome += amount;
+          } else if (item.type === 'expense') {
+            financialsByDay[dateStr].netExpense += amount;
+          }
+        }
+      });
+
+      // Process payments
+      (paymentsData || []).forEach((item: any) => {
+        const dateStr = item.created_at?.split('T')[0];
+        if (financialsByDay[dateStr]) {
+          const amount = Number(item.amount_original) || 0;
+          // Only include UZS payments for net profit calculation
+          if (item.currency_original === 'UZS') {
+            if (item.type === 'sale') {
+              financialsByDay[dateStr].netIncome += amount;
+            } else if (item.type === 'expense') {
+              financialsByDay[dateStr].netExpense += amount;
+            }
+          }
+        }
+      });
+
+      // Calculate net profit for each day
+      Object.keys(financialsByDay).forEach(dateStr => {
+        financialsByDay[dateStr].netProfit = financialsByDay[dateStr].netIncome - financialsByDay[dateStr].netExpense;
+      });
+
+      setDayFinancials(financialsByDay);
+    } catch (error) {
+      console.error('Error fetching day financials:', error);
+    }
   };
 
   type CheckedInBookingRow = {
@@ -168,6 +257,14 @@ function CEOFinancialCalendar() {
         .eq('type', 'income')
         .order('created_at', { ascending: false });
 
+      // Fetch payments for this day
+      const { data: payments } = await supabase
+        .from('payments')
+        .select('*')
+        .gte('created_at', `${dateStr}T00:00:00`)
+        .lte('created_at', `${dateStr}T23:59:59`)
+        .order('created_at', { ascending: false });
+
       // Fetch receipts for this day (revenue from settled tabs)
       const { data: receipts } = await supabase
         .from('booking_receipts')
@@ -190,12 +287,14 @@ function CEOFinancialCalendar() {
 
       setDayFinances(finances || []);
       setDayIncome(income || []);
+      setDayPayments(payments || []);
       setDayBookings(Object.values(bookingsMap));
       setDayReceipts(receipts || []);
     } catch (error) {
       console.error('Error fetching data:', error);
       setDayFinances([]);
       setDayIncome([]);
+      setDayPayments([]);
       setDayBookings([]);
       setDayReceipts([]);
     } finally {
@@ -392,6 +491,7 @@ function CEOFinancialCalendar() {
               const day = i + 1;
               const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
               const dayCounts = checkedInCounts[dateStr] || { inHouse: 0, arriving: 0, departing: 0 };
+              const dayFin = dayFinancials[dateStr] || { netIncome: 0, netExpense: 0, netProfit: 0 };
               const isToday = new Date().toDateString() === new Date(year, month, day).toDateString();
               return (
                 <button
@@ -404,25 +504,34 @@ function CEOFinancialCalendar() {
                   }`}
                 >
                   <span className={`text-[10px] sm:text-xs font-bold ${isToday ? 'text-[#0B6E4F]' : 'text-[#EDE6D6]'}`}>{day}</span>
-                  {(dayCounts.inHouse > 0 || dayCounts.arriving > 0 || dayCounts.departing > 0) && (
-                    <div className="flex gap-0.5 sm:gap-1 self-end flex-wrap">
-                      {dayCounts.inHouse > 0 && (
-                        <div className="text-[8px] sm:text-[10px] font-data font-bold text-[#3B82F6] bg-[#3B82F6]/20 px-1 sm:px-1.5 py-0.5 rounded border border-[#3B82F6]/40">
-                          👤{dayCounts.inHouse}
-                        </div>
-                      )}
-                      {dayCounts.arriving > 0 && (
-                        <div className="text-[8px] sm:text-[10px] font-data font-bold text-[#0B6E4F] bg-[#0B6E4F]/20 px-1 sm:px-1.5 py-0.5 rounded border border-[#0B6E4F]/40">
-                          👤{dayCounts.arriving}
-                        </div>
-                      )}
-                      {dayCounts.departing > 0 && (
-                        <div className="text-[8px] sm:text-[10px] font-data font-bold text-[#F97316] bg-[#F97316]/20 px-1 sm:px-1.5 py-0.5 rounded border border-[#F97316]/40">
-                          👤{dayCounts.departing}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <div className="flex flex-col items-end gap-1">
+                    {(dayCounts.inHouse > 0 || dayCounts.arriving > 0 || dayCounts.departing > 0) && (
+                      <div className="flex gap-0.5 sm:gap-1 self-end flex-wrap">
+                        {dayCounts.inHouse > 0 && (
+                          <div className="text-[8px] sm:text-[10px] font-data font-bold text-[#3B82F6] bg-[#3B82F6]/20 px-1 sm:px-1.5 py-0.5 rounded border border-[#3B82F6]/40">
+                            👤{dayCounts.inHouse}
+                          </div>
+                        )}
+                        {dayCounts.arriving > 0 && (
+                          <div className="text-[8px] sm:text-[10px] font-data font-bold text-[#0B6E4F] bg-[#0B6E4F]/20 px-1 sm:px-1.5 py-0.5 rounded border border-[#0B6E4F]/40">
+                            👤{dayCounts.arriving}
+                          </div>
+                        )}
+                        {dayCounts.departing > 0 && (
+                          <div className="text-[8px] sm:text-[10px] font-data font-bold text-[#F97316] bg-[#F97316]/20 px-1 sm:px-1.5 py-0.5 rounded border border-[#F97316]/40">
+                            👤{dayCounts.departing}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {dayFin.netProfit !== 0 && (
+                      <div className="text-[8px] sm:text-[10px] font-bold truncate w-full text-right">
+                        <span className={dayFin.netProfit > 0 ? 'text-[#0B6E4F]' : 'text-[#722F37]'}>
+                          {dayFin.netProfit > 0 ? '+' : ''}{formatCurrency(dayFin.netProfit)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </button>
               );
             })}
@@ -726,6 +835,39 @@ function CEOFinancialCalendar() {
                         );
                       })()}
                     </div>
+                  </div>
+                </div>
+
+                {/* Payments Section */}
+                <div className="mt-6">
+                  <h4 className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest mb-4">All Transactions (Payments)</h4>
+                  <div className="space-y-3">
+                    {dayPayments.length === 0 ? (
+                      <div className="py-8 border-2 border-dashed border-[#5C4A2E]/30 rounded-lg text-center">
+                        <p className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest">No Payment Transactions</p>
+                      </div>
+                    ) : (
+                      dayPayments.map((payment: any) => (
+                        <div
+                          key={payment.id}
+                          className="p-4 rounded-lg border border-[#5C4A2E]/30 bg-[#1C232E]"
+                        >
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <p className="font-bold text-[#EDE6D6] text-xs">
+                                {payment.exchange_id ? 'Currency Exchange' : 
+                                 payment.note?.startsWith('Stock purchase:') ? 'Stock Purchase' :
+                                 payment.type === 'sale' ? 'POS Sale' : 'Payment'}
+                              </p>
+                              <p className="text-[10px] text-[#9C9384] mt-1">{payment.note || payment.method}</p>
+                            </div>
+                            <p className={`font-data font-bold text-sm ${payment.type === 'expense' ? 'text-[#722F37]' : 'text-[#0B6E4F]'}`}>
+                              {payment.type === 'expense' ? '-' : '+'}{payment.amount_original.toLocaleString()} {payment.currency_original}
+                            </p>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               </>

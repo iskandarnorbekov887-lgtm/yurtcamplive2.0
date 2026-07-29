@@ -50,6 +50,16 @@ function ManagerFinancials() {
   const [amount, setAmount] = useState('');
   const [workerName, setWorkerName] = useState('');
   
+  // Currency exchange state
+  const [showExchangeModal, setShowExchangeModal] = useState(false);
+  const [exchangeForm, setExchangeForm] = useState({
+    usdAmount: '',
+    exchangeRate: '11000'
+  });
+  const [cashBox, setCashBox] = useState<{ USD: number; UZS: number; EUR: number }>({ USD: 0, UZS: 0, EUR: 0 });
+  // Store all payments for current month to combine with finances in calendar view
+  const [allPayments, setAllPayments] = useState<any[]>([]);
+  
   // Worker names for combobox
   const [workerNames, setWorkerNames] = useState<string[]>([]);
   const [workerNameInput, setWorkerNameInput] = useState('');
@@ -67,6 +77,11 @@ function ManagerFinancials() {
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
+  // Day transactions modal state
+  const [showDayTransactionsModal, setShowDayTransactionsModal] = useState(false);
+  const [dayTransactions, setDayTransactions] = useState<any[]>([]);
+  const [loadingDayTransactions, setLoadingDayTransactions] = useState(false);
+
   // Drinks state - new normalized structure
   const [drinks, setDrinks] = useState<any[]>([]);
   const [drinkVariants, setDrinkVariants] = useState<any[]>([]);
@@ -82,7 +97,7 @@ function ManagerFinancials() {
   const [lockBrandAndUnit, setLockBrandAndUnit] = useState(false);
   const [drinkForm, setDrinkForm] = useState({
     name: '',
-    category: 'saqlangan_ichimliklar',
+    category: 'salqin_ichimliklar',
     unit: '0.5L',
     quantity: '',
     buy_price: '',
@@ -91,10 +106,34 @@ function ManagerFinancials() {
 
   // Unit presets per category
   const unitPresets: Record<string, string[]> = {
-    saqlangan_ichimliklar: ['0.25L banka', '0.33L banka', '0.5L', '1L', '1.5L', '2L'],
+    salqin_ichimliklar: ['0.25L banka', '0.33L banka', '0.5L', '1L', '1.5L', '2L'],
     piva: ['0.5L banka', '0.5L shisha', '1L'],
     vino: ['shisha', '0.75L'],
     aroq: ['0.25L shisha', '0.5L shisha', '0.7L shisha', '1L shisha']
+  };
+
+  // Fetch all payments for the current month to use in calendar calculations
+  const fetchAllPayments = async () => {
+    try {
+      const month = String(currentMonth + 1).padStart(2, '0');
+      const year = String(currentYear);
+      const start = `${year}-${month}-01T00:00:00`;
+      const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
+      const nextYear = currentMonth === 11 ? currentYear + 1 : currentYear;
+      const endMonth = String(nextMonth + 1).padStart(2, '0');
+      const end = `${nextYear}-${endMonth}-01T00:00:00`;
+
+      const { data, error } = await supabase
+        .from('payments')
+        .select('*')
+        .gte('created_at', start)
+        .lt('created_at', end);
+
+      if (error) throw error;
+      setAllPayments(data || []);
+    } catch (err: any) {
+      console.error('Error fetching payments for calendar:', err);
+    }
   };
 
   // Fetch recent expenses on load
@@ -102,7 +141,217 @@ function ManagerFinancials() {
     fetchRecentExpenses();
     fetchWorkerNames();
     fetchDrinks();
+    fetchCashBox();
+    fetchAllPayments();
   }, []);
+
+  // Re‑fetch payments when month/year changes (e.g., navigating calendar)
+  useEffect(() => {
+    fetchAllPayments();
+  }, [currentMonth, currentYear]);
+
+  const fetchCashBox = async () => {
+    // Fetch cash payments from payments table
+    const { data: paymentsData } = await supabase.from('payments').select('*').eq('method', 'Cash');
+    
+    // Fetch income/expense from camp_finances
+    const { data: financesData } = await supabase.from('camp_finances').select('*');
+    
+    // Start with payments summary (sale adds, expense subtracts)
+    const summary = paymentsData?.reduce((acc: any, p: any) => {
+      const amount = Number(p.amount_original) || 0;
+      const currency = p.currency_original || 'USD';
+      if (p.type === 'expense') {
+        acc[currency] = (acc[currency] || 0) - amount;
+      } else {
+        // Default to 'sale' or treat as income
+        acc[currency] = (acc[currency] || 0) + amount;
+      }
+      return acc;
+    }, { USD: 0, UZS: 0, EUR: 0 }) || { USD: 0, UZS: 0, EUR: 0 };
+    
+    // Add camp_finances (income adds, expense subtracts)
+    if (financesData) {
+      financesData.forEach((f: any) => {
+        const amount = Number(f.original_amount) || 0;
+        const currency = f.currency || 'UZS';
+        if (f.type === 'income') {
+          summary[currency] = (summary[currency] || 0) + amount;
+        } else if (f.type === 'expense') {
+          summary[currency] = (summary[currency] || 0) - amount;
+        }
+      });
+    }
+    
+    setCashBox(summary);
+  };
+
+  const formatCurrency = (value: number) => {
+    const absValue = Math.abs(value);
+    if (absValue >= 1000000) {
+      return `${(value / 1000000).toFixed(1)}M`;
+    } else if (absValue >= 1000) {
+      return `${(value / 1000).toFixed(0)}K`;
+    } else {
+      return value.toFixed(0);
+    }
+  };
+
+  const fetchDayTransactions = async (dateStr: string) => {
+    setLoadingDayTransactions(true);
+    try {
+      // Fetch camp_finances for the date
+      const { data: financesData, error: financesError } = await supabase
+        .from('camp_finances')
+        .select('*')
+        .eq('transaction_date', dateStr);
+
+      // Fetch payments for the date
+      const { data: paymentsData, error: paymentsError } = await supabase
+        .from('payments')
+        .select('*')
+        .gte('created_at', `${dateStr}T00:00:00`)
+        .lte('created_at', `${dateStr}T23:59:59`);
+
+      // Combine and format transactions
+      const combinedTransactions: any[] = [];
+
+      // Add camp_finances transactions
+      (financesData || []).forEach((item: any) => {
+        combinedTransactions.push({
+          id: item.id,
+          type: item.type === 'income' ? 'income' : 'expense',
+          category: item.type === 'expense' ? item.category : (item.guest_name || 'Income'),
+          description: item.description || '',
+          amount: item.original_amount,
+          currency: item.currency || 'UZS',
+          created_at: item.created_at,
+          source: 'camp_finances'
+        });
+      });
+
+      // Add payments transactions
+      (paymentsData || []).forEach((item: any) => {
+        if (item.exchange_id) {
+          // Currency exchange
+          combinedTransactions.push({
+            id: item.id,
+            type: item.type === 'expense' ? 'expense' : 'income',
+            category: 'Currency Exchange',
+            description: item.note || '',
+            amount: item.amount_original,
+            currency: item.currency_original,
+            created_at: item.created_at,
+            source: 'payment_exchange'
+          });
+        } else if (item.note && item.note.startsWith('Stock purchase:')) {
+          // Drink restock
+          combinedTransactions.push({
+            id: item.id,
+            type: 'expense',
+            category: 'Stock Purchase',
+            description: item.note || '',
+            amount: item.amount_original,
+            currency: item.currency_original,
+            created_at: item.created_at,
+            source: 'payment_restock'
+          });
+        } else if (item.type === 'sale') {
+          // Drink sale (POS)
+          combinedTransactions.push({
+            id: item.id,
+            type: 'income',
+            category: 'POS Sale',
+            description: item.note || 'Walk-in POS sale',
+            amount: item.amount_original,
+            currency: item.currency_original,
+            created_at: item.created_at,
+            source: 'payment_sale'
+          });
+        }
+      });
+
+      // Sort by created_at, newest first
+      combinedTransactions.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      setDayTransactions(combinedTransactions);
+      setShowDayTransactionsModal(true);
+    } catch (error) {
+      console.error('Error fetching day transactions:', error);
+    } finally {
+      setLoadingDayTransactions(false);
+    }
+  };
+
+  const handleCurrencyExchange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setMessage('');
+
+    try {
+      const usdAmount = parseFloat(exchangeForm.usdAmount);
+      const exchangeRate = parseFloat(exchangeForm.exchangeRate);
+
+      if (isNaN(usdAmount) || isNaN(exchangeRate) || usdAmount <= 0 || exchangeRate <= 0) {
+        setMessage('Please enter valid amounts');
+        setSubmitting(false);
+        return;
+      }
+
+      // Validate USD balance
+      if (usdAmount > cashBox.USD) {
+        setMessage(`Insufficient USD balance. Available: $${cashBox.USD.toFixed(2)}`);
+        setSubmitting(false);
+        return;
+      }
+
+      const uzsAmount = usdAmount * exchangeRate;
+      const exchangeId = crypto.randomUUID();
+
+      // Insert USD expense payment
+      const { error: usdError } = await supabase
+        .from('payments')
+        .insert({
+          booking_id: null,
+          amount_original: usdAmount,
+          currency_original: 'USD',
+          amount_usd_equivalent: usdAmount,
+          exchange_rate_used: 1,
+          method: 'Cash',
+          type: 'expense',
+          note: `Currency exchange: USD to so'm @ rate ${exchangeRate}`,
+          exchange_id: exchangeId
+        });
+      if (usdError) throw usdError;
+
+      // Insert UZS sale payment
+      const { error: uzsError } = await supabase
+        .from('payments')
+        .insert({
+          booking_id: null,
+          amount_original: uzsAmount,
+          currency_original: 'UZS',
+          amount_usd_equivalent: uzsAmount / exchangeRate,
+          exchange_rate_used: exchangeRate,
+          method: 'Cash',
+          type: 'sale',
+          note: `Currency exchange: from USD @ rate ${exchangeRate}`,
+          exchange_id: exchangeId
+        });
+      if (uzsError) throw uzsError;
+
+      setMessage('Currency exchange completed successfully!');
+      setExchangeForm({ usdAmount: '', exchangeRate: '11000' });
+      setShowExchangeModal(false);
+      fetchCashBox();
+    } catch (err: any) {
+      setMessage(`${t('msg.error')}: ${err.message}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const fetchDrinks = async () => {
     try {
@@ -266,6 +515,22 @@ function ManagerFinancials() {
             })
             .eq('id', restockingVariant.id);
           if (updateError) throw updateError;
+
+          // Create expense payment for the purchase
+          const totalCost = buyPrice * quantity;
+          const drinkName = drinks.find(d => d.id === existingVariant.drink_id)?.name || drinkForm.name || 'Unknown drink';
+          const { error: paymentError } = await supabase
+            .from('payments')
+            .insert({
+              booking_id: null,
+              amount_original: totalCost,
+              currency_original: 'UZS',
+              method: 'Cash',
+              type: 'expense',
+              note: `Stock purchase: ${drinkName} ${existingVariant.unit} x${quantity}`
+            });
+          if (paymentError) throw paymentError;
+          fetchCashBox();
         }
       } else {
         // Create new drink or variant
@@ -336,6 +601,21 @@ function ManagerFinancials() {
             .eq('id', existingVariant.id);
           if (restockError) throw restockError;
           setMessage(t('msg.variant_restocked'));
+
+          // Create expense payment for the purchase
+          const totalCost = buyPrice * quantity;
+          const { error: paymentError } = await supabase
+            .from('payments')
+            .insert({
+              booking_id: null,
+              amount_original: totalCost,
+              currency_original: 'UZS',
+              method: 'Cash',
+              type: 'expense',
+              note: `Stock purchase: ${existingVariant.drink_name} ${existingVariant.unit} x${quantity}`
+            });
+          if (paymentError) throw paymentError;
+          fetchCashBox();
         } else {
           // Insert new variant
           const { error: insertVariantError } = await supabase
@@ -349,10 +629,26 @@ function ManagerFinancials() {
             });
           if (insertVariantError) throw insertVariantError;
           setMessage(t('msg.drink_purchase_saved'));
+
+          // Create expense payment for the purchase
+          const totalCost = buyPrice * quantity;
+          const drinkName = (selectedBrandId && selectedBrandId !== 'new' ? drinks.find(d => d.id === selectedBrandId)?.name : null) || drinkForm.name || 'Unknown drink';
+          const { error: paymentError } = await supabase
+            .from('payments')
+            .insert({
+              booking_id: null,
+              amount_original: totalCost,
+              currency_original: 'UZS',
+              method: 'Cash',
+              type: 'expense',
+              note: `Stock purchase: ${drinkName} ${drinkForm.unit} x${quantity}`
+            });
+          if (paymentError) throw paymentError;
+          fetchCashBox();
         }
       }
 
-      setDrinkForm({ name: '', category: 'saqlangan_ichimliklar', unit: '0.5L', quantity: '', buy_price: '', sell_price: '' });
+      setDrinkForm({ name: '', category: 'salqin_ichimliklar', unit: '0.5L', quantity: '', buy_price: '', sell_price: '' });
       setRestockingVariant(null);
       setDrinkFormMode('add');
       setSelectedBrandId('');
@@ -395,6 +691,18 @@ function ManagerFinancials() {
           </div>
           <div className="flex items-center gap-4">
             <LanguageSwitcher variant="light" />
+            {cashBox.USD > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowExchangeModal(true)}
+                className="px-4 py-2.5 bg-[#C9A227]/90 hover:bg-[#C9A227] rounded-xl text-xs font-black transition-all shadow-lg hover:shadow-[#C9A227]/20 active:scale-95 flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+                Exchange USD
+              </button>
+            )}
             <button
               onClick={signOut}
               className="px-5 py-2.5 bg-[#722F37]/90 hover:bg-[#722F37] rounded-xl text-xs font-black transition-all shadow-lg hover:shadow-[#722F37]/20 active:scale-95 flex items-center gap-2"
@@ -409,6 +717,29 @@ function ManagerFinancials() {
       </header>
 
       <main className="max-w-7xl mx-auto p-6">
+        {/* Cashbox Balance Display */}
+        <div className="bg-[#1C232E] rounded-2xl shadow-xl border border-[#5C4A2E]/30 p-6 mb-6">
+          <h3 className="text-lg font-black text-[#EDE6D6] mb-4 font-heading">Cashbox Balance</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {cashBox.USD !== 0 && (
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">USD Total</p>
+                <p className="text-2xl font-data font-bold tracking-tight text-white">${cashBox.USD.toLocaleString()}</p>
+              </div>
+            )}
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">UZS Total</p>
+              <p className="text-2xl font-data font-bold tracking-tight text-white">{cashBox.UZS.toLocaleString()} <span className="text-[10px] text-slate-500 font-medium">SUM</span></p>
+            </div>
+            {cashBox.EUR !== 0 && (
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">EUR Total</p>
+                <p className="text-2xl font-data font-bold tracking-tight text-white">€{cashBox.EUR.toLocaleString()}</p>
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Form Section */}
           <div className="bg-[#1C232E] rounded-2xl shadow-xl border border-[#5C4A2E]/30 p-8">
@@ -582,7 +913,7 @@ function ManagerFinancials() {
                   <p className="text-xs text-[#9C9384]">{t('drinks.no_drinks')}</p>
                 ) : (
                   <div className="space-y-2 md:space-y-3">
-                    {['saqlangan_ichimliklar', 'piva', 'vino', 'aroq'].map(category => {
+                    {['salqin_ichimliklar', 'piva', 'vino', 'aroq'].map(category => {
                       const categoryDrinks = drinks.filter(d => d.category === category);
                       const categoryVariants = drinkVariants.filter(v => categoryDrinks.some(d => d.id === v.drink_id));
                       const categoryStock = categoryVariants.reduce((sum, v) => sum + (v.quantity_in_stock || 0), 0);
@@ -761,7 +1092,7 @@ function ManagerFinancials() {
                         }}
                         className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#0F1419]"
                       >
-                        <option value="saqlangan_ichimliklar">{t('drinks.category_saqlangan_ichimliklar')}</option>
+                        <option value="salqin_ichimliklar">{t('drinks.category_salqin_ichimliklar')}</option>
                         <option value="piva">{t('drinks.category_piva')}</option>
                         <option value="vino">{t('drinks.category_vino')}</option>
                         <option value="aroq">{t('drinks.category_aroq')}</option>
@@ -850,7 +1181,7 @@ function ManagerFinancials() {
                       </div>
                     )}
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('drinks.quantity')}</label>
                       <input
@@ -861,6 +1192,8 @@ function ManagerFinancials() {
                         required
                       />
                     </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('drinks.buy_price')}</label>
                       <input
@@ -895,7 +1228,7 @@ function ManagerFinancials() {
                         setSelectedBrandId('');
                         setShowNewBrandInput(false);
                         setLockBrandAndUnit(false);
-                        setDrinkForm({ name: '', category: 'saqlangan_ichimliklar', unit: '0.5L', quantity: '', buy_price: '', sell_price: '' });
+                        setDrinkForm({ name: '', category: 'salqin_ichimliklar', unit: '0.5L', quantity: '', buy_price: '', sell_price: '' });
                       }}
                       className="flex-1 py-3 bg-[#2A1518] text-[#9C9384] rounded-xl font-bold uppercase text-xs hover:bg-[#2A1518]/80 transition-all border border-[#5C4A2E]/30"
                     >
@@ -968,7 +1301,7 @@ function ManagerFinancials() {
                         setShowRestockModal(false);
                         setDrinkFormMode('add');
                         setRestockingVariant(null);
-                        setDrinkForm({ name: '', category: 'saqlangan_ichimliklar', unit: '0.5L', quantity: '', buy_price: '', sell_price: '' });
+                        setDrinkForm({ name: '', category: 'salqin_ichimliklar', unit: '0.5L', quantity: '', buy_price: '', sell_price: '' });
                       }}
                       className="flex-1 py-3 bg-[#2A1518] text-[#9C9384] rounded-xl font-bold uppercase text-xs hover:bg-[#2A1518]/80 transition-all border border-[#5C4A2E]/30"
                     >
@@ -1062,8 +1395,15 @@ function ManagerFinancials() {
                 for (let day = 1; day <= totalDays; day++) {
                   const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                   const dayFinances = recentExpenses.filter(f => f.date === dateStr);
-                  const netIncome = dayFinances.filter(f => f.type === 'income').reduce((sum, f) => sum + f.amount_uzs, 0);
-                  const netExpense = dayFinances.filter(f => f.type === 'expense').reduce((sum, f) => sum + f.amount_uzs, 0);
+                  // Payments for this day (date portion of created_at)
+                  const dayPayments = allPayments.filter(p => p.created_at?.slice(0, 10) === dateStr);
+                  const finIncome = dayFinances.filter(f => f.type === 'income').reduce((sum, f) => sum + f.amount_uzs, 0);
+                  const finExpense = dayFinances.filter(f => f.type === 'expense').reduce((sum, f) => sum + f.amount_uzs, 0);
+                  const payIncome = dayPayments.filter(p => p.type === 'sale').reduce((sum, p) => sum + Number(p.amount_original), 0);
+                  const payExpense = dayPayments.filter(p => p.type === 'expense').reduce((sum, p) => sum + Number(p.amount_original), 0);
+                  const netIncome = finIncome + payIncome;
+                  const netExpense = finExpense + payExpense;
+                  const netProfit = netIncome - netExpense;
                   
                   const today = new Date().toISOString().split('T')[0];
                   const isToday = dateStr === today;
@@ -1072,24 +1412,24 @@ function ManagerFinancials() {
                   days.push(
                     <button
                       key={day}
-                      onClick={() => setDate(dateStr)}
+                      onClick={() => {
+                        setDate(dateStr);
+                        fetchDayTransactions(dateStr);
+                      }}
                       className={`
                         aspect-square rounded-lg border-2 p-1 flex flex-col items-center justify-center transition-all hover:border-[#0B6E4F] hover:shadow-md
                         ${isToday ? 'border-2 border-[#C9A227] bg-[#0F1419]' : 'border-[#5C4A2E]/30 bg-[#0F1419]'}
                         ${isSelected ? 'border-2 border-[#0B6E4F] bg-[#0B6E4F]/20' : ''}
-                        ${netIncome > 0 ? 'bg-[#0B6E4F]/10' : ''}
-                        ${netExpense > 0 ? 'bg-[#722F37]/10' : ''}
+                        ${netProfit > 0 ? 'bg-[#0B6E4F]/10' : ''}
+                        ${netProfit < 0 ? 'bg-[#722F37]/10' : ''}
                       `}
                     >
                       <span className="text-xs sm:text-sm font-black text-[#EDE6D6]">{day}</span>
-                      {(netIncome > 0 || netExpense > 0) && (
+                      {netProfit !== 0 && (
                         <div className="text-[10px] sm:text-xs mt-0.5 sm:mt-1 truncate w-full text-center">
-                          {netIncome > 0 && (
-                            <span className="text-[#0B6E4F] font-bold">+{(netIncome / 1000000).toFixed(1)}M</span>
-                          )}
-                          {netExpense > 0 && (
-                            <span className="text-[#722F37] font-bold">-{(netExpense / 1000000).toFixed(1)}M</span>
-                          )}
+                          <span className={`font-bold ${netProfit > 0 ? 'text-[#0B6E4F]' : 'text-[#722F37]'}`}>
+                            {netProfit > 0 ? '+' : ''}{formatCurrency(netProfit)}
+                          </span>
                         </div>
                       )}
                     </button>
@@ -1147,6 +1487,115 @@ function ManagerFinancials() {
               })()
             )}
           </div>
+          )}
+
+          {/* Currency Exchange Modal */}
+          {showExchangeModal && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-[#1C232E] rounded-2xl p-6 max-w-md w-full border border-[#5C4A2E]/30">
+                <h3 className="text-lg font-black text-[#EDE6D6] mb-4">Exchange USD to UZS</h3>
+                <form onSubmit={handleCurrencyExchange} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-black text-[#EDE6D6] mb-2">USD Amount</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={exchangeForm.usdAmount}
+                      onChange={(e) => setExchangeForm({ ...exchangeForm, usdAmount: e.target.value })}
+                      className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#0F1419]"
+                      required
+                    />
+                    <p className="text-xs text-[#9C9384] mt-1">Available: ${cashBox.USD.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-black text-[#EDE6D6] mb-2">Exchange Rate (1 USD = ? UZS)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={exchangeForm.exchangeRate}
+                      onChange={(e) => setExchangeForm({ ...exchangeForm, exchangeRate: e.target.value })}
+                      className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 transition-all text-[#EDE6D6] font-semibold bg-[#0F1419]"
+                      required
+                    />
+                  </div>
+                  {exchangeForm.usdAmount && exchangeForm.exchangeRate && (
+                    <div className="bg-[#0F1419] p-3 rounded-lg border border-[#5C4A2E]/30">
+                      <p className="text-sm text-[#9C9384]">You will receive:</p>
+                      <p className="text-lg font-black text-[#C9A227]">
+                        {(parseFloat(exchangeForm.usdAmount) * parseFloat(exchangeForm.exchangeRate)).toLocaleString()} UZS
+                      </p>
+                    </div>
+                  )}
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowExchangeModal(false)}
+                      className="flex-1 py-3 bg-[#2A1518] text-[#9C9384] rounded-xl font-bold uppercase text-xs hover:bg-[#2A1518]/80 transition-all border border-[#5C4A2E]/30"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="flex-1 py-3 bg-[#0B6E4F] text-[#C9A227] rounded-xl font-bold uppercase text-xs hover:bg-[#0B6E4F]/80 transition-all disabled:opacity-50"
+                    >
+                      {submitting ? 'Processing...' : 'Exchange'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Day Transactions Modal */}
+          {showDayTransactionsModal && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => setShowDayTransactionsModal(false)}>
+              <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+              <div className="relative bg-[#1C232E] rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden animate-in zoom-in-95 duration-200 border border-[#5C4A2E]/30" onClick={e => e.stopPropagation()}>
+                <div className="p-6 border-b border-[#5C4A2E]/30 flex justify-between items-center">
+                  <h2 className="text-xl font-black text-[#EDE6D6]">{date} - All Transactions</h2>
+                  <button
+                    onClick={() => setShowDayTransactionsModal(false)}
+                    className="p-2 hover:bg-[#2A1518] rounded-lg transition-all"
+                  >
+                    <svg className="w-6 h-6 text-[#9C9384]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="p-6 overflow-y-auto max-h-[60vh]">
+                  {loadingDayTransactions ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="w-8 h-8 border-4 border-[#0B6E4F] border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                  ) : dayTransactions.length === 0 ? (
+                    <p className="text-[#9C9384] italic text-sm">No transactions for this date</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {dayTransactions.map((item) => (
+                        <div
+                          key={item.id}
+                          className="bg-[#0F1419] rounded-lg p-4 border border-[#5C4A2E]/30"
+                        >
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <p className="font-black text-[#EDE6D6]">{item.category}</p>
+                              <p className="text-sm text-[#9C9384]">{item.description}</p>
+                              <p className="text-xs text-[#5C4A2E] mt-1">{item.source}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className={`font-black ${item.type === 'expense' ? 'text-[#722F37]' : 'text-[#0B6E4F]'}`}>
+                                {item.type === 'expense' ? '-' : '+'}{item.amount.toLocaleString()} {item.currency}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </main>

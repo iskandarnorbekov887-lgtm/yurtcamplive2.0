@@ -240,7 +240,7 @@ function ManagerFinancialDetail() {
             </div>
             <div>
               <p className="text-xs font-bold uppercase tracking-widest text-[#9C9384] mb-2">Type</p>
-              <p className={`text-lg font-bold ${finance.type === 'income' ? 'text-[#0B6E4F]' : 'text-[#722F37]'}`}>
+              <p className={`text-lg font-bold ${finance.type === 'income' ? 'text-[#4ADE80]' : 'text-[#F87171]'}`}>
                 {finance.type === 'income' ? 'Income' : 'Expense'}
               </p>
             </div>
@@ -249,7 +249,7 @@ function ManagerFinancialDetail() {
           {finance.type === 'expense' ? (
             <>
               <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Category</p>
+                <p className="text-xs font-bold uppercase tracking-widest text-[#9C9384] mb-2">Category</p>
                 {editing ? (
                   <select
                     value={editData?.category || ''}
@@ -261,11 +261,11 @@ function ManagerFinancialDetail() {
                     <option value="other expenses">Other Expenses</option>
                   </select>
                 ) : (
-                  <p className="text-lg font-semibold text-slate-800">{finance.category}</p>
+                  <p className="text-lg font-semibold text-[#EDE6D6]">{finance.category}</p>
                 )}
               </div>
               <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Description</p>
+                <p className="text-xs font-bold uppercase tracking-widest text-[#9C9384] mb-2">Description</p>
                 {editing ? (
                   <textarea
                     value={editData?.description || ''}
@@ -274,11 +274,11 @@ function ManagerFinancialDetail() {
                     className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl text-slate-900"
                   />
                 ) : (
-                  <p className="text-lg text-slate-700">{finance.description || 'No description'}</p>
+                  <p className="text-lg text-[#EDE6D6]">{finance.description || 'No description'}</p>
                 )}
               </div>
               <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Amount (UZS)</p>
+                <p className="text-xs font-bold uppercase tracking-widest text-[#9C9384] mb-2">Amount (UZS)</p>
                 {editing ? (
                   <input
                     type="number"
@@ -292,12 +292,12 @@ function ManagerFinancialDetail() {
                     className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl text-slate-900 font-semibold"
                   />
                 ) : (
-                  <p className="text-lg font-bold text-slate-800">{finance.original_amount.toLocaleString()} UZS</p>
+                  <p className="text-lg font-bold text-[#EDE6D6]">{finance.original_amount.toLocaleString()} UZS</p>
                 )}
               </div>
               {finance.receipt_url && (
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Receipt</p>
+                  <p className="text-xs font-bold uppercase tracking-widest text-[#9C9384] mb-2">Receipt</p>
                   <button
                     onClick={() => finance.receipt_url && window.open(finance.receipt_url, '_blank')}
                     className="text-blue-600 hover:underline font-bold"
@@ -311,7 +311,7 @@ function ManagerFinancialDetail() {
             <>
               {/* Income Details */}
               <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Guest Name</p>
+                <p className="text-xs font-bold uppercase tracking-widest text-[#9C9384] mb-2">Guest Name</p>
                 {editing ? (
                   <input
                     type="text"
@@ -320,13 +320,13 @@ function ManagerFinancialDetail() {
                     className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl text-slate-900 font-semibold"
                   />
                 ) : (
-                  <p className="text-lg font-semibold text-slate-800">{finance.guest_name || 'No guest name'}</p>
+                  <p className="text-lg font-semibold text-[#EDE6D6]">{finance.guest_name || 'No guest name'}</p>
                 )}
               </div>
 
 
               <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Description</p>
+                <p className="text-xs font-bold uppercase tracking-widest text-[#9C9384] mb-2">Description</p>
                 {editing ? (
                   <textarea
                     value={editData?.description || ''}
@@ -335,12 +335,12 @@ function ManagerFinancialDetail() {
                     className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl text-slate-900"
                   />
                 ) : (
-                  <p className="text-lg text-slate-700">{finance.description || 'No description'}</p>
+                  <p className="text-lg text-[#EDE6D6]">{finance.description || 'No description'}</p>
                 )}
               </div>
 
               <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Amount ({finance.currency || 'UZS'})</p>
+                <p className="text-xs font-bold uppercase tracking-widest text-[#9C9384] mb-2">Amount ({finance.currency || 'UZS'})</p>
                 {editing ? (
                   <input
                     type="number"
@@ -350,14 +350,14 @@ function ManagerFinancialDetail() {
                     className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl text-slate-900 font-semibold"
                   />
                 ) : (
-                  <p className="text-lg font-bold text-slate-800">{finance.original_amount.toLocaleString()} {finance.currency || 'UZS'}</p>
+                  <p className="text-lg font-bold text-[#EDE6D6]">{finance.original_amount.toLocaleString()} {finance.currency || 'UZS'}</p>
                 )}
               </div>
 
               {finance.currency !== 'UZS' && (
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Exchange Rate</p>
-                  <p className="text-lg font-semibold text-slate-800">{finance.exchange_rate} {finance.currency}/UZS</p>
+                  <p className="text-xs font-bold uppercase tracking-widest text-[#9C9384] mb-2">Exchange Rate</p>
+                  <p className="text-lg font-semibold text-[#EDE6D6]">{finance.exchange_rate} {finance.currency}/UZS</p>
                 </div>
               )}
             </>
