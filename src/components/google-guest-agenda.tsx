@@ -1397,11 +1397,10 @@ export function GoogleGuestAgenda({
         </div>
         <div className="flex items-center gap-2">
           {onAddNewBooking && (
-            <button 
+            <button
               onClick={() => setShowAddModal(true)}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center gap-2"
+              className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
             >
-              <span>+</span>
               {t('agenda.add_booking')}
             </button>
           )}

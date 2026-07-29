@@ -33,6 +33,8 @@ const translations = {
     'tab.occupancy': 'Check-in & Out',
     'tab.finance': 'Finance',
     'tab.team': 'Team',
+    'tab.checkin': 'Check In',
+    'tab.financials': 'Financials',
     
     // Buttons
     'btn.logout': 'Log Out',
@@ -341,7 +343,7 @@ const translations = {
     'drinks.sell': 'Sell',
     'drinks.selling': 'Selling...',
     'drinks.sale_error': 'Failed to complete sale',
-    'drinks.out_of_stock': 'Not enough stock available',
+    'drinks.out_of_stock': 'Out of stock',
     'drinks.total': 'Total',
     'drinks.recent_sales': 'Recent Sales',
     'drinks.no_sales': 'No sales today',
@@ -374,7 +376,7 @@ const translations = {
     'drinks.category': 'Category',
     'drinks.category_non_alcoholic': 'Non-alcoholic',
     'drinks.category_alcoholic': 'Alcoholic',
-    'drinks.category_saqlangan_ichimliklar': 'Soft Drinks',
+    'drinks.category_salqin_ichimliklar': 'Soft Drinks',
     'drinks.category_piva': 'Beer',
     'drinks.category_vino': 'Wine',
     'drinks.category_aroq': 'Vodka',
@@ -388,6 +390,7 @@ const translations = {
     'drinks.unit_shisha': 'shisha/bottle',
     'drinks.select_brand': 'Select brand',
     'drinks.new_brand_name': 'New brand name',
+    'drinks.currency': 'Currency',
 
     // POS
     'pos.title': 'Point of Sale',
@@ -473,6 +476,8 @@ const translations = {
     'tab.occupancy': 'Kelish / Ketish',
     'tab.finance': 'Moliya',
     'tab.team': 'Jamoa',
+    'tab.checkin': 'Kelish',
+    'tab.financials': 'Moliya',
     
     // Buttons
     'btn.logout': 'Chiqish',
@@ -781,7 +786,7 @@ const translations = {
     'drinks.sell': 'Sotish',
     'drinks.selling': 'Sotilmoqda...',
     'drinks.sale_error': 'Sotishni tugatish muvaffaqiyatsiz',
-    'drinks.out_of_stock': 'Yetarli zaxira yo\'q',
+    'drinks.out_of_stock': 'Tugagan',
     'drinks.total': 'Jami',
     'drinks.recent_sales': 'So\'nggi sotuvlar',
     'drinks.no_sales': 'Bugun sotuvlar yo\'q',
@@ -814,7 +819,7 @@ const translations = {
     'drinks.category': 'Kategoriya',
     'drinks.category_non_alcoholic': 'Alkogolsiz',
     'drinks.category_alcoholic': 'Alkogolli',
-    'drinks.category_saqlangan_ichimliklar': 'Saqlangan ichimliklar',
+    'drinks.category_salqin_ichimliklar': 'Salqin ichimliklar',
     'drinks.category_piva': 'Piva',
     'drinks.category_vino': 'Vino',
     'drinks.category_aroq': 'Aroq',
@@ -828,6 +833,7 @@ const translations = {
     'drinks.unit_shisha': 'shisha/bottle',
     'drinks.select_brand': 'Brendni tanlang',
     'drinks.new_brand_name': 'Yangi brend nomi',
+    'drinks.currency': 'Valyuta',
 
     // POS
     'pos.title': 'Sotish nuqtasi',

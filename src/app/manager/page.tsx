@@ -263,12 +263,6 @@ function ManagerPortal() {
                   >
                     💰 {t('nav.fiscal_recording')}
                   </a>
-                  <a 
-                    href="/financials/pos" 
-                    className="block p-3 rounded-lg text-[10px] font-bold uppercase tracking-widest text-[#0B6E4F] bg-[#0B6E4F]/10 border border-[#0B6E4F]/30 hover:bg-[#0B6E4F]/20 transition-all text-center"
-                  >
-                    🛒 {t('pos.title')}
-                  </a>
                   <button 
                     onClick={() => {
                       signOut();
