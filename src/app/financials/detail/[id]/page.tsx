@@ -6,18 +6,20 @@ import { useEffect, useState } from 'react';
 import { ProtectedRoute } from '@/components/protected-route';
 import { supabase, type Finance } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
+import { useLanguage } from '@/lib/language-context';
 import { useRouter, useParams } from 'next/navigation';
 
-export default function ManagerFinancialDetailPage() {
+export default function FinancialDetailPage() {
   return (
-    <ProtectedRoute allowedRoles={['Manager']}>
-      <ManagerFinancialDetail />
+    <ProtectedRoute allowedRoles={['Manager', 'CEO']}>
+      <FinancialDetail />
     </ProtectedRoute>
   );
 }
 
-function ManagerFinancialDetail() {
+function FinancialDetail() {
   const { user, signOut } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
   const params = useParams();
   const financeId = params.id as string;
@@ -31,10 +33,34 @@ function ManagerFinancialDetail() {
   const [requestingDelete, setRequestingDelete] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteReason, setDeleteReason] = useState('');
+  const [requestingEdit, setRequestingEdit] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editRequestDescription, setEditRequestDescription] = useState('');
+  const [workerNames, setWorkerNames] = useState<string[]>([]);
+  const [showNewWorkerInput, setShowNewWorkerInput] = useState(false);
+  const [selectedWorkerOption, setSelectedWorkerOption] = useState('');
+  const [newWorkerName, setNewWorkerName] = useState('');
 
   useEffect(() => {
     fetchFinanceDetails();
+    fetchWorkerNames();
   }, [financeId]);
+
+  const fetchWorkerNames = async () => {
+    try {
+      const { data } = await supabase
+        .from('camp_finances')
+        .select('worker_name')
+        .eq('category', 'workers income')
+        .eq('team_id', user?.team_id)
+        .not('worker_name', 'is', null);
+      
+      const names = [...new Set(data?.map(r => r.worker_name).filter(Boolean) || [])].sort();
+      setWorkerNames(names);
+    } catch (error) {
+      console.error('Error fetching worker names:', error);
+    }
+  };
 
   const fetchFinanceDetails = async () => {
     try {
@@ -46,6 +72,9 @@ function ManagerFinancialDetail() {
       if (data && data.length > 0) {
         setFinance(data[0]);
         setEditData(data[0]);
+        if (data[0].category === 'workers income' && data[0].worker_name) {
+          setSelectedWorkerOption(data[0].worker_name);
+        }
       }
     } catch (error) {
       console.error('Error fetching finance details:', error);
@@ -61,6 +90,22 @@ function ManagerFinancialDetail() {
     setMessage('');
 
     try {
+      // Check for duplicate worker name (case-insensitive) only when adding new worker
+      if (editData.category === 'workers income' && showNewWorkerInput && newWorkerName.trim()) {
+        const normalizedInput = newWorkerName.trim().toLowerCase();
+        const existingWorker = workerNames.find(name => name.toLowerCase() === normalizedInput);
+        if (existingWorker) {
+          setMessage('Bu ishchi allaqachon mavjud');
+          setSaving(false);
+          return;
+        }
+      }
+
+      // Update worker_name based on selection
+      if (editData.category === 'workers income') {
+        editData.worker_name = selectedWorkerOption === '__new__' ? newWorkerName : selectedWorkerOption;
+      }
+
       const { error } = await supabase
         .from('camp_finances')
         .update(editData)
@@ -114,6 +159,12 @@ function ManagerFinancialDetail() {
     setDeleteReason('');
   };
 
+  const handleRequestEdit = () => {
+    if (!finance || !user) return;
+    setEditModalOpen(true);
+    setEditRequestDescription('');
+  };
+
   const handleConfirmDelete = async () => {
     if (!finance || !user || !deleteReason.trim()) {
       setMessage('Please provide a reason for deletion.');
@@ -159,6 +210,51 @@ function ManagerFinancialDetail() {
     }
   };
 
+  const handleConfirmEdit = async () => {
+    if (!finance || !user || !editRequestDescription.trim()) {
+      setMessage('Please describe what needs to be changed.');
+      return;
+    }
+    
+    setRequestingEdit(true);
+    setEditModalOpen(false);
+    setMessage('');
+
+    try {
+      // Send notification to CEO to review edit request
+      const { data: ceoData } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('role', 'CEO')
+        .eq('team_id', user?.team_id)
+        .single();
+
+      if (ceoData) {
+        const title = finance.type === 'income' ? 'Edit Income Request' : 'Edit Expense Request';
+        const message = finance.type === 'income' 
+          ? `Manager requested to edit income: ${finance.guest_name || 'Guest'} - ${finance.original_amount.toLocaleString()} ${finance.currency || 'UZS'}. Request: ${editRequestDescription}`
+          : `Manager requested to edit expense: ${finance.category} - ${finance.original_amount.toLocaleString()} UZS. Request: ${editRequestDescription}`;
+        
+        await supabase.from('notifications').insert({
+          user_id: ceoData.id,
+          team_id: user?.team_id,
+          type: 'edit_request',
+          title: title,
+          message: message,
+          related_id: finance.id,
+        });
+
+        setMessage('Edit request sent to CEO for review.');
+        setTimeout(() => setMessage(''), 3000);
+      }
+    } catch (err: any) {
+      setMessage(`Error: ${err.message}`);
+    } finally {
+      setRequestingEdit(false);
+      setEditRequestDescription('');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0F1419] flex items-center justify-center">
@@ -192,23 +288,44 @@ function ManagerFinancialDetail() {
               <h1 className="text-2xl font-black tracking-tight text-[#EDE6D6]">
                 {finance.type === 'income' ? 'Income' : 'Expense'} Details
               </h1>
-              <p className="text-xs text-[#C9A227]/80 font-bold tracking-widest uppercase opacity-80">Manager View</p>
+              <p className="text-xs text-[#C9A227]/80 font-bold tracking-widest uppercase opacity-80">{user?.role === 'CEO' ? 'CEO View' : 'Manager View'}</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => setEditing(!editing)}
-              className="px-5 py-2.5 bg-indigo-600/90 hover:bg-indigo-600 rounded-xl text-xs font-black transition-all shadow-lg hover:shadow-indigo-500/20 active:scale-95"
-            >
-              {editing ? 'Cancel' : 'Edit'}
-            </button>
-            <button
-              onClick={handleRequestDelete}
-              disabled={requestingDelete}
-              className="px-5 py-2.5 bg-amber-600/90 hover:bg-amber-600 rounded-xl text-xs font-black transition-all shadow-lg hover:shadow-amber-500/20 active:scale-95 disabled:opacity-50"
-            >
-              {requestingDelete ? 'Requesting...' : 'Request Delete'}
-            </button>
+            {user?.role === 'CEO' ? (
+              <>
+                <button
+                  onClick={() => setEditing(!editing)}
+                  className="px-5 py-2.5 bg-indigo-600/90 hover:bg-indigo-600 rounded-xl text-xs font-black transition-all shadow-lg hover:shadow-indigo-500/20 active:scale-95"
+                >
+                  {editing ? 'Cancel' : 'Edit'}
+                </button>
+                <button
+                  onClick={handleRequestDelete}
+                  disabled={requestingDelete}
+                  className="px-5 py-2.5 bg-red-600/90 hover:bg-red-600 rounded-xl text-xs font-black transition-all shadow-lg hover:shadow-red-500/20 active:scale-95 disabled:opacity-50"
+                >
+                  {requestingDelete ? 'Deleting...' : 'Delete'}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={handleRequestEdit}
+                  disabled={requestingEdit}
+                  className="px-5 py-2.5 bg-indigo-600/90 hover:bg-indigo-600 rounded-xl text-xs font-black transition-all shadow-lg hover:shadow-indigo-500/20 active:scale-95 disabled:opacity-50"
+                >
+                  {requestingEdit ? 'Requesting...' : 'Request Edit'}
+                </button>
+                <button
+                  onClick={handleRequestDelete}
+                  disabled={requestingDelete}
+                  className="px-5 py-2.5 bg-amber-600/90 hover:bg-amber-600 rounded-xl text-xs font-black transition-all shadow-lg hover:shadow-amber-500/20 active:scale-95 disabled:opacity-50"
+                >
+                  {requestingDelete ? 'Requesting...' : 'Request Delete'}
+                </button>
+              </>
+            )}
             <button
               onClick={signOut}
               className="px-5 py-2.5 bg-rose-600/90 hover:bg-rose-600 rounded-xl text-xs font-black transition-all shadow-lg hover:shadow-rose-500/20 active:scale-95 flex items-center gap-2"
@@ -256,9 +373,9 @@ function ManagerFinancialDetail() {
                     onChange={(e) => setEditData({ ...editData!, category: e.target.value })}
                     className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl text-slate-900 font-semibold"
                   >
-                    <option value="workers income">Workers Income</option>
-                    <option value="gas for car">Gas for Car</option>
-                    <option value="other expenses">Other Expenses</option>
+                    <option value="workers income">{t('txn.category_workers_income')}</option>
+                    <option value="gas for car">{t('txn.category_gas')}</option>
+                    <option value="other expenses">{t('txn.category_other_expenses')}</option>
                   </select>
                 ) : (
                   <p className="text-lg font-semibold text-[#EDE6D6]">{finance.category}</p>
@@ -277,6 +394,76 @@ function ManagerFinancialDetail() {
                   <p className="text-lg text-[#EDE6D6]">{finance.description || 'No description'}</p>
                 )}
               </div>
+              {editData?.category === 'workers income' && (
+                <>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-[#9C9384] mb-2">{t('txn.worker_name_label')}</p>
+                    {editing ? (
+                      <div>
+                        <select
+                          value={selectedWorkerOption}
+                          onChange={(e) => {
+                            const newValue = e.target.value;
+                            setSelectedWorkerOption(newValue);
+                            setShowNewWorkerInput(newValue === '__new__');
+                            if (newValue !== '__new__') {
+                              setEditData({ ...editData!, worker_name: newValue });
+                            }
+                          }}
+                          className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl text-slate-900 font-semibold"
+                        >
+                          <option value="">{t('form.select_worker')}</option>
+                          {workerNames.map(name => (
+                            <option key={name} value={name}>{name}</option>
+                          ))}
+                          <option value="__new__">{t('txn.add_new_worker')}</option>
+                        </select>
+                        {showNewWorkerInput && (
+                          <div className="mt-3">
+                            <input
+                              type="text"
+                              value={newWorkerName}
+                              onChange={(e) => setNewWorkerName(e.target.value)}
+                              placeholder={t('form.enter_worker_name')}
+                              className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl text-slate-900 font-semibold"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-lg font-semibold text-[#EDE6D6]">{finance.worker_name || 'No worker name'}</p>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-widest text-[#9C9384] mb-2">{t('txn.period_start_label')}</p>
+                      {editing ? (
+                        <input
+                          type="date"
+                          value={editData?.period_start || ''}
+                          onChange={(e) => setEditData({ ...editData!, period_start: e.target.value })}
+                          className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl text-slate-900 font-semibold"
+                        />
+                      ) : (
+                        <p className="text-lg font-semibold text-[#EDE6D6]">{finance.period_start || 'Not set'}</p>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-widest text-[#9C9384] mb-2">{t('txn.period_end_label')}</p>
+                      {editing ? (
+                        <input
+                          type="date"
+                          value={editData?.period_end || ''}
+                          onChange={(e) => setEditData({ ...editData!, period_end: e.target.value })}
+                          className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl text-slate-900 font-semibold"
+                        />
+                      ) : (
+                        <p className="text-lg font-semibold text-[#EDE6D6]">{finance.period_end || 'Not set'}</p>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest text-[#9C9384] mb-2">Amount (UZS)</p>
                 {editing ? (
@@ -415,6 +602,41 @@ function ManagerFinancialDetail() {
                 className="flex-1 py-3 bg-[#722F37] text-[#EDE6D6] rounded-xl font-bold hover:bg-[#722F37]/80 transition-all disabled:opacity-50 border border-[#722F37]/40"
               >
                 {requestingDelete ? 'Sending...' : 'Send Request'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Request Modal */}
+      {editModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => setEditModalOpen(false)}>
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+          <div className="relative bg-[#1C232E] rounded-2xl shadow-2xl w-full max-w-md p-8 animate-in zoom-in-95 duration-200 border border-[#5C4A2E]/30" onClick={e => e.stopPropagation()}>
+            <h2 className="text-xl font-black text-[#EDE6D6] mb-4">Request Edit</h2>
+            <p className="text-sm text-[#9C9384] mb-4">
+              Please describe what needs to be changed for this {finance?.type === 'income' ? 'income' : 'expense'} record.
+            </p>
+            <textarea
+              value={editRequestDescription}
+              onChange={(e) => setEditRequestDescription(e.target.value)}
+              placeholder="Ne o'zgartirilishi kerak / What needs to change..."
+              rows={4}
+              className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl text-[#EDE6D6] mb-4 focus:border-[#0B6E4F] focus:ring-2 focus:ring-[#0B6E4F]/20 bg-[#1C232E] placeholder:text-[#9C9384]"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => setEditModalOpen(false)}
+                className="flex-1 py-3 bg-[#1C232E]/50 text-[#9C9384] rounded-xl font-bold hover:bg-[#2A1518] transition-all border border-[#5C4A2E]/30"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmEdit}
+                disabled={!editRequestDescription.trim() || requestingEdit}
+                className="flex-1 py-3 bg-[#722F37] text-[#EDE6D6] rounded-xl font-bold hover:bg-[#722F37]/80 transition-all disabled:opacity-50 border border-[#722F37]/40"
+              >
+                {requestingEdit ? 'Sending...' : 'Send Request'}
               </button>
             </div>
           </div>

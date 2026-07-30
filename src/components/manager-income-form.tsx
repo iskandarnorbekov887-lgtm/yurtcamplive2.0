@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase, Booking } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
+import { useLanguage } from '@/lib/language-context';
 import { Globe, Home, Waves } from 'lucide-react';
 
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
 
 export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, isSystemOnly = false }: Props) {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const currentUserId = user?.id;
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
@@ -208,7 +210,7 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
         {/* Header */}
         <div className="bg-[#0B6E4F] px-8 py-6 flex justify-between items-center">
           <div>
-            <h2 className="text-xl font-black text-[#C9A227] uppercase tracking-tight">New Manager Booking</h2>
+            <h2 className="text-xl font-black text-[#C9A227] uppercase tracking-tight">{t('manager_booking.title')}</h2>
           </div>
           <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-2xl bg-[#1C232E]/20 text-[#C9A227] hover:bg-[#1C232E]/30 transition-all">×</button>
         </div>
@@ -228,7 +230,7 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
                   {c === 'international' && <Globe size={18} strokeWidth={2} className={isActive ? 'text-[#C9A227]' : 'text-[#9C9384]'} />}
                   {c === 'local' && <Home size={18} strokeWidth={2} className={isActive ? 'text-[#C9A227]' : 'text-[#9C9384]'} />}
                   {c === 'pool' && <Waves size={18} strokeWidth={2} className={isActive ? 'text-[#C9A227]' : 'text-[#9C9384]'} />}
-                  <span>{c === 'international' ? 'International' : c === 'local' ? 'Local' : 'Pool'}</span>
+                  <span>{c === 'international' ? t('manager_booking.international') : c === 'local' ? t('manager_booking.local') : t('manager_booking.pool')}</span>
                 </button>
               );
             })}
@@ -237,8 +239,8 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
           {mainCategory === 'international' && (
             <div className={`flex items-center justify-between p-4 rounded-2xl border-2 animate-in slide-in-from-top-2 transition-all ${isCamper ? 'bg-[#B8860B]/20 border-[#B8860B]/40 shadow-sm' : 'bg-[#1C232E] border-[#5C4A2E]/30'}`}>
               <div className="flex flex-col">
-                <span className={`text-sm font-bold ${isCamper ? 'text-[#B8860B]' : 'text-[#EDE6D6]'}`}>Guest is a Camper</span>
-                <span className={`text-[10px] font-bold uppercase tracking-widest ${isCamper ? 'text-[#B8860B]' : 'text-[#9C9384]'}`}>Registers as 'camper' category</span>
+                <span className={`text-sm font-bold ${isCamper ? 'text-[#B8860B]' : 'text-[#EDE6D6]'}`}>{t('manager_booking.camper_toggle')}</span>
+                <span className={`text-[10px] font-bold uppercase tracking-widest ${isCamper ? 'text-[#B8860B]' : 'text-[#9C9384]'}`}>{t('manager_booking.camper_subtitle')}</span>
               </div>
               <button type="button" onClick={() => setIsCamper(!isCamper)}
                 className={`w-12 h-6 rounded-full transition-all relative ${isCamper ? 'bg-[#B8860B]' : 'bg-[#5C4A2E]/50'}`}>
@@ -249,10 +251,10 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
 
           {mainCategory === 'local' && (
             <div className="flex gap-2 p-1 bg-[#B8860B]/20 rounded-xl border border-[#B8860B]/40">
-              {(['day', 'night'] as const).map(t => (
-                <button key={t} type="button" onClick={() => setLocalType(t)}
-                  className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${localType === t ? 'bg-[#1C232E] text-[#B8860B] shadow-sm' : 'text-[#B8860B]'}`}>
-                  {t === 'day' ? '☀️ Day Visit' : '🌙 Night Stay'}
+              {(['day', 'night'] as const).map(type => (
+                <button key={type} type="button" onClick={() => setLocalType(type)}
+                  className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${localType === type ? 'bg-[#1C232E] text-[#B8860B] shadow-sm' : 'text-[#B8860B]'}`}>
+                  {type === 'day' ? t('manager_booking.day_visit') : t('manager_booking.night_stay')}
                 </button>
               ))}
             </div>
@@ -261,20 +263,20 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
           {/* Core Fields */}
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest ml-1">Guest Name *</label>
-              <input type="text" value={guestName} onChange={e => setGuestName(e.target.value)} placeholder="Full Name..."
+              <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest ml-1">{t('manager_booking.guest_name')} *</label>
+              <input type="text" value={guestName} onChange={e => setGuestName(e.target.value)} placeholder={t('manager_booking.guest_name_placeholder')}
                 className="w-full px-5 py-4 bg-[#1C232E]/50 border-2 border-[#5C4A2E]/30 rounded-[20px] text-base font-bold text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all" />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest ml-1">Adults</label>
+                  <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest ml-1">{t('manager_booking.adults')}</label>
                   <input type="number" min="1" value={numAdults} onChange={e => setNumAdults(parseInt(e.target.value) || 1)}
                     className="w-full px-5 py-4 bg-[#1C232E]/50 border-2 border-[#5C4A2E]/30 rounded-[20px] text-base font-bold text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all" />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest ml-1">Children (under 12)</label>
+                  <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest ml-1">{t('manager_booking.children')}</label>
                   <input type="number" min="0" value={numChildren} onChange={e => setNumChildren(parseInt(e.target.value) || 0)}
                     className="w-full px-5 py-4 bg-[#1C232E]/50 border-2 border-[#5C4A2E]/30 rounded-[20px] text-base font-bold text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all" />
                 </div>
@@ -282,7 +284,7 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
 
               {(mainCategory === 'international' || (mainCategory === 'local' && localType === 'night')) && (
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest ml-1">Check-out</label>
+                  <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest ml-1">{t('manager_booking.checkout')}</label>
                   <input type="date" value={checkOut} onChange={e => setCheckOut(e.target.value)}
                     className="w-full px-5 py-4 bg-[#1C232E]/50 border-2 border-[#5C4A2E]/30 rounded-[20px] text-sm font-bold text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all" />
                 </div>
@@ -292,7 +294,7 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
             {(mainCategory === 'local' || mainCategory === 'pool') && (
               <>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest ml-1">Payment Method *</label>
+                  <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest ml-1">{t('manager_booking.payment_method')} *</label>
                   <div className="flex gap-2">
                     <button type="button" onClick={() => setPaymentMethod('cash')}
                       className={`flex-1 py-3 rounded-[16px] text-sm font-black uppercase tracking-wider transition-all ${
@@ -300,7 +302,7 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
                           ? 'bg-[#0B6E4F] text-[#EDE6D6]' 
                           : 'bg-[#1C232E]/50 border-2 border-[#5C4A2E]/30 text-[#9C9384]'
                       }`}>
-                      Cash
+                      {t('manager_booking.cash')}
                     </button>
                     <button type="button" onClick={() => setPaymentMethod('online')}
                       className={`flex-1 py-3 rounded-[16px] text-sm font-black uppercase tracking-wider transition-all ${
@@ -308,15 +310,15 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
                           ? 'bg-[#0B6E4F] text-[#EDE6D6]' 
                           : 'bg-[#1C232E]/50 border-2 border-[#5C4A2E]/30 text-[#9C9384]'
                       }`}>
-                      Online
+                      {t('manager_booking.online')}
                     </button>
                   </div>
                 </div>
                 <div className="space-y-1.5 animate-in slide-in-from-top-2">
-                  <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest ml-1">Payment Amount (UZS) *</label>
+                  <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest ml-1">{t('manager_booking.payment_amount')} *</label>
                   <div className="relative">
-                    <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[#9C9384] font-black text-xs">SUM</span>
-                    <input type="number" required value={amountUZS} onChange={e => setAmountUZS(e.target.value)} placeholder="0.00"
+                    <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[#9C9384] font-black text-xs">{t('manager_booking.currency_suffix')}</span>
+                    <input type="number" required value={amountUZS} onChange={e => setAmountUZS(e.target.value)} placeholder={t('manager_booking.amount_placeholder')}
                       className="w-full px-5 py-4 bg-[#1C232E]/50 border-2 border-[#5C4A2E]/30 rounded-[20px] text-xl font-black text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all" />
                   </div>
                 </div>
@@ -337,7 +339,7 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
                 ? 'bg-[#0B6E4F] text-[#C9A227] hover:bg-[#0B6E4F]/80 shadow-[#0B6E4F]/20' 
                 : 'bg-[#C9A227] text-[#1C232E] hover:bg-[#C9A227]/80 shadow-[#C9A227]/20'
             }`}>
-            {submitting ? 'Processing...' : (mainCategory === 'local' || mainCategory === 'pool' ? 'PAY & REGISTER' : 'CREATE BOOKING')}
+            {submitting ? t('manager_booking.processing') : (mainCategory === 'local' || mainCategory === 'pool' ? t('manager_booking.pay_register') : t('manager_booking.create_booking'))}
           </button>
         </form>
       </div>

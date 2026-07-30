@@ -252,7 +252,7 @@ function CookPortal() {
       <main className="flex-1 relative overflow-y-auto bg-[#0F1419]">
         
         {/* Top Bar */}
-        <div className="sticky top-0 z-30 px-8 py-4 flex justify-between items-center bg-[#1C232E]/80 backdrop-blur-sm border-b border-[#5C4A2E]/30">
+        <div className="sticky top-0 z-[200] px-8 py-4 flex justify-between items-center bg-[#1C232E]/80 backdrop-blur-sm border-b border-[#5C4A2E]/30">
           <div className="text-xs font-bold text-[#9C9384] uppercase tracking-widest">
             {activeTab === 'orders' ? 'Kitchen Queue' : activeTab === 'procurement' ? 'Supply Requests' : activeTab === 'usage' ? 'Weighing Station' : activeTab === 'inventory' ? 'Stores' : activeTab === 'pos' ? 'Drinks POS' : 'Calendar'}
           </div>

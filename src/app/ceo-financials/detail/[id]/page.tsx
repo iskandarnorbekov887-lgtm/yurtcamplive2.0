@@ -142,7 +142,7 @@ function CEOFinancialDetail() {
             <div className="space-y-6">
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest text-[#9C9384] mb-2">Date</p>
-                <p className="text-lg font-semibold text-[#EDE6D6]">{new Date(finance.date).toLocaleDateString(getLocale(), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                <p className="text-lg font-semibold text-[#EDE6D6]">{finance.date ? new Date(finance.date).toLocaleDateString(getLocale(), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'Invalid Date'}</p>
               </div>
 
               <div>
@@ -161,6 +161,25 @@ function CEOFinancialDetail() {
                 <p className="text-xs font-bold uppercase tracking-widest text-[#9C9384] mb-2">Description</p>
                 <p className="text-lg text-[#9C9384]">{finance.description || 'No description'}</p>
               </div>
+
+              {finance.category === 'workers income' && (
+                <>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-[#9C9384] mb-2">Ishchi Ismi / Worker Name</p>
+                    <p className="text-lg font-semibold text-[#EDE6D6]">{finance.worker_name || 'No worker name'}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-widest text-[#9C9384] mb-2">To'langan sana (dan) / Paid From</p>
+                      <p className="text-lg font-semibold text-[#EDE6D6]">{finance.period_start || 'Not set'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-widest text-[#9C9384] mb-2">To'langan sana (gacha) / Paid To</p>
+                      <p className="text-lg font-semibold text-[#EDE6D6]">{finance.period_end || 'Not set'}</p>
+                    </div>
+                  </div>
+                </>
+              )}
 
               {finance.currency !== 'UZS' && (
                 <div>

@@ -108,6 +108,9 @@ export interface Finance {
   amount_uzs: number;
   description: string | null;
   guest_name: string | null;
+  worker_name: string | null;
+  period_start: string | null;
+  period_end: string | null;
   receipt_url: string | null;
   created_by: string;
   created_at: string;

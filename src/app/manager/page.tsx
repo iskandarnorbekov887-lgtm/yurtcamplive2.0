@@ -284,7 +284,7 @@ function ManagerPortal() {
       <main className="flex-1 relative overflow-y-auto bg-[#0F1419]">
         
         {/* Top Bar */}
-        <div className="sticky top-0 z-30 px-4 md:px-8 py-3 md:py-4 flex justify-between items-center bg-[#1C232E] backdrop-blur-sm border-b border-[#5C4A2E]/30">
+        <div className="sticky top-0 z-[200] px-4 md:px-8 py-3 md:py-4 flex justify-between items-center bg-[#1C232E] backdrop-blur-sm border-b border-[#5C4A2E]/30">
           <div className="flex items-center gap-2 md:gap-3">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}

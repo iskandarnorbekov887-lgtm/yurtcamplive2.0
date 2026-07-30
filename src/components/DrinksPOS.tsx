@@ -30,7 +30,7 @@ export function DrinksPOS() {
   const [salesHistory, setSalesHistory] = useState<any[]>([]);
 
   const unitPresets: Record<string, string[]> = {
-    saqlangan_ichimliklar: ['0.25L banka', '0.33L banka', '0.5L', '1L', '1.5L', '2L'],
+    salqin_ichimliklar: ['0.25L banka', '0.33L banka', '0.5L', '1L', '1.5L', '2L'],
     piva: ['0.5L banka', '0.5L shisha', '1L'],
     vino: ['shisha', '0.75L'],
     aroq: ['0.25L shisha', '0.5L shisha', '0.7L shisha', '1L shisha']
@@ -213,7 +213,7 @@ export function DrinksPOS() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Drinks Grid */}
         <div className="lg:col-span-2 space-y-6 order-2 lg:order-1">
-          {['saqlangan_ichimliklar', 'piva', 'vino', 'aroq'].map(category => {
+          {['salqin_ichimliklar', 'piva', 'vino', 'aroq'].map(category => {
             const categoryDrinks = drinks.filter(d => d.category === category && d.quantity_in_stock > 0);
             if (categoryDrinks.length === 0) return null;
 
