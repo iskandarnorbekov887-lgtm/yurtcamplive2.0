@@ -155,11 +155,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       alert(error.message);
       setLoading(false);
     } else {
+      // Capture login history after successful sign-in
+      if (data.user) {
+        try {
+          // Fetch user's profile to get team_id
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('team_id')
+          .eq('id', data.user.id)
+          .single();
+          
+          if (profileData) {
+            await supabase.from('login_history').insert({
+              user_id: data.user.id,
+              team_id: profileData.team_id,
+              device_info: navigator.userAgent,
+            });
+          }
+        } catch (err) {
+          console.error('Failed to record login history:', err);
+          // Don't block login if this fails
+        }
+      }
       router.refresh();
     }
   };
