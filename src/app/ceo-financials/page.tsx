@@ -41,8 +41,26 @@ function CEOFinancialCalendar() {
   const [transactionAmount, setTransactionAmount] = useState('');
   const [transactionDescription, setTransactionDescription] = useState('');
   const [transactionWorkerName, setTransactionWorkerName] = useState('');
+  const [selectedWorkerOption, setSelectedWorkerOption] = useState('');
+  const [newWorkerName, setNewWorkerName] = useState('');
+  const [transactionPeriodStart, setTransactionPeriodStart] = useState('');
+  const [transactionPeriodEnd, setTransactionPeriodEnd] = useState('');
   const [submittingTransaction, setSubmittingTransaction] = useState(false);
   const [transactionMessage, setTransactionMessage] = useState('');
+  const [workerNames, setWorkerNames] = useState<string[]>([]);
+  const [workerPayments, setWorkerPayments] = useState<any[]>([]);
+  const [loadingWorkerPayments, setLoadingWorkerPayments] = useState(false);
+  const [showNewWorkerInput, setShowNewWorkerInput] = useState(false);
+  
+  // Exchange modal state
+  const [exchangeModalOpen, setExchangeModalOpen] = useState(false);
+  const [exchangeFromCurrency, setExchangeFromCurrency] = useState<'USD' | 'EUR'>('USD');
+  const [exchangeAmount, setExchangeAmount] = useState('');
+  const [exchangeRate, setExchangeRate] = useState('');
+  const [exchangeRateSource, setExchangeRateSource] = useState<'auto' | 'manual'>('manual');
+  const [submittingExchange, setSubmittingExchange] = useState(false);
+  const [exchangeMessage, setExchangeMessage] = useState('');
+  const [exchangeAmountError, setExchangeAmountError] = useState('');
   
   // Expanded booking IDs for collapsible rows
   const [expandedBookings, setExpandedBookings] = useState<Set<number>>(new Set());
@@ -51,7 +69,43 @@ function CEOFinancialCalendar() {
     fetchCashBox();
     fetchCheckedInCounts();
     fetchDayFinancials();
+    fetchWorkerNames();
+    fetchWorkerPayments();
   }, [currentDate]);
+
+  const fetchWorkerNames = async () => {
+    try {
+      const { data } = await supabase
+        .from('camp_finances')
+        .select('worker_name')
+        .eq('category', 'workers income')
+        .eq('team_id', user?.team_id)
+        .not('worker_name', 'is', null);
+      
+      const names = [...new Set(data?.map(r => r.worker_name).filter(Boolean) || [])].sort();
+      setWorkerNames(names);
+    } catch (error) {
+      console.error('Error fetching worker names:', error);
+    }
+  };
+
+  const fetchWorkerPayments = async () => {
+    setLoadingWorkerPayments(true);
+    try {
+      const { data } = await supabase
+        .from('camp_finances')
+        .select('*')
+        .eq('category', 'workers income')
+        .eq('team_id', user?.team_id)
+        .order('period_start', { ascending: false });
+      
+      setWorkerPayments(data || []);
+    } catch (error) {
+      console.error('Error fetching worker payments:', error);
+    } finally {
+      setLoadingWorkerPayments(false);
+    }
+  };
 
   const fetchCashBox = async () => {
     // Fetch cash payments from payments table
@@ -59,6 +113,12 @@ function CEOFinancialCalendar() {
     
     // Fetch income/expense from camp_finances
     const { data: financesData } = await supabase.from('camp_finances').select('*');
+    
+    // Fetch currency exchanges
+    const { data: exchangesData } = await supabase
+      .from('currency_exchanges')
+      .select('*')
+      .eq('team_id', user?.team_id);
     
     // Start with payments summary (sale adds, expense subtracts)
     const summary = paymentsData?.reduce((acc: any, p: any) => {
@@ -86,7 +146,20 @@ function CEOFinancialCalendar() {
       });
     }
     
+    // Add currency exchanges (subtract from_currency, add to UZS)
+    if (exchangesData) {
+      exchangesData.forEach((e: any) => {
+        const fromAmount = Number(e.from_amount) || 0;
+        const toAmount = Number(e.to_amount) || 0;
+        const fromCurrency = e.from_currency;
+        
+        summary[fromCurrency] = (summary[fromCurrency] || 0) - fromAmount;
+        summary['UZS'] = (summary['UZS'] || 0) + toAmount;
+      });
+    }
+    
     setCashBox(summary);
+    return summary;
   };
 
   const formatCurrency = (value: number) => {
@@ -97,6 +170,85 @@ function CEOFinancialCalendar() {
       return `${(value / 1000).toFixed(0)}K`;
     } else {
       return value.toFixed(0);
+    }
+  };
+
+  const handleFetchExchangeRate = async () => {
+    try {
+      const response = await fetch('/api/exchange-rate');
+      const data = await response.json();
+      
+      if (response.ok) {
+        setExchangeRate(data[exchangeFromCurrency].toString());
+        setExchangeRateSource('auto');
+        setExchangeMessage('');
+      } else {
+        setExchangeMessage(data.error || t('exchange.rate_fetch_error'));
+      }
+    } catch (error) {
+      setExchangeMessage(t('exchange.rate_fetch_error'));
+    }
+  };
+
+  const handleConfirmExchange = async () => {
+    if (!exchangeAmount.trim() || !exchangeRate.trim()) {
+      setExchangeMessage('Please fill in all fields');
+      return;
+    }
+    
+    const amount = parseFloat(exchangeAmount);
+    const rate = parseFloat(exchangeRate);
+    const toAmount = amount * rate;
+    
+    if (amount <= 0 || rate <= 0) {
+      setExchangeMessage('Amount and rate must be positive');
+      return;
+    }
+    
+    // Re-fetch cash box to get current balance (in case it changed since modal opened)
+    const freshBalance = await fetchCashBox();
+    
+    // Validate against current balance
+    const availableBalance = freshBalance[exchangeFromCurrency] || 0;
+    if (amount > availableBalance) {
+      setExchangeMessage(
+        t('exchange.insufficient_balance')
+          .replace('{amount}', availableBalance.toLocaleString())
+          .replace('{currency}', exchangeFromCurrency)
+      );
+      return;
+    }
+    
+    setSubmittingExchange(true);
+    setExchangeMessage('');
+    
+    try {
+      await supabase.from('currency_exchanges').insert({
+        team_id: user?.team_id,
+        from_currency: exchangeFromCurrency,
+        from_amount: amount,
+        to_currency: 'UZS',
+        to_amount: toAmount,
+        rate: rate,
+        rate_source: exchangeRateSource,
+        created_by: user?.id,
+      });
+      
+      setExchangeMessage(t('exchange.success'));
+      setExchangeModalOpen(false);
+      setExchangeAmount('');
+      setExchangeRate('');
+      setExchangeRateSource('manual');
+      setExchangeAmountError('');
+      
+      // Refresh cash box
+      fetchCashBox();
+      
+      setTimeout(() => setExchangeMessage(''), 3000);
+    } catch (error) {
+      setExchangeMessage('Error recording exchange');
+    } finally {
+      setSubmittingExchange(false);
     }
   };
 
@@ -323,10 +475,22 @@ function CEOFinancialCalendar() {
 
     try {
       // Validate worker name for workers income category
-      if (transactionType === 'expense' && transactionCategory === 'workers income' && !transactionWorkerName.trim()) {
+      const finalWorkerName = selectedWorkerOption === '__new__' ? newWorkerName : selectedWorkerOption;
+      if (transactionType === 'expense' && transactionCategory === 'workers income' && !finalWorkerName.trim()) {
         setTransactionMessage('Please enter a worker name for workers income');
         setSubmittingTransaction(false);
         return;
+      }
+
+      // Check for duplicate worker name (case-insensitive) only when adding new worker
+      if (transactionType === 'expense' && transactionCategory === 'workers income' && showNewWorkerInput && newWorkerName.trim()) {
+        const normalizedInput = newWorkerName.trim().toLowerCase();
+        const existingWorker = workerNames.find(name => name.toLowerCase() === normalizedInput);
+        if (existingWorker) {
+          setTransactionMessage('Bu ishchi allaqachon mavjud');
+          setSubmittingTransaction(false);
+          return;
+        }
       }
 
       const amountValue = parseFloat(transactionAmount);
@@ -347,7 +511,9 @@ function CEOFinancialCalendar() {
         exchange_rate: 1,
         amount_uzs: amountValue,
         description: transactionDescription,
-        worker_name: transactionType === 'expense' && transactionCategory === 'workers income' ? transactionWorkerName : null,
+        worker_name: transactionType === 'expense' && transactionCategory === 'workers income' ? finalWorkerName : null,
+        period_start: transactionType === 'expense' && transactionCategory === 'workers income' ? transactionPeriodStart : null,
+        period_end: transactionType === 'expense' && transactionCategory === 'workers income' ? transactionPeriodEnd : null,
         created_by: user.id,
         team_id: user?.team_id,
       });
@@ -361,6 +527,11 @@ function CEOFinancialCalendar() {
       setTransactionAmount('');
       setTransactionDescription('');
       setTransactionWorkerName('');
+      setSelectedWorkerOption('');
+      setNewWorkerName('');
+      setShowNewWorkerInput(false);
+      setTransactionPeriodStart('');
+      setTransactionPeriodEnd('');
       
       // Refresh day data
       const day = selectedDay.getDate();
@@ -431,10 +602,16 @@ function CEOFinancialCalendar() {
             <div className="p-2.5 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
               <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
             </div>
-            <div>
+            <div className="flex-1">
               <h2 className="text-sm font-bold uppercase tracking-widest">{t('msg.cash_box')}</h2>
               <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest mt-0.5">{t('msg.physical_drawer_contents')}</p>
             </div>
+            <button
+              onClick={() => setExchangeModalOpen(true)}
+              className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all border border-emerald-500/20"
+            >
+              {t('exchange.title')}
+            </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-8">
             <div className="space-y-1">
@@ -875,6 +1052,74 @@ function CEOFinancialCalendar() {
           </div>
         )}
 
+        {/* Worker Payments Section */}
+        <div className="mt-6 bg-[#1C232E] rounded-2xl shadow-xl border border-[#5C4A2E]/30 p-8">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-2xl font-black text-[#EDE6D6] font-heading">{t('txn.worker_payments_section')}</h3>
+            <button
+              onClick={() => router.push('/financials/workers')}
+              className="px-4 py-2 bg-[#0B6E4F] hover:bg-[#0B6E4F]/80 text-[#C9A227] rounded-xl text-xs font-black transition-all shadow-lg hover:shadow-[#0B6E4F]/20 active:scale-95"
+            >
+              {t('txn.view_all_workers')}
+            </button>
+          </div>
+          
+          {loadingWorkerPayments ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-8 h-8 border-4 border-[#0B6E4F] border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          ) : workerPayments.length === 0 ? (
+            <p className="text-[#9C9384] italic text-sm">No worker payments recorded</p>
+          ) : (
+            (() => {
+              const groupedByWorker = workerPayments.reduce((acc: any, payment: any) => {
+                const workerName = payment.worker_name || 'Unknown';
+                if (!acc[workerName]) {
+                  acc[workerName] = [];
+                }
+                acc[workerName].push(payment);
+                return acc;
+              }, {});
+
+              Object.keys(groupedByWorker).forEach(workerName => {
+                groupedByWorker[workerName].sort((a: any, b: any) => 
+                  new Date(b.period_start || '').getTime() - new Date(a.period_start || '').getTime()
+                );
+              });
+
+              return (
+                <div className="space-y-6">
+                  {Object.entries(groupedByWorker).map(([workerName, payments]: [string, any]) => (
+                    <div key={workerName} className="bg-[#0F1419] rounded-xl p-6 border border-[#5C4A2E]/30">
+                      <h4 className="text-lg font-black text-[#C9A227] mb-4">{workerName}</h4>
+                      <div className="space-y-3">
+                        {payments.map((payment: any) => (
+                          <div key={payment.id} className="flex justify-between items-center bg-[#1C232E] rounded-lg p-4 border border-[#5C4A2E]/20">
+                            <div>
+                              <p className="text-sm text-[#9C9384]">
+                                {payment.period_start && payment.period_end 
+                                  ? `${payment.period_start} – ${payment.period_end}`
+                                  : payment.period_start || payment.period_end || 'No period specified'
+                                }
+                              </p>
+                              <p className="text-xs text-[#5C4A2E] mt-1">{payment.transaction_date}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-black text-[#EDE6D6]">
+                                {payment.amount_uzs?.toLocaleString()} UZS
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()
+          )}
+        </div>
+
         {/* Slide-out Transaction Panel */}
         {slideOutOpen && (
           <div className="fixed inset-0 z-50" onClick={() => setSlideOutOpen(false)}>
@@ -961,15 +1206,62 @@ function CEOFinancialCalendar() {
                   {/* Worker Name - only for workers income */}
                   {transactionType === 'expense' && transactionCategory === 'workers income' && (
                     <div>
-                      <label className="block text-[10px] font-bold text-[#9C9384] uppercase tracking-widest mb-2">Worker Name</label>
-                      <input
-                        type="text"
-                        value={transactionWorkerName}
-                        onChange={(e) => setTransactionWorkerName(e.target.value)}
-                        placeholder="Enter worker name"
+                      <label className="block text-[10px] font-bold text-[#9C9384] uppercase tracking-widest mb-2">{t('txn.worker_name_label')}</label>
+                      <select
+                        value={selectedWorkerOption}
+                        onChange={(e) => {
+                          const newValue = e.target.value;
+                          setSelectedWorkerOption(newValue);
+                          setShowNewWorkerInput(newValue === '__new__');
+                          if (newValue !== '__new__') {
+                            setTransactionWorkerName(newValue);
+                          }
+                        }}
                         className="w-full px-3 py-2 border border-[#5C4A2E]/30 rounded-lg bg-[#0F1419] text-[#EDE6D6] text-sm focus:border-[#0B6E4F] focus:ring-1 focus:ring-[#0B6E4F]/20 transition-all"
                         required
-                      />
+                      >
+                        <option value="">{t('form.select_worker')}</option>
+                        {workerNames.map(name => (
+                          <option key={name} value={name}>{name}</option>
+                        ))}
+                        <option value="__new__">{t('txn.add_new_worker')}</option>
+                      </select>
+                      {showNewWorkerInput && (
+                        <div className="mt-3">
+                          <input
+                            type="text"
+                            value={newWorkerName}
+                            onChange={(e) => setNewWorkerName(e.target.value)}
+                            placeholder={t('form.enter_worker_name')}
+                            className="w-full px-3 py-2 border border-[#5C4A2E]/30 rounded-lg bg-[#0F1419] text-[#EDE6D6] text-sm focus:border-[#0B6E4F] focus:ring-1 focus:ring-[#0B6E4F]/20 transition-all"
+                            required
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Period Date Fields - only for workers income */}
+                  {transactionType === 'expense' && transactionCategory === 'workers income' && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-[#9C9384] uppercase tracking-widest mb-2">{t('txn.period_start_label')}</label>
+                        <input
+                          type="date"
+                          value={transactionPeriodStart}
+                          onChange={(e) => setTransactionPeriodStart(e.target.value)}
+                          className="w-full px-3 py-2 border border-[#5C4A2E]/30 rounded-lg bg-[#0F1419] text-[#EDE6D6] text-sm focus:border-[#0B6E4F] focus:ring-1 focus:ring-[#0B6E4F]/20 transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-[#9C9384] uppercase tracking-widest mb-2">{t('txn.period_end_label')}</label>
+                        <input
+                          type="date"
+                          value={transactionPeriodEnd}
+                          onChange={(e) => setTransactionPeriodEnd(e.target.value)}
+                          className="w-full px-3 py-2 border border-[#5C4A2E]/30 rounded-lg bg-[#0F1419] text-[#EDE6D6] text-sm focus:border-[#0B6E4F] focus:ring-1 focus:ring-[#0B6E4F]/20 transition-all"
+                        />
+                      </div>
                     </div>
                   )}
 
@@ -979,6 +1271,7 @@ function CEOFinancialCalendar() {
                     <input
                       type="number"
                       step="0.01"
+                      min="0.01"
                       value={transactionAmount}
                       onChange={(e) => setTransactionAmount(e.target.value)}
                       placeholder={t('form.enter_amount_uzs')}
@@ -1014,6 +1307,154 @@ function CEOFinancialCalendar() {
           </div>
         )}
       </main>
+
+      {/* Exchange Modal */}
+      {exchangeModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => setExchangeModalOpen(false)}>
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+          <div className="relative bg-zinc-950 rounded-xl shadow-2xl w-full max-w-md p-8 animate-in zoom-in-95 duration-200 border border-white/5" onClick={e => e.stopPropagation()}>
+            <h2 className="text-xl font-black text-white mb-6">{t('exchange.title')}</h2>
+            
+            {exchangeMessage && (
+              <div className={`mb-4 p-3 rounded-lg text-sm ${
+                exchangeMessage.includes('Error') || exchangeMessage.includes('Could not') || exchangeMessage.includes('please')
+                  ? 'bg-red-500/10 text-red-500 border border-red-500/20'
+                  : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+              }`}>
+                {exchangeMessage}
+              </div>
+            )}
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">{t('exchange.from_currency')}</label>
+                <select
+                  value={exchangeFromCurrency}
+                  onChange={(e) => {
+                    setExchangeFromCurrency(e.target.value as 'USD' | 'EUR');
+                    setExchangeRate('');
+                    setExchangeRateSource('manual');
+                    setExchangeAmountError('');
+                    // Re-validate amount if it exists
+                    if (exchangeAmount) {
+                      const amount = parseFloat(exchangeAmount);
+                      const newAvailableBalance = cashBox[e.target.value as 'USD' | 'EUR'] || 0;
+                      if (amount > newAvailableBalance) {
+                        setExchangeAmountError(
+                          t('exchange.insufficient_balance')
+                            .replace('{amount}', newAvailableBalance.toLocaleString())
+                            .replace('{currency}', e.target.value)
+                        );
+                      }
+                    }
+                  }}
+                  className="w-full px-4 py-3 border border-white/10 rounded-lg bg-zinc-900 text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition-all"
+                >
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">{t('exchange.amount')}</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={exchangeAmount}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setExchangeAmount(value);
+                    
+                    // Validate against current balance
+                    if (value) {
+                      const amount = parseFloat(value);
+                      const availableBalance = cashBox[exchangeFromCurrency] || 0;
+                      if (amount > availableBalance) {
+                        setExchangeAmountError(
+                          t('exchange.insufficient_balance')
+                            .replace('{amount}', availableBalance.toLocaleString())
+                            .replace('{currency}', exchangeFromCurrency)
+                        );
+                      } else {
+                        setExchangeAmountError('');
+                      }
+                    } else {
+                      setExchangeAmountError('');
+                    }
+                  }}
+                  placeholder="0.00"
+                  className={`w-full px-4 py-3 border rounded-lg bg-zinc-900 text-white focus:ring-1 transition-all ${
+                    exchangeAmountError 
+                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
+                      : 'border-white/10 focus:border-emerald-500 focus:ring-emerald-500/20'
+                  }`}
+                />
+                {exchangeAmountError && (
+                  <p className="mt-1 text-xs text-red-500">{exchangeAmountError}</p>
+                )}
+              </div>
+              
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">{t('exchange.rate')}</label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={exchangeRate}
+                    onChange={(e) => {
+                      setExchangeRate(e.target.value);
+                      setExchangeRateSource('manual');
+                    }}
+                    placeholder="0.00"
+                    className="flex-1 px-4 py-3 border border-white/10 rounded-lg bg-zinc-900 text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleFetchExchangeRate}
+                    className="px-4 py-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 rounded-lg text-xs font-bold uppercase tracking-widest transition-all border border-emerald-500/20 whitespace-nowrap"
+                  >
+                    {t('exchange.get_current_rate')}
+                  </button>
+                </div>
+              </div>
+              
+              <div className="bg-zinc-900 rounded-lg p-4 border border-white/5">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{t('exchange.result')}</p>
+                <p className="text-2xl font-bold text-emerald-500">
+                  {exchangeAmount && exchangeRate 
+                    ? (parseFloat(exchangeAmount) * parseFloat(exchangeRate)).toLocaleString('uz-UZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) 
+                    : '0.00'}
+                  {' UZS'}
+                </p>
+              </div>
+              
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => {
+                    setExchangeModalOpen(false);
+                    setExchangeAmount('');
+                    setExchangeRate('');
+                    setExchangeRateSource('manual');
+                    setExchangeMessage('');
+                  }}
+                  className="flex-1 py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg font-bold uppercase tracking-widest text-xs transition-all"
+                >
+                  {t('exchange.cancel')}
+                </button>
+                <button
+                  onClick={handleConfirmExchange}
+                  disabled={submittingExchange || !exchangeAmount.trim() || !exchangeRate.trim() || !!exchangeAmountError}
+                  className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-bold uppercase tracking-widest text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {submittingExchange ? 'Processing...' : t('exchange.confirm')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
