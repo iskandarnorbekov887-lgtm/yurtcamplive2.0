@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { useRouter } from 'next/navigation';
+import { CEOFinancialAnalytics } from '@/components/CEOFinancialAnalytics';
 
 export default function CEOFinancialsPage() {
   return (
@@ -24,6 +25,7 @@ function CEOFinancialCalendar() {
   const router = useRouter();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [activeView, setActiveView] = useState<'calendar' | 'analytics'>('calendar');
   const [dayFinances, setDayFinances] = useState<Finance[]>([]);
   const [dayBookings, setDayBookings] = useState<Booking[]>([]);
   const [dayReceipts, setDayReceipts] = useState<any[]>([]);
@@ -581,6 +583,28 @@ function CEOFinancialCalendar() {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            <div className="flex bg-[#1C232E]/20 rounded-lg p-1 border border-[#5C4A2E]/30 backdrop-blur-sm">
+              <button
+                onClick={() => setActiveView('calendar')}
+                className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
+                  activeView === 'calendar'
+                    ? 'bg-[#0B6E4F] text-[#C9A227]'
+                    : 'text-[#9C9384] hover:text-[#EDE6D6]'
+                }`}
+              >
+                Calendar
+              </button>
+              <button
+                onClick={() => setActiveView('analytics')}
+                className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
+                  activeView === 'analytics'
+                    ? 'bg-[#0B6E4F] text-[#C9A227]'
+                    : 'text-[#9C9384] hover:text-[#EDE6D6]'
+                }`}
+              >
+                Analytics
+              </button>
+            </div>
             <LanguageSwitcher variant="dark" />
             <button
               onClick={signOut}
@@ -595,7 +619,7 @@ function CEOFinancialCalendar() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto p-6 space-y-6">
+      <main className="max-w-7xl mx-auto p-6 space-y-6">
         {/* Cash Box Summary */}
         <div className="bg-zinc-950 rounded-xl p-8 text-white shadow-lg border border-white/5">
           <div className="flex items-center gap-3 mb-8">
@@ -629,6 +653,8 @@ function CEOFinancialCalendar() {
           </div>
         </div>
 
+        {activeView === 'calendar' ? (
+          <>
         <div className="bg-[#1C232E] rounded-lg border border-[#5C4A2E]/30 shadow-sm p-8">
           <div className="flex justify-between items-center mb-10">
             <button
@@ -1305,6 +1331,10 @@ function CEOFinancialCalendar() {
               </div>
             </div>
           </div>
+        )}
+          </>
+        ) : (
+          <CEOFinancialAnalytics />
         )}
       </main>
 
