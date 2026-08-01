@@ -2467,6 +2467,11 @@ export function BookingModal(props: BookingModalProps) {
                                       className={`w-full ${pay.currency === 'UZS' ? 'pl-11' : 'pl-8'} pr-4 py-4 bg-[#1C232E] border-2 border-[#2A2F36] rounded-3xl text-xl font-black text-[#EDE6D6] focus:border-[#0B6E4F] shadow-md`}
                                     />
                                   </div>
+                                  {pay.currency !== 'USD' && pay.amount && (
+                                    <div className="col-span-12 text-[10px] font-mono text-[#0B6E4F] bg-[#0B6E4F]/10 px-3 py-2 rounded-lg border border-[#0B6E4F]/20">
+                                      {parseFloat(pay.amount).toLocaleString()} {pay.currency} ≈ ${((parseFloat(pay.amount) || 0) / currentRate).toFixed(2)} (rate: {currentRate.toLocaleString()})
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </div>

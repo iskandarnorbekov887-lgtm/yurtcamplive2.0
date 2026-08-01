@@ -1129,7 +1129,18 @@ export function GoogleGuestAgenda({
           discount: svcDiscount > 0 ? { amount: svcDiscount, reason: svcDiscountReason } : null
         },
         total: receiptTotals.grandTotal,
-        payments: receiptTotals.grandTotal === 0 ? [] : svcPayList.filter(p => parseFloat(p.amount) !== 0)
+        payments: receiptTotals.grandTotal === 0 ? [] : svcPayList.filter(p => parseFloat(p.amount) !== 0).map((p: any) => {
+          const amt = parseFloat(p.amount) || 0;
+          const defaultRate = p.currency === 'USD' ? 1 : (p.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92));
+          const usdEquiv = p.currency === 'USD' ? amt : (amt / defaultRate);
+          return {
+            amount_original: amt,
+            currency_original: p.currency,
+            method: p.method,
+            exchange_rate_used: defaultRate,
+            amount_usd_equivalent: usdEquiv
+          };
+        })
       };
 
       // ── Pre-insert duplicate check ──
@@ -1159,8 +1170,35 @@ export function GoogleGuestAgenda({
       for (const p of svcPayList) {
         const amt = parseFloat(p.amount) || 0;
         if (amt === 0) continue;
-        const rate = p.currency === 'USD' ? 1 : (p.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92));
-        const usdEquiv = p.currency === 'USD' ? amt : (amt / rate);
+        
+        // Calculate exchange rate: use default from pricing, or back-calculate if amount exactly matches owed USD
+        const defaultRate = p.currency === 'USD' ? 1 : (p.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92));
+        const usdEquivDefault = p.currency === 'USD' ? amt : (amt / defaultRate);
+        
+        // If the USD equivalent matches what's owed (within small tolerance), back-calculate the exact rate
+        let rate = defaultRate;
+        let usdEquiv = usdEquivDefault;
+        
+        // Calculate what this payment row is covering in USD
+        const otherRowsPaidUsd = svcPayList
+          .filter((_: any, idx: number) => _ !== p)
+          .reduce((sum: number, other: any) => {
+            const otherAmt = parseFloat(other.amount) || 0;
+            const otherRate = other.currency === 'USD' ? 1 : (other.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92));
+            return sum + (other.currency === 'USD' ? otherAmt : (otherAmt / otherRate));
+          }, 0);
+        const stillOwedUsd = debtRemaining - otherRowsPaidUsd;
+        
+        // If the entered amount is very close to what would exactly settle the remaining balance, back-calculate rate
+        if (p.currency !== 'USD' && stillOwedUsd > 0) {
+          const expectedAmt = stillOwedUsd * defaultRate;
+          const tolerance = 0.01; // 1% tolerance
+          if (Math.abs(amt - expectedAmt) / expectedAmt < tolerance) {
+            rate = amt / stillOwedUsd;
+            usdEquiv = stillOwedUsd;
+          }
+        }
+        
         const { error: payErr } = await supabase.from('payments').insert({
           booking_id: sel.id,
           amount_original: amt,
