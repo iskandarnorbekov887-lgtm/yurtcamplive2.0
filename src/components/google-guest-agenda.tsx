@@ -1149,44 +1149,64 @@ export function GoogleGuestAgenda({
       }
 
       // ── STEP 4: Record payments in payments table ──
+      const paidFor: string[] = [];
+      if (svcAmount > 0) paidFor.push('Accommodation');
+      if (lunchCharged > 0) paidFor.push('Lunch');
+      if (dinnerCharged > 0) paidFor.push('Dinner');
+      if (Object.keys(snapshot.items.services).length > 0) paidFor.push('Services');
+      const itemSummary = paidFor.length > 0 ? paidFor.join(' + ') : 'Booking payment';
+
       for (const p of svcPayList) {
         const amt = parseFloat(p.amount) || 0;
         if (amt === 0) continue;
         const rate = p.currency === 'USD' ? 1 : (p.currency === 'UZS' ? (pricing?.usd_to_uzs || 12500) : (pricing?.usd_to_eur || 0.92));
         const usdEquiv = p.currency === 'USD' ? amt : (amt / rate);
-        await supabase.from('payments').insert({
+        const { error: payErr } = await supabase.from('payments').insert({
           booking_id: sel.id,
           amount_original: amt,
           currency_original: p.currency,
           method: p.method,
           exchange_rate_used: rate,
           amount_usd_equivalent: usdEquiv,
-          note: `Receipt #${receiptId}`
+          note: `${itemSummary} — Receipt #${receiptId}`
         });
+        if (payErr) {
+          console.error('[finalizeTab] Payment insert failed:', payErr);
+          flash('⚠ Payment failed to save. Please check the transaction and retry.');
+          finalizingRef.current = false;
+          setLoadingAction('');
+          return false;
+        }
       }
 
       // ── STEP 5: Archive receipt ──
       try {
-        await supabase.from('booking_receipts').insert({
+        const { error: receiptErr } = await supabase.from('booking_receipts').insert({
           booking_id: sel.id,
           receipt_id: receiptId,
           snapshot,
-          total_usd: realTotal, // Use real total for revenue/statistics
+          total_usd: realTotal,
           settled_at: sel.check_out?.split('T')[0],
         });
-        // Optimistic add — show immediately without refresh
-        setSettledReceipts(prev => [{
-          id: receiptId,
-          receipt_id: receiptId,
-          date: snapshot.date || now.toISOString(),
-          settled_at: snapshot.settled_at || now.toISOString(),
-          items: snapshot.items,
-          total: receiptTotals.grandTotal,
-          total_usd: realTotal,
-          payments: snapshot.payments,
-          snapshot,
-        }, ...prev]);
-      } catch {}
+        if (receiptErr) {
+          console.error('[finalizeTab] Receipt archive failed:', receiptErr);
+        } else {
+          // Optimistic add — show immediately without refresh
+          setSettledReceipts(prev => [{
+            id: receiptId,
+            receipt_id: receiptId,
+            date: snapshot.date || now.toISOString(),
+            settled_at: snapshot.settled_at || now.toISOString(),
+            items: snapshot.items,
+            total: receiptTotals.grandTotal,
+            total_usd: realTotal,
+            payments: snapshot.payments,
+            snapshot,
+          }, ...prev]);
+        }
+      } catch (e) {
+        console.error('[finalizeTab] Receipt archive threw:', e);
+      }
 
       // ── STEP 6: Flip meal_requests to Paid (Single Source of Truth) ──
       if (mealIds.length > 0) {
