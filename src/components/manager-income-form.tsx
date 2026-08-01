@@ -138,15 +138,14 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
           await supabase.from('booking_receipts').insert([{
             booking_id: bookingData.id,
             receipt_id: `RCP-${bookingData.id}-${Date.now()}`,
-            amount: price,
-            currency: 'UZS',
-            total_usd: price / 12500, // Safe generic fallback for USD equivalent
-            settled_at: bookingData.check_out?.split('T')[0],
-            created_by: currentUserId,
-            snapshot: { 
+            total_usd: price / 12500,
+            snapshot: {
               note: mainCategory === 'pool' ? 'Instant Pool Payment' : `Local ${localType} payment`,
-              payment_method: paymentMethod
-            }
+              payment_method: paymentMethod,
+              amount_original: price,
+              currency_original: 'UZS',
+              created_by: currentUserId,
+            },
           }]);
           
           await supabase.from('payments').insert({

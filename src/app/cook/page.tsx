@@ -156,7 +156,7 @@ function CookPortal() {
   const handleAddDrink = async (drink: any) => {
     if (!selectedBooking) return;
     try {
-      const currentTab = selectedBooking.drinks_tab || [];
+      const currentTab = selectedBooking.meta?.drinks_tab || [];
       const nextTab = [...currentTab, { 
         drink_id: drink.id, 
         drink_name: drink.name, 
@@ -165,19 +165,13 @@ function CookPortal() {
         currency: drink.currency 
       }];
       
-      const payloadToSave = { drinks_tab: nextTab } as any;
-      delete payloadToSave.meta;
-
-
-
-
-
+      const payloadToSave = { meta: { ...(selectedBooking.meta || {}), drinks_tab: nextTab } } as any;
 
       delete payloadToSave.last_edited_by_id;
       delete payloadToSave.days;
       await supabase.from('bookings').update(payloadToSave).eq('id', selectedBooking.id);
       
-      setSelectedBooking({ ...selectedBooking, drinks_tab: nextTab });
+      setSelectedBooking({ ...selectedBooking, meta: { ...selectedBooking.meta, drinks_tab: nextTab } });
       fetchData();
     } catch (err) {
       console.error('Add drink failed:', err);
@@ -508,9 +502,9 @@ function CookPortal() {
                     </div>
                   ) : (
                     <div className="bg-[#1C232E]/50 rounded-lg p-4 border border-[#5C4A2E]/30">
-                      {selectedBooking.drinks_tab && (selectedBooking.drinks_tab as any[]).length > 0 ? (
+                      {selectedBooking.meta?.drinks_tab && (selectedBooking.meta?.drinks_tab as any[]).length > 0 ? (
                         <div className="space-y-2">
-                          {(selectedBooking.drinks_tab as any[]).map((item: any, i: number) => (
+                          {(selectedBooking.meta?.drinks_tab as any[]).map((item: any, i: number) => (
                             <div key={i} className="flex justify-between items-center text-sm">
                               <span className="text-[#EDE6D6]">{item.drink_name}</span>
                               <span className="font-data text-[#EDE6D6]">x{item.quantity}</span>

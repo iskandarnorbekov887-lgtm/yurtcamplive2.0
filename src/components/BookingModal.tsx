@@ -1302,7 +1302,7 @@ export function BookingModal(props: BookingModalProps) {
                               // Update bookings table with default_vegetarian_qty
                               await supabase
                                 .from('bookings')
-                                .update({ default_vegetarian_qty: mealRequestAdultVegQty + mealRequestChildVegQty })
+                                .update({ meta: { ...(sel?.meta || {}), default_vegetarian_qty: mealRequestAdultVegQty + mealRequestChildVegQty } })
                                 .eq('id', sel.id);
 
                               // If this is Lunch, auto-apply the same vegetarian count to Dinner on the same day

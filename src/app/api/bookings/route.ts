@@ -129,12 +129,13 @@ export async function POST(request: NextRequest) {
         await supabase.from('booking_receipts').insert([{
           booking_id: booking.id,
           receipt_id: `RCP-${booking.id}-${Date.now()}`,
-          amount,
-          currency,
-          total_usd: amount / 12500, // Safe generic fallback for USD equivalent
-          settled_at: booking.check_out?.split('T')[0],
-          created_by,
-          snapshot: { note: guest_category === 'pool' ? 'Instant Pool Payment' : `Local ${local_stay_type} payment` },
+          total_usd: amount / 12500,
+          snapshot: {
+            note: guest_category === 'pool' ? 'Instant Pool Payment' : `Local ${local_stay_type} payment`,
+            amount_original: amount,
+            currency_original: currency,
+            created_by,
+          },
         }]);
       } catch (e) {
         console.error('Failed to create booking receipt:', e);

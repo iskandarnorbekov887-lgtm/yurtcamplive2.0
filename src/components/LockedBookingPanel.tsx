@@ -162,7 +162,7 @@ function ExtendStayForm({ booking, currentUserId, onSuccess, onCancel }: ExtendS
         .update({
           check_out: newCheckOut,
           total_price: (booking.total_price || 0) + amount,
-          is_manually_updated: true,
+          meta: { ...(booking.meta || {}), is_manually_updated: true },
         })
         .eq('id', booking.id);
       if (bookErr) throw bookErr;
