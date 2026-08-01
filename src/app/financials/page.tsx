@@ -143,8 +143,8 @@ function ManagerFinancials() {
       const { data, error } = await supabase
         .from('payments')
         .select('*')
-        .gte('created_at', start)
-        .lt('created_at', end);
+        .gte('transaction_date', start.split('T')[0])
+        .lt('transaction_date', end.split('T')[0]);
 
       if (error) throw error;
       setAllPayments(data || []);
@@ -326,8 +326,7 @@ function ManagerFinancials() {
       const { data: paymentsData, error: paymentsError } = await supabase
         .from('payments')
         .select('*')
-        .gte('created_at', `${dateStr}T00:00:00`)
-        .lte('created_at', `${dateStr}T23:59:59`);
+        .eq('transaction_date', dateStr);
 
       // Combine and format transactions
       const combinedTransactions: any[] = [];
@@ -372,8 +371,20 @@ function ManagerFinancials() {
             created_at: item.created_at,
             source: 'payment_restock'
           });
+        } else if (item.type === 'sale' && item.booking_id) {
+          // Booking tab payment (accommodation/food/services)
+          combinedTransactions.push({
+            id: item.id,
+            type: 'income',
+            category: 'Booking Payment',
+            description: item.note || 'Tab payment',
+            amount: item.amount_original,
+            currency: item.currency_original,
+            created_at: item.created_at,
+            source: 'booking_payment'
+          });
         } else if (item.type === 'sale') {
-          // Drink sale (POS)
+          // Drink sale (POS) — booking_id is null for true walk-in sales
           combinedTransactions.push({
             id: item.id,
             type: 'income',
@@ -1566,8 +1577,8 @@ function ManagerFinancials() {
                 for (let day = 1; day <= totalDays; day++) {
                   const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                   const dayFinances = recentExpenses.filter(f => f.date === dateStr);
-                  // Payments for this day (date portion of created_at)
-                  const dayPayments = allPayments.filter(p => p.created_at?.slice(0, 10) === dateStr);
+                  // Payments for this day (date portion of transaction_date)
+                  const dayPayments = allPayments.filter(p => p.transaction_date === dateStr);
                   const finIncome = dayFinances.filter(f => f.type === 'income').reduce((sum, f) => sum + f.amount_uzs, 0);
                   const finExpense = dayFinances.filter(f => f.type === 'expense').reduce((sum, f) => sum + f.amount_uzs, 0);
                   const payIncome = dayPayments.filter(p => p.type === 'sale').reduce((sum, p) => sum + Number(p.amount_original), 0);

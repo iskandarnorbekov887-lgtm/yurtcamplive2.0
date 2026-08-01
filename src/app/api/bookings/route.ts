@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       status: isFinancial ? 'completed' : 'checked_in',
       source: is_system_only ? 'System' : 'manual',
       total_price: isFinancial ? amount : 0,
-      payment_status: isFinancial ? 'paid' : 'Unpaid',
+      payment_status: isFinancial ? 'paid' : 'unpaid',
       currency,
       exchange_rate: currency === 'UZS' ? 1 : (currency === 'USD' ? 1 : await fetchUsdToEur()),
       created_by,
@@ -114,10 +114,7 @@ export async function POST(request: NextRequest) {
     };
 
     // Purge room-related fields for Local/Pool/Financials
-    if (isFinancial) {
-      payload.collected_amount = amount;
-      payload.collected_currency = currency;
-    }
+    // collected_amount is now computed by database trigger from payments table
 
     const { data: booking, error } = await supabase
       .from('bookings')

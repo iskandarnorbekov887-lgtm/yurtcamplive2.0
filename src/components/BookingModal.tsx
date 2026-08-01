@@ -387,12 +387,7 @@ export function BookingModal(props: BookingModalProps) {
         data.number_of_children = svcChildren;
       }
 
-      // 3. Keep payment logic synchronized - prepaid should NOT add to collected_amount
-      // collected_amount is for manager-collected cash only, not office-prepaid amounts
-      if (!isPrepaid && svcAmount > 0) {
-        data.collected_amount = (sel.collected_amount || 0) + svcAmount;
-        data.collected_currency = 'USD';
-      }
+      // 3. collected_amount is now computed by database trigger from payments table
 
       // 4. Manual Protection Rule
       if (sel.google_event_id || sel.source === 'System' || sel.source === 'office') {

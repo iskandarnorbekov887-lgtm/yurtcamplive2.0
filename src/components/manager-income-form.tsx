@@ -103,7 +103,7 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
         status: isFinancial ? 'completed' : 'checked_in', // Local (Day/Night) and Pool are instant-completed
         source: 'manual',
         total_price: price, // Unified Financial Fix
-        payment_status: isFinancial ? 'paid' : 'Unpaid',
+        payment_status: isFinancial ? 'paid' : 'unpaid',
         currency: 'UZS',
         exchange_rate: 1,
         created_by: currentUserId,

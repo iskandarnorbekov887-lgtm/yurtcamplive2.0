@@ -271,8 +271,8 @@ function CEOFinancialCalendar() {
       const { data: paymentsData } = await supabase
         .from('payments')
         .select('*')
-        .gte('created_at', `${year}-${String(month + 1).padStart(2, '0')}-01T00:00:00`)
-        .lte('created_at', `${year}-${String(month + 1).padStart(2, '0')}-${daysInMonth}T23:59:59`);
+        .gte('transaction_date', `${year}-${String(month + 1).padStart(2, '0')}-01`)
+        .lte('transaction_date', `${year}-${String(month + 1).padStart(2, '0')}-${daysInMonth}`);
 
       const financialsByDay: Record<string, { netIncome: number; netExpense: number; netProfit: number }> = {};
 
@@ -297,7 +297,7 @@ function CEOFinancialCalendar() {
 
       // Process payments
       (paymentsData || []).forEach((item: any) => {
-        const dateStr = item.created_at?.split('T')[0];
+        const dateStr = item.transaction_date || item.created_at?.split('T')[0];
         if (financialsByDay[dateStr]) {
           const amount = Number(item.amount_original) || 0;
           // Only include UZS payments for net profit calculation
@@ -415,8 +415,7 @@ function CEOFinancialCalendar() {
       const { data: payments } = await supabase
         .from('payments')
         .select('*')
-        .gte('created_at', `${dateStr}T00:00:00`)
-        .lte('created_at', `${dateStr}T23:59:59`)
+        .eq('transaction_date', dateStr)
         .order('created_at', { ascending: false });
 
       // Fetch receipts for this day (revenue from settled tabs)
@@ -1060,6 +1059,7 @@ function CEOFinancialCalendar() {
                               <p className="font-bold text-[#EDE6D6] text-xs">
                                 {payment.exchange_id ? 'Currency Exchange' : 
                                  payment.note?.startsWith('Stock purchase:') ? 'Stock Purchase' :
+                                 payment.type === 'sale' && payment.booking_id ? 'Booking Payment' :
                                  payment.type === 'sale' ? 'POS Sale' : 'Payment'}
                               </p>
                               <p className="text-[10px] text-[#9C9384] mt-1">{payment.note || payment.method}</p>

@@ -28,7 +28,7 @@ export function UnifiedFolio({ booking, pricing }: UnifiedFolioProps) {
 
   const totalBill = accommodationBase + mealsBill;
   const liveTab = totalBill - collected;
-  const isPrepaid = booking.payment_status === 'Prepaid';
+  const isPrepaid = booking.payment_status === 'paid';
 
   return (
     <div className="bg-[#1C232E] border border-[#5C4A2E]/30 p-6 shadow-[4px_4px_0px_0px_rgba(92,74,46,0.3)] animate-in fade-in duration-300">

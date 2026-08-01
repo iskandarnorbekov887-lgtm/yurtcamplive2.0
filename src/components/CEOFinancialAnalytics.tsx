@@ -97,8 +97,8 @@ export function CEOFinancialAnalytics() {
     const { data: paymentsData } = await supabase
       .from('payments')
       .select('*')
-      .gte('created_at', `${year}-${String(month + 1).padStart(2, '0')}-01T00:00:00`)
-      .lte('created_at', `${year}-${String(month + 1).padStart(2, '0')}-${daysInMonth}T23:59:59`);
+      .gte('transaction_date', `${year}-${String(month + 1).padStart(2, '0')}-01`)
+      .lte('transaction_date', `${year}-${String(month + 1).padStart(2, '0')}-${daysInMonth}`);
 
     // Fetch bookings for the month
     const { data: bookingsData } = await supabase
@@ -132,7 +132,7 @@ export function CEOFinancialAnalytics() {
 
       // Process payments (UZS only)
       (paymentsData || []).forEach((item: any) => {
-        const itemDateStr = item.created_at?.split('T')[0];
+        const itemDateStr = item.transaction_date || item.created_at?.split('T')[0];
         if (itemDateStr === dateStr && item.currency_original === 'UZS') {
           const amount = Number(item.amount_original) || 0;
           if (item.type === 'sale') {
@@ -185,8 +185,8 @@ export function CEOFinancialAnalytics() {
     const { data: paymentsData } = await supabase
       .from('payments')
       .select('*')
-      .gte('created_at', `${year}-${String(month + 1).padStart(2, '0')}-01T00:00:00`)
-      .lte('created_at', `${year}-${String(month + 1).padStart(2, '0')}-${daysInMonth}T23:59:59`);
+      .gte('transaction_date', `${year}-${String(month + 1).padStart(2, '0')}-01`)
+      .lte('transaction_date', `${year}-${String(month + 1).padStart(2, '0')}-${daysInMonth}`);
 
     const { data: bookingsData } = await supabase
       .from('bookings')
@@ -230,7 +230,7 @@ export function CEOFinancialAnalytics() {
 
       // Process payments for this day
       (paymentsData || []).forEach((item: any) => {
-        const itemDateStr = item.created_at?.split('T')[0];
+        const itemDateStr = item.transaction_date || item.created_at?.split('T')[0];
         if (itemDateStr === dateStr && item.currency_original === 'UZS') {
           const amount = Number(item.amount_original) || 0;
           if (item.type === 'sale') {
@@ -276,8 +276,8 @@ export function CEOFinancialAnalytics() {
     const { data: paymentsData } = await supabase
       .from('payments')
       .select('*')
-      .gte('created_at', `${year}-01-01T00:00:00`)
-      .lte('created_at', `${year}-12-31T23:59:59`);
+      .gte('transaction_date', `${year}-01-01`)
+      .lte('transaction_date', `${year}-12-31`);
 
     const { data: bookingsData } = await supabase
       .from('bookings')
@@ -317,7 +317,7 @@ export function CEOFinancialAnalytics() {
 
     // Process payments
     (paymentsData || []).forEach((item: any) => {
-      const itemDate = new Date(item.created_at);
+      const itemDate = new Date(item.transaction_date || item.created_at);
       if (itemDate.getFullYear() === year && item.currency_original === 'UZS') {
         const monthKey = monthNames[itemDate.getMonth()];
         const amount = Number(item.amount_original) || 0;
@@ -362,7 +362,7 @@ export function CEOFinancialAnalytics() {
     const { data: paymentsData } = await supabase
       .from('payments')
       .select('*')
-      .order('created_at', { ascending: true });
+      .order('transaction_date', { ascending: true });
 
     const { data: bookingsData } = await supabase
       .from('bookings')
@@ -398,7 +398,7 @@ export function CEOFinancialAnalytics() {
 
     // Process payments
     (paymentsData || []).forEach((item: any) => {
-      const itemDate = new Date(item.created_at);
+      const itemDate = new Date(item.transaction_date || item.created_at);
       const yearKey = itemDate.getFullYear().toString();
       
       if (!yearlyData[yearKey]) {

@@ -616,7 +616,7 @@ export function GoogleGuestAgenda({
                         {String(booking.status).replace('_', ' ')}
                       </span>
                       {(() => {
-                        const isPrepaid = booking.payment_status === 'Prepaid';
+                        const isPrepaid = booking.payment_status === 'paid';
                         const accommodation = booking.total_price || 0;
                         // collected defined below
                         const mealPrice = pricing?.lunch_price || 10;
@@ -758,7 +758,7 @@ export function GoogleGuestAgenda({
         number_of_adults: adults,
         number_of_children: children,
         guest_count_confirmed: true,
-        payment_status: 'Unpaid',
+        payment_status: 'unpaid',
         approved_by_manager: true,
         created_by: String(currentUserId),
         team_id: teamId,
@@ -914,7 +914,7 @@ export function GoogleGuestAgenda({
 
       // Calculate initial total for payment line
       const initialGTotal = Math.max(0, 
-        (b.payment_status === 'Prepaid' || b.is_accommodation_prepaid ? 0 : stayPrice)
+        (b.payment_status === 'paid' || b.is_accommodation_prepaid ? 0 : stayPrice)
       );
 
       setSvcPayList([{ 
@@ -1262,12 +1262,10 @@ export function GoogleGuestAgenda({
       }
 
       const updates = {
-        collected_amount: calculatedIsPrepaid ? (sel.collected_amount || 0) : Math.max(0, totalPaidUsd),
         total_price: hasSettled ? ((sel.total_price || 0) + svcDateAdjustment) : (svcAmount + svcDateAdjustment),
-        payment_status: (gTotal === 0) || calculatedIsPrepaid ? 'Prepaid' : 'Paid',
         payment_method: svcPayList.length > 0 ? svcPayList[svcPayList.length - 1].method : 'Cash',
         is_accommodation_prepaid: isPrepaid,
-
+        // collected_amount, payment_status, and is_prepaid are now computed by database triggers
         meta: updatedMeta
       };
       

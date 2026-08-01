@@ -58,6 +58,15 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Record individual payments
+    const items = tab_data.items || {};
+    const paidFor: string[] = [];
+    if (items.accommodation) paidFor.push('Accommodation');
+    if (items.meals && Object.keys(items.meals).length > 0) paidFor.push('Food');
+    if (items.services && Object.keys(items.services).length > 0) paidFor.push('Services');
+    if (items.extras && items.extras.length > 0) paidFor.push('Extras');
+    if (items.drinks && items.drinks.length > 0) paidFor.push('Drinks');
+    const paymentNote = `Tab close — ${paidFor.length > 0 ? paidFor.join(' + ') : 'Booking payment'} (Booking #${booking_id})`;
+
     const payments = (tab_data.payments || []).map((p: any) => ({
       booking_id,
       amount_original: parseFloat(p.amount) || 0,
@@ -67,6 +76,7 @@ export async function POST(request: NextRequest) {
         : (parseFloat(p.amount) || 0) / (p.rate || (p.currency === 'UZS' ? 12500 : 0.92)),
       exchange_rate_used: p.rate || (p.currency === 'UZS' ? 12500 : 0.92),
       method: p.method || 'Cash',
+      note: paymentNote,
       created_at: new Date().toISOString(),
     }));
 
@@ -74,6 +84,10 @@ export async function POST(request: NextRequest) {
       const { error: payErr } = await supabase.from('payments').insert(payments);
       if (payErr) {
         console.error('Payments insert error:', payErr);
+        return NextResponse.json(
+          { error: `Payment failed to save: ${payErr.message}. Tab was not finalized — please retry.` },
+          { status: 500 }
+        );
       }
     }
 
@@ -88,7 +102,6 @@ export async function POST(request: NextRequest) {
     const updates: Record<string, any> = {
       is_manually_updated: true,
       total_price: (booking.total_price || 0) + (tab_data.total || 0),
-      collected_amount: (booking.collected_amount || 0) + totalPaid,
       last_edited_at: new Date().toISOString(),
     };
 
