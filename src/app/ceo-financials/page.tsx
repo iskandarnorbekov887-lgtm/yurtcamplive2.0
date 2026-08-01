@@ -422,7 +422,8 @@ function CEOFinancialCalendar() {
       const { data: receipts } = await supabase
         .from('booking_receipts')
         .select('*')
-        .eq('settled_at', dateStr)
+        .gte('created_at', `${dateStr}T00:00:00`)
+        .lt('created_at', `${dateStr}T23:59:59.999`)
         .order('created_at', { ascending: false });
 
       // Fetch all bookings that have receipts for this day (to get guest names)
@@ -780,7 +781,7 @@ function CEOFinancialCalendar() {
                         const currencyTotals: Record<string, number> = {};
                         dayReceipts.forEach(receipt => {
                           receipt.snapshot?.payments?.forEach((payment: any) => {
-                            currencyTotals[payment.currency] = (currencyTotals[payment.currency] || 0) + payment.amount;
+                            currencyTotals[payment.currency_original] = (currencyTotals[payment.currency_original] || 0) + payment.amount_original;
                           });
                         });
                         dayIncome.forEach(income => {
@@ -804,9 +805,10 @@ function CEOFinancialCalendar() {
                       <p className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest mb-1">{t('msg.uzs_collected_today')}</p>
                       <p className="text-4xl font-data font-bold text-[#EDE6D6] tracking-tighter">
                         {(() => {
-                          const uzsCollected = dayReceipts
-                            .filter(r => r.currency === 'UZS')
-                            .reduce((sum, r) => sum + (r.amount || 0), 0);
+                          const uzsCollected = dayReceipts.reduce((sum, r) => {
+                            const uzsPayments = (r.snapshot?.payments || []).filter((p: any) => p.currency_original === 'UZS');
+                            return sum + uzsPayments.reduce((s: number, p: any) => s + (p.amount_original || 0), 0);
+                          }, 0);
                           return uzsCollected.toLocaleString() + " SUM";
                         })()}
                       </p>
@@ -839,7 +841,7 @@ function CEOFinancialCalendar() {
                           const currencyTotals: Record<string, number> = {};
                           receipts.forEach(receipt => {
                             receipt.snapshot?.payments?.forEach((payment: any) => {
-                              currencyTotals[payment.currency] = (currencyTotals[payment.currency] || 0) + payment.amount;
+                              currencyTotals[payment.currency_original] = (currencyTotals[payment.currency_original] || 0) + payment.amount_original;
                             });
                           });
                           const latestTime = receipts.reduce((latest, r) => {
@@ -949,7 +951,7 @@ function CEOFinancialCalendar() {
                                           {receipt.snapshot?.payments?.map((payment: any, idx: number) => (
                                             <div key={idx} className="flex justify-between items-center text-[9px] text-[#9C9384] mt-2 pt-2 border-t border-[#5C4A2E]/20">
                                               <span>{payment.method}</span>
-                                              <span className="font-data font-bold text-[#EDE6D6]">{payment.amount} {payment.currency}</span>
+                                              <span className="font-data font-bold text-[#EDE6D6]">{payment.amount_original} {payment.currency_original}</span>
                                             </div>
                                           ))}
                                         </div>
