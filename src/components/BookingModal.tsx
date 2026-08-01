@@ -2416,17 +2416,17 @@ export function BookingModal(props: BookingModalProps) {
                                 <div className="col-span-12 space-y-1.5">
                                   <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">{t('booking.method')}</span>
                                   <div className="flex gap-2">
-                                    {[t('booking.cash'), t('booking.online')].map((m: any) => (
+                                    {[{ value: 'Cash', label: t('booking.cash') }, { value: 'Online', label: t('booking.online') }].map(({ value, label }) => (
                                       <button
-                                        key={m}
-                                        onClick={() => setSvcPayList(svcPayList.map((p: any, i: number) => i === pi ? { ...p, method: m } : p))}
+                                        key={value}
+                                        onClick={() => setSvcPayList(svcPayList.map((p: any, i: number) => i === pi ? { ...p, method: value } : p))}
                                         className={`flex-1 py-3 rounded-2xl text-xs font-black uppercase tracking-tighter transition-all border-2 ${
-                                          pay.method === m 
+                                          pay.method === value 
                                             ? 'bg-[#0B6E4F] border-[#0B6E4F] text-[#C9A227] shadow-lg' 
                                             : 'bg-[#1C232E] border-[#2A2F36] text-[#9C9384] hover:border-[#0B6E4F]'
                                         }`}
                                       >
-                                        {String(m)}
+                                        {String(label)}
                                       </button>
                                     ))}
                                   </div>
