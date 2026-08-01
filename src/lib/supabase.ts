@@ -39,47 +39,33 @@ export interface Booking {
   source: string;
   status: string;
   notes: string;
-  meal_notes: string;
-  transportation: string;
-  meal_preference: string;
-  guide_required: boolean;
   created_by_role: string;
   approved_by_manager: boolean;
-  guest_category?: string;
-  local_stay_type?: string;
-  last_adjustment?: string;
   last_reduction?: string;
   checkin_signature?: string;
   checkin_signed_at?: string;
-  is_manual_dates?: boolean;
   kitchen_orders?: any[];
   settled_receipts?: any[];
-  stay_paid?: boolean;
   draft?: any;
-  is_system_only?: boolean;
   created_by: string;
   last_edited_by: string;
   last_edited_by_role: string;
   created_at: string;
   nights?: string;
   payment_method?: 'in_camp' | 'all_paid' | 'partially_paid' | null;
-  payment_note?: string | null;
   currency?: 'UZS' | 'USD' | 'EUR';
   exchange_rate?: number;
-  extra_services?: Array<{ name: string; price: number; currency: 'UZS' | 'USD' | 'EUR' }>;
   collected_amount?: number;
   collected_currency?: 'UZS' | 'USD' | 'EUR';
   payments?: any[];
   is_prepaid?: boolean;
   is_accommodation_prepaid?: boolean;
-  default_vegetarian_qty?: number;
   guest_count_confirmed?: boolean;
   checked_out_at?: string;
   /** Joined meal_requests from the normalized table (not a DB column) */
   meal_requests?: MealRequest[];
   /** Joined booking_services from the normalized table (not a DB column) */
   booking_services?: any[];
-  drinks_tab?: any;
 }
 
 export interface Tab {

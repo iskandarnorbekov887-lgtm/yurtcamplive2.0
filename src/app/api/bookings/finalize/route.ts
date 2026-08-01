@@ -100,7 +100,6 @@ export async function POST(request: NextRequest) {
     }, 0) || 0;
 
     const updates: Record<string, any> = {
-      is_manually_updated: true,
       total_price: (booking.total_price || 0) + (tab_data.total || 0),
       last_edited_at: new Date().toISOString(),
     };

@@ -107,9 +107,6 @@ export async function POST(request: NextRequest) {
       team_id,
       approved_by_manager: true,
       notes,
-      is_manual_dates: meta.is_manual_dates,
-      guest_category: meta.guest_category,
-      local_stay_type: meta.local_stay_type,
       meta,
     };
 

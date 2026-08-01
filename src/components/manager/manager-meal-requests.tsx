@@ -166,10 +166,11 @@ export function ManagerMealRequests({ booking, onClose, onSent, teamId, userRole
       return;
     }
 
-    // Update bookings table with default_vegetarian_qty
+    // Update bookings meta with default_vegetarian_qty
+    const currentMeta = Array.isArray(booking.meta) ? { days: booking.meta } : (booking.meta || {});
     await supabase
       .from('bookings')
-      .update({ default_vegetarian_qty: vegAdultsQty + vegChildrenQty })
+      .update({ meta: { ...currentMeta, default_vegetarian_qty: vegAdultsQty + vegChildrenQty } })
       .eq('id', booking.id);
 
     // If this is Lunch, auto-apply the same vegetarian count to Dinner on the same day
@@ -324,7 +325,7 @@ export function ManagerMealRequests({ booking, onClose, onSent, teamId, userRole
                                   checked: e.target.checked,
                                   adult_qty: e.target.checked ? (booking.number_of_adults || 1) : 0,
                                   child_qty: e.target.checked ? (booking.number_of_children || 0) : 0,
-                                  veg_adults_qty: e.target.checked ? (booking.default_vegetarian_qty || 0) : 0,
+                                  veg_adults_qty: e.target.checked ? ((Array.isArray(booking.meta) ? {} : (booking.meta || {}))?.default_vegetarian_qty || 0) : 0,
                                   veg_children_qty: 0,
                                   dietary: prev[`${date}-Lunch`]?.dietary || 'Normal'
                                 }
@@ -489,7 +490,7 @@ export function ManagerMealRequests({ booking, onClose, onSent, teamId, userRole
                                   checked: e.target.checked,
                                   adult_qty: e.target.checked ? (booking.number_of_adults || 1) : 0,
                                   child_qty: e.target.checked ? (booking.number_of_children || 0) : 0,
-                                  veg_adults_qty: e.target.checked ? (booking.default_vegetarian_qty || 0) : 0,
+                                  veg_adults_qty: e.target.checked ? ((Array.isArray(booking.meta) ? {} : (booking.meta || {}))?.default_vegetarian_qty || 0) : 0,
                                   veg_children_qty: 0,
                                   dietary: prev[`${date}-Dinner`]?.dietary || 'Normal'
                                 }

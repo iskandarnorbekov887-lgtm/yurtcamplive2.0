@@ -74,11 +74,8 @@ export function GoogleGuestAgenda({
   const getPrefix = (item: ListItem) => {
     const booking = item.booking;
     if (!booking) return '';
-    
-    const category = booking.guest_category || '';
 
-    if (category === 'pool') return '🏊 ';
-    if (category === 'local') return '🏠 ';
+    // guest_category column removed from bookings table
     return '';
   };
 
@@ -870,7 +867,7 @@ export function GoogleGuestAgenda({
 
       // ── Read directly from database columns ──
       let existingDays: DayEntry[] = [];
-      let guestCategory = b.guest_category || '';
+      // guest_category column removed from bookings table
 
       setSvcAdults(b.number_of_adults || b.guest_count || 1);
       setSvcChildren(b.number_of_children || 0);
@@ -909,7 +906,7 @@ export function GoogleGuestAgenda({
 
       // ── Payment line defaults ──
       let defaultCurrency: 'UZS' | 'USD' | 'EUR' = 'USD';
-      if (guestCategory === 'local' || guestCategory === 'pool') defaultCurrency = 'UZS';
+      // guest_category column removed from bookings table - no longer used to set default currency
       setCollectedCurrency(defaultCurrency);
 
       // Calculate initial total for payment line

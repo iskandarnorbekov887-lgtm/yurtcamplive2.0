@@ -108,14 +108,14 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
         exchange_rate: 1,
         created_by: currentUserId,
         approved_by_manager: true,
-        is_manual_dates: true,
-        guest_category: finalCategory,
-        local_stay_type: mainCategory === 'local' ? localType : null,
         team_id: user?.team_id,
         meta: {
           is_pool_visitor: mainCategory === 'pool',
           is_room_stay: isRoomStay,
-          is_system_only: true
+          is_system_only: true,
+          is_manual_dates: true,
+          guest_category: finalCategory,
+          local_stay_type: mainCategory === 'local' ? localType : null
         }
       };
 

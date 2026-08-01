@@ -201,10 +201,10 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
     try {
       await onUpdateBooking(sel.id, { 
         total_price: newTotal,
-        last_adjustment: String(amount)
+        meta: { ...currentMeta, last_adjustment: String(amount) }
       });
       setExtFee(String(amount));
-      setSel({ ...sel, total_price: newTotal, last_adjustment: String(amount) });
+      setSel({ ...sel, total_price: newTotal, meta: { ...currentMeta, last_adjustment: String(amount) } });
     } catch (e) {
       console.error(e);
     } finally {
@@ -373,7 +373,7 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
 
     const updates: Partial<Booking> = {
       ...editData,
-      is_manual_dates: true
+      meta: { ...currentMeta, is_manual_dates: true }
     };
 
     const updatedSel = { ...sel, ...updates } as Booking;
@@ -776,13 +776,13 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                              </div>
                              
                              <div className="space-y-2">
-                                {(isClosed ? (activeTab?.items?.drinks || []) : (sel?.drinks_tab || []))?.map((line: any, lidx: number) => (
+                                {(isClosed ? (activeTab?.items?.drinks || []) : (Array.isArray(sel?.meta) ? {} : (sel?.meta || {}))?.drinks_tab || [])?.map((line: any, lidx: number) => (
                                   <div key={lidx} className="flex justify-between text-xs font-bold text-[#EDE6D6]">
                                     <span>{String(line?.drink_name)} x{String(line?.quantity)}</span>
                                     <span>${String(line?.price * line?.quantity)}</span>
                                   </div>
                                 ))}
-                                {(isClosed ? (activeTab?.items?.extras || []) : (sel?.extra_services || []))?.map((line: any, lidx: number) => (
+                                {(isClosed ? (activeTab?.items?.extras || []) : (Array.isArray(sel?.meta) ? {} : (sel?.meta || {}))?.extra_services || [])?.map((line: any, lidx: number) => (
                                   <div key={lidx} className="flex justify-between text-xs font-bold text-[#EDE6D6]">
                                     <span>{String(line?.name)}</span>
                                     <span>${String(line?.price)}</span>
@@ -1153,7 +1153,8 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
               <button
                 onClick={async () => {
                   if (sel && onUpdateBooking && selectedDrinks.length > 0) {
-                    const currentDrinks = sel.drinks_tab || [];
+                    const currentMeta = Array.isArray(sel.meta) ? { days: sel.meta } : (sel.meta || {});
+                    const currentDrinks = currentMeta.drinks_tab || [];
                     const updatedDrinks = [...currentDrinks];
                     selectedDrinks.forEach(selected => {
                       const existing = updatedDrinks.find(d => d.drink_id === selected.drink_id);
@@ -1163,10 +1164,10 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
                         updatedDrinks.push(selected);
                       }
                     });
-                    await onUpdateBooking(sel.id, { drinks_tab: updatedDrinks });
+                    await onUpdateBooking(sel.id, { meta: { ...currentMeta, drinks_tab: updatedDrinks } });
                     setShowDrinksPopup(false);
                     setSelectedDrinks([]);
-                    setSel({ ...sel, drinks_tab: updatedDrinks });
+                    setSel({ ...sel, meta: { ...currentMeta, drinks_tab: updatedDrinks } });
                   }
                 }}
                 className="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-all"
@@ -1236,12 +1237,13 @@ export function OccupancyCalendar({ bookings, userRole, currentUserId, staff, on
               <button
                 onClick={async () => {
                   if (sel && onUpdateBooking && newExtraService.name && newExtraService.price) {
-                    const currentServices = sel.extra_services || [];
+                    const currentMeta = Array.isArray(sel.meta) ? { days: sel.meta } : (sel.meta || {});
+                    const currentServices = currentMeta.extra_services || [];
                     const updatedServices = [...currentServices, { name: newExtraService.name, price: parseFloat(newExtraService.price), currency: newExtraService.currency }];
-                    await onUpdateBooking(sel.id, { extra_services: updatedServices });
+                    await onUpdateBooking(sel.id, { meta: { ...currentMeta, extra_services: updatedServices } });
                     setShowExtraServicesPopup(false);
                     setNewExtraService({ name: '', price: '', currency: 'USD' });
-                    setSel({ ...sel, extra_services: updatedServices });
+                    setSel({ ...sel, meta: { ...currentMeta, extra_services: updatedServices } });
                   }
                 }}
                 className="flex-1 py-3 bg-[#B8860B] text-[#EDE6D6] rounded-xl font-bold hover:bg-[#B8860B]/80 transition-all"
