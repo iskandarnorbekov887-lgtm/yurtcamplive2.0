@@ -1186,7 +1186,6 @@ export function GoogleGuestAgenda({
           receipt_id: receiptId,
           snapshot,
           total_usd: realTotal,
-          settled_at: sel.check_out?.split('T')[0],
         });
         if (receiptErr) {
           console.error('[finalizeTab] Receipt archive failed:', receiptErr);
