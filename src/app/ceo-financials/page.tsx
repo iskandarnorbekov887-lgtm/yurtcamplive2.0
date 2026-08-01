@@ -918,10 +918,11 @@ function CEOFinancialCalendar() {
                                                 <div className="flex justify-between items-center text-[9px]">
                                                   <span className="text-[#EDE6D6]">Accommodation</span>
                                                   <div className="flex items-center gap-2">
-                                                    {receipt.snapshot.items.isPrepaid && (
+                                                    {receipt.snapshot.items.isPrepaid ? (
                                                       <span className="text-[8px] font-bold bg-emerald-400 text-emerald-900 px-1 py-0.5 rounded uppercase">PREPAID</span>
+                                                    ) : (
+                                                      <span className="font-data font-bold text-[#EDE6D6]">${receipt.snapshot.items.accommodation.toFixed(2)}</span>
                                                     )}
-                                                    <span className="font-data font-bold text-[#EDE6D6]">${receipt.snapshot.items.accommodation.toFixed(2)}</span>
                                                   </div>
                                                 </div>
                                               )}
