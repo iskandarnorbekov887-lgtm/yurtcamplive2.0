@@ -374,8 +374,10 @@ export function BookingModal(props: BookingModalProps) {
       const data: any = {
         guest_count_confirmed: true,
         is_accommodation_prepaid: isPrepaid,
-
-        guest_category: category,
+        meta: {
+          ...currentMeta,
+          guest_category: category
+        },
         
         // 2. Map all numeric data to the single 'amount' column
         amount: svcAmount, 
@@ -391,7 +393,7 @@ export function BookingModal(props: BookingModalProps) {
 
       // 4. Manual Protection Rule
       if (sel.google_event_id || sel.source === 'System' || sel.source === 'office') {
-        data.is_manually_updated = true;
+        data.meta.is_manually_updated = true;
       }
 
       await onUpdateBooking(sel.id, data);

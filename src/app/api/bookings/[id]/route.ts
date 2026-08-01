@@ -117,15 +117,21 @@ export async function PATCH(
         }
       }
       if (extra_services !== undefined) {
-        bookingFields.extra_services = extra_services.map((s: any) => ({
-          name: s.name,
-          price: parseFloat(s.price) || 0,
-          currency: s.currency || 'USD',
-        }));
+        bookingFields.meta = {
+          ...(bookingFields.meta || {}),
+          extra_services: extra_services.map((s: any) => ({
+            name: s.name,
+            price: parseFloat(s.price) || 0,
+            currency: s.currency || 'USD',
+          }))
+        };
       }
     }
 
-    bookingFields.is_manually_updated = true;
+    bookingFields.meta = {
+      ...(bookingFields.meta || {}),
+      is_manually_updated: true
+    };
     if (last_edited_by_id) {
       bookingFields.last_edited_by_id = last_edited_by_id;
       bookingFields.last_edited_at = new Date().toISOString();
