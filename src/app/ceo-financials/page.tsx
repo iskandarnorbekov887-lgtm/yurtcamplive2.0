@@ -914,7 +914,7 @@ function CEOFinancialCalendar() {
                                           </div>
                                           {receipt.snapshot?.items && (
                                             <div className="space-y-2">
-                                              {receipt.snapshot.items.accommodation && (
+                                              {receipt.snapshot.items.accommodation > 0 && (
                                                 <div className="flex justify-between items-center text-[9px]">
                                                   <span className="text-[#EDE6D6]">Accommodation</span>
                                                   <div className="flex items-center gap-2">
@@ -943,8 +943,13 @@ function CEOFinancialCalendar() {
                                                 </>
                                               )}
                                               {receipt.snapshot.items.services && Object.keys(receipt.snapshot.items.services).length > 0 && (
-                                                <div className="text-[9px] text-[#9C9384]">
-                                                  Services: {Object.keys(receipt.snapshot.items.services).length} item(s)
+                                                <div className="space-y-1">
+                                                  {Object.entries(receipt.snapshot.items.services).map(([name, amount]: [string, any]) => (
+                                                    <div key={name} className="flex justify-between items-center text-[9px]">
+                                                      <span className="text-[#EDE6D6]">{name}</span>
+                                                      <span className="font-data font-bold text-[#EDE6D6]">${Number(amount).toFixed(2)}</span>
+                                                    </div>
+                                                  ))}
                                                 </div>
                                               )}
                                             </div>
