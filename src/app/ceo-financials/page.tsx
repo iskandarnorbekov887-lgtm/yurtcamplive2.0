@@ -121,7 +121,16 @@ function CEOFinancialCalendar() {
       .from('currency_exchanges')
       .select('*')
       .eq('team_id', user?.team_id);
-    
+
+    let liveRates = { USD: 12500, EUR: 13500 };
+    try {
+      const rateResponse = await fetch('/api/exchange-rate');
+      if (rateResponse.ok) {
+        const rateJson = await rateResponse.json();
+        if (rateJson?.USD && rateJson?.EUR) liveRates = { USD: rateJson.USD, EUR: rateJson.EUR };
+      }
+    } catch {}
+
     // Start with payments summary (sale adds, expense subtracts)
     const summary = paymentsData?.reduce((acc: any, p: any) => {
       const amount = Number(p.amount_original) || 0;
@@ -274,6 +283,15 @@ function CEOFinancialCalendar() {
         .gte('transaction_date', `${year}-${String(month + 1).padStart(2, '0')}-01`)
         .lte('transaction_date', `${year}-${String(month + 1).padStart(2, '0')}-${daysInMonth}`);
 
+      let liveRates = { USD: 12500, EUR: 13500 };
+      try {
+        const rateResponse = await fetch('/api/exchange-rate');
+        if (rateResponse.ok) {
+          const rateJson = await rateResponse.json();
+          if (rateJson?.USD && rateJson?.EUR) liveRates = { USD: rateJson.USD, EUR: rateJson.EUR };
+        }
+      } catch {}
+
       const financialsByDay: Record<string, { netIncome: number; netExpense: number; netProfit: number }> = {};
 
       // Initialize all days
@@ -299,15 +317,16 @@ function CEOFinancialCalendar() {
       (paymentsData || []).forEach((item: any) => {
         const dateStr = item.transaction_date || item.created_at?.split('T')[0];
         if (financialsByDay[dateStr]) {
-          const amount = Number(item.amount_original) || 0;
-          // Only include UZS payments for net profit calculation
-          if (item.currency_original === 'UZS') {
-            if (item.type === 'sale') {
-              financialsByDay[dateStr].netIncome += amount;
-            } else if (item.type === 'expense') {
-              financialsByDay[dateStr].netExpense += amount;
-            }
+          const currency = item.currency_original || 'UZS';
+          let amountUzs = 0;
+          if (currency === 'UZS') {
+            amountUzs = Number(item.amount_original) || 0;
+          } else {
+            const usdEq = Number(item.amount_usd_equivalent) || Number(item.amount_original) || 0;
+            amountUzs = currency === 'EUR' ? usdEq * liveRates.EUR : usdEq * liveRates.USD;
           }
+          if (item.type === 'sale') financialsByDay[dateStr].netIncome += amountUzs;
+          else if (item.type === 'expense') financialsByDay[dateStr].netExpense += amountUzs;
         }
       });
 
