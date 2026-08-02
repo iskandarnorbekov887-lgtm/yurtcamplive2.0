@@ -343,6 +343,9 @@ export function GoogleGuestAgenda({
       setActiveMeals([]);
       return;
     }
+    // reset payment inputs so a new booking always starts on Cash
+    setSvcPayList([{ amount: '', currency: 'USD', method: 'Cash' }]);
+    setPayModified(false);
 
     const syncKitchen = async () => {
       const fetchedForId = sel.id;
