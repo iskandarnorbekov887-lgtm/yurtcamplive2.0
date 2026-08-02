@@ -905,25 +905,55 @@ function CEOFinancialCalendar() {
                                   }}
                                   className="w-full p-4 hover:bg-[#1C232E]/50 transition-all text-left group"
                                 >
-                                  <div className="flex justify-between items-start">
-                                    <div>
-                                      <p className="font-bold text-[#EDE6D6] text-xs">{item.booking?.guest_name || `Booking #${item.bookingId}`}</p>
-                                      <span className="text-[9px] font-bold text-[#3B82F6] bg-[#3B82F6]/20 px-1.5 py-0.5 rounded border border-[#3B82F6]/40 mt-1 inline-block">Guest Payment</span>
-                                      <p className="text-[9px] text-[#9C9384] mt-1">{item.receipts.length} receipt(s)</p>
-                                    </div>
-                                    <div className="text-right">
-                                      <div className="space-y-1">
-                                        {Object.entries(item.currencyTotals).map(([currency, amount]: [string, any]) => (
-                                          <p key={currency} className="text-[10px] font-data font-bold text-[#0B6E4F]">
-                                            {currency === 'USD' ? '$' : currency === 'EUR' ? '€' : ''}{Number(amount).toLocaleString()} {currency}
-                                          </p>
-                                        ))}
+                                  {(() => {
+                                    const b = item.booking;
+                                    const adults = b?.number_of_adults || 0;
+                                    const children = b?.number_of_children || 0;
+                                    const pax = adults + children || b?.guest_count || 0;
+                                    let nights: number | null = null;
+                                    if (b?.check_in && b?.check_out) {
+                                      const n = Math.round((new Date(b.check_out).getTime() - new Date(b.check_in).getTime()) / (1000 * 60 * 60 * 24));
+                                      if (Number.isFinite(n) && n > 0) nights = n;
+                                    }
+                                    const isAccPrepaid = !!b?.is_accommodation_prepaid;
+                                    return (
+                                      <div className="flex justify-between items-start">
+                                        <div>
+                                          <p className="font-bold text-[#EDE6D6] text-xs">{b?.guest_name || `Booking #${item.bookingId}`}</p>
+                                          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                                            <span className="text-[9px] font-bold text-[#3B82F6] bg-[#3B82F6]/20 px-1.5 py-0.5 rounded border border-[#3B82F6]/40">Guest Payment</span>
+                                            {isAccPrepaid && (
+                                              <span className="text-[9px] font-bold bg-emerald-400 text-emerald-900 px-1.5 py-0.5 rounded uppercase">Prepaid</span>
+                                            )}
+                                            {pax > 0 && (
+                                              <span className="text-[9px] font-bold text-[#9C9384] bg-[#1C232E] px-1.5 py-0.5 rounded border border-[#5C4A2E]/40">{pax} {pax === 1 ? 'guest' : 'guests'}</span>
+                                            )}
+                                            {nights !== null && (
+                                              <span className="text-[9px] font-bold text-[#9C9384] bg-[#1C232E] px-1.5 py-0.5 rounded border border-[#5C4A2E]/40">{nights} {nights === 1 ? 'night' : 'nights'}</span>
+                                            )}
+                                          </div>
+                                          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1.5 text-[9px] text-[#9C9384]">
+                                            {typeof b?.total_price === 'number' && (
+                                              <span>Accommodation: <span className="font-data font-bold text-[#EDE6D6]">{isAccPrepaid ? 'Prepaid' : `$${Number(b.total_price).toFixed(2)}`}</span></span>
+                                            )}
+                                            <span>{item.receipts.length} receipt(s)</span>
+                                          </div>
+                                        </div>
+                                        <div className="text-right">
+                                          <div className="space-y-1">
+                                            {Object.entries(item.currencyTotals).map(([currency, amount]: [string, any]) => (
+                                              <p key={currency} className="text-[10px] font-data font-bold text-[#0B6E4F]">
+                                                {currency === 'USD' ? '$' : currency === 'EUR' ? '€' : ''}{Number(amount).toLocaleString()} {currency}
+                                              </p>
+                                            ))}
+                                          </div>
+                                          <svg className={`w-4 h-4 text-[#9C9384] mt-2 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                          </svg>
+                                        </div>
                                       </div>
-                                      <svg className={`w-4 h-4 text-[#9C9384] mt-2 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                      </svg>
-                                    </div>
-                                  </div>
+                                    );
+                                  })()}
                                 </button>
                                 {isExpanded && (
                                   <div className="p-4 border-t border-[#5C4A2E]/30 bg-[#0F1419]/50">
@@ -936,7 +966,7 @@ function CEOFinancialCalendar() {
                                           </div>
                                           {receipt.snapshot?.items && (
                                             <div className="space-y-2">
-                                              {receipt.snapshot.items.accommodation > 0 && (
+                                              {(receipt.snapshot.items.accommodation > 0 || receipt.snapshot.items.isPrepaid) && (
                                                 <div className="flex justify-between items-center text-[9px]">
                                                   <span className="text-[#EDE6D6]">Accommodation</span>
                                                   <div className="flex items-center gap-2">
