@@ -1001,7 +1001,7 @@ function CEOFinancialCalendar() {
                                                   {Object.entries(receipt.snapshot.items.services).map(([name, amount]: [string, any]) => (
                                                     <div key={name} className="flex justify-between items-center text-[9px]">
                                                       <span className="text-[#EDE6D6]">{name}</span>
-                                                      <span className="font-data font-bold text-[#EDE6D6]">${Number(amount).toFixed(2)}</span>
+                                                      <span className="font-data font-bold text-[#EDE6D6]">{Number(amount) > 0 ? `$${Number(amount).toFixed(2)}` : 'Prepaid'}</span>
                                                     </div>
                                                   ))}
                                                 </div>
