@@ -437,25 +437,28 @@ function CEOFinancialCalendar() {
         .eq('transaction_date', dateStr)
         .order('created_at', { ascending: false });
 
-      // Fetch receipts for this day (revenue from settled tabs)
-      const { data: receipts } = await supabase
-        .from('booking_receipts')
+      // Find bookings that actually checked out on THIS day (real checkout date,
+      // not whenever the receipt happened to be typed into the system)
+      const { data: checkedOutBookings } = await supabase
+        .from('bookings')
         .select('*')
-        .gte('created_at', `${dateStr}T00:00:00`)
-        .lt('created_at', `${dateStr}T23:59:59.999`)
-        .order('created_at', { ascending: false });
+        .gte('checked_out_at', `${dateStr}T00:00:00`)
+        .lt('checked_out_at', `${dateStr}T23:59:59.999`);
 
-      // Fetch all bookings that have receipts for this day (to get guest names)
-      const bookingIds = receipts ? [...new Set(receipts.map(r => r.booking_id))] : [];
+      const bookingIds = (checkedOutBookings || []).map(b => b.id);
       let bookingsMap: Record<number, Booking> = {};
+      (checkedOutBookings || []).forEach(b => { bookingsMap[b.id] = b; });
+
+      // Now fetch receipts belonging to those specific bookings — no date
+      // filter on the receipt itself, only on the booking's real checkout day
+      let receipts: any[] = [];
       if (bookingIds.length > 0) {
-        const { data: bookings } = await supabase
-          .from('bookings')
+        const { data } = await supabase
+          .from('booking_receipts')
           .select('*')
-          .in('id', bookingIds);
-        if (bookings) {
-          bookingsMap = bookings.reduce((acc, b) => ({ ...acc, [b.id]: b }), {});
-        }
+          .in('booking_id', bookingIds)
+          .order('created_at', { ascending: false });
+        receipts = data || [];
       }
 
       setDayFinances(finances || []);
