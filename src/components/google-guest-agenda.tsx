@@ -1389,7 +1389,46 @@ export function GoogleGuestAgenda({
     }
     setLoadingAction('guestcheckout');
     try {
-      await onUpdateBooking(sel.id, { status: 'completed', checked_out_at: sel.check_out });
+      // Ensure a receipt exists even if this booking was fully prepaid
+      // and finalizeTab was never called (no on-site charges to settle).
+      const { data: existingReceipts } = await supabase
+        .from('booking_receipts')
+        .select('id')
+        .eq('booking_id', sel.id)
+        .limit(1);
+
+      if (!existingReceipts || existingReceipts.length === 0) {
+        const now = new Date();
+        const datePart = now.toISOString().split('T')[0].replace(/-/g, '').slice(2);
+        const randPart = Math.random().toString(36).substring(2, 6).toUpperCase();
+        const receiptId = `RCP-${datePart}-${randPart}`;
+        await supabase.from('booking_receipts').insert({
+          booking_id: sel.id,
+          receipt_id: receiptId,
+          snapshot: {
+            id: receiptId,
+            date: now.toISOString(),
+            settled_at: now.toISOString(),
+            items: {
+              accommodation: sel.total_price || 0,
+              isPrepaid: true,
+              meals: { lunch: 0, dinner: 0, lunchCharged: 0, dinnerCharged: 0, mealDetails: [] },
+              services: {},
+              extras: [],
+              drinks: [],
+              discount: null,
+              stay_adjustment: 0,
+              settled_meal_ids: []
+            },
+            total: 0,
+            payments: [],
+            note: 'Fully prepaid — no on-site charges collected.'
+          },
+          total_usd: 0,
+        });
+      }
+
+      await onUpdateBooking(sel.id, { status: 'completed', checked_out_at: sel.check_out, payment_status: 'paid' });
       flash('✓ Guest checked out.');
       if (onRefresh) await onRefresh();
       return true;

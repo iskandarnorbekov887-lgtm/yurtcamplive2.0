@@ -816,6 +816,32 @@ export function BookingModal(props: BookingModalProps) {
                         <p className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest">Guest Tab Closed & Settled</p>
                       </div>
                     </div>
+
+                    {(() => {
+                      const receipts = getSettledReceiptsForSel();
+                      if (!receipts || receipts.length === 0) return null;
+                      return (
+                        <div className="space-y-3 border-t border-[#2A2F36] pt-4">
+                          {receipts.map((r: any, idx: number) => {
+                            const { lineItems, total } = buildReceiptLineItems(r.snapshot?.items ? r.snapshot : r, pricing);
+                            return (
+                              <div key={r.id || idx} className="bg-[#0F1419]/50 rounded-2xl p-4 space-y-2">
+                                <p className="text-[10px] font-black text-[#9C9384] uppercase">{r.receipt_id || r.id}</p>
+                                {lineItems.map((li, i) => (
+                                  <div key={i} className="flex justify-between text-[11px]">
+                                    <span className="text-[#EDE6D6]">{li.label}</span>
+                                    <span className="font-bold text-[#EDE6D6]">{li.isPrepaid ? 'PREPAID' : `$${li.amount.toFixed(2)}`}</span>
+                                  </div>
+                                ))}
+                                <div className="flex justify-between text-[11px] font-black border-t border-[#2A2F36] pt-2">
+                                  <span>Total</span><span>${total.toFixed(2)}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })()}

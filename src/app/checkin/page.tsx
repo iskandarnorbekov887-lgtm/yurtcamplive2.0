@@ -74,6 +74,34 @@ function CheckinPortal() {
     if (!booking) return;
 
     const amountValue = booking.total_price || 0;
+
+    // Ensure a receipt exists for audit trail, even for prepaid POS/local bookings
+    const { data: existingReceipts } = await supabase
+      .from('booking_receipts')
+      .select('id')
+      .eq('booking_id', id)
+      .limit(1);
+
+    if (!existingReceipts || existingReceipts.length === 0) {
+      const now = new Date();
+      const datePart = now.toISOString().split('T')[0].replace(/-/g, '').slice(2);
+      const randPart = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const receiptId = `RCP-${datePart}-${randPart}`;
+      await supabase.from('booking_receipts').insert({
+        booking_id: id,
+        receipt_id: receiptId,
+        snapshot: {
+          id: receiptId,
+          date: now.toISOString(),
+          settled_at: now.toISOString(),
+          items: { accommodation: amountValue, isPrepaid: !!booking.is_prepaid, services: {}, meals: {}, extras: [], drinks: [], discount: null },
+          total: amountValue,
+          payments: [{ method: booking.payment_method || 'Cash', amount_original: amountValue, currency_original: booking.currency || 'UZS', amount_usd_equivalent: amountValue }],
+        },
+        total_usd: amountValue,
+      });
+    }
+
     const rateValue = booking.exchange_rate || 1;
     const amountUZS = booking.currency === 'UZS' ? amountValue : amountValue * rateValue;
 
