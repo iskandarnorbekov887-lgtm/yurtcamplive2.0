@@ -796,49 +796,51 @@ function CEOFinancialCalendar() {
               <>
                 {/* Net Profit Summary */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6 mb-8">
-                  <div className="bg-[#1C232E]/50 rounded-lg p-6 border border-[#5C4A2E]/30 shadow-sm">
-                    <p className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest mb-1">Collected Today</p>
-                    <div className="space-y-2">
-                      {(() => {
-                        const currencyTotals: Record<string, number> = {};
-                        dayReceipts.forEach(receipt => {
-                          receipt.snapshot?.payments?.forEach((payment: any) => {
-                            currencyTotals[payment.currency_original] = (currencyTotals[payment.currency_original] || 0) + payment.amount_original;
-                          });
-                        });
-                        dayIncome.forEach(income => {
-                          currencyTotals['UZS'] = (currencyTotals['UZS'] || 0) + income.amount_uzs;
-                        });
-                        
-                        return Object.keys(currencyTotals).length > 0 ? (
-                          Object.entries(currencyTotals).map(([currency, amount]) => (
+                  {(() => {
+                    const currencyTotals: Record<string, number> = {};
+                    dayReceipts.forEach(receipt => {
+                      receipt.snapshot?.payments?.forEach((payment: any) => {
+                        currencyTotals[payment.currency_original] = (currencyTotals[payment.currency_original] || 0) + payment.amount_original;
+                      });
+                    });
+                    dayIncome.forEach(income => {
+                      currencyTotals['UZS'] = (currencyTotals['UZS'] || 0) + income.amount_uzs;
+                    });
+                    const totalCollected = Object.values(currencyTotals).reduce((sum, val) => sum + val, 0);
+                    if (totalCollected === 0) return null;
+                    return (
+                      <div className="bg-[#1C232E]/50 rounded-lg p-6 border border-[#5C4A2E]/30 shadow-sm">
+                        <p className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest mb-1">Collected Today</p>
+                        <div className="space-y-2">
+                          {Object.entries(currencyTotals).map(([currency, amount]) => (
                             <p key={currency} className="text-2xl font-data font-bold text-[#EDE6D6] tracking-tight">
                               {currency === 'USD' ? '$' : currency === 'EUR' ? '€' : ''}{amount.toLocaleString()} {currency === 'UZS' ? 'SUM' : currency}
                             </p>
-                          ))
-                        ) : (
-                          <p className="text-2xl font-data font-bold text-[#9C9384] tracking-tight">$0.00</p>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                  <div className="bg-[#1C232E]/50 rounded-lg p-6 border border-[#5C4A2E]/30 shadow-sm flex items-center justify-between">
-                    <div>
-                      <p className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest mb-1">{t('msg.uzs_collected_today')}</p>
-                      <p className="text-4xl font-data font-bold text-[#EDE6D6] tracking-tighter">
-                        {(() => {
-                          const uzsCollected = dayReceipts.reduce((sum, r) => {
-                            const uzsPayments = (r.snapshot?.payments || []).filter((p: any) => p.currency_original === 'UZS');
-                            return sum + uzsPayments.reduce((s: number, p: any) => s + (p.amount_original || 0), 0);
-                          }, 0);
-                          return uzsCollected.toLocaleString() + " SUM";
-                        })()}
-                      </p>
-                    </div>
-                    <div className={`p-4 rounded-full ${dayReceipts.length > 0 ? 'bg-[#0B6E4F]/20 text-[#0B6E4F]' : 'bg-[#1C232E]/30 text-[#9C9384]'}`}>
-                      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    </div>
-                  </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  {(() => {
+                    const uzsCollected = dayReceipts.reduce((sum, r) => {
+                      const uzsPayments = (r.snapshot?.payments || []).filter((p: any) => p.currency_original === 'UZS');
+                      return sum + uzsPayments.reduce((s: number, p: any) => s + (p.amount_original || 0), 0);
+                    }, 0);
+                    if (uzsCollected === 0) return null;
+                    return (
+                      <div className="bg-[#1C232E]/50 rounded-lg p-6 border border-[#5C4A2E]/30 shadow-sm flex items-center justify-between">
+                        <div>
+                          <p className="text-[10px] font-bold text-[#9C9384] uppercase tracking-widest mb-1">{t('msg.uzs_collected_today')}</p>
+                          <p className="text-4xl font-data font-bold text-[#EDE6D6] tracking-tighter">
+                            {uzsCollected.toLocaleString()} SUM
+                          </p>
+                        </div>
+                        <div className={`p-4 rounded-full ${dayReceipts.length > 0 ? 'bg-[#0B6E4F]/20 text-[#0B6E4F]' : 'bg-[#1C232E]/30 text-[#9C9384]'}`}>
+                          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
