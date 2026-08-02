@@ -181,6 +181,10 @@ export function BookingModal(props: BookingModalProps) {
   const [drinkQuantity, setDrinkQuantity] = useState(1);
   const [showDrinkSelector, setShowDrinkSelector] = useState(false);
 
+  // Manual rate calculator state
+  const [manualAmount, setManualAmount] = useState('');
+  const [manualCurrency, setManualCurrency] = useState<'UZS' | 'EUR'>('UZS');
+
   const [showCreatePopover, setShowCreatePopover] = useState(false);
   const [newAdults, setNewAdults] = useState<string | number>(1);
   const [newChildren, setNewChildren] = useState<string | number>(0);
@@ -188,6 +192,14 @@ export function BookingModal(props: BookingModalProps) {
   const resetCreatePopoverState = () => {
     setNewAdults(1);
     setNewChildren(0);
+  };
+
+  const calculateManualRate = (usdAmount: number) => {
+    const target = parseFloat(manualAmount);
+    if (!target || target <= 0 || !usdAmount) return;
+
+    const rate = target / usdAmount; // e.g. 120000 / 100 = 1200
+    setPricing({ ...pricing, [manualCurrency === 'UZS' ? 'usd_to_uzs' : 'usd_to_eur']: rate });
   };
 
   // Use svcDiscountReason from props instead of local state
@@ -2416,13 +2428,38 @@ export function BookingModal(props: BookingModalProps) {
                                   <div className="col-span-12 space-y-1.5 animate-in slide-in-from-left-2">
                                     <div className="flex justify-between items-center px-1">
                                       <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Exchange Rate (1 USD =)</span>
-                                      <button 
-                                        onClick={() => fetchCbuRate(pay.currency)}
-                                        disabled={loadingAction.includes('rate')}
-                                        className="text-[9px] font-black text-indigo-600 hover:text-indigo-700 underline"
-                                      >
-                                        Get Live Rate
-                                      </button>
+                                      <div className="flex gap-2 items-center">
+                                        <button
+                                          onClick={() => fetchCbuRate(pay.currency)}
+                                          disabled={loadingAction.includes('rate')}
+                                          className="text-[9px] font-black text-indigo-600 hover:text-indigo-700 underline"
+                                        >
+                                          Get Live Rate
+                                        </button>
+                                        <div className="flex gap-2 items-center border-l border-white/10 pl-2">
+                                          <select
+                                            value={manualCurrency}
+                                            onChange={(e) => setManualCurrency(e.target.value as 'UZS' | 'EUR')}
+                                            className="bg-[#1C232E] border border-white/10 rounded-md px-2 py-1 text-xs"
+                                          >
+                                            <option value="UZS">SUM</option>
+                                            <option value="EUR">EUR</option>
+                                          </select>
+                                          <input
+                                            type="number"
+                                            placeholder="e.g. 120000"
+                                            value={manualAmount}
+                                            onChange={(e) => setManualAmount(e.target.value)}
+                                            className="bg-[#1C232E] border border-white/10 rounded-md px-2 py-1 text-xs w-28"
+                                          />
+                                          <button
+                                            onClick={() => calculateManualRate(parseFloat(pay.amount) || 0)}
+                                            className="px-3 py-1 bg-[#C9A227] text-[#1C232E] text-xs font-bold rounded-md"
+                                          >
+                                            Get
+                                          </button>
+                                        </div>
+                                      </div>
                                     </div>
                                     <div className="relative group">
                                       <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">Rate:</div>
