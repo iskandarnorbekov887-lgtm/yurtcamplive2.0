@@ -22,7 +22,9 @@ export function buildReceiptLineItems(
   const items = snapshot.items || {};
 
   // 1. Accommodation
-  if (items.accommodation !== undefined && items.accommodation > 0) {
+  // Show whenever there's a charge, OR when accommodation was prepaid (amount is
+  // legitimately $0 in that case, but the guest should still see it was covered).
+  if (items.accommodation !== undefined && (items.accommodation > 0 || items.isPrepaid)) {
     lineItems.push({
       label: 'Accommodation',
       amount: items.isPrepaid ? 0 : items.accommodation,
