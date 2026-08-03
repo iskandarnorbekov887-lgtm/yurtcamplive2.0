@@ -436,7 +436,7 @@ export function GoogleGuestAgenda({
   }, [gcEvents, bookings]);
 
   const gcItems = useMemo(() => gcEvents.map(ev => ({
-    key: `gc-${ev.id}`, name: ev.summary, start: ev.start, end: ev.end, source: 'google' as const, booking: null, event: ev,
+    key: `gc-${ev.id}`, name: ev.location || ev.summary, start: ev.start, end: ev.end, source: 'google' as const, booking: null, event: ev,
   })), [gcEvents]);
 
   const bookingItems = useMemo(() => bookings.map(b => ({
@@ -744,7 +744,7 @@ export function GoogleGuestAgenda({
       }
 
       const payload: any = {
-        guest_name: String(ev.summary || "Unnamed Guest"),
+        guest_name: String(ev.location || ev.summary || "Unnamed Guest"),
         check_in: String(ev.start),
         check_out: String(
           ev.end && ev.end !== ev.start
