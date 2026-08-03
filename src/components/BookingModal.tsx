@@ -566,6 +566,11 @@ export function BookingModal(props: BookingModalProps) {
             <div className="p-5 space-y-4">
               <h2 className="text-xl font-black text-[#EDE6D6]">{ev.summary || '(No title)'}</h2>
               <p className="text-sm text-[#9C9384] mt-0.5 font-data">{ev.start} → {ev.end}</p>
+              {ev.location && (
+                <p className="text-sm text-[#EDE6D6] font-bold flex items-center gap-1.5 mt-1">
+                  <span aria-hidden="true">📍</span> {ev.location}
+                </p>
+              )}
               {ev.description && (
                 <p className="text-xs text-[#9C9384] mt-2 whitespace-pre-wrap bg-[#1C232E]/50 rounded-xl p-3 border border-[#2A2F36]">{htmlDescriptionToText(ev.description)}</p>
               )}
@@ -593,6 +598,11 @@ export function BookingModal(props: BookingModalProps) {
             <div>
               <h2 className="text-xl font-black text-[#EDE6D6]">{ev.summary || '(No title)'}</h2>
               <p className="text-sm text-[#9C9384] mt-0.5 font-data">{ev.start} → {ev.end}</p>
+              {ev.location && (
+                <p className="text-sm text-[#EDE6D6] font-bold flex items-center gap-1.5 mt-1">
+                  <span aria-hidden="true">📍</span> {ev.location}
+                </p>
+              )}
               {ev.description && (
                 <p className="text-xs text-[#9C9384] mt-2 whitespace-pre-wrap bg-[#1C232E]/50 rounded-xl p-3 border border-[#2A2F36]">{htmlDescriptionToText(ev.description)}</p>
               )}
