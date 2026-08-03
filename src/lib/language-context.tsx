@@ -477,6 +477,13 @@ const translations = {
     'txn.payment_history': 'Payment History',
     'txn.payment_count': 'payments',
     'txn.no_workers_found': 'No workers found',
+
+    // Receipt OCR
+    'receipt.prompt': 'Scan a receipt to auto-fill',
+    'receipt.take_photo': 'Take Photo',
+    'receipt.upload_photo': 'Upload Photo',
+    'receipt.scanning': 'Scanning...',
+    'receipt.error': 'Could not read receipt',
     'txn.no_payments_found': 'No payments found for this worker',
 
     // Calendar
@@ -970,13 +977,20 @@ const translations = {
     'txn.worker_name_label': 'Ishchi ismi',
     'txn.add_new_worker': '+ Yangi ishchi qo\'shish',
     'txn.tab_drinks': 'Ichimliklar',
-    'txn.date_format_month_short': 'oy',
+    'txn.date_format_month_short': 'O',
     'txn.view_all_workers': 'Barcha ishchilarni ko\'rish',
     'txn.all_workers': 'Barcha ishchilar',
     'txn.total_paid': 'Jami to\'langan',
     'txn.payment_history': 'To\'lov tarixi',
     'txn.payment_count': 'to\'lovlar',
     'txn.no_workers_found': 'Ishchilar topilmadi',
+
+    // Receipt OCR
+    'receipt.prompt': 'Chekni skanerlash uchun',
+    'receipt.take_photo': 'Rasmga olish',
+    'receipt.upload_photo': 'Rasm yuklash',
+    'receipt.scanning': 'Skanerlanmoqda...',
+    'receipt.error': 'Chekni oʻqib boʻlmadi',
     'txn.no_payments_found': 'Bu ishchi uchun to\'lovlar topilmadi',
 
     // Calendar

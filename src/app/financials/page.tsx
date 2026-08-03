@@ -99,6 +99,10 @@ function ManagerFinancials() {
   const [dayTransactions, setDayTransactions] = useState<any[]>([]);
   const [loadingDayTransactions, setLoadingDayTransactions] = useState(false);
 
+  // Receipt OCR state
+  const [receiptLoading, setReceiptLoading] = useState(false);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
+
   // Drinks state - new normalized structure
   const [drinks, setDrinks] = useState<any[]>([]);
   const [drinkVariants, setDrinkVariants] = useState<any[]>([]);
@@ -830,6 +834,40 @@ function ManagerFinancials() {
     }
   };
 
+  const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setReceiptLoading(true);
+    setReceiptError(null);
+
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string).split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const res = await fetch('/api/receipt-ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64 }),
+      });
+
+      if (!res.ok) throw new Error('Failed to read receipt');
+      const data = await res.json();
+
+      setAmount(String(data.total ?? ''));
+      setDescription(data.items?.join(', ') ?? '');
+    } catch (err) {
+      setReceiptError(t('receipt.error') || 'Could not read receipt');
+    } finally {
+      setReceiptLoading(false);
+      e.target.value = '';
+    }
+  };
+
 
   return (
     <div className="min-h-screen bg-[#0F1419] font-sans">
@@ -928,13 +966,13 @@ function ManagerFinancials() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Type Toggle - Expense first */}
-            <div className="flex gap-4">
+            <div className="flex gap-2 sm:gap-4">
               <button
                 type="button"
                 onClick={() => setType('expense')}
-                className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all ${
-                  type === 'expense' 
-                    ? 'bg-[#722F37] text-[#C9A227] shadow-lg shadow-[#722F37]/30' 
+                className={`flex-1 py-2 px-2 sm:py-3 sm:px-4 rounded-xl font-bold text-xs sm:text-base transition-all ${
+                  type === 'expense'
+                    ? 'bg-[#722F37] text-[#C9A227] shadow-lg shadow-[#722F37]/30'
                     : 'bg-[#1C232E] text-[#9C9384] hover:bg-[#2A1518]'
                 }`}
               >
@@ -943,9 +981,9 @@ function ManagerFinancials() {
               <button
                 type="button"
                 onClick={() => setType('income')}
-                className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all ${
-                  type === 'income' 
-                    ? 'bg-[#0B6E4F] text-[#C9A227] shadow-lg shadow-[#0B6E4F]/30' 
+                className={`flex-1 py-2 px-2 sm:py-3 sm:px-4 rounded-xl font-bold text-xs sm:text-base transition-all ${
+                  type === 'income'
+                    ? 'bg-[#0B6E4F] text-[#C9A227] shadow-lg shadow-[#0B6E4F]/30'
                     : 'bg-[#1C232E] text-[#9C9384] hover:bg-[#2A1518]'
                 }`}
               >
@@ -954,13 +992,13 @@ function ManagerFinancials() {
               <button
                 type="button"
                 onClick={() => setType('drinks')}
-                className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all ${
-                  type === 'drinks' 
-                    ? 'bg-[#C9A227] text-[#0F1419] shadow-lg shadow-[#C9A227]/30' 
+                className={`flex-1 py-2 px-2 sm:py-3 sm:px-4 rounded-xl font-bold text-xs sm:text-base transition-all ${
+                  type === 'drinks'
+                    ? 'bg-[#0B6E4F] text-[#C9A227] shadow-lg shadow-[#0B6E4F]/30'
                     : 'bg-[#1C232E] text-[#9C9384] hover:bg-[#2A1518]'
                 }`}
               >
-                {t('txn.tab_drinks')}
+                {t('drinks.title')}
               </button>
             </div>
 
@@ -990,6 +1028,25 @@ function ManagerFinancials() {
                     <option key={cat.value} value={cat.value}>{cat.label}</option>
                   ))}
                 </select>
+              </div>
+            )}
+
+            {/* Receipt OCR - only for groceries category */}
+            {type === 'expense' && category === 'groceries' && (
+              <div className="bg-[#1C232E] rounded-xl p-4 space-y-3">
+                <p className="text-sm text-[#9C9384]">{t('receipt.prompt') || 'Scan a receipt to auto-fill'}</p>
+                <div className="flex gap-3">
+                  <label className="flex-1 text-center py-2 px-3 rounded-lg bg-[#722F37] text-[#C9A227] font-bold text-sm cursor-pointer">
+                    {t('receipt.take_photo') || 'Take Photo'}
+                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleReceiptUpload} />
+                  </label>
+                  <label className="flex-1 text-center py-2 px-3 rounded-lg bg-[#0B6E4F] text-[#C9A227] font-bold text-sm cursor-pointer">
+                    {t('receipt.upload_photo') || 'Upload Photo'}
+                    <input type="file" accept="image/*" className="hidden" onChange={handleReceiptUpload} />
+                  </label>
+                </div>
+                {receiptLoading && <p className="text-xs text-[#9C9384]">{t('receipt.scanning') || 'Scanning...'}</p>}
+                {receiptError && <p className="text-xs text-red-400">{receiptError}</p>}
               </div>
             )}
 
