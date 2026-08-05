@@ -1079,13 +1079,16 @@ export function GoogleGuestAgenda({
       // ── Calculate is_prepaid correctly: true if entire tab has zero outstanding balance ──
       // is_prepaid = (food is prepaid OR no food charges) AND (accommodation is prepaid OR stay_price = 0)
       // IMPORTANT: the accommodation-prepaid toggle only reflects intent — if a real payment was
-      // actually collected for accommodation in THIS settlement (svcAmount > 0 and money was taken),
-      // the tab is not actually prepaid, regardless of the toggle state. Otherwise a receipt can end
-      // up stamped PREPAID while a real cash/UZS payment for the full accommodation amount was recorded.
+      // actually collected for accommodation in THIS settlement, the tab is not actually prepaid,
+      // regardless of the toggle state. Otherwise a receipt can end up stamped PREPAID while a
+      // real cash/UZS payment for the full accommodation amount was recorded.
       const hasFoodCharges = activeMeals.some((m: any) => !m.prepaid && (m.status === 'confirmed' || m.status === 'served'));
       const hasAccommodationCharges = (sel.total_price || 0) > 0;
-      const accommodationPaidThisSession = svcAmount > 0 && totalPaidUsd > 0;
-      const calculatedIsPrepaid = (!hasFoodCharges || activeMeals.every((m: any) => m.prepaid)) && 
+      // If money was collected that could cover accommodation charges, it's not prepaid.
+      // Use total_price (the actual accommodation charge) instead of svcAmount (which is 0 when prepaid toggle is on)
+      const accommodationCharge = sel.total_price || 0;
+      const accommodationPaidThisSession = accommodationCharge > 0 && totalPaidUsd >= accommodationCharge;
+      const calculatedIsPrepaid = (!hasFoodCharges || activeMeals.every((m: any) => m.prepaid)) &&
                                    (!hasAccommodationCharges || (isPrepaid && !accommodationPaidThisSession));
 
       const snapshot = {
