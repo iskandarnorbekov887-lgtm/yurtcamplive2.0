@@ -27,7 +27,7 @@ export function buildReceiptLineItems(
   if (items.accommodation !== undefined && (items.accommodation > 0 || items.isPrepaid)) {
     lineItems.push({
       label: 'Accommodation',
-      amount: items.isPrepaid ? 0 : items.accommodation,
+      amount: items.accommodation, // Always show real amount, even if prepaid
       isPrepaid: items.isPrepaid || false
     });
   }
@@ -41,10 +41,12 @@ export function buildReceiptLineItems(
       const lunchAmount = meals.lunchCharged !== undefined 
         ? meals.lunchCharged 
         : meals.lunch * (pricingConfig?.lunch_price || 10);
+      const lunchMealDetails = meals.mealDetails?.filter((m: any) => m.meal_type === 'Lunch') || [];
+      const lunchAllPrepaid = lunchMealDetails.length > 0 && lunchMealDetails.every((m: any) => m.prepaid === true);
       lineItems.push({
         label: `Lunch x${meals.lunch}`,
         amount: lunchAmount,
-        isPrepaid: false
+        isPrepaid: lunchAllPrepaid
       });
     }
 
@@ -53,10 +55,12 @@ export function buildReceiptLineItems(
       const dinnerAmount = meals.dinnerCharged !== undefined 
         ? meals.dinnerCharged 
         : meals.dinner * (pricingConfig?.dinner_price || 10);
+      const dinnerMealDetails = meals.mealDetails?.filter((m: any) => m.meal_type === 'Dinner') || [];
+      const dinnerAllPrepaid = dinnerMealDetails.length > 0 && dinnerMealDetails.every((m: any) => m.prepaid === true);
       lineItems.push({
         label: `Dinner x${meals.dinner}`,
         amount: dinnerAmount,
-        isPrepaid: false
+        isPrepaid: dinnerAllPrepaid
       });
     }
   }

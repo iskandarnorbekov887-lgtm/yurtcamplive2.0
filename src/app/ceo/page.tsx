@@ -11,6 +11,7 @@ import { GoogleGuestAgenda } from '@/components/google-guest-agenda';
 import { ManagerIncomeForm } from '@/components/manager-income-form';
 import { ManagerMealRequests } from '@/components/manager/manager-meal-requests';
 import { EditApprovalQueue } from '@/components/EditApprovalQueue';
+import { DrinkTransactionLog } from '@/components/DrinkTransactionLog';
 import type { UserRole } from '@/lib/supabase';
 
 // Force dynamic rendering to avoid SSR issues with auth
@@ -731,15 +732,18 @@ function CEODashboard() {
           </div>
         )}
         {activeTab === 'financials' && (
-          <div className="bg-[#1C232E] rounded-[2.5rem] shadow-xl border border-[#5C4A2E]/30 p-8 animate-in fade-in duration-500">
-            <h2 className="text-2xl font-black text-[#EDE6D6] mb-4 font-heading">Financial Calendar</h2>
-            <p className="text-[#9C9384] mb-6">View income and expenses by date. Click on any day to see details.</p>
-            <a
-              href="/ceo-financials"
-              className="inline-block px-6 py-3 bg-[#0B6E4F] text-[#C9A227] rounded-lg font-bold uppercase tracking-widest text-xs hover:bg-[#0B6E4F] transition-all shadow-lg"
-            >
-              Go to Financial Calendar
-            </a>
+          <div className="animate-in fade-in duration-500 space-y-6">
+            <div className="bg-[#1C232E] rounded-[2.5rem] shadow-xl border border-[#5C4A2E]/30 p-8">
+              <h2 className="text-2xl font-black text-[#EDE6D6] mb-4 font-heading">Financial Calendar</h2>
+              <p className="text-[#9C9384] mb-6">View income and expenses by date. Click on any day to see details.</p>
+              <a
+                href="/ceo-financials"
+                className="inline-block px-6 py-3 bg-[#0B6E4F] text-[#C9A227] rounded-lg font-bold uppercase tracking-widest text-xs hover:bg-[#0B6E4F] transition-all shadow-lg"
+              >
+                Go to Financial Calendar
+              </a>
+            </div>
+            <DrinkTransactionLog />
           </div>
         )}
         {activeTab === 'team' && (

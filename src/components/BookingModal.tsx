@@ -194,9 +194,24 @@ export function BookingModal(props: BookingModalProps) {
 
   useEffect(() => {
     // Fetch drinks for the drink selector
-    supabase.from('drinks').select('*').order('name').then(({ data }) => {
-      setDrinks(data || []);
-    });
+    supabase
+      .from('drink_variants')
+      .select('*, drinks!inner(name, category)')
+      .gt('quantity_in_stock', 0)
+      .order('drinks(name)')
+      .then(({ data }) => {
+        const variants = (data || []).map(v => ({
+          id: v.id,
+          drink_id: v.drink_id,
+          drink_name: v.drinks.name,
+          category: v.drinks.category,
+          unit: v.unit,
+          quantity_in_stock: v.quantity_in_stock,
+          sell_price: v.sell_price,
+          buy_price: v.buy_price
+        }));
+        setDrinks(variants);
+      });
   }, []);
 
   useEffect(() => {
@@ -840,12 +855,32 @@ export function BookingModal(props: BookingModalProps) {
                                 {lineItems.map((li, i) => (
                                   <div key={i} className="flex justify-between text-[11px]">
                                     <span className="text-[#EDE6D6]">{li.label}</span>
-                                    <span className="font-bold text-[#EDE6D6]">{li.isPrepaid ? 'PREPAID' : `$${li.amount.toFixed(2)}`}</span>
+                                    <span className="font-bold text-[#EDE6D6]">
+                                      {li.isPrepaid ? (li.amount > 0 ? `PREPAID — $${li.amount.toFixed(2)}` : 'PREPAID') : `$${li.amount.toFixed(2)}`}
+                                    </span>
                                   </div>
                                 ))}
                                 <div className="flex justify-between text-[11px] font-black border-t border-[#2A2F36] pt-2">
                                   <span>Total</span><span>${total.toFixed(2)}</span>
                                 </div>
+                                {(r.snapshot?.payments || r.payments) && (r.snapshot?.payments || r.payments).length > 0 && (
+                                  <div className="mt-3 pt-3 border-t border-[#2A2F36]">
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-[#9C9384] mb-2">Payments Collected This Session</p>
+                                    {(r.snapshot?.payments || r.payments).map((p: any, pi: number) => (
+                                      <div key={pi} className="flex justify-between text-[10px] text-[#EDE6D6]">
+                                        <span>{p.method}</span>
+                                        <span>
+                                          {p.currency_original === 'USD' 
+                                            ? `$${parseFloat(p.amount_original).toFixed(2)}`
+                                            : `${parseFloat(p.amount_original).toLocaleString()} ${p.currency_original}`}
+                                          {p.currency_original !== 'USD' && (
+                                            <span className="text-[#9C9384] ml-1">(${parseFloat(p.amount_usd_equivalent).toFixed(2)})</span>
+                                          )}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
@@ -1589,8 +1624,8 @@ export function BookingModal(props: BookingModalProps) {
                           </div>
                         )}
 
-                        {/* Drinks - Add to Tab */}
-                        {isStaff && (
+                        {/* Drinks - Add to Tab - TEMPORARILY HIDDEN */}
+                        {false && isStaff && (
                           <div className="bg-[#1C232E]/50 rounded-lg p-3 border border-[#2A2F36]">
                             <div className="flex justify-between items-center mb-2">
                               <div className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">{t('drinks.add_to_tab')}</div>
@@ -1619,9 +1654,8 @@ export function BookingModal(props: BookingModalProps) {
                                       }`}
                                     >
                                       <div className="flex items-center gap-3">
-                                        <span className="text-2xl">{drink.icon}</span>
                                         <div>
-                                          <div className="text-sm font-bold uppercase">{drink.name}</div>
+                                          <div className="text-sm font-bold uppercase">{drink.drink_name}</div>
                                           <div className="text-[10px] text-[#9C9384]">${drink.sell_price?.toFixed(2) || '0.00'}</div>
                                         </div>
                                       </div>
@@ -1666,8 +1700,7 @@ export function BookingModal(props: BookingModalProps) {
                                           quantity: drinkQuantity,
                                           is_paid: false,
                                           details: {
-                                            name: selectedDrink.name,
-                                            icon: selectedDrink.icon,
+                                            name: selectedDrink.drink_name,
                                             drink_id: selectedDrink.id
                                           }
                                         };
@@ -1676,7 +1709,7 @@ export function BookingModal(props: BookingModalProps) {
                                         setSelectedDrink(null);
                                         setDrinkQuantity(1);
                                         setShowDrinkSelector(false);
-                                        flash(`✓ Added ${selectedDrink.name} x${drinkQuantity} to tab`);
+                                        flash(`✓ Added ${selectedDrink.drink_name} x${drinkQuantity} to tab`);
                                       }}
                                       disabled={drinkQuantity > selectedDrink.quantity_in_stock}
                                       className="w-full py-2 bg-[#0B6E4F] text-[#C9A227] rounded-lg text-xs font-black uppercase tracking-widest hover:bg-[#0B6E4F]/80 transition-all disabled:opacity-50"

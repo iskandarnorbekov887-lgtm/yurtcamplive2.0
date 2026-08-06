@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ProtectedRoute } from '@/components/protected-route';
 import { supabase, type Finance } from '@/lib/supabase';
@@ -71,6 +71,7 @@ function ManagerFinancials() {
   const [exchangeMessage, setExchangeMessage] = useState('');
   const [exchangeAmountError, setExchangeAmountError] = useState('');
   const [cashBox, setCashBox] = useState<{ USD: number; UZS: number; EUR: number }>({ USD: 0, UZS: 0, EUR: 0 });
+  const [onlineCashBox, setOnlineCashBox] = useState<{ USD: number; UZS: number; EUR: number }>({ USD: 0, UZS: 0, EUR: 0 });
   // Store all payments for current month to combine with finances in calendar view
   const [allPayments, setAllPayments] = useState<any[]>([]);
   
@@ -80,6 +81,8 @@ function ManagerFinancials() {
   
   // Date - set via calendar selection
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const datePickerRef = useRef<HTMLDivElement>(null);
 
   // Recent expenses
   const [recentExpenses, setRecentExpenses] = useState<Finance[]>([]);
@@ -102,6 +105,9 @@ function ManagerFinancials() {
   // Receipt OCR state
   const [receiptLoading, setReceiptLoading] = useState(false);
   const [receiptError, setReceiptError] = useState<string | null>(null);
+  const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
+  const [parsedItems, setParsedItems] = useState<Array<{ item_name: string; quantity: number; unit_price: number }>>([]);
+  const [showReviewMode, setShowReviewMode] = useState(false);
 
   // Drinks state - new normalized structure
   const [drinks, setDrinks] = useState<any[]>([]);
@@ -172,9 +178,29 @@ function ManagerFinancials() {
     fetchAllPayments();
   }, [currentMonth, currentYear]);
 
+  // Close date picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(event.target as Node)) {
+        setShowDatePicker(false);
+      }
+    };
+
+    if (showDatePicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showDatePicker]);
+
   const fetchCashBox = async () => {
     // Fetch cash payments from payments table
     const { data: paymentsData } = await supabase.from('payments').select('*').eq('method', 'Cash');
+    
+    // Fetch online payments from payments table
+    const { data: onlinePaymentsData } = await supabase.from('payments').select('*').eq('method', 'Online');
     
     // Fetch income/expense from camp_finances
     const { data: financesData } = await supabase.from('camp_finances').select('*');
@@ -192,26 +218,50 @@ function ManagerFinancials() {
       if (p.type === 'expense') {
         acc[currency] = (acc[currency] || 0) - amount;
       } else {
-        // Default to 'sale' or treat as income
         acc[currency] = (acc[currency] || 0) + amount;
       }
       return acc;
     }, { USD: 0, UZS: 0, EUR: 0 }) || { USD: 0, UZS: 0, EUR: 0 };
     
-    // Add camp_finances (income adds, expense subtracts)
+    // Online payments summary (same logic)
+    const onlineSummary = onlinePaymentsData?.reduce((acc: any, p: any) => {
+      const amount = Number(p.amount_original) || 0;
+      const currency = p.currency_original || 'USD';
+      if (p.type === 'expense') {
+        acc[currency] = (acc[currency] || 0) - amount;
+      } else {
+        acc[currency] = (acc[currency] || 0) + amount;
+      }
+      return acc;
+    }, { USD: 0, UZS: 0, EUR: 0 }) || { USD: 0, UZS: 0, EUR: 0 };
+    
+    // Add camp_finances - split by payment_method
+    const onlinePaymentMethods = ['Online'];
     if (financesData) {
       financesData.forEach((f: any) => {
         const amount = Number(f.original_amount) || 0;
         const currency = f.currency || 'UZS';
-        if (f.type === 'income') {
-          summary[currency] = (summary[currency] || 0) + amount;
-        } else if (f.type === 'expense') {
-          summary[currency] = (summary[currency] || 0) - amount;
+        const paymentMethod = f.payment_method || 'Cash'; // treat null as Cash for backward compatibility
+        
+        if (onlinePaymentMethods.includes(paymentMethod)) {
+          // Online branch
+          if (f.type === 'income') {
+            onlineSummary[currency] = (onlineSummary[currency] || 0) + amount;
+          } else if (f.type === 'expense') {
+            onlineSummary[currency] = (onlineSummary[currency] || 0) - amount;
+          }
+        } else {
+          // Cash branch (default)
+          if (f.type === 'income') {
+            summary[currency] = (summary[currency] || 0) + amount;
+          } else if (f.type === 'expense') {
+            summary[currency] = (summary[currency] || 0) - amount;
+          }
         }
       });
     }
     
-    // Add currency exchanges (subtract from_currency, add to UZS)
+    // Add currency exchanges (cash-only - subtract from_currency, add to UZS)
     if (exchangesData) {
       exchangesData.forEach((e: any) => {
         const fromAmount = Number(e.from_amount) || 0;
@@ -224,6 +274,7 @@ function ManagerFinancials() {
     }
     
     setCashBox(summary);
+    setOnlineCashBox(onlineSummary);
     return summary;
   };
 
@@ -616,7 +667,7 @@ function ManagerFinancials() {
         return;
       }
 
-      const { error: insertError } = await supabase.from('camp_finances').insert({
+      const { error: insertError, data: financeData } = await supabase.from('camp_finances').insert({
         transaction_date: date,
         type,
         category: type === 'expense' ? category : 'Income',
@@ -625,14 +676,28 @@ function ManagerFinancials() {
         exchange_rate: 1,
         amount_uzs: amountValue,
         description,
+        receipt_url: receiptUrl || null,
         worker_name: type === 'expense' && category === 'workers income' ? finalWorkerName : null,
         period_start: type === 'expense' && category === 'workers income' ? periodStart : null,
         period_end: type === 'expense' && category === 'workers income' ? periodEnd : null,
         created_by: user.id,
         team_id: user?.team_id,
-      });
+      }).select().single();
 
       if (insertError) throw insertError;
+
+      // Insert line items for groceries category
+      if (type === 'expense' && category === 'groceries' && parsedItems.length > 0) {
+        const itemsToInsert = parsedItems.map(item => ({
+          finance_id: financeData.id,
+          item_name: item.item_name,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+        }));
+
+        const { error: itemsError } = await supabase.from('camp_finance_items').insert(itemsToInsert);
+        if (itemsError) throw itemsError;
+      }
 
       setMessage(t('msg.record_saved'));
       fetchRecentExpenses();
@@ -648,6 +713,9 @@ function ManagerFinancials() {
       setShowNewWorkerInput(false);
       setPeriodStart('');
       setPeriodEnd('');
+      setReceiptUrl(null);
+      setParsedItems([]);
+      setShowReviewMode(false);
     } catch (err: any) {
       setMessage(`${t('msg.error')}: ${err.message}`);
     } finally {
@@ -760,12 +828,19 @@ function ManagerFinancials() {
 
         if (existingVariant) {
           // Restock existing variant
+          const oldQty = existingVariant.quantity_in_stock;
+          const oldBuyPrice = existingVariant.buy_price || 0;
+          const newTotalQty = oldQty + quantity;
+          const weightedBuyPrice = newTotalQty > 0
+            ? ((oldQty * oldBuyPrice) + (quantity * buyPrice)) / newTotalQty
+            : buyPrice;
+
           const { error: restockError } = await supabase
             .from('drink_variants')
             .update({
-              quantity_in_stock: existingVariant.quantity_in_stock + quantity,
-              buy_price: buyPrice,
-              sell_price: sellPrice
+              quantity_in_stock: newTotalQty,
+              buy_price: Math.round(weightedBuyPrice), // round to whole UZS
+              sell_price: sellPrice // selling price update is fine to overwrite directly
             })
             .eq('id', existingVariant.id);
           if (restockError) throw restockError;
@@ -842,6 +917,22 @@ function ManagerFinancials() {
     setReceiptError(null);
 
     try {
+      // Upload to Supabase Storage
+      const fileName = `${Date.now()}_${file.name}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('receipts')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('receipts')
+        .getPublicUrl(fileName);
+
+      setReceiptUrl(publicUrl);
+
+      // Convert to base64 for OCR
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve((reader.result as string).split(',')[1]);
@@ -849,6 +940,7 @@ function ManagerFinancials() {
         reader.readAsDataURL(file);
       });
 
+      // Call OCR API
       const res = await fetch('/api/receipt-ocr', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -858,8 +950,14 @@ function ManagerFinancials() {
       if (!res.ok) throw new Error('Failed to read receipt');
       const data = await res.json();
 
-      setAmount(String(data.total ?? ''));
-      setDescription(data.items?.join(', ') ?? '');
+      // Set parsed items and show review mode
+      setParsedItems(data.items || []);
+      setShowReviewMode(true);
+      
+      // Calculate total from parsed items
+      const total = data.items?.reduce((sum: number, item: any) => sum + (item.quantity * item.unit_price), 0) || 0;
+      setAmount(String(total));
+      setDescription(data.items?.map((i: any) => i.item_name).join(', ') || '');
     } catch (err) {
       setReceiptError(t('receipt.error') || 'Could not read receipt');
     } finally {
@@ -931,23 +1029,48 @@ function ManagerFinancials() {
               {t('exchange.title')}
             </button>
           </div>
+          
+          {/* Cash Section */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {cashBox.USD !== 0 && (
               <div className="space-y-1">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">USD Total</p>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Cash (USD)</p>
                 <p className="text-2xl font-data font-bold tracking-tight text-white">${cashBox.USD.toLocaleString()}</p>
               </div>
             )}
             <div className="space-y-1">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">UZS Total</p>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Cash (UZS)</p>
               <p className="text-2xl font-data font-bold tracking-tight text-white">{cashBox.UZS.toLocaleString()} <span className="text-[10px] text-slate-500 font-medium">SUM</span></p>
             </div>
             {cashBox.EUR !== 0 && (
               <div className="space-y-1">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">EUR Total</p>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Cash (EUR)</p>
                 <p className="text-2xl font-data font-bold tracking-tight text-white">€{cashBox.EUR.toLocaleString()}</p>
               </div>
             )}
+          </div>
+          
+          {/* Online Charged Section */}
+          <div className="mt-6 pt-6 border-t border-[#5C4A2E]/30">
+            <p className="text-[10px] font-bold text-[#0B6E4F] uppercase tracking-widest mb-3">Online Charged (not physical cash)</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {onlineCashBox.USD !== 0 && (
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Online (USD)</p>
+                  <p className="text-2xl font-data font-bold tracking-tight text-white">${onlineCashBox.USD.toLocaleString()}</p>
+                </div>
+              )}
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Online (UZS)</p>
+                <p className="text-2xl font-data font-bold tracking-tight text-white">{onlineCashBox.UZS.toLocaleString()} <span className="text-[10px] text-slate-500 font-medium">SUM</span></p>
+              </div>
+              {onlineCashBox.EUR !== 0 && (
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Online (EUR)</p>
+                  <p className="text-2xl font-data font-bold tracking-tight text-white">€{onlineCashBox.EUR.toLocaleString()}</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1006,10 +1129,135 @@ function ManagerFinancials() {
             {type !== 'drinks' && (
               <div>
                 <label className="block text-sm font-black text-[#EDE6D6] mb-2">{t('form.selected_date')}</label>
-                <div className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl bg-[#0B6E4F]/10 text-[#C9A227] font-black">
-                  {new Date(date).toLocaleDateString(getLocale(), { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowDatePicker(!showDatePicker)}
+                  className="w-full px-4 py-3 border-2 border-[#5C4A2E]/30 rounded-xl bg-[#0B6E4F]/10 text-[#C9A227] font-black flex items-center justify-between hover:border-[#0B6E4F] hover:bg-[#0B6E4F]/20 transition-all cursor-pointer"
+                >
+                  <span>{new Date(date).toLocaleDateString(getLocale(), { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </button>
                 <p className="text-xs text-[#9C9384] mt-1 font-semibold">{t('form.select_date_from_calendar')}</p>
+                
+                {/* Date Picker Popover */}
+                {showDatePicker && (
+                  <div ref={datePickerRef} className="mt-2 bg-[#1C232E] rounded-xl shadow-lg border border-[#5C4A2E]/30 p-3 z-50 max-w-xs">
+                    <div className="flex justify-between items-center mb-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+                          const newYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+                          setCurrentMonth(newMonth);
+                          setCurrentYear(newYear);
+                        }}
+                        className="px-2 py-1 bg-[#1C232E]/50 rounded text-[#EDE6D6] hover:bg-[#2A1518] border border-[#2A2F36] text-xs"
+                      >
+                        ←
+                      </button>
+                      <span className="text-xs font-black text-[#EDE6D6]">
+                        {new Date(currentYear, currentMonth).toLocaleDateString(getLocale(), { month: 'short', year: 'numeric' })}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newMonth = currentMonth === 11 ? 0 : currentMonth + 1;
+                          const newYear = currentMonth === 11 ? currentYear + 1 : currentYear;
+                          setCurrentMonth(newMonth);
+                          setCurrentYear(newYear);
+                        }}
+                        className="px-2 py-1 bg-[#1C232E]/50 rounded text-[#EDE6D6] hover:bg-[#2A1518] border border-[#2A2F36] text-xs"
+                      >
+                        →
+                      </button>
+                    </div>
+                    
+                    {/* Calendar Grid */}
+                    <div className="grid grid-cols-7 gap-0.5">
+                      {/* Day Headers */}
+                      {[t('day.1'), t('day.2'), t('day.3'), t('day.4'), t('day.5'), t('day.6'), t('day.0')].map((day, i) => (
+                        <div key={day} className="text-center text-[10px] font-black text-[#9C9384] py-0.5">
+                          {day}
+                        </div>
+                      ))}
+
+                      {/* Calendar Days */}
+                      {(() => {
+                        const firstDay = new Date(currentYear, currentMonth, 1);
+                        const lastDay = new Date(currentYear, currentMonth + 1, 0);
+                        const startDay = (firstDay.getDay() + 6) % 7;
+                        const totalDays = lastDay.getDate();
+
+                        const days = [];
+                        for (let i = 0; i < startDay; i++) {
+                          days.push(<div key={`empty-${i}`} className="aspect-square"></div>);
+                        }
+
+                        for (let day = 1; day <= totalDays; day++) {
+                          const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                          const dayFinances = recentExpenses.filter(f => f.date === dateStr);
+                          const dayPayments = allPayments.filter(p => p.transaction_date === dateStr);
+                          const finIncome = dayFinances.filter(f => f.type === 'income').reduce((sum, f) => sum + f.amount_uzs, 0);
+                          const finExpense = dayFinances.filter(f => f.type === 'expense').reduce((sum, f) => sum + f.amount_uzs, 0);
+                          const payIncome = dayPayments.filter(p => p.type === 'sale').reduce((sum, p) => sum + Number(p.amount_original), 0);
+                          const payExpense = dayPayments.filter(p => p.type === 'expense').reduce((sum, p) => sum + Number(p.amount_original), 0);
+                          const netIncome = finIncome + payIncome;
+                          const netExpense = finExpense + payExpense;
+                          const netProfit = netIncome - netExpense;
+                          
+                          const today = new Date().toISOString().split('T')[0];
+                          const isToday = dateStr === today;
+                          const isSelected = dateStr === date;
+
+                          days.push(
+                            <button
+                              key={day}
+                              type="button"
+                              onClick={() => {
+                                setDate(dateStr);
+                                setShowDatePicker(false);
+                              }}
+                              className={`
+                                aspect-square rounded border p-0.5 flex flex-col items-center justify-center transition-all hover:border-[#0B6E4F]
+                                ${isToday ? 'border border-[#C9A227] bg-[#0F1419]' : 'border-[#5C4A2E]/30 bg-[#0F1419]'}
+                                ${isSelected ? 'border border-[#0B6E4F] bg-[#0B6E4F]/20' : ''}
+                                ${netProfit > 0 ? 'bg-[#0B6E4F]/10' : ''}
+                                ${netProfit < 0 ? 'bg-[#722F37]/10' : ''}
+                              `}
+                            >
+                              <span className="text-[10px] font-black text-[#EDE6D6]">{day}</span>
+                              {netProfit !== 0 && (
+                                <div className="text-[8px] mt-0 truncate w-full text-center">
+                                  <span className={`font-bold ${netProfit > 0 ? 'text-[#0B6E4F]' : 'text-[#722F37]'}`}>
+                                    {netProfit > 0 ? '+' : ''}{formatCurrency(netProfit)}
+                                  </span>
+                                </div>
+                              )}
+                            </button>
+                          );
+                        }
+
+                        return days;
+                      })()}
+                    </div>
+                    
+                    <div className="mt-2 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const today = new Date().toISOString().split('T')[0];
+                          setDate(today);
+                          setShowDatePicker(false);
+                        }}
+                        className="px-2 py-1 bg-[#0B6E4F] text-[#C9A227] rounded font-bold hover:bg-[#0B6E4F]/80 transition-all text-[10px]"
+                      >
+                        {t('calendar.today')}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1032,7 +1280,7 @@ function ManagerFinancials() {
             )}
 
             {/* Receipt OCR - only for groceries category */}
-            {type === 'expense' && category === 'groceries' && (
+            {type === 'expense' && category === 'groceries' && !showReviewMode && (
               <div className="bg-[#1C232E] rounded-xl p-4 space-y-3">
                 <p className="text-sm text-[#9C9384]">{t('receipt.prompt') || 'Scan a receipt to auto-fill'}</p>
                 <div className="flex gap-3">
@@ -1047,6 +1295,117 @@ function ManagerFinancials() {
                 </div>
                 {receiptLoading && <p className="text-xs text-[#9C9384]">{t('receipt.scanning') || 'Scanning...'}</p>}
                 {receiptError && <p className="text-xs text-red-400">{receiptError}</p>}
+              </div>
+            )}
+
+            {/* Receipt Review Mode - only for groceries category */}
+            {type === 'expense' && category === 'groceries' && showReviewMode && (
+              <div className="bg-[#1C232E] rounded-xl p-4 space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-sm font-black text-[#C9A227]">Review Receipt Items</h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowReviewMode(false);
+                      setReceiptUrl(null);
+                      setParsedItems([]);
+                    }}
+                    className="text-xs text-[#9C9384] hover:text-[#EDE6D6]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+
+                {/* Receipt Image */}
+                {receiptUrl && (
+                  <div className="rounded-lg overflow-hidden border border-[#5C4A2E]/30">
+                    <img src={receiptUrl} alt="Receipt" className="w-full h-auto max-h-48 object-contain" />
+                  </div>
+                )}
+
+                {/* Editable Items Table */}
+                <div className="space-y-2">
+                  {parsedItems.map((item, index) => (
+                    <div key={index} className="flex gap-2 items-center bg-[#0F1419] rounded-lg p-2 border border-[#5C4A2E]/30">
+                      <input
+                        type="text"
+                        value={item.item_name}
+                        onChange={(e) => {
+                          const newItems = [...parsedItems];
+                          newItems[index].item_name = e.target.value;
+                          setParsedItems(newItems);
+                        }}
+                        className="flex-1 px-2 py-1 bg-[#1C232E] border border-[#5C4A2E]/30 rounded text-xs text-[#EDE6D6]"
+                        placeholder="Item name"
+                      />
+                      <input
+                        type="number"
+                        value={item.quantity}
+                        onChange={(e) => {
+                          const newItems = [...parsedItems];
+                          newItems[index].quantity = parseFloat(e.target.value) || 1;
+                          setParsedItems(newItems);
+                        }}
+                        className="w-16 px-2 py-1 bg-[#1C232E] border border-[#5C4A2E]/30 rounded text-xs text-[#EDE6D6]"
+                        placeholder="Qty"
+                      />
+                      <input
+                        type="number"
+                        value={item.unit_price}
+                        onChange={(e) => {
+                          const newItems = [...parsedItems];
+                          newItems[index].unit_price = parseFloat(e.target.value) || 0;
+                          setParsedItems(newItems);
+                        }}
+                        className="w-24 px-2 py-1 bg-[#1C232E] border border-[#5C4A2E]/30 rounded text-xs text-[#EDE6D6]"
+                        placeholder="Price"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newItems = parsedItems.filter((_, i) => i !== index);
+                          setParsedItems(newItems);
+                        }}
+                        className="px-2 py-1 bg-[#722F37] text-[#C9A227] rounded text-xs hover:bg-[#722F37]/80"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Add Item Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setParsedItems([...parsedItems, { item_name: '', quantity: 1, unit_price: 0 }]);
+                  }}
+                  className="w-full py-2 bg-[#0B6E4F]/20 text-[#0B6E4F] rounded-lg text-xs font-bold hover:bg-[#0B6E4F]/30"
+                >
+                  + Add Item
+                </button>
+
+                {/* Running Total */}
+                <div className="flex justify-between items-center py-2 border-t border-[#5C4A2E]/30">
+                  <span className="text-sm font-black text-[#EDE6D6]">Total:</span>
+                  <span className="text-lg font-black text-[#C9A227]">
+                    {parsedItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0).toLocaleString()} UZS
+                  </span>
+                </div>
+
+                {/* Confirm & Save Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const total = parsedItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+                    setAmount(String(total));
+                    setDescription(parsedItems.map(i => i.item_name).join(', '));
+                    setShowReviewMode(false);
+                  }}
+                  className="w-full py-3 bg-[#0B6E4F] text-[#C9A227] rounded-xl font-bold text-sm hover:bg-[#0B6E4F]/80 transition-all"
+                >
+                  Confirm & Save to Form
+                </button>
               </div>
             )}
 

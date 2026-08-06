@@ -10,6 +10,7 @@ import { useLanguage } from '@/lib/language-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { useRouter } from 'next/navigation';
 import { CEOFinancialAnalytics } from '@/components/CEOFinancialAnalytics';
+import { DrinksFinancialSummary } from '@/components/DrinksFinancialSummary';
 
 export default function CEOFinancialsPage() {
   return (
@@ -33,6 +34,7 @@ function CEOFinancialCalendar() {
   const [dayPayments, setDayPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [cashBox, setCashBox] = useState<{ USD: number; UZS: number; EUR: number }>({ USD: 0, UZS: 0, EUR: 0 });
+  const [onlineCashBox, setOnlineCashBox] = useState<{ USD: number; UZS: number; EUR: number }>({ USD: 0, UZS: 0, EUR: 0 });
   const [checkedInCounts, setCheckedInCounts] = useState<Record<string, { inHouse: number; arriving: number; departing: number }>>({});
   const [dayFinancials, setDayFinancials] = useState<Record<string, { netIncome: number; netExpense: number; netProfit: number }>>({});
   
@@ -113,6 +115,9 @@ function CEOFinancialCalendar() {
     // Fetch cash payments from payments table
     const { data: paymentsData } = await supabase.from('payments').select('*').eq('method', 'Cash');
     
+    // Fetch online payments from payments table
+    const { data: onlinePaymentsData } = await supabase.from('payments').select('*').eq('method', 'Online');
+    
     // Fetch income/expense from camp_finances
     const { data: financesData } = await supabase.from('camp_finances').select('*');
     
@@ -138,26 +143,50 @@ function CEOFinancialCalendar() {
       if (p.type === 'expense') {
         acc[currency] = (acc[currency] || 0) - amount;
       } else {
-        // Default to 'sale' or treat as income
         acc[currency] = (acc[currency] || 0) + amount;
       }
       return acc;
     }, { USD: 0, UZS: 0, EUR: 0 }) || { USD: 0, UZS: 0, EUR: 0 };
     
-    // Add camp_finances (income adds, expense subtracts)
+    // Online payments summary (same logic)
+    const onlineSummary = onlinePaymentsData?.reduce((acc: any, p: any) => {
+      const amount = Number(p.amount_original) || 0;
+      const currency = p.currency_original || 'USD';
+      if (p.type === 'expense') {
+        acc[currency] = (acc[currency] || 0) - amount;
+      } else {
+        acc[currency] = (acc[currency] || 0) + amount;
+      }
+      return acc;
+    }, { USD: 0, UZS: 0, EUR: 0 }) || { USD: 0, UZS: 0, EUR: 0 };
+    
+    // Add camp_finances - split by payment_method
+    const onlinePaymentMethods = ['Online'];
     if (financesData) {
       financesData.forEach((f: any) => {
         const amount = Number(f.original_amount) || 0;
         const currency = f.currency || 'UZS';
-        if (f.type === 'income') {
-          summary[currency] = (summary[currency] || 0) + amount;
-        } else if (f.type === 'expense') {
-          summary[currency] = (summary[currency] || 0) - amount;
+        const paymentMethod = f.payment_method || 'Cash'; // treat null as Cash for backward compatibility
+        
+        if (onlinePaymentMethods.includes(paymentMethod)) {
+          // Online branch
+          if (f.type === 'income') {
+            onlineSummary[currency] = (onlineSummary[currency] || 0) + amount;
+          } else if (f.type === 'expense') {
+            onlineSummary[currency] = (onlineSummary[currency] || 0) - amount;
+          }
+        } else {
+          // Cash branch (default)
+          if (f.type === 'income') {
+            summary[currency] = (summary[currency] || 0) + amount;
+          } else if (f.type === 'expense') {
+            summary[currency] = (summary[currency] || 0) - amount;
+          }
         }
       });
     }
     
-    // Add currency exchanges (subtract from_currency, add to UZS)
+    // Add currency exchanges (cash-only - subtract from_currency, add to UZS)
     if (exchangesData) {
       exchangesData.forEach((e: any) => {
         const fromAmount = Number(e.from_amount) || 0;
@@ -170,6 +199,7 @@ function CEOFinancialCalendar() {
     }
     
     setCashBox(summary);
+    setOnlineCashBox(onlineSummary);
     return summary;
   };
 
@@ -660,20 +690,46 @@ function CEOFinancialCalendar() {
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-8">
+            {/* Cash Section */}
             <div className="space-y-1">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('msg.usd_total')}</p>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('msg.cash_usd')}</p>
               <p className="text-2xl font-data font-bold tracking-tight text-white">${cashBox.USD.toLocaleString()}</p>
             </div>
             <div className="space-y-1 border-x border-white/5 px-8">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('msg.uzs_total')}</p>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('msg.cash_uzs')}</p>
               <p className="text-2xl font-data font-bold tracking-tight text-white">{cashBox.UZS.toLocaleString()} <span className="text-[10px] text-slate-500 font-medium">SUM</span></p>
             </div>
             <div className="space-y-1">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('msg.eur_total')}</p>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('msg.cash_eur')}</p>
               <p className="text-2xl font-data font-bold tracking-tight text-white">€{cashBox.EUR.toLocaleString()}</p>
             </div>
           </div>
+
+          {/* Online Charged Section */}
+          <div className="mt-6 pt-6 border-t border-[#5C4A2E]/30">
+            <p className="text-[10px] font-bold text-[#0B6E4F] uppercase tracking-widest mb-3">{t('msg.online_charged_label')}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-8">
+              {onlineCashBox.USD !== 0 && (
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('msg.online_usd')}</p>
+                  <p className="text-2xl font-data font-bold tracking-tight text-white">${onlineCashBox.USD.toLocaleString()}</p>
+                </div>
+              )}
+              <div className="space-y-1 border-x border-white/5 px-8">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('msg.online_uzs')}</p>
+                <p className="text-2xl font-data font-bold tracking-tight text-white">{onlineCashBox.UZS.toLocaleString()} <span className="text-[10px] text-slate-500 font-medium">SUM</span></p>
+              </div>
+              {onlineCashBox.EUR !== 0 && (
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('msg.online_eur')}</p>
+                  <p className="text-2xl font-data font-bold tracking-tight text-white">€{onlineCashBox.EUR.toLocaleString()}</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
+
+        <DrinksFinancialSummary />
 
         {activeView === 'calendar' ? (
           <>

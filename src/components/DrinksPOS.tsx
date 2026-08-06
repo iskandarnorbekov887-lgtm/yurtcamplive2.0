@@ -27,40 +27,12 @@ export function DrinksPOS() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
   const [showConfetti, setShowConfetti] = useState(false);
-  const [salesHistory, setSalesHistory] = useState<any[]>([]);
+  const [salesHistory, setSalesHistory] = useState<Array<{ id: string; sold_at: string; quantity: number; price_at_sale: number; drink_variants: { unit: string; drinks: { name: string } } }>>([]);
 
-  const unitPresets: Record<string, string[]> = {
-    salqin_ichimliklar: ['0.25L banka', '0.33L banka', '0.5L', '1L', '1.5L', '2L'],
-    piva: ['0.5L banka', '0.5L shisha', '1L'],
-    vino: ['shisha', '0.75L'],
-    aroq: ['0.25L shisha', '0.5L shisha', '0.7L shisha', '1L shisha']
-  };
+  // Pricing and payment state
+  // sell_price and buy_price are stored in UZS (base currency)
+  const [method, setMethod] = useState<'Cash' | 'Online'>('Cash');
 
-  // Fetch drinks and sales history
-  useEffect(() => {
-    fetchDrinks();
-    fetchSalesHistory();
-    
-    // Subscribe to realtime changes
-    const drinksChannel = supabase
-      .channel('pos-drinks-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'drink_variants' }, () => {
-        fetchDrinks();
-      })
-      .subscribe();
-
-    const salesChannel = supabase
-      .channel('pos-sales-changes')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'drink_sales' }, () => {
-        fetchSalesHistory();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(drinksChannel);
-      supabase.removeChannel(salesChannel);
-    };
-  }, []);
 
   const fetchSalesHistory = async () => {
     const { data, error } = await supabase
@@ -99,6 +71,35 @@ export function DrinksPOS() {
     }
   };
 
+  // Fetch drinks and sales history
+  useEffect(() => {
+    const fetchData = async () => {
+      await fetchDrinks();
+      await fetchSalesHistory();
+    };
+    fetchData();
+    
+    // Subscribe to realtime changes
+    const drinksChannel = supabase
+      .channel('pos-drinks-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'drink_variants' }, () => {
+        fetchDrinks();
+      })
+      .subscribe();
+
+    const salesChannel = supabase
+      .channel('pos-sales-changes')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'drink_sales' }, () => {
+        fetchSalesHistory();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(drinksChannel);
+      supabase.removeChannel(salesChannel);
+    };
+  }, []);
+
   const addToCart = (variant: DrinkVariant) => {
     if (variant.quantity_in_stock <= 0 || !variant.sell_price) return;
     
@@ -130,7 +131,7 @@ export function DrinksPOS() {
     setCart(cart.filter(item => item.variant.id !== variantId));
   };
 
-  const cartTotal = cart.reduce((sum, item) => sum + (item.quantity * (item.variant.sell_price || 0)), 0);
+  const cartTotalUzs = cart.reduce((sum, item) => sum + (item.quantity * (item.variant.sell_price || 0)), 0);
 
   const handleCheckout = async () => {
     if (cart.length === 0) return;
@@ -167,11 +168,11 @@ export function DrinksPOS() {
         .from('payments')
         .insert({
           booking_id: null,
-          amount_original: cartTotal,
+          amount_original: cartTotalUzs,
           currency_original: 'UZS',
-          amount_usd_equivalent: cartTotal / 11000,
-          exchange_rate_used: 11000,
-          method: 'Cash',
+          amount_usd_equivalent: cartTotalUzs / 12500,
+          exchange_rate_used: 12500,
+          method,
           note: 'Walk-in POS sale'
         });
       
@@ -235,7 +236,7 @@ export function DrinksPOS() {
                       <p className="font-bold text-[#EDE6D6] mb-1 text-sm md:text-base">{variant.drink_name}</p>
                       <p className="text-xs text-[#9C9384] mb-2">{variant.unit}</p>
                       {variant.sell_price ? (
-                        <p className="text-sm font-black text-[#C9A227]">${variant.sell_price.toFixed(2)}</p>
+                        <p className="text-sm font-black text-[#C9A227]">{variant.sell_price.toLocaleString()} UZS</p>
                       ) : (
                         <p className="text-sm font-black text-[#DC2626]">{t('pos.price_not_set')}</p>
                       )}
@@ -258,57 +259,75 @@ export function DrinksPOS() {
             <p className="text-[#9C9384] italic">{t('pos.empty_cart')}</p>
           ) : (
             <>
-              <div className="space-y-3 mb-4 max-h-64 md:max-h-96 overflow-y-auto">
+              <div className="space-y-2 mb-3 max-h-64 md:max-h-96 overflow-y-auto">
                 {cart.map(item => (
-                  <div key={item.variant.id} className="bg-[#0F1419] p-3 rounded-lg border border-[#5C4A2E]/30">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <p className="font-bold text-[#EDE6D6] text-sm">{item.variant.drink_name}</p>
-                        <p className="text-xs text-[#9C9384]">{item.variant.unit}</p>
+                  <div key={item.variant.id} className="bg-[#0F1419] p-2 rounded-lg border border-[#5C4A2E]/30">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-[#EDE6D6] text-xs truncate">{item.variant.drink_name}</p>
+                        <p className="text-[10px] text-[#9C9384]">{item.variant.unit}</p>
                       </div>
-                      <button
-                        onClick={() => removeFromCart(item.variant.id)}
-                        className="text-[#722F37] hover:text-[#DC2626] text-xs min-w-[20px] h-6"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
                         <button
                           onClick={() => updateCartQuantity(item.variant.id, -1)}
-                          className="w-8 h-8 bg-[#5C4A2E]/30 rounded text-[#EDE6D6] hover:bg-[#5C4A2E]/50"
+                          className="w-6 h-6 bg-[#5C4A2E]/30 rounded text-[#EDE6D6] text-xs hover:bg-[#5C4A2E]/50"
                         >
                           -
                         </button>
-                        <span className="text-sm font-bold text-[#EDE6D6]">{item.quantity}</span>
+                        <span className="text-xs font-bold text-[#EDE6D6] w-4 text-center">{item.quantity}</span>
                         <button
                           onClick={() => updateCartQuantity(item.variant.id, 1)}
                           disabled={item.quantity >= item.variant.quantity_in_stock}
-                          className="w-8 h-8 bg-[#5C4A2E]/30 rounded text-[#EDE6D6] hover:bg-[#5C4A2E]/50 disabled:opacity-50"
+                          className="w-6 h-6 bg-[#5C4A2E]/30 rounded text-[#EDE6D6] text-xs hover:bg-[#5C4A2E]/50 disabled:opacity-50"
                         >
                           +
                         </button>
                       </div>
-                      <p className="text-sm font-black text-[#C9A227]">
-                        ${item.variant.sell_price ? (item.quantity * item.variant.sell_price).toFixed(2) : 'N/A'}
+                      <p className="text-xs font-black text-[#C9A227] whitespace-nowrap">
+                        {item.variant.sell_price ? `${(item.quantity * item.variant.sell_price).toLocaleString()} UZS` : 'N/A'}
                       </p>
+                      <button
+                        onClick={() => removeFromCart(item.variant.id)}
+                        className="text-[#722F37] hover:text-[#DC2626] text-[10px] w-5 h-5 flex items-center justify-center"
+                      >
+                        ✕
+                      </button>
                     </div>
                   </div>
                 ))}
               </div>
               
-              <div className="border-t border-[#5C4A2E]/30 pt-4 mb-4">
+              {/* Payment Method Toggle */}
+              <div className="flex gap-2 mb-3">
+                {(['Cash', 'Online'] as const).map((meth) => (
+                  <button
+                    key={meth}
+                    type="button"
+                    onClick={() => setMethod(meth)}
+                    className={`flex-1 py-1 px-2 rounded-md font-bold text-[10px] transition-all ${
+                      method === meth
+                        ? 'bg-[#0B6E4F] text-[#C9A227]'
+                        : 'bg-[#0F1419] text-[#9C9384] hover:bg-[#5C4A2E]/30'
+                    }`}
+                  >
+                    {meth}
+                  </button>
+                ))}
+              </div>
+
+              <div className="border-t border-[#5C4A2E]/30 pt-3 mb-3">
                 <div className="flex justify-between items-center">
-                  <span className="font-bold text-[#EDE6D6]">{t('pos.total')}</span>
-                  <span className="text-lg md:text-xl font-black text-[#C9A227]">{cartTotal.toLocaleString()} UZS</span>
+                  <span className="font-bold text-[#EDE6D6] text-sm">{t('pos.total')}</span>
+                  <span className="text-base md:text-lg font-black text-[#C9A227]">
+                    {cartTotalUzs.toLocaleString(undefined, { maximumFractionDigits: 0 })} SUM
+                  </span>
                 </div>
               </div>
 
               <button
                 onClick={handleCheckout}
                 disabled={submitting || cart.length === 0}
-                className="w-full py-3 md:py-4 bg-[#0B6E4F] text-[#C9A227] rounded-xl font-bold uppercase hover:bg-[#0B6E4F]/80 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base"
+                className="w-full py-2.5 bg-[#0B6E4F] text-[#C9A227] rounded-lg font-bold uppercase hover:bg-[#0B6E4F]/80 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-xs"
               >
                 {submitting ? t('btn.saving') : t('pos.checkout')}
               </button>

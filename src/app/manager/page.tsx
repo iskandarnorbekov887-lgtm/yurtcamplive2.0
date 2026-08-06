@@ -13,6 +13,7 @@ import { ManagerNotifications } from '@/components/manager/manager-notifications
 import { ManagerProcurement } from '@/components/procurement/manager-procurement';
 import { ManagerMealRequests } from '@/components/manager/manager-meal-requests';
 import { DrinksPOS } from '@/components/DrinksPOS';
+import { DrinkTransactionLog } from '@/components/DrinkTransactionLog';
 import StoragePage from '@/app/financials/storage/page';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LayoutDashboard, ShoppingBag, Box, Bell, LogOut, Utensils, Calendar, Menu, X, ShoppingCart } from 'lucide-react';
@@ -84,20 +85,28 @@ function ManagerPortal() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 30000);
-    
-    // Real-time listeners
+
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedFetch = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(fetchData, 800);
+    };
+
     const bookingsChannel = supabase
       .channel('manager-bookings-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, debouncedFetch)
       .subscribe();
       
     const mealsChannel = supabase
       .channel('manager-meals-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'meal_requests' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'meal_requests' }, debouncedFetch)
       .subscribe();
 
+    // Fallback poll in case realtime disconnects, much less aggressive
+    const interval = setInterval(fetchData, 120000);
+
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       clearInterval(interval);
       supabase.removeChannel(bookingsChannel);
       supabase.removeChannel(mealsChannel);
@@ -449,7 +458,12 @@ function ManagerPortal() {
 
               {activeTab === 'procurement' && <ManagerProcurement />}
               {activeTab === 'inventory' && <StoragePage />}
-              {activeTab === 'pos' && <DrinksPOS />}
+              {activeTab === 'pos' && (
+                <div className="space-y-6">
+                  <DrinksPOS />
+                  <DrinkTransactionLog />
+                </div>
+              )}
             </motion.div>
           </AnimatePresence>
         </div>
