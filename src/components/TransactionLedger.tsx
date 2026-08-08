@@ -617,23 +617,26 @@ export function TransactionLedger() {
   const categoryBadgeColor = (t: LedgerTxn) =>
     t.type === 'income' ? 'bg-[#0B6E4F]/20 text-[#0B6E4F]' : 'bg-[#722F37]/20 text-[#722F37]';
 
-  const getPaymentIconForTxn = (t: LedgerTxn) => {
-    let method = t.method;
-    
-    // For camp_finances expenses with no method, default to Cash
-    if (t.source === 'camp_finances' && !method) {
-      method = 'Cash';
-    }
-    
+  const getPaymentMethodForTxn = (t: LedgerTxn): string | null | undefined => {
     if (t.source === 'booking_payment' && t.booking_id) {
       const receipts = bookingReceiptsCache[t.booking_id] || [];
       const latestReceipt = receipts.length > 0 
         ? receipts.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
         : null;
       const paymentsFromSnapshot = latestReceipt?.snapshot?.payments || [];
-      method = paymentsFromSnapshot.length > 0 
+      return paymentsFromSnapshot.length > 0 
         ? paymentsFromSnapshot[0].method 
         : t.method;
+    }
+    return t.method;
+  };
+
+  const getPaymentIconForTxn = (t: LedgerTxn) => {
+    let method = getPaymentMethodForTxn(t);
+    
+    // For camp_finances expenses with no method, default to Cash
+    if (t.source === 'camp_finances' && !method) {
+      method = 'Cash';
     }
     
     if (method) {
@@ -831,7 +834,7 @@ export function TransactionLedger() {
                       <>
                         {getPaymentIconForTxn(t)}
                         <span className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">
-                          {(t.method || t.source === 'camp_finances' ? 'Cash' : 'Unknown')}
+                          {getPaymentMethodForTxn(t) || (t.source === 'camp_finances' ? 'Cash' : 'Unknown')}
                         </span>
                         <span className={`text-sm font-bold whitespace-nowrap ${t.type === 'income' ? 'text-[#0B6E4F]' : 'text-[#722F37]'}`}>
                           {t.type === 'income' ? '+' : '-'}{formatOriginal(t.amount, t.currency)}
