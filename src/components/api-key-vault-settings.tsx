@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/auth-context';
+import { supabase } from '@/lib/supabase';
 import { Key, ShieldCheck, CheckCircle2, AlertTriangle, Loader2, Save, Trash2, Eye, EyeOff } from 'lucide-react';
 
 type SaveStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -74,8 +75,18 @@ export function ApiKeyVaultSettings() {
   const resolveTeamId = useCallback(async (): Promise<string | null> => {
     if (!user?.id) return null;
     
-    const { data: profile } = await fetch('/api/user/profile').then(r => r.json());
-    return profile?.team_id || profile?.id || null;
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('team_id, id')
+      .eq('id', user.id)
+      .single();
+
+    if (error) {
+      console.warn('[ApiKeyVaultSettings] Could not read team_id from profile:', error.message);
+      return user.id; // graceful fallback: user IS the team
+    }
+
+    return profile?.team_id ?? profile?.id ?? user.id;
   }, [user?.id]);
 
   const fetchKeyStatus = useCallback(async () => {
