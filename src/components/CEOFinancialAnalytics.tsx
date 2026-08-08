@@ -2,10 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { TransactionLedger } from '@/components/TransactionLedger';
 import { 
-  BarChart, 
   Bar, 
-  LineChart, 
   Line, 
   XAxis, 
   YAxis, 
@@ -36,66 +35,18 @@ interface SummaryData {
   averageGuestsPerDay: number;
 }
 
-interface DayGuest {
-  id: number;
-  guest_name: string;
-  total_price: number;
-  collected_amount: number;
-  currency: string;
-  payment_status: string | null;
-  is_prepaid: boolean;
-  is_accommodation_prepaid: boolean;
-  is_food_prepaid: boolean;
-}
-
-interface DayExpense {
-  id: number;
-  category: string | null;
-  description: string | null;
-  amount_uzs: number;
-  worker_name: string | null;
-}
-
-interface ExpenseLineItem {
-  id: number;
-  item_name: string;
-  quantity: number;
-  unit_price: number;
-  line_total: number;
-}
-
 export function CEOFinancialAnalytics() {
   const [timeRange, setTimeRange] = useState<TimeRange>('daily');
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData[]>([]);
   const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
   const [loading, setLoading] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
-  const [periodBreakdown, setPeriodBreakdown] = useState<AnalyticsData[]>([]);
-
-  // Day transactions panel (guests + expenses for a clicked day)
-  const [panelDate, setPanelDate] = useState<string | null>(null);
-  const [panelLoading, setPanelLoading] = useState(false);
-  const [dayGuests, setDayGuests] = useState<DayGuest[]>([]);
-  const [dayExpenses, setDayExpenses] = useState<DayExpense[]>([]);
-  const [expandedExpenseId, setExpandedExpenseId] = useState<number | null>(null);
-  const [expenseItemsCache, setExpenseItemsCache] = useState<Record<number, ExpenseLineItem[]>>({});
-  const [expenseItemsLoading, setExpenseItemsLoading] = useState<number | null>(null);
+  const [chartVisible, setChartVisible] = useState(true);
 
   const currentDate = new Date();
 
   useEffect(() => {
     fetchAnalyticsData();
   }, [timeRange]);
-
-  useEffect(() => {
-    // Default the transactions panel to today once daily data is available
-    if (timeRange === 'daily' && !panelDate && analyticsData.length > 0) {
-      const todayStr = new Date().toISOString().split('T')[0];
-      const hasToday = analyticsData.some(d => d.period === todayStr);
-      openDayPanel(hasToday ? todayStr : analyticsData[analyticsData.length - 1].period);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [analyticsData, timeRange]);
 
   const fetchAnalyticsData = async () => {
     setLoading(true);
@@ -546,127 +497,8 @@ export function CEOFinancialAnalytics() {
     return num.toFixed(0);
   };
 
-  const handlePeriodClick = (period: string) => {
-    setSelectedPeriod(period);
-    
-    // For daily view, show the day's breakdown
-    if (timeRange === 'daily') {
-      const dayData = analyticsData.find(d => d.period === period);
-      setPeriodBreakdown(dayData ? [dayData] : []);
-    } else {
-      // For weekly/monthly/yearly, show all days in that period
-      // This would require additional fetching - for now, show the period summary
-      const periodData = analyticsData.find(d => d.period === period);
-      setPeriodBreakdown(periodData ? [periodData] : []);
-    }
-  };
-
   const formatCurrency = (amount: number): string => {
     return `${formatNumber(amount)} UZS`;
-  };
-
-  const formatMoney = (amount: number, currency: string): string => {
-    return `${formatNumber(amount)} ${currency}`;
-  };
-
-  // Called when a bar/point on the chart (or a table row) is clicked.
-  // Only meaningful for a single day, so weekly/monthly/yearly periods
-  // fall back to the first day of that period.
-  const openDayPanel = (period: string) => {
-    let dateStr = period;
-    if (timeRange !== 'daily') {
-      // period strings for other ranges aren't plain dates - try to find
-      // a matching day inside the underlying data as a best-effort fallback.
-      const match = analyticsData.find(d => d.period === period);
-      dateStr = match ? match.period : period;
-    }
-    setPanelDate(dateStr);
-    setExpandedExpenseId(null);
-    fetchDayPanel(dateStr);
-  };
-
-  const fetchDayPanel = async (dateStr: string) => {
-    setPanelLoading(true);
-    try {
-      const { data: bookingsData } = await supabase
-        .from('bookings')
-        .select('id, guest_name, total_price, collected_amount, currency, payment_status, is_prepaid, is_accommodation_prepaid, is_food_prepaid, check_in')
-        .eq('check_in', dateStr);
-
-      const { data: financesData } = await supabase
-        .from('camp_finances')
-        .select('id, category, description, amount_uzs, worker_name, transaction_date, created_at, type')
-        .eq('type', 'expense');
-
-      const expensesForDay = (financesData || []).filter((item: any) => {
-        const itemDateStr = item.transaction_date || item.created_at?.split('T')[0];
-        return itemDateStr === dateStr;
-      });
-
-      setDayGuests(
-        (bookingsData || []).map((b: any) => ({
-          id: b.id,
-          guest_name: b.guest_name,
-          total_price: Number(b.total_price) || 0,
-          collected_amount: Number(b.collected_amount) || 0,
-          currency: b.currency || 'USD',
-          payment_status: b.payment_status,
-          is_prepaid: !!b.is_prepaid,
-          is_accommodation_prepaid: !!b.is_accommodation_prepaid,
-          is_food_prepaid: !!b.is_food_prepaid,
-        }))
-      );
-
-      setDayExpenses(
-        expensesForDay.map((e: any) => ({
-          id: e.id,
-          category: e.category,
-          description: e.description,
-          amount_uzs: Number(e.amount_uzs) || 0,
-          worker_name: e.worker_name,
-        }))
-      );
-    } catch (error) {
-      console.error('Error fetching day panel data:', error);
-      setDayGuests([]);
-      setDayExpenses([]);
-    } finally {
-      setPanelLoading(false);
-    }
-  };
-
-  const toggleExpenseExpand = async (expenseId: number) => {
-    if (expandedExpenseId === expenseId) {
-      setExpandedExpenseId(null);
-      return;
-    }
-    setExpandedExpenseId(expenseId);
-
-    if (!expenseItemsCache[expenseId]) {
-      setExpenseItemsLoading(expenseId);
-      try {
-        const { data } = await supabase
-          .from('camp_finance_items')
-          .select('id, item_name, quantity, unit_price, line_total')
-          .eq('finance_id', expenseId);
-
-        setExpenseItemsCache(prev => ({
-          ...prev,
-          [expenseId]: (data || []).map((item: any) => ({
-            id: item.id,
-            item_name: item.item_name,
-            quantity: Number(item.quantity) || 0,
-            unit_price: Number(item.unit_price) || 0,
-            line_total: Number(item.line_total) || 0,
-          })),
-        }));
-      } catch (error) {
-        console.error('Error fetching expense line items:', error);
-        setExpenseItemsCache(prev => ({ ...prev, [expenseId]: [] }));
-      } finally {
-        setExpenseItemsLoading(null);
-      }
-    }
   };
 
   if (loading) {
@@ -728,10 +560,18 @@ export function CEOFinancialAnalytics() {
         </div>
       )}
 
-      {/* Chart + Day Transactions Panel */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div className="xl:col-span-2 bg-[#1C232E] rounded-xl p-6 border border-[#5C4A2E]/30">
-          <h3 className="text-lg font-black text-[#EDE6D6] mb-4">Financial Overview</h3>
+      {/* Chart (toggleable) */}
+      <div className="bg-[#1C232E] rounded-xl border border-[#5C4A2E]/30 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-black text-[#EDE6D6]">Financial Overview</h3>
+          <button
+            onClick={() => setChartVisible(!chartVisible)}
+            className="px-3 py-1.5 rounded-lg font-bold uppercase tracking-widest text-[10px] bg-[#0F1419]/50 text-[#9C9384] hover:bg-[#2A1518]/50 transition-all"
+          >
+            {chartVisible ? 'Hide Chart' : 'Show Chart'}
+          </button>
+        </div>
+        {chartVisible && (
           <ResponsiveContainer width="100%" height={300}>
             <ComposedChart data={analyticsData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#5C4A2E" />
@@ -761,256 +601,31 @@ export function CEOFinancialAnalytics() {
                 fill="#0B6E4F"
                 name="Income"
                 radius={[4, 4, 0, 0]}
-                cursor="pointer"
-                onClick={(data: any) => openDayPanel(data.period)}
               />
               <Bar
                 dataKey="expense"
                 fill="#722F37"
                 name="Expense"
                 radius={[4, 4, 0, 0]}
-                cursor="pointer"
-                onClick={(data: any) => openDayPanel(data.period)}
               />
               <Line 
                 type="monotone" 
                 dataKey="netProfit" 
                 stroke="#C9A227" 
                 strokeWidth={3}
-                dot={{ fill: '#C9A227', r: 4, cursor: 'pointer', onClick: (data: any) => openDayPanel(data?.payload?.period) } as any}
+                dot={{ fill: '#C9A227', r: 4 }}
                 name="Net Profit"
               />
             </ComposedChart>
           </ResponsiveContainer>
-          {timeRange === 'daily' && (
-            <p className="text-[10px] text-[#9C9384] mt-2">Click a bar to see that day's guests and expenses →</p>
-          )}
-        </div>
-
-        {/* Day Transactions Panel */}
-        <div className="bg-[#1C232E] rounded-xl border border-[#5C4A2E]/30 flex flex-col max-h-[420px] xl:max-h-none">
-          <div className="p-4 border-b border-[#5C4A2E]/30">
-            <h3 className="text-sm font-black text-[#EDE6D6] uppercase tracking-widest">
-              {panelDate ? panelDate : 'Day Transactions'}
-            </h3>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {!panelDate && (
-              <p className="text-xs text-[#9C9384]">
-                {timeRange === 'daily'
-                  ? 'Pick a day above to see who checked in and what was spent.'
-                  : 'Switch to the Daily view and click a bar to inspect a specific day.'}
-              </p>
-            )}
-
-            {panelDate && panelLoading && (
-              <p className="text-xs text-[#9C9384]">Loading…</p>
-            )}
-
-            {panelDate && !panelLoading && (
-              <>
-                {/* Guests */}
-                <div>
-                  <p className="text-[10px] font-black text-[#C9A227] uppercase tracking-widest mb-2">
-                    Guests Checked In {dayGuests.length > 0 && `(${dayGuests.length})`}
-                  </p>
-                  {dayGuests.length === 0 ? (
-                    <p className="text-xs text-[#9C9384]">No check-ins this day.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {dayGuests.map((g) => (
-                        <div key={g.id} className="bg-[#0F1419]/50 rounded-lg p-3 border border-[#5C4A2E]/20">
-                          <div className="flex justify-between items-start gap-2">
-                            <span className="text-sm font-medium text-[#EDE6D6]">{g.guest_name}</span>
-                            <span className="text-sm font-bold text-[#0B6E4F] whitespace-nowrap">
-                              {formatMoney(g.collected_amount, g.currency)}
-                            </span>
-                          </div>
-                          <div className="flex flex-wrap gap-1 mt-1.5">
-                            {g.is_prepaid && (
-                              <span className="text-[9px] font-black uppercase tracking-widest bg-[#0B6E4F]/20 text-[#0B6E4F] px-2 py-0.5 rounded-full">
-                                Prepaid
-                              </span>
-                            )}
-                            {g.is_accommodation_prepaid && !g.is_prepaid && (
-                              <span className="text-[9px] font-black uppercase tracking-widest bg-[#0B6E4F]/20 text-[#0B6E4F] px-2 py-0.5 rounded-full">
-                                Stay Prepaid
-                              </span>
-                            )}
-                            {g.is_food_prepaid && (
-                              <span className="text-[9px] font-black uppercase tracking-widest bg-[#0B6E4F]/20 text-[#0B6E4F] px-2 py-0.5 rounded-full">
-                                Food Prepaid
-                              </span>
-                            )}
-                            {!g.is_prepaid && !g.is_accommodation_prepaid && !g.is_food_prepaid && (
-                              <span className="text-[9px] font-black uppercase tracking-widest bg-[#722F37]/20 text-[#722F37] px-2 py-0.5 rounded-full">
-                                {g.payment_status || 'unpaid'}
-                              </span>
-                            )}
-                          </div>
-                          {g.collected_amount < g.total_price && (
-                            <p className="text-[10px] text-[#9C9384] mt-1">
-                              of {formatMoney(g.total_price, g.currency)} total
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Expenses */}
-                <div>
-                  <p className="text-[10px] font-black text-[#722F37] uppercase tracking-widest mb-2">
-                    Expenses {dayExpenses.length > 0 && `(${dayExpenses.length})`}
-                  </p>
-                  {dayExpenses.length === 0 ? (
-                    <p className="text-xs text-[#9C9384]">No expenses this day.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {dayExpenses.map((e) => (
-                        <div key={e.id} className="bg-[#0F1419]/50 rounded-lg border border-[#5C4A2E]/20 overflow-hidden">
-                          <button
-                            onClick={() => toggleExpenseExpand(e.id)}
-                            className="w-full text-left p-3 flex justify-between items-center gap-2 hover:bg-[#2A1518]/50 transition-colors"
-                          >
-                            <div className="min-w-0">
-                              <span className="text-sm font-medium text-[#EDE6D6] block truncate">
-                                {e.category || e.description || 'Expense'}
-                              </span>
-                              {e.worker_name && (
-                                <span className="text-[10px] text-[#9C9384]">{e.worker_name}</span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className="text-sm font-bold text-[#722F37]">
-                                {formatCurrency(e.amount_uzs)}
-                              </span>
-                              <svg
-                                className={`w-4 h-4 text-[#9C9384] transition-transform ${expandedExpenseId === e.id ? 'rotate-180' : ''}`}
-                                fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                              >
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                              </svg>
-                            </div>
-                          </button>
-
-                          {expandedExpenseId === e.id && (
-                            <div className="px-3 pb-3 border-t border-[#5C4A2E]/20 pt-2">
-                              {e.description && (
-                                <p className="text-xs text-[#9C9384] mb-2">{e.description}</p>
-                              )}
-                              {expenseItemsLoading === e.id ? (
-                                <p className="text-xs text-[#9C9384]">Loading items…</p>
-                              ) : (expenseItemsCache[e.id]?.length || 0) === 0 ? (
-                                <p className="text-xs text-[#9C9384]">No itemized breakdown for this expense.</p>
-                              ) : (
-                                <div className="space-y-1">
-                                  {expenseItemsCache[e.id].map((item) => (
-                                    <div key={item.id} className="flex justify-between text-xs">
-                                      <span className="text-[#EDE6D6]">
-                                        {item.item_name} <span className="text-[#9C9384]">×{item.quantity}</span>
-                                      </span>
-                                      <span className="text-[#9C9384]">{formatCurrency(item.line_total)}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* Detailed Breakdown Table */}
-      <div className="bg-[#1C232E] rounded-xl border border-[#5C4A2E]/30 overflow-hidden">
-        <h3 className="text-lg font-black text-[#EDE6D6] p-6 pb-4">Detailed Breakdown</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-[#0F1419]/50 border-b border-[#5C4A2E]/30">
-              <tr>
-                <th className="px-6 py-3 text-left text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Period</th>
-                <th className="px-6 py-3 text-right text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Income</th>
-                <th className="px-6 py-3 text-right text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Expense</th>
-                <th className="px-6 py-3 text-right text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Net Profit</th>
-                <th className="px-6 py-3 text-right text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Guests In</th>
-                <th className="px-6 py-3 text-right text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Guests Out</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#5C4A2E]/20">
-              {analyticsData.map((item) => (
-                <tr 
-                  key={item.period}
-                  onClick={() => { handlePeriodClick(item.period); openDayPanel(item.period); }}
-                  className="hover:bg-[#2A1518] cursor-pointer transition-colors"
-                >
-                  <td className="px-6 py-3 text-sm font-medium text-[#EDE6D6]">{item.period}</td>
-                  <td className="px-6 py-3 text-sm text-right text-[#0B6E4F]">{formatCurrency(item.income)}</td>
-                  <td className="px-6 py-3 text-sm text-right text-[#722F37]">{formatCurrency(item.expense)}</td>
-                  <td className={`px-6 py-3 text-sm text-right font-bold ${item.netProfit >= 0 ? 'text-[#0B6E4F]' : 'text-[#722F37]'}`}>
-                    {formatCurrency(item.netProfit)}
-                  </td>
-                  <td className="px-6 py-3 text-sm text-right text-[#C9A227]">{item.guestsIn}</td>
-                  <td className="px-6 py-3 text-sm text-right text-[#C9A227]">{item.guestsOut}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* Transaction Explorer */}
+      <div>
+        <h3 className="text-lg font-black text-[#EDE6D6] mb-4">Transaction Explorer</h3>
+        <TransactionLedger />
       </div>
-
-      {/* Period Breakdown Modal */}
-      {selectedPeriod && periodBreakdown.length > 0 && (
-        <div className="fixed inset-0 bg-[#0F1419]/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-[#1C232E] rounded-[2rem] w-full max-w-2xl p-8 shadow-2xl animate-in zoom-in duration-200 border border-[#5C4A2E]/30">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-black text-[#EDE6D6]">{selectedPeriod} Breakdown</h3>
-              <button
-                onClick={() => setSelectedPeriod(null)}
-                className="text-[#9C9384] hover:text-[#EDE6D6] transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="space-y-4">
-              {periodBreakdown.map((item) => (
-                <div key={item.period} className="bg-[#0F1419]/50 rounded-lg p-4 border border-[#5C4A2E]/20">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Income</p>
-                      <p className="text-lg font-bold text-[#0B6E4F]">{formatCurrency(item.income)}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Expense</p>
-                      <p className="text-lg font-bold text-[#722F37]">{formatCurrency(item.expense)}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Net Profit</p>
-                      <p className={`text-lg font-bold ${item.netProfit >= 0 ? 'text-[#0B6E4F]' : 'text-[#722F37]'}`}>
-                        {formatCurrency(item.netProfit)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Guests</p>
-                      <p className="text-lg font-bold text-[#C9A227]">In: {item.guestsIn} | Out: {item.guestsOut}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
