@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { CreditCard, Globe, Banknote } from 'lucide-react';
 
 type TxnType = 'income' | 'expense';
 
@@ -44,6 +45,40 @@ interface BookingDetail {
   is_food_prepaid: boolean;
 }
 
+interface BookingReceipt {
+  id: number;
+  booking_id: number;
+  snapshot: {
+    items?: {
+      accommodation?: number;
+      food?: number;
+      meals?: number;
+      [key: string]: any;
+    };
+    total?: number;
+    payments?: Array<{
+      method: string;
+      amount_original: number;
+      currency_original: string;
+      exchange_rate_used?: number;
+    }>;
+    [key: string]: any;
+  };
+  total_usd?: number;
+  created_at: string;
+}
+
+interface BookingPayment {
+  id: number;
+  booking_id: number;
+  amount_original: number;
+  currency_original: string;
+  exchange_rate_used: number | null;
+  amount_usd_equivalent: number;
+  method: string;
+  created_at: string;
+}
+
 type Preset = 'today' | 'week' | 'month' | 'year' | 'all' | 'custom';
 
 function toDateStr(d: Date): string {
@@ -71,6 +106,8 @@ export function TransactionLedger() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [lineItemsCache, setLineItemsCache] = useState<Record<number, FinanceLineItem[]>>({});
   const [bookingCache, setBookingCache] = useState<Record<number, BookingDetail | null>>({});
+  const [bookingReceiptsCache, setBookingReceiptsCache] = useState<Record<number, BookingReceipt[]>>({});
+  const [bookingPaymentsCache, setBookingPaymentsCache] = useState<Record<number, BookingPayment[]>>({});
   const [detailLoading, setDetailLoading] = useState<string | null>(null);
 
   // Initialize default range: current month to date
@@ -395,6 +432,61 @@ export function TransactionLedger() {
           setDetailLoading(null);
         }
       }
+
+      // Lazy-load booking receipts
+      if (!(txn.booking_id in bookingReceiptsCache)) {
+        setDetailLoading(txn.id);
+        try {
+          const { data } = await supabase
+            .from('booking_receipts')
+            .select('*')
+            .eq('booking_id', txn.booking_id);
+          setBookingReceiptsCache((prev) => (({
+            ...prev,
+            [txn.booking_id!]: (data || []).map((r: any) => ({
+              id: r.id,
+              booking_id: r.booking_id,
+              snapshot: r.snapshot,
+              total_usd: r.total_usd ? Number(r.total_usd) : undefined,
+              created_at: r.created_at,
+            })),
+          })));
+        } catch (error) {
+          console.error('Error fetching booking receipts:', error);
+          setBookingReceiptsCache((prev) => ({ ...prev, [txn.booking_id!]: [] }));
+        } finally {
+          setDetailLoading(null);
+        }
+      }
+
+      // Lazy-load booking payments
+      if (!(txn.booking_id in bookingPaymentsCache)) {
+        setDetailLoading(txn.id);
+        try {
+          const { data } = await supabase
+            .from('payments')
+            .select('*')
+            .eq('booking_id', txn.booking_id);
+          setBookingPaymentsCache((prev) => ({
+            ...prev,
+            [txn.booking_id!]: (data || []).map((p: any) => ({
+              id: p.id,
+              booking_id: p.booking_id,
+              amount_original: Number(p.amount_original) || 0,
+              currency_original: p.currency_original || 'USD',
+              exchange_rate_used: p.exchange_rate_used ? Number(p.exchange_rate_used) : null,
+              amount_usd_equivalent: Number(p.amount_usd_equivalent) || 0,
+              method: p.method || 'unknown',
+              created_at: p.created_at,
+            })),
+          }));
+        } catch (error) {
+          console.error('Error fetching booking payments:', error);
+          setBookingPaymentsCache((prev) => ({ ...prev, [txn.booking_id!]: [] }));
+        } finally {
+          setDetailLoading(null);
+        }
+      }
     }
   };
 
@@ -565,58 +657,102 @@ export function TransactionLedger() {
                           bookingCache[t.booking_id] ? (
                             (() => {
                               const b = bookingCache[t.booking_id!]!;
-                              const accommodationPaid = b.is_prepaid || b.is_accommodation_prepaid;
-                              const foodPaid = b.is_prepaid || b.is_food_prepaid;
-                              const remaining = Math.max(b.total_price - b.collected_amount, 0);
+                              const receipts = bookingReceiptsCache[t.booking_id] || [];
+                              
+                              // Get latest receipt
+                              const latestReceipt = receipts.length > 0 
+                                ? receipts.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+                                : null;
+                              
+                              // Read from snapshot directly
+                              const accommodation = latestReceipt?.snapshot?.items?.accommodation;
+                              const food = latestReceipt?.snapshot?.items?.food ?? latestReceipt?.snapshot?.items?.meals;
+                              const totalFromSnapshot = latestReceipt?.snapshot?.total;
+                              const paymentsFromSnapshot = latestReceipt?.snapshot?.payments || [];
+                              
+                              // Use snapshot payments if available, otherwise fall back to payments table
+                              const paymentsToShow = paymentsFromSnapshot.length > 0 
+                                ? paymentsFromSnapshot 
+                                : (bookingPaymentsCache[t.booking_id] || []);
+                              
+                              // Helper for plain number formatting (no K/M, full precision)
+                              const formatPlainNumber = (num: number | undefined | null) => 
+                                (num ?? 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+                              
+                              // Helper for payment icon
+                              const getPaymentIcon = (method: string) => {
+                                const m = method.toLowerCase();
+                                if (m.includes('online') || m.includes('card') || m.includes('transfer')) {
+                                  return <CreditCard size={12} className="text-[#9C9384]" />;
+                                }
+                                if (m.includes('cash')) {
+                                  return <Banknote size={12} className="text-[#9C9384]" />;
+                                }
+                                return <Globe size={12} className="text-[#9C9384]" />;
+                              };
+                              
+                              // Calculate total paid USD from payments
+                              const totalPaidUsd = paymentsToShow.reduce((sum, p) => {
+                                const usdEquiv = (p as any).amount_usd_equivalent;
+                                return sum + (typeof usdEquiv === 'number' ? usdEquiv : 0);
+                              }, 0);
+                              
                               return (
                                 <div className="space-y-3">
-                                  {/* Collected so far, front and center */}
-                                  <div className="flex items-center justify-between bg-[#0F1419]/50 rounded-lg px-3 py-2">
-                                    <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Collected</span>
-                                    <span className="text-sm font-bold text-[#0B6E4F]">
-                                      {formatOriginal(b.collected_amount, b.currency)}
-                                      <span className="text-[#9C9384] font-normal"> / {formatOriginal(b.total_price, b.currency)}</span>
-                                    </span>
-                                  </div>
+                                  {/* Amount breakdown from receipt snapshot - only if real data exists */}
+                                  {latestReceipt && (typeof accommodation === 'number' && accommodation > 0 || typeof food === 'number' && food > 0) ? (
+                                    <div className="space-y-1.5 pt-2 border-t border-[#5C4A2E]/20">
+                                      {typeof accommodation === 'number' && accommodation > 0 && (
+                                        <div className="flex justify-between text-xs">
+                                          <span className="text-[#9C9384]">Accommodation</span>
+                                          <span className="text-[#EDE6D6] font-medium">{formatPlainNumber(accommodation)} USD</span>
+                                        </div>
+                                      )}
+                                      {typeof food === 'number' && food > 0 && (
+                                        <div className="flex justify-between text-xs">
+                                          <span className="text-[#9C9384]">Food & Services</span>
+                                          <span className="text-[#EDE6D6] font-medium">{formatPlainNumber(food)} USD</span>
+                                        </div>
+                                      )}
+                                      {typeof totalFromSnapshot === 'number' && totalFromSnapshot > 0 && (
+                                        <div className="flex justify-between text-xs pt-1 border-t border-[#5C4A2E]/20">
+                                          <span className="text-[#9C9384] font-black uppercase tracking-widest">Total</span>
+                                          <span className="text-[#EDE6D6] font-bold">{formatPlainNumber(totalFromSnapshot)} USD</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <div className="flex justify-between text-xs pt-2 border-t border-[#5C4A2E]/20">
+                                      <span className="text-[#9C9384] font-black uppercase tracking-widest">Total</span>
+                                      <span className="text-[#EDE6D6] font-bold">{formatPlainNumber(b.total_price)} {b.currency}</span>
+                                    </div>
+                                  )}
 
-                                  {/* Paid / prepaid checklist */}
-                                  <div className="space-y-1.5">
-                                    <div className="flex items-center gap-2 text-xs">
-                                      <span className={accommodationPaid ? 'text-[#0B6E4F]' : 'text-[#722F37]'}>
-                                        {accommodationPaid ? '✓' : '✕'}
-                                      </span>
-                                      <span className="text-[#EDE6D6]">Accommodation {accommodationPaid ? 'paid / prepaid' : 'not paid'}</span>
+                                  {/* Paid in section - show payment method + amount pairs with icons */}
+                                  {paymentsToShow.length > 0 && (
+                                    <div className="space-y-1.5 pt-2 border-t border-[#5C4A2E]/20">
+                                      <p className="text-[9px] font-black text-[#9C9384] uppercase tracking-widest">Paid in</p>
+                                      {paymentsToShow.map((p, idx) => (
+                                        <div key={idx} className="flex justify-between text-xs items-baseline">
+                                          <div className="flex items-center gap-2">
+                                            {getPaymentIcon(p.method)}
+                                            <span className="text-[#EDE6D6]">{p.method}</span>
+                                            {p.currency_original !== 'USD' && p.exchange_rate_used && (
+                                              <span className="text-[#9C9384] ml-1">
+                                                @{formatPlainNumber(p.exchange_rate_used)} UZS/USD
+                                              </span>
+                                            )}
+                                          </div>
+                                          <span className="text-[#EDE6D6] font-medium">
+                                            {formatPlainNumber(p.amount_original)} {p.currency_original}
+                                          </span>
+                                        </div>
+                                      ))}
+                                      <div className="flex justify-between text-xs pt-1 border-t border-[#5C4A2E]/20">
+                                        <span className="text-[#9C9384] font-black uppercase tracking-widest">Total Paid (USD equiv)</span>
+                                        <span className="text-[#0B6E4F] font-bold">{formatPlainNumber(totalPaidUsd)} USD</span>
+                                      </div>
                                     </div>
-                                    <div className="flex items-center gap-2 text-xs">
-                                      <span className={foodPaid ? 'text-[#0B6E4F]' : 'text-[#722F37]'}>
-                                        {foodPaid ? '✓' : '✕'}
-                                      </span>
-                                      <span className="text-[#EDE6D6]">Food {foodPaid ? 'paid / prepaid' : 'not paid'}</span>
-                                    </div>
-                                  </div>
-
-                                  {/* Total / paid / remaining, with currency */}
-                                  <div className="grid grid-cols-3 gap-2 pt-1 border-t border-[#5C4A2E]/20">
-                                    <div>
-                                      <p className="text-[9px] font-black text-[#9C9384] uppercase tracking-widest">Total</p>
-                                      <p className="text-xs text-[#EDE6D6] font-medium">{formatOriginal(b.total_price, b.currency)}</p>
-                                    </div>
-                                    <div>
-                                      <p className="text-[9px] font-black text-[#9C9384] uppercase tracking-widest">Paid</p>
-                                      <p className="text-xs text-[#0B6E4F] font-medium">{formatOriginal(b.collected_amount, b.currency)}</p>
-                                    </div>
-                                    <div>
-                                      <p className="text-[9px] font-black text-[#9C9384] uppercase tracking-widest">Remaining</p>
-                                      <p className={`text-xs font-medium ${remaining > 0 ? 'text-[#722F37]' : 'text-[#0B6E4F]'}`}>
-                                        {formatOriginal(remaining, b.currency)}
-                                      </p>
-                                    </div>
-                                  </div>
-
-                                  {!accommodationPaid && !foodPaid && (
-                                    <span className="inline-block text-[9px] font-black uppercase tracking-widest bg-[#722F37]/20 text-[#722F37] px-2 py-0.5 rounded-full">
-                                      {b.payment_status || 'unpaid'}
-                                    </span>
                                   )}
                                 </div>
                               );
