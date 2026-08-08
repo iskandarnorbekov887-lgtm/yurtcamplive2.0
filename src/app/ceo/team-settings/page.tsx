@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ProtectedRoute } from '@/components/protected-route';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
+import { ApiKeyVaultSettings } from '@/components/api-key-vault-settings';
 import {
   Settings,
   Calendar,
@@ -708,6 +709,9 @@ function TeamSettingsContent() {
             </div>
           </form>
         </div>
+
+        {/* ── API Key Vault ───────────────────────────────────────────────────── */}
+        <ApiKeyVaultSettings />
 
         {/* ── How-to guide card ───────────────────────────────────────────────── */}
         <div className="bg-[#1C232E]/60 rounded-[24px] border border-[#5C4A2E]/20 p-6 space-y-4">

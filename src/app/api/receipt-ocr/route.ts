@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/utils/supabase/server';
+import { createServiceRoleClient } from '@/utils/supabase/service-role';
 
 interface ParsedItem {
   item_name: string;
@@ -10,12 +12,47 @@ export async function POST(req: NextRequest) {
   try {
     const { image } = await req.json();
 
+    // Get the Google Vision API key from the vault or fall back to env var
+    let apiKey = process.env.GOOGLE_VISION_API_KEY;
+
+    try {
+      const supabase = await createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('team_id, id')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profile) {
+          const teamId = profile.team_id || profile.id;
+          const adminClient = createServiceRoleClient();
+          const { data: vaultKey, error: vaultError } = await adminClient.rpc('get_team_api_key', {
+            p_team_id: teamId,
+            p_key_name: 'google_vision',
+          });
+
+          if (!vaultError && vaultKey) {
+            apiKey = vaultKey;
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching API key from vault, falling back to env var:', error);
+    }
+
+    if (!apiKey) {
+      return NextResponse.json({ error: 'Google Vision API key not configured' }, { status: 500 });
+    }
+
     console.log('=== BASE64 IMAGE LENGTH ===');
     console.log(image.length);
     console.log('=== END BASE64 IMAGE LENGTH ===');
 
     const res = await fetch(
-      `https://vision.googleapis.com/v1/images:annotate?key=${process.env.GOOGLE_VISION_API_KEY}`,
+      `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
