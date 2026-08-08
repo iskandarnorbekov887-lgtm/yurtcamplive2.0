@@ -1324,73 +1324,97 @@ function ManagerFinancials() {
                 )}
 
                 {/* Editable Items Table */}
-                <div className="space-y-2">
-                  {parsedItems.map((item, index) => (
-                    <div key={index} className="flex gap-2 items-center bg-[#0F1419] rounded-lg p-2 border border-[#5C4A2E]/30">
-                      <input
-                        type="text"
-                        value={item.item_name}
-                        onChange={(e) => {
-                          const newItems = [...parsedItems];
-                          newItems[index].item_name = e.target.value;
-                          setParsedItems(newItems);
-                        }}
-                        className="flex-1 px-2 py-1 bg-[#1C232E] border border-[#5C4A2E]/30 rounded text-xs text-[#EDE6D6]"
-                        placeholder="Item name"
-                      />
-                      <input
-                        type="number"
-                        value={item.quantity}
-                        onChange={(e) => {
-                          const newItems = [...parsedItems];
-                          newItems[index].quantity = parseFloat(e.target.value) || 1;
-                          setParsedItems(newItems);
-                        }}
-                        className="w-16 px-2 py-1 bg-[#1C232E] border border-[#5C4A2E]/30 rounded text-xs text-[#EDE6D6]"
-                        placeholder="Qty"
-                      />
-                      <input
-                        type="number"
-                        value={item.unit_price}
-                        onChange={(e) => {
-                          const newItems = [...parsedItems];
-                          newItems[index].unit_price = parseFloat(e.target.value) || 0;
-                          setParsedItems(newItems);
-                        }}
-                        className="w-24 px-2 py-1 bg-[#1C232E] border border-[#5C4A2E]/30 rounded text-xs text-[#EDE6D6]"
-                        placeholder="Price"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newItems = parsedItems.filter((_, i) => i !== index);
-                          setParsedItems(newItems);
-                        }}
-                        className="px-2 py-1 bg-[#722F37] text-[#C9A227] rounded text-xs hover:bg-[#722F37]/80"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Add Item Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setParsedItems([...parsedItems, { item_name: '', quantity: 1, unit_price: 0 }]);
-                  }}
-                  className="w-full py-2 bg-[#0B6E4F]/20 text-[#0B6E4F] rounded-lg text-xs font-bold hover:bg-[#0B6E4F]/30"
-                >
-                  + Add Item
-                </button>
-
-                {/* Running Total */}
-                <div className="flex justify-between items-center py-2 border-t border-[#5C4A2E]/30">
-                  <span className="text-sm font-black text-[#EDE6D6]">Total:</span>
-                  <span className="text-lg font-black text-[#C9A227]">
-                    {parsedItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0).toLocaleString()} UZS
-                  </span>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-[#5C4A2E]/30">
+                        <th className="text-left py-2 px-3 font-black text-[#9C9384] uppercase tracking-widest">Name</th>
+                        <th className="text-center py-2 px-3 font-black text-[#9C9384] uppercase tracking-widest w-20">Quantity</th>
+                        <th className="text-right py-2 px-3 font-black text-[#9C9384] uppercase tracking-widest w-28">Price (UZS)</th>
+                        <th className="text-center py-2 px-3 font-black text-[#9C9384] uppercase tracking-widest w-16">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {parsedItems.map((item, index) => (
+                        <tr key={index} className="border-b border-[#5C4A2E]/20 hover:bg-[#1C232E]/50">
+                          <td className="py-2 px-3">
+                            <input
+                              type="text"
+                              value={item.item_name}
+                              onChange={(e) => {
+                                const newItems = [...parsedItems];
+                                newItems[index].item_name = e.target.value;
+                                setParsedItems(newItems);
+                              }}
+                              className="w-full px-2 py-1 bg-[#0F1419] border border-[#5C4A2E]/30 rounded text-xs text-[#EDE6D6] focus:border-[#0B6E4F] focus:outline-none"
+                              placeholder="Item name"
+                            />
+                          </td>
+                          <td className="py-2 px-3">
+                            <input
+                              type="number"
+                              value={item.quantity}
+                              onChange={(e) => {
+                                const newItems = [...parsedItems];
+                                newItems[index].quantity = parseFloat(e.target.value) || 1;
+                                setParsedItems(newItems);
+                              }}
+                              className="w-full px-2 py-1 bg-[#0F1419] border border-[#5C4A2E]/30 rounded text-xs text-[#EDE6D6] text-center focus:border-[#0B6E4F] focus:outline-none"
+                              placeholder="Qty"
+                            />
+                          </td>
+                          <td className="py-2 px-3">
+                            <input
+                              type="number"
+                              value={item.unit_price}
+                              onChange={(e) => {
+                                const newItems = [...parsedItems];
+                                newItems[index].unit_price = parseFloat(e.target.value) || 0;
+                                setParsedItems(newItems);
+                              }}
+                              className="w-full px-2 py-1 bg-[#0F1419] border border-[#5C4A2E]/30 rounded text-xs text-[#EDE6D6] text-right focus:border-[#0B6E4F] focus:outline-none"
+                              placeholder="Price"
+                            />
+                          </td>
+                          <td className="py-2 px-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newItems = parsedItems.filter((_, i) => i !== index);
+                                setParsedItems(newItems);
+                              }}
+                              className="px-2 py-1 bg-[#722F37] text-[#C9A227] rounded text-xs hover:bg-[#722F37]/80 transition-all"
+                            >
+                              ✕
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 border-[#5C4A2E]/50">
+                        <td colSpan={2} className="py-3 px-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setParsedItems([...parsedItems, { item_name: '', quantity: 1, unit_price: 0 }]);
+                            }}
+                            className="w-full py-2 bg-[#0B6E4F]/20 text-[#0B6E4F] rounded-lg text-xs font-bold hover:bg-[#0B6E4F]/30 transition-all"
+                          >
+                            + Add Item
+                          </button>
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <span className="text-sm font-black text-[#EDE6D6]">Total:</span>
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <span className="text-lg font-black text-[#C9A227]">
+                            {parsedItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0).toLocaleString()} UZS
+                          </span>
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
                 </div>
 
                 {/* Confirm & Save Button */}
