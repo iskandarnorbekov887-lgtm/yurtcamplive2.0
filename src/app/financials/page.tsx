@@ -106,7 +106,7 @@ function ManagerFinancials() {
   const [receiptLoading, setReceiptLoading] = useState(false);
   const [receiptError, setReceiptError] = useState<string | null>(null);
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
-  const [parsedItems, setParsedItems] = useState<Array<{ item_name: string; quantity: number; unit_price: number }>>([]);
+  const [parsedItems, setParsedItems] = useState<Array<{ item_name: string; quantity: number; unit: string; unit_price: number }>>([]);
   const [showReviewMode, setShowReviewMode] = useState(false);
 
   // Drinks state - new normalized structure
@@ -692,6 +692,7 @@ function ManagerFinancials() {
           finance_id: financeData.id,
           item_name: item.item_name,
           quantity: item.quantity,
+          unit: item.unit,
           unit_price: item.unit_price,
         }));
 
@@ -909,7 +910,83 @@ function ManagerFinancials() {
     }
   };
 
-  const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Compress image client-side before upload
+  const compressImage = async (file: File, maxSizeMB = 1): Promise<Blob> => {
+    const originalSize = file.size;
+    console.log(`[Receipt Compression] Original size: ${(originalSize / 1024 / 1024).toFixed(2)} MB`);
+
+    const img = new Image();
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    return new Promise((resolve, reject) => {
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        const maxDimension = 1800; // Target max dimension for OCR readability
+
+        // Resize if exceeds max dimension
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        let quality = 0.8;
+        let blob: Blob | null = null;
+        let attempts = 0;
+        const maxAttempts = 5;
+
+        const compress = () => {
+          canvas.toBlob(
+            (result) => {
+              if (!result) {
+                reject(new Error('Failed to compress image'));
+                return;
+              }
+
+              blob = result;
+              const compressedSize = blob.size;
+              const targetSize = maxSizeMB * 1024 * 1024;
+
+              console.log(`[Receipt Compression] Attempt ${attempts + 1}: ${(compressedSize / 1024 / 1024).toFixed(2)} MB (quality: ${quality})`);
+
+              // If under target size or max attempts reached, return
+              if (compressedSize <= targetSize || attempts >= maxAttempts) {
+                console.log(`[Receipt Compression] Final size: ${(compressedSize / 1024 / 1024).toFixed(2)} MB (reduced by ${((1 - compressedSize / originalSize) * 100).toFixed(1)}%)`);
+                resolve(blob);
+                return;
+              }
+
+              // Otherwise, reduce quality and try again
+              attempts++;
+              quality -= 0.1;
+              if (quality < 0.1) quality = 0.1;
+              compress();
+            },
+            'image/jpeg',
+            quality
+          );
+        };
+
+        compress();
+      };
+
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
+  const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>, useGroqVision = false) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -917,11 +994,15 @@ function ManagerFinancials() {
     setReceiptError(null);
 
     try {
-      // Upload to Supabase Storage
-      const fileName = `${Date.now()}_${file.name}`;
+      // Compress image client-side
+      const compressedBlob = await compressImage(file, 1); // Target under 1MB
+      const compressedFile = new File([compressedBlob], file.name, { type: 'image/jpeg' });
+
+      // Upload compressed image to Supabase Storage
+      const fileName = `${Date.now()}_${file.name.replace(/\.[^/.]+$/, '.jpg')}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('receipts')
-        .upload(fileName, file);
+        .upload(fileName, compressedFile);
 
       if (uploadError) throw uploadError;
 
@@ -932,16 +1013,17 @@ function ManagerFinancials() {
 
       setReceiptUrl(publicUrl);
 
-      // Convert to base64 for OCR
+      // Convert compressed image to base64 for OCR
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve((reader.result as string).split(',')[1]);
         reader.onerror = reject;
-        reader.readAsDataURL(file);
+        reader.readAsDataURL(compressedFile);
       });
 
-      // Call OCR API
-      const res = await fetch('/api/receipt-ocr', {
+      // Call OCR API (with optional Groq Vision test path)
+      const url = useGroqVision ? '/api/receipt-ocr?provider=groq_vision' : '/api/receipt-ocr';
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: base64 }),
@@ -1286,13 +1368,17 @@ function ManagerFinancials() {
                 <div className="flex gap-3">
                   <label className="flex-1 text-center py-2 px-3 rounded-lg bg-[#722F37] text-[#C9A227] font-bold text-sm cursor-pointer">
                     {t('receipt.take_photo') || 'Take Photo'}
-                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleReceiptUpload} />
+                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleReceiptUpload(e, false)} />
                   </label>
                   <label className="flex-1 text-center py-2 px-3 rounded-lg bg-[#0B6E4F] text-[#C9A227] font-bold text-sm cursor-pointer">
                     {t('receipt.upload_photo') || 'Upload Photo'}
-                    <input type="file" accept="image/*" className="hidden" onChange={handleReceiptUpload} />
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleReceiptUpload(e, false)} />
                   </label>
                 </div>
+                <label className="w-full text-center py-2 px-3 rounded-lg bg-[#C9A227] text-[#0F1419] font-bold text-sm cursor-pointer hover:bg-[#C9A227]/80 transition-all">
+                  Test with Groq Vision
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleReceiptUpload(e, true)} />
+                </label>
                 {receiptLoading && <p className="text-xs text-[#9C9384]">{t('receipt.scanning') || 'Scanning...'}</p>}
                 {receiptError && <p className="text-xs text-red-400">{receiptError}</p>}
               </div>
@@ -1330,6 +1416,7 @@ function ManagerFinancials() {
                       <tr className="border-b border-[#5C4A2E]/30">
                         <th className="text-left py-2 px-3 font-black text-[#9C9384] uppercase tracking-widest">Name</th>
                         <th className="text-center py-2 px-3 font-black text-[#9C9384] uppercase tracking-widest w-20">Quantity</th>
+                        <th className="text-center py-2 px-3 font-black text-[#9C9384] uppercase tracking-widest w-16">Unit</th>
                         <th className="text-right py-2 px-3 font-black text-[#9C9384] uppercase tracking-widest w-28">Price (UZS)</th>
                         <th className="text-center py-2 px-3 font-black text-[#9C9384] uppercase tracking-widest w-16">Action</th>
                       </tr>
@@ -1361,6 +1448,19 @@ function ManagerFinancials() {
                               }}
                               className="w-full px-2 py-1 bg-[#0F1419] border border-[#5C4A2E]/30 rounded text-xs text-[#EDE6D6] text-center focus:border-[#0B6E4F] focus:outline-none"
                               placeholder="Qty"
+                            />
+                          </td>
+                          <td className="py-2 px-3">
+                            <input
+                              type="text"
+                              value={item.unit}
+                              onChange={(e) => {
+                                const newItems = [...parsedItems];
+                                newItems[index].unit = e.target.value;
+                                setParsedItems(newItems);
+                              }}
+                              className="w-full px-2 py-1 bg-[#0F1419] border border-[#5C4A2E]/30 rounded text-xs text-[#EDE6D6] text-center focus:border-[#0B6E4F] focus:outline-none"
+                              placeholder="Unit"
                             />
                           </td>
                           <td className="py-2 px-3">
@@ -1397,7 +1497,7 @@ function ManagerFinancials() {
                           <button
                             type="button"
                             onClick={() => {
-                              setParsedItems([...parsedItems, { item_name: '', quantity: 1, unit_price: 0 }]);
+                              setParsedItems([...parsedItems, { item_name: '', quantity: 1, unit: '', unit_price: 0 }]);
                             }}
                             className="w-full py-2 bg-[#0B6E4F]/20 text-[#0B6E4F] rounded-lg text-xs font-bold hover:bg-[#0B6E4F]/30 transition-all"
                           >

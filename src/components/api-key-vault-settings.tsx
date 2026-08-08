@@ -17,7 +17,17 @@ const API_KEY_SLOTS: ApiKeySlot[] = [
   {
     keyName: 'google_vision',
     label: 'Google Vision API Key',
-    description: 'Used for receipt OCR scanning',
+    description: 'Used for receipt OCR scanning (primary)',
+  },
+  {
+    keyName: 'ocr_space',
+    label: 'OCR.space API Key',
+    description: 'Used for receipt OCR scanning (fallback)',
+  },
+  {
+    keyName: 'groq',
+    label: 'Groq API Key',
+    description: 'Used for AI-powered receipt parsing',
   },
   {
     keyName: 'anthropic',
@@ -151,8 +161,11 @@ export function ApiKeyVaultSettings() {
       setKeyValues(prev => ({ ...prev, [keyName]: '' }));
       setShowKey(prev => ({ ...prev, [keyName]: false }));
       
-      // Refresh key status
-      await fetchKeyStatus();
+      // Optimistic update: mark key as set immediately
+      setKeyStatus(prev => ({ ...prev, [keyName]: true }));
+      
+      // Refresh key status in background for consistency
+      fetchKeyStatus();
     } catch (error) {
       console.error('Error saving API key:', error);
       setSaveStatus('error');
@@ -190,8 +203,11 @@ export function ApiKeyVaultSettings() {
       setSaveStatus('success');
       setSaveMessage(`${API_KEY_SLOTS.find(k => k.keyName === keyName)?.label} removed successfully.`);
       
-      // Refresh key status
-      await fetchKeyStatus();
+      // Optimistic update: mark key as not set immediately
+      setKeyStatus(prev => ({ ...prev, [keyName]: false }));
+      
+      // Refresh key status in background for consistency
+      fetchKeyStatus();
     } catch (error) {
       console.error('Error deleting API key:', error);
       setSaveStatus('error');
