@@ -618,26 +618,26 @@ export function TransactionLedger() {
     t.type === 'income' ? 'bg-[#0B6E4F]/20 text-[#0B6E4F]' : 'bg-[#722F37]/20 text-[#722F37]';
 
   const getPaymentIconForTxn = (t: LedgerTxn) => {
+    let method = t.method;
+    
+    // For camp_finances expenses with no method, default to Cash
+    if (t.source === 'camp_finances' && !method) {
+      method = 'Cash';
+    }
+    
     if (t.source === 'booking_payment' && t.booking_id) {
       const receipts = bookingReceiptsCache[t.booking_id] || [];
       const latestReceipt = receipts.length > 0 
         ? receipts.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
         : null;
       const paymentsFromSnapshot = latestReceipt?.snapshot?.payments || [];
-      const method = paymentsFromSnapshot.length > 0 
+      method = paymentsFromSnapshot.length > 0 
         ? paymentsFromSnapshot[0].method 
         : t.method;
-      if (method) {
-        const m = method.toLowerCase();
-        if (m.includes('online') || m.includes('card') || m.includes('transfer')) {
-          return <CreditCard size={14} className="text-[#9C9384]" />;
-        }
-        if (m.includes('cash')) {
-          return <Banknote size={14} className="text-[#9C9384]" />;
-        }
-      }
-    } else if (t.method) {
-      const m = t.method.toLowerCase();
+    }
+    
+    if (method) {
+      const m = method.toLowerCase();
       if (m.includes('online') || m.includes('card') || m.includes('transfer')) {
         return <CreditCard size={14} className="text-[#9C9384]" />;
       }
@@ -804,32 +804,6 @@ export function TransactionLedger() {
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      {t.source === 'booking_payment' && (() => {
-                        const receipts = bookingReceiptsCache[t.booking_id!] || [];
-                        const latestReceipt = receipts.length > 0 
-                          ? receipts.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
-                          : null;
-                        const paymentsFromSnapshot = latestReceipt?.snapshot?.payments || [];
-                        const method = paymentsFromSnapshot.length > 0 
-                          ? paymentsFromSnapshot[0].method 
-                          : t.method;
-                        const icon = method ? (() => {
-                          const m = method.toLowerCase();
-                          if (m.includes('online') || m.includes('card') || m.includes('transfer')) {
-                            return <CreditCard size={14} className="text-[#9C9384]" />;
-                          }
-                          if (m.includes('cash')) {
-                            return <Banknote size={14} className="text-[#9C9384]" />;
-                          }
-                          return null;
-                        })() : null;
-                        return (
-                          <>
-                            {icon}
-                            <span className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">{method || 'Unknown'}</span>
-                          </>
-                        );
-                      })()}
                       <span className="text-sm font-medium text-[#EDE6D6] truncate">{t.label}</span>
                       <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${categoryBadgeColor(t)}`}>
                         {t.category}
@@ -854,9 +828,15 @@ export function TransactionLedger() {
                         PREPAID
                       </span>
                     ) : (
-                      <span className={`text-sm font-bold whitespace-nowrap ${t.type === 'income' ? 'text-[#0B6E4F]' : 'text-[#722F37]'}`}>
-                        {t.type === 'income' ? '+' : '-'}{formatOriginal(t.amount, t.currency)}
-                      </span>
+                      <>
+                        {getPaymentIconForTxn(t)}
+                        <span className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">
+                          {(t.method || t.source === 'camp_finances' ? 'Cash' : 'Unknown')}
+                        </span>
+                        <span className={`text-sm font-bold whitespace-nowrap ${t.type === 'income' ? 'text-[#0B6E4F]' : 'text-[#722F37]'}`}>
+                          {t.type === 'income' ? '+' : '-'}{formatOriginal(t.amount, t.currency)}
+                        </span>
+                      </>
                     )}
                     <svg
                       className={`w-4 h-4 text-[#9C9384] transition-transform ${expandedId === t.id ? 'rotate-180' : ''}`}
