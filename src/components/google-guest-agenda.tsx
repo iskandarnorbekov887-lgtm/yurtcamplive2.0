@@ -144,28 +144,6 @@ export function GoogleGuestAgenda({
 
   
 
-  const getPrefix = (item: ListItem) => {
-
-    const booking = item.booking;
-
-    if (!booking) return '';
-
-    
-
-    const category = booking.guest_category || '';
-
-
-
-    if (category === 'pool') return '🏊 ';
-
-    if (category === 'local') return '🏠 ';
-
-    return '';
-
-  };
-
-
-
   const [svcAmount, setSvcAmount] = useState(0);
 
   const [svcDiscount, setSvcDiscount] = useState(0);
@@ -1200,8 +1178,6 @@ export function GoogleGuestAgenda({
 
               <p className={`font-bold text-sm truncate ${isActuallyCancelled ? 'text-white' : 'text-[#EDE6D6]'}`}>
 
-                <span className="text-[#9C9384] font-medium mr-1">{getPrefix(item)}</span>
-
                 {item.name}
 
               </p>
@@ -1742,8 +1718,6 @@ export function GoogleGuestAgenda({
 
       let existingDays: DayEntry[] = [];
 
-      let guestCategory = b.guest_category || '';
-
 
 
       setSvcAdults(b.number_of_adults || b.guest_count || 1);
@@ -1819,8 +1793,6 @@ export function GoogleGuestAgenda({
       // ── Payment line defaults ──
 
       let defaultCurrency: 'UZS' | 'USD' | 'EUR' = 'USD';
-
-      if (guestCategory === 'local' || guestCategory === 'pool') defaultCurrency = 'UZS';
 
       setCollectedCurrency(defaultCurrency);
 
