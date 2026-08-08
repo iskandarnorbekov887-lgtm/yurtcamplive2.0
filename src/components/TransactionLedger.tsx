@@ -115,6 +115,7 @@ export function TransactionLedger() {
   const [bookingReceiptsCache, setBookingReceiptsCache] = useState<Record<number, BookingReceipt[]>>({});
   const [bookingPaymentsCache, setBookingPaymentsCache] = useState<Record<number, BookingPayment[]>>({});
   const [drinkSalesCache, setDrinkSalesCache] = useState<Record<number, any[]>>({});
+  const [bookingDrinkSalesCache, setBookingDrinkSalesCache] = useState<Record<number, any[]>>({});
   const [detailLoading, setDetailLoading] = useState<string | null>(null);
 
   // Initialize default range: current month to date
@@ -637,6 +638,28 @@ export function TransactionLedger() {
         }
       }
     }
+
+    // Lazy-load drink sales for booking payments
+    if (txn.source === 'booking_payment' && txn.booking_id) {
+      if (!(txn.booking_id in bookingDrinkSalesCache)) {
+        setDetailLoading(txn.id);
+        try {
+          const { data } = await supabase
+            .from('drink_sales')
+            .select('*, drink_variants!inner(*, drinks!inner(name))')
+            .eq('booking_id', txn.booking_id);
+          setBookingDrinkSalesCache((prev) => ({
+            ...prev,
+            [txn.booking_id!]: data || [],
+          }));
+        } catch (error) {
+          console.error('Error fetching booking drink sales:', error);
+          setBookingDrinkSalesCache((prev) => ({ ...prev, [txn.booking_id!]: [] }));
+        } finally {
+          setDetailLoading(null);
+        }
+      }
+    }
   };
 
   const categoryBadgeColor = (t: LedgerTxn) =>
@@ -1070,6 +1093,35 @@ export function TransactionLedger() {
                                             </div>
                                           ));
                                         })()
+                                      )}
+                                      
+                                      {/* Drinks from snapshot */}
+                                      {latestReceipt.snapshot?.items?.drinks && Array.isArray(latestReceipt.snapshot.items.drinks) && latestReceipt.snapshot.items.drinks.length > 0 && (
+                                        <>
+                                          <p className="text-[9px] font-black text-[#9C9384] uppercase tracking-widest pt-2 border-t border-[#5C4A2E]/20">Drinks</p>
+                                          {latestReceipt.snapshot.items.drinks.map((drink: any, idx: number) => (
+                                            <div key={idx} className="flex justify-between text-xs">
+                                              <span className="text-[#9C9384]">{drink.drink_name || 'Unknown'} x{drink.quantity || 0}</span>
+                                              <span className="text-[#EDE6D6]">{formatPlainNumber((drink.price || 0) * (drink.quantity || 0))} USD</span>
+                                            </div>
+                                          ))}
+                                        </>
+                                      )}
+                                      
+                                      {/* Fallback: Drinks from drink_sales when snapshot has none */}
+                                      {(!latestReceipt.snapshot?.items?.drinks || !Array.isArray(latestReceipt.snapshot.items.drinks) || latestReceipt.snapshot.items.drinks.length === 0) && 
+                                       bookingDrinkSalesCache[t.booking_id] && bookingDrinkSalesCache[t.booking_id].length > 0 && (
+                                        <>
+                                          <p className="text-[9px] font-black text-[#9C9384] uppercase tracking-widest pt-2 border-t border-[#5C4A2E]/20">Drinks</p>
+                                          {bookingDrinkSalesCache[t.booking_id].map((sale: any) => (
+                                            <div key={sale.id} className="flex justify-between text-xs">
+                                              <span className="text-[#9C9384]">
+                                                {sale.drink_variants?.drinks?.name || 'Unknown'} {sale.drink_variants?.unit || ''} x{sale.quantity}
+                                              </span>
+                                              <span className="text-[#EDE6D6]">{(sale.quantity * sale.price_at_sale).toLocaleString()} UZS</span>
+                                            </div>
+                                          ))}
+                                        </>
                                       )}
                                       
                                       {/* Total */}
