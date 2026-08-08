@@ -114,6 +114,7 @@ export function TransactionLedger() {
   const [bookingCache, setBookingCache] = useState<Record<number, BookingDetail | null>>({});
   const [bookingReceiptsCache, setBookingReceiptsCache] = useState<Record<number, BookingReceipt[]>>({});
   const [bookingPaymentsCache, setBookingPaymentsCache] = useState<Record<number, BookingPayment[]>>({});
+  const [drinkSalesCache, setDrinkSalesCache] = useState<Record<number, any[]>>({});
   const [detailLoading, setDetailLoading] = useState<string | null>(null);
 
   // Initialize default range: current month to date
@@ -268,6 +269,7 @@ export function TransactionLedger() {
             label: item.note || 'Walk-in POS sale',
             description: item.note || 'Walk-in POS sale',
             source: 'payment_sale',
+            finance_id: item.id,
             ...base,
           });
         } else if (item.type === 'expense') {
@@ -278,6 +280,7 @@ export function TransactionLedger() {
             label: item.note || 'Payment expense',
             description: item.note || '',
             source: 'payment_sale',
+            finance_id: item.id,
             ...base,
           });
         }
@@ -607,6 +610,28 @@ export function TransactionLedger() {
         } catch (error) {
           console.error('Error fetching booking payments:', error);
           setBookingPaymentsCache((prev) => ({ ...prev, [txn.booking_id!]: [] }));
+        } finally {
+          setDetailLoading(null);
+        }
+      }
+    }
+
+    // Lazy-load drink sales for walk-in POS sales
+    if (txn.source === 'payment_sale' && txn.finance_id) {
+      if (!(txn.finance_id in drinkSalesCache)) {
+        setDetailLoading(txn.id);
+        try {
+          const { data } = await supabase
+            .from('drink_sales')
+            .select('*, drink_variants!inner(*, drinks!inner(name))')
+            .eq('payment_id', txn.finance_id);
+          setDrinkSalesCache((prev) => ({
+            ...prev,
+            [txn.finance_id!]: data || [],
+          }));
+        } catch (error) {
+          console.error('Error fetching drink sales:', error);
+          setDrinkSalesCache((prev) => ({ ...prev, [txn.finance_id!]: [] }));
         } finally {
           setDetailLoading(null);
         }
@@ -1088,10 +1113,57 @@ export function TransactionLedger() {
                         )}
 
                         {/* Generic payments (exchange / stock / POS) */}
-                        {(t.source === 'payment_exchange' || t.source === 'payment_restock' || t.source === 'payment_sale') && (
+                        {t.source === 'payment_exchange' && (
                           <div className="flex justify-between text-xs">
                             <span className="text-[#9C9384]">Method</span>
                             <span className="text-[#EDE6D6]">{t.method || '—'}</span>
+                          </div>
+                        )}
+                        {t.source === 'payment_restock' && (
+                          <div className="space-y-1.5 pt-2 border-t border-[#5C4A2E]/20">
+                            {t.description && t.description.startsWith('Stock purchase:') ? (
+                              <>
+                                <div className="flex justify-between text-xs">
+                                  <span className="text-[#9C9384]">Item</span>
+                                  <span className="text-[#EDE6D6]">{t.description.replace('Stock purchase: ', '')}</span>
+                                </div>
+                                <div className="flex justify-between text-xs">
+                                  <span className="text-[#9C9384]">Method</span>
+                                  <span className="text-[#EDE6D6]">{t.method || 'Cash'}</span>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="flex justify-between text-xs">
+                                <span className="text-[#9C9384]">Method</span>
+                                <span className="text-[#EDE6D6]">{t.method || 'Cash'}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {t.source === 'payment_sale' && (
+                          <div className="space-y-1.5 pt-2 border-t border-[#5C4A2E]/20">
+                            {t.finance_id && drinkSalesCache[t.finance_id] && drinkSalesCache[t.finance_id].length > 0 ? (
+                              <>
+                                <p className="text-[9px] font-black text-[#9C9384] uppercase tracking-widest">Items</p>
+                                {drinkSalesCache[t.finance_id].map((sale: any) => (
+                                  <div key={sale.id} className="flex justify-between text-xs">
+                                    <span className="text-[#9C9384]">
+                                      {sale.drink_variants?.drinks?.name || 'Unknown'} {sale.drink_variants?.unit || ''} x{sale.quantity}
+                                    </span>
+                                    <span className="text-[#EDE6D6]">{(sale.quantity * sale.price_at_sale).toLocaleString()} UZS</span>
+                                  </div>
+                                ))}
+                                <div className="flex justify-between text-xs pt-1 border-t border-[#5C4A2E]/20">
+                                  <span className="text-[#9C9384]">Method</span>
+                                  <span className="text-[#EDE6D6]">{t.method || 'Cash'}</span>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="flex justify-between text-xs">
+                                <span className="text-[#9C9384]">Method</span>
+                                <span className="text-[#EDE6D6]">{t.method || 'Cash'}</span>
+                              </div>
+                            )}
                           </div>
                         )}
                       </>

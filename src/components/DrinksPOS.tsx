@@ -140,6 +140,26 @@ export function DrinksPOS() {
     setMessage('');
 
     try {
+      // Insert payment record first (booking_id is NULL for walk-in sales)
+      const { data: paymentData, error: paymentError } = await supabase
+        .from('payments')
+        .insert({
+          booking_id: null,
+          amount_original: cartTotalUzs,
+          currency_original: 'UZS',
+          amount_usd_equivalent: cartTotalUzs / 12500,
+          exchange_rate_used: 12500,
+          method,
+          note: 'Walk-in POS sale'
+        })
+        .select('id')
+        .single();
+      
+      if (paymentError) throw new Error(`Failed to record payment: ${paymentError.message}`);
+      if (!paymentData) throw new Error('Failed to get payment ID');
+
+      const paymentId = paymentData.id;
+
       // Start transaction-like operations
       for (const cartItem of cart) {
         // Decrement stock in drink_variants
@@ -150,33 +170,19 @@ export function DrinksPOS() {
         
         if (stockError) throw new Error(`Failed to update stock for ${cartItem.variant.drink_name}: ${stockError.message}`);
 
-        // Insert drink_sales record (booking_id is NULL for walk-in sales)
+        // Insert drink_sales record with payment_id (booking_id is NULL for walk-in sales)
         const { error: salesError } = await supabase
           .from('drink_sales')
           .insert({
             variant_id: cartItem.variant.id,
             booking_id: null,
             quantity: cartItem.quantity,
-            price_at_sale: cartItem.variant.sell_price || 0
+            price_at_sale: cartItem.variant.sell_price || 0,
+            payment_id: paymentId
           });
         
         if (salesError) throw new Error(`Failed to record sale for ${cartItem.variant.drink_name}: ${salesError.message}`);
       }
-
-      // Insert payment record (booking_id is NULL for walk-in sales)
-      const { error: paymentError } = await supabase
-        .from('payments')
-        .insert({
-          booking_id: null,
-          amount_original: cartTotalUzs,
-          currency_original: 'UZS',
-          amount_usd_equivalent: cartTotalUzs / 12500,
-          exchange_rate_used: 12500,
-          method,
-          note: 'Walk-in POS sale'
-        });
-      
-      if (paymentError) throw new Error(`Failed to record payment: ${paymentError.message}`);
 
       // Success
       setShowConfetti(true);
