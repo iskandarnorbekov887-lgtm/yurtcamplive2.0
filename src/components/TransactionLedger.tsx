@@ -241,6 +241,42 @@ export function TransactionLedger() {
       });
 
       txns.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      // Bulk-fetch guest/booking detail for all booking-payment rows up front,
+      // so the guest name (not the receipt note) shows directly in the list.
+      const bookingIds = Array.from(
+        new Set(txns.filter((t) => t.source === 'booking_payment' && t.booking_id).map((t) => t.booking_id as number))
+      );
+
+      if (bookingIds.length > 0) {
+        const { data: bookingsData } = await supabase
+          .from('bookings')
+          .select('id, guest_name, total_price, collected_amount, currency, payment_status, is_prepaid, is_accommodation_prepaid, is_food_prepaid')
+          .in('id', bookingIds);
+
+        const freshBookingCache: Record<number, BookingDetail | null> = {};
+        (bookingsData || []).forEach((b: any) => {
+          freshBookingCache[b.id] = {
+            id: b.id,
+            guest_name: b.guest_name,
+            total_price: Number(b.total_price) || 0,
+            collected_amount: Number(b.collected_amount) || 0,
+            currency: b.currency || 'USD',
+            payment_status: b.payment_status,
+            is_prepaid: !!b.is_prepaid,
+            is_accommodation_prepaid: !!b.is_accommodation_prepaid,
+            is_food_prepaid: !!b.is_food_prepaid,
+          };
+        });
+        setBookingCache((prev) => ({ ...prev, ...freshBookingCache }));
+
+        txns.forEach((t) => {
+          if (t.source === 'booking_payment' && t.booking_id && freshBookingCache[t.booking_id]) {
+            t.label = freshBookingCache[t.booking_id]!.guest_name || t.label;
+          }
+        });
+      }
+
       setRawTxns(txns);
       setExpandedId(null);
     } catch (error) {
@@ -527,34 +563,64 @@ export function TransactionLedger() {
                         {/* Booking detail for booking-payment income */}
                         {t.source === 'booking_payment' && t.booking_id && (
                           bookingCache[t.booking_id] ? (
-                            <div className="space-y-2">
-                              <div className="flex justify-between text-xs">
-                                <span className="text-[#9C9384]">Guest</span>
-                                <span className="text-[#EDE6D6] font-medium">{bookingCache[t.booking_id]!.guest_name}</span>
-                              </div>
-                              <div className="flex justify-between text-xs">
-                                <span className="text-[#9C9384]">Total vs Collected</span>
-                                <span className="text-[#EDE6D6]">
-                                  {formatOriginal(bookingCache[t.booking_id]!.collected_amount, bookingCache[t.booking_id]!.currency)} of {formatOriginal(bookingCache[t.booking_id]!.total_price, bookingCache[t.booking_id]!.currency)}
-                                </span>
-                              </div>
-                              <div className="flex flex-wrap gap-1">
-                                {bookingCache[t.booking_id]!.is_prepaid && (
-                                  <span className="text-[9px] font-black uppercase tracking-widest bg-[#0B6E4F]/20 text-[#0B6E4F] px-2 py-0.5 rounded-full">Prepaid</span>
-                                )}
-                                {bookingCache[t.booking_id]!.is_accommodation_prepaid && !bookingCache[t.booking_id]!.is_prepaid && (
-                                  <span className="text-[9px] font-black uppercase tracking-widest bg-[#0B6E4F]/20 text-[#0B6E4F] px-2 py-0.5 rounded-full">Stay Prepaid</span>
-                                )}
-                                {bookingCache[t.booking_id]!.is_food_prepaid && (
-                                  <span className="text-[9px] font-black uppercase tracking-widest bg-[#0B6E4F]/20 text-[#0B6E4F] px-2 py-0.5 rounded-full">Food Prepaid</span>
-                                )}
-                                {!bookingCache[t.booking_id]!.is_prepaid && !bookingCache[t.booking_id]!.is_accommodation_prepaid && !bookingCache[t.booking_id]!.is_food_prepaid && (
-                                  <span className="text-[9px] font-black uppercase tracking-widest bg-[#722F37]/20 text-[#722F37] px-2 py-0.5 rounded-full">
-                                    {bookingCache[t.booking_id]!.payment_status || 'unpaid'}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
+                            (() => {
+                              const b = bookingCache[t.booking_id!]!;
+                              const accommodationPaid = b.is_prepaid || b.is_accommodation_prepaid;
+                              const foodPaid = b.is_prepaid || b.is_food_prepaid;
+                              const remaining = Math.max(b.total_price - b.collected_amount, 0);
+                              return (
+                                <div className="space-y-3">
+                                  {/* Collected so far, front and center */}
+                                  <div className="flex items-center justify-between bg-[#0F1419]/50 rounded-lg px-3 py-2">
+                                    <span className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Collected</span>
+                                    <span className="text-sm font-bold text-[#0B6E4F]">
+                                      {formatOriginal(b.collected_amount, b.currency)}
+                                      <span className="text-[#9C9384] font-normal"> / {formatOriginal(b.total_price, b.currency)}</span>
+                                    </span>
+                                  </div>
+
+                                  {/* Paid / prepaid checklist */}
+                                  <div className="space-y-1.5">
+                                    <div className="flex items-center gap-2 text-xs">
+                                      <span className={accommodationPaid ? 'text-[#0B6E4F]' : 'text-[#722F37]'}>
+                                        {accommodationPaid ? '✓' : '✕'}
+                                      </span>
+                                      <span className="text-[#EDE6D6]">Accommodation {accommodationPaid ? 'paid / prepaid' : 'not paid'}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-xs">
+                                      <span className={foodPaid ? 'text-[#0B6E4F]' : 'text-[#722F37]'}>
+                                        {foodPaid ? '✓' : '✕'}
+                                      </span>
+                                      <span className="text-[#EDE6D6]">Food {foodPaid ? 'paid / prepaid' : 'not paid'}</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Total / paid / remaining, with currency */}
+                                  <div className="grid grid-cols-3 gap-2 pt-1 border-t border-[#5C4A2E]/20">
+                                    <div>
+                                      <p className="text-[9px] font-black text-[#9C9384] uppercase tracking-widest">Total</p>
+                                      <p className="text-xs text-[#EDE6D6] font-medium">{formatOriginal(b.total_price, b.currency)}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-[9px] font-black text-[#9C9384] uppercase tracking-widest">Paid</p>
+                                      <p className="text-xs text-[#0B6E4F] font-medium">{formatOriginal(b.collected_amount, b.currency)}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-[9px] font-black text-[#9C9384] uppercase tracking-widest">Remaining</p>
+                                      <p className={`text-xs font-medium ${remaining > 0 ? 'text-[#722F37]' : 'text-[#0B6E4F]'}`}>
+                                        {formatOriginal(remaining, b.currency)}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  {!accommodationPaid && !foodPaid && (
+                                    <span className="inline-block text-[9px] font-black uppercase tracking-widest bg-[#722F37]/20 text-[#722F37] px-2 py-0.5 rounded-full">
+                                      {b.payment_status || 'unpaid'}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()
                           ) : (
                             <p className="text-xs text-[#9C9384]">No linked booking found.</p>
                           )
