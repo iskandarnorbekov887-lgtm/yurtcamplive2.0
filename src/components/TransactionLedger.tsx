@@ -98,6 +98,7 @@ export function TransactionLedger() {
   const [dateTo, setDateTo] = useState<string>('');
   const [typeFilter, setTypeFilter] = useState<'all' | TxnType>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [paymentTypeFilter, setPaymentTypeFilter] = useState<'all' | 'prepaid' | 'paid' | 'online' | 'cash'>('all');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [rawTxns, setRawTxns] = useState<LedgerTxn[]>([]);
@@ -339,9 +340,41 @@ export function TransactionLedger() {
         const haystack = `${t.label} ${t.description} ${t.worker_name || ''} ${t.category}`.toLowerCase();
         if (!haystack.includes(q)) return false;
       }
+      
+      // Payment type filter for income booking-payment rows
+      if (paymentTypeFilter !== 'all' && t.type === 'income' && t.source === 'booking_payment' && t.booking_id) {
+        const booking = bookingCache[t.booking_id];
+        const receipts = bookingReceiptsCache[t.booking_id] || [];
+        const latestReceipt = receipts.length > 0 
+          ? receipts.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+          : null;
+        
+        // Check if prepaid
+        const isPrepaid = booking?.is_prepaid || booking?.is_accommodation_prepaid || booking?.is_food_prepaid 
+          || latestReceipt?.snapshot?.items?.isPrepaid;
+        
+        // Get payment method from receipt snapshot or transaction method
+        const paymentsFromSnapshot = latestReceipt?.snapshot?.payments || [];
+        const paymentMethod = paymentsFromSnapshot.length > 0 
+          ? paymentsFromSnapshot[0].method 
+          : t.method;
+        
+        // Apply filter
+        if (paymentTypeFilter === 'prepaid' && !isPrepaid) return false;
+        if (paymentTypeFilter === 'paid' && (isPrepaid || booking?.payment_status !== 'paid')) return false;
+        if (paymentTypeFilter === 'online' && !paymentMethod?.toLowerCase().includes('online') && !paymentMethod?.toLowerCase().includes('card') && !paymentMethod?.toLowerCase().includes('transfer')) return false;
+        if (paymentTypeFilter === 'cash' && !paymentMethod?.toLowerCase().includes('cash')) return false;
+      } else if (paymentTypeFilter !== 'all' && t.type === 'income') {
+        // For non-booking-payment income, filter by method
+        const paymentMethod = t.method;
+        if (paymentTypeFilter === 'online' && !paymentMethod?.toLowerCase().includes('online') && !paymentMethod?.toLowerCase().includes('card') && !paymentMethod?.toLowerCase().includes('transfer')) return false;
+        if (paymentTypeFilter === 'cash' && !paymentMethod?.toLowerCase().includes('cash')) return false;
+        if (paymentTypeFilter === 'prepaid' || paymentTypeFilter === 'paid') return false; // Only applies to bookings
+      }
+      
       return true;
     });
-  }, [rawTxns, typeFilter, categoryFilter, search]);
+  }, [rawTxns, typeFilter, categoryFilter, search, paymentTypeFilter, bookingCache, bookingReceiptsCache]);
 
   const summary = useMemo(() => {
     let income = 0;
@@ -493,6 +526,37 @@ export function TransactionLedger() {
   const categoryBadgeColor = (t: LedgerTxn) =>
     t.type === 'income' ? 'bg-[#0B6E4F]/20 text-[#0B6E4F]' : 'bg-[#722F37]/20 text-[#722F37]';
 
+  const getPaymentIconForTxn = (t: LedgerTxn) => {
+    if (t.source === 'booking_payment' && t.booking_id) {
+      const receipts = bookingReceiptsCache[t.booking_id] || [];
+      const latestReceipt = receipts.length > 0 
+        ? receipts.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+        : null;
+      const paymentsFromSnapshot = latestReceipt?.snapshot?.payments || [];
+      const method = paymentsFromSnapshot.length > 0 
+        ? paymentsFromSnapshot[0].method 
+        : t.method;
+      if (method) {
+        const m = method.toLowerCase();
+        if (m.includes('online') || m.includes('card') || m.includes('transfer')) {
+          return <CreditCard size={14} className="text-[#9C9384]" />;
+        }
+        if (m.includes('cash')) {
+          return <Banknote size={14} className="text-[#9C9384]" />;
+        }
+      }
+    } else if (t.method) {
+      const m = t.method.toLowerCase();
+      if (m.includes('online') || m.includes('card') || m.includes('transfer')) {
+        return <CreditCard size={14} className="text-[#9C9384]" />;
+      }
+      if (m.includes('cash')) {
+        return <Banknote size={14} className="text-[#9C9384]" />;
+      }
+    }
+    return null;
+  };
+
   return (
     <div className="space-y-4">
       {/* Filter Bar */}
@@ -562,6 +626,24 @@ export function TransactionLedger() {
             ))}
           </select>
 
+          {typeFilter === 'income' && (
+            <div className="flex gap-1 bg-[#0F1419]/50 rounded-lg p-1">
+              {(['all', 'prepaid', 'paid', 'online', 'cash'] as const).map((pt) => (
+                <button
+                  key={pt}
+                  onClick={() => setPaymentTypeFilter(pt)}
+                  className={`px-3 py-1 rounded-md font-bold uppercase tracking-widest text-[10px] transition-all ${
+                    paymentTypeFilter === pt
+                      ? 'bg-[#C9A227] text-[#0F1419]'
+                      : 'text-[#9C9384] hover:text-[#EDE6D6]'
+                  }`}
+                >
+                  {pt === 'all' ? 'All' : pt === 'prepaid' ? 'Prepaid' : pt === 'paid' ? 'Paid' : pt === 'online' ? 'Online' : 'Cash'}
+                </button>
+              ))}
+            </div>
+          )}
+
           <input
             type="text"
             value={search}
@@ -616,6 +698,7 @@ export function TransactionLedger() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
+                    {t.type === 'income' && getPaymentIconForTxn(t)}
                     <span className={`text-sm font-bold whitespace-nowrap ${t.type === 'income' ? 'text-[#0B6E4F]' : 'text-[#722F37]'}`}>
                       {t.type === 'income' ? '+' : '-'}{formatOriginal(t.amount, t.currency)}
                     </span>
@@ -736,9 +819,8 @@ export function TransactionLedger() {
                                         <div key={idx} className="flex justify-between text-xs items-baseline">
                                           <div className="flex items-center gap-2">
                                             {getPaymentIcon(p.method)}
-                                            <span className="text-[#EDE6D6]">{p.method}</span>
                                             {p.currency_original !== 'USD' && p.exchange_rate_used && (
-                                              <span className="text-[#9C9384] ml-1">
+                                              <span className="text-[#9C9384]">
                                                 @{formatPlainNumber(p.exchange_rate_used)} UZS/USD
                                               </span>
                                             )}
