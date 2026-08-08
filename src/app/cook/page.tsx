@@ -106,6 +106,8 @@ function CookPortal() {
         }))
       );
       
+      console.table(allMeals);
+      
       const filteredMeals = allMeals.filter((m) => {
         const statusLower = (m.status || '').toLowerCase();
         return statusLower !== 'served' && statusLower !== 'cancelled';
@@ -179,7 +181,8 @@ function CookPortal() {
   };
 
   const today = getLocalDateStr();
-  const queueMeals = mealRequests.filter(m => m.meal_date === today);
+  const yesterday = getLocalDateStr(new Date(Date.now() - 86400000));
+  const queueMeals = mealRequests.filter(m => m.meal_date === today || m.meal_date === yesterday);
   const upcomingMeals = mealRequests.filter(m => m.meal_date > today);
   const pendingCount = queueMeals.filter(m => (m.status || '').toLowerCase() === 'pending').length;
 
