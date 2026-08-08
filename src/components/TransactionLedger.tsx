@@ -804,6 +804,32 @@ export function TransactionLedger() {
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
+                      {t.source === 'booking_payment' && (() => {
+                        const receipts = bookingReceiptsCache[t.booking_id!] || [];
+                        const latestReceipt = receipts.length > 0 
+                          ? receipts.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+                          : null;
+                        const paymentsFromSnapshot = latestReceipt?.snapshot?.payments || [];
+                        const method = paymentsFromSnapshot.length > 0 
+                          ? paymentsFromSnapshot[0].method 
+                          : t.method;
+                        const icon = method ? (() => {
+                          const m = method.toLowerCase();
+                          if (m.includes('online') || m.includes('card') || m.includes('transfer')) {
+                            return <CreditCard size={14} className="text-[#9C9384]" />;
+                          }
+                          if (m.includes('cash')) {
+                            return <Banknote size={14} className="text-[#9C9384]" />;
+                          }
+                          return null;
+                        })() : null;
+                        return (
+                          <>
+                            {icon}
+                            <span className="text-[10px] font-black uppercase tracking-widest text-[#9C9384]">{method || 'Unknown'}</span>
+                          </>
+                        );
+                      })()}
                       <span className="text-sm font-medium text-[#EDE6D6] truncate">{t.label}</span>
                       <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${categoryBadgeColor(t)}`}>
                         {t.category}
@@ -828,12 +854,9 @@ export function TransactionLedger() {
                         PREPAID
                       </span>
                     ) : (
-                      <>
-                        {t.type === 'income' && getPaymentIconForTxn(t)}
-                        <span className={`text-sm font-bold whitespace-nowrap ${t.type === 'income' ? 'text-[#0B6E4F]' : 'text-[#722F37]'}`}>
-                          {t.type === 'income' ? '+' : '-'}{formatOriginal(t.amount, t.currency)}
-                        </span>
-                      </>
+                      <span className={`text-sm font-bold whitespace-nowrap ${t.type === 'income' ? 'text-[#0B6E4F]' : 'text-[#722F37]'}`}>
+                        {t.type === 'income' ? '+' : '-'}{formatOriginal(t.amount, t.currency)}
+                      </span>
                     )}
                     <svg
                       className={`w-4 h-4 text-[#9C9384] transition-transform ${expandedId === t.id ? 'rotate-180' : ''}`}
@@ -959,8 +982,18 @@ export function TransactionLedger() {
                                         </div>
                                       ))}
                                       <div className="flex justify-between text-xs pt-1 border-t border-[#5C4A2E]/20">
-                                        <span className="text-[#9C9384] font-black uppercase tracking-widest">Total Paid ({b.collected_currency} equiv)</span>
-                                        <span className="text-[#0B6E4F] font-bold">{formatPlainNumber(b.collected_amount)} {b.collected_currency}</span>
+                                        <span className="text-[#9C9384] font-black uppercase tracking-widest">Total Paid (UZS equiv)</span>
+                                        <span className="text-[#0B6E4F] font-bold">
+                                          {formatPlainNumber(paymentsToShow.reduce((sum, p) => {
+                                            if (p.currency_original === 'UZS') {
+                                              return sum + (p.amount_original || 0);
+                                            }
+                                            // Convert to UZS using exchange_rate_used
+                                            const usdEquiv = (p as any).amount_usd_equivalent || 0;
+                                            const exchangeRate = p.exchange_rate_used || 0;
+                                            return sum + (usdEquiv * exchangeRate);
+                                          }, 0))} UZS
+                                        </span>
                                       </div>
                                     </div>
                                   )}
