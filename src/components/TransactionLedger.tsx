@@ -17,7 +17,7 @@ interface LedgerTxn {
   amount_uzs: number;
   txn_date: string;
   created_at: string;
-  source: 'camp_finances' | 'payment_exchange' | 'payment_restock' | 'booking_payment' | 'payment_sale';
+  source: 'camp_finances' | 'payment_exchange' | 'payment_restock' | 'booking_payment' | 'payment_sale' | 'prepaid_booking';
   finance_id?: number;
   booking_id?: number;
   worker_name?: string | null;
@@ -98,10 +98,12 @@ export function TransactionLedger() {
   const [dateTo, setDateTo] = useState<string>('');
   const [typeFilter, setTypeFilter] = useState<'all' | TxnType>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [paymentTypeFilter, setPaymentTypeFilter] = useState<'all' | 'prepaid' | 'paid' | 'online' | 'cash'>('all');
+  const [paymentTypeFilterLevel1, setPaymentTypeFilterLevel1] = useState<'all' | 'prepaid' | 'paid_in_camp'>('all');
+  const [paymentTypeFilterLevel2, setPaymentTypeFilterLevel2] = useState<'all' | 'cash' | 'online'>('all');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [rawTxns, setRawTxns] = useState<LedgerTxn[]>([]);
+  const [prepaidBookings, setPrepaidBookings] = useState<LedgerTxn[]>([]);
   const [rates, setRates] = useState<{ USD: number; EUR: number }>({ USD: 12500, EUR: 13500 });
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -317,9 +319,35 @@ export function TransactionLedger() {
 
       setRawTxns(txns);
       setExpandedId(null);
+
+      // Fetch prepaid bookings separately
+      const { data: prepaidBookingsData } = await supabase
+        .from('bookings')
+        .select('id, guest_name, check_in, total_price, collected_amount, currency, payment_status, is_prepaid, is_accommodation_prepaid, is_food_prepaid')
+        .or('is_prepaid.eq.true,is_accommodation_prepaid.eq.true,is_food_prepaid.eq.true')
+        .gte('check_in', from)
+        .lte('check_in', to);
+
+      const prepaidTxns: LedgerTxn[] = (prepaidBookingsData || []).map((b: any) => ({
+        id: `prepaid-${b.id}`,
+        type: 'income',
+        category: 'Booking Payment',
+        label: b.guest_name || 'Prepaid booking',
+        description: `Check-in: ${b.check_in}`,
+        amount: 0,
+        currency: b.currency || 'USD',
+        amount_uzs: 0,
+        txn_date: b.check_in,
+        created_at: b.check_in,
+        source: 'prepaid_booking',
+        booking_id: b.id,
+        is_prepaid_hint: true,
+      }));
+      setPrepaidBookings(prepaidTxns);
     } catch (error) {
       console.error('Error fetching ledger transactions:', error);
       setRawTxns([]);
+      setPrepaidBookings([]);
     } finally {
       setLoading(false);
     }
@@ -333,7 +361,11 @@ export function TransactionLedger() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return rawTxns.filter((t) => {
+    const allTxns = paymentTypeFilterLevel1 === 'all' || paymentTypeFilterLevel1 === 'prepaid' 
+      ? [...rawTxns, ...prepaidBookings] 
+      : rawTxns;
+    
+    return allTxns.filter((t) => {
       if (typeFilter !== 'all' && t.type !== typeFilter) return false;
       if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
       if (q) {
@@ -341,40 +373,26 @@ export function TransactionLedger() {
         if (!haystack.includes(q)) return false;
       }
       
-      // Payment type filter for income booking-payment rows
-      if (paymentTypeFilter !== 'all' && t.type === 'income' && t.source === 'booking_payment' && t.booking_id) {
-        const booking = bookingCache[t.booking_id];
-        const receipts = bookingReceiptsCache[t.booking_id] || [];
-        const latestReceipt = receipts.length > 0 
-          ? receipts.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
-          : null;
+      // Level 1 filter
+      if (paymentTypeFilterLevel1 === 'prepaid') {
+        // Only show prepaid bookings
+        if (t.source !== 'prepaid_booking') return false;
+      } else if (paymentTypeFilterLevel1 === 'paid_in_camp') {
+        // Only show paid-in-camp (not prepaid)
+        if (t.source === 'prepaid_booking') return false;
         
-        // Check if prepaid
-        const isPrepaid = booking?.is_prepaid || booking?.is_accommodation_prepaid || booking?.is_food_prepaid 
-          || latestReceipt?.snapshot?.items?.isPrepaid;
-        
-        // Get payment method from receipt snapshot or transaction method
-        const paymentsFromSnapshot = latestReceipt?.snapshot?.payments || [];
-        const paymentMethod = paymentsFromSnapshot.length > 0 
-          ? paymentsFromSnapshot[0].method 
-          : t.method;
-        
-        // Apply filter
-        if (paymentTypeFilter === 'prepaid' && !isPrepaid) return false;
-        if (paymentTypeFilter === 'paid' && (isPrepaid || booking?.payment_status !== 'paid')) return false;
-        if (paymentTypeFilter === 'online' && !paymentMethod?.toLowerCase().includes('online') && !paymentMethod?.toLowerCase().includes('card') && !paymentMethod?.toLowerCase().includes('transfer')) return false;
-        if (paymentTypeFilter === 'cash' && !paymentMethod?.toLowerCase().includes('cash')) return false;
-      } else if (paymentTypeFilter !== 'all' && t.type === 'income') {
-        // For non-booking-payment income, filter by method
-        const paymentMethod = t.method;
-        if (paymentTypeFilter === 'online' && !paymentMethod?.toLowerCase().includes('online') && !paymentMethod?.toLowerCase().includes('card') && !paymentMethod?.toLowerCase().includes('transfer')) return false;
-        if (paymentTypeFilter === 'cash' && !paymentMethod?.toLowerCase().includes('cash')) return false;
-        if (paymentTypeFilter === 'prepaid' || paymentTypeFilter === 'paid') return false; // Only applies to bookings
+        // Level 2 filter for payment method
+        if (paymentTypeFilterLevel2 !== 'all' && t.type === 'income') {
+          const paymentMethod = t.method;
+          if (paymentTypeFilterLevel2 === 'online' && !paymentMethod?.toLowerCase().includes('online') && !paymentMethod?.toLowerCase().includes('card') && !paymentMethod?.toLowerCase().includes('transfer')) return false;
+          if (paymentTypeFilterLevel2 === 'cash' && !paymentMethod?.toLowerCase().includes('cash')) return false;
+        }
       }
+      // 'all' shows everything
       
       return true;
     });
-  }, [rawTxns, typeFilter, categoryFilter, search, paymentTypeFilter, bookingCache, bookingReceiptsCache]);
+  }, [rawTxns, prepaidBookings, typeFilter, categoryFilter, search, paymentTypeFilterLevel1, paymentTypeFilterLevel2]);
 
   const summary = useMemo(() => {
     let income = 0;
@@ -627,21 +645,46 @@ export function TransactionLedger() {
           </select>
 
           {typeFilter === 'income' && (
-            <div className="flex gap-1 bg-[#0F1419]/50 rounded-lg p-1">
-              {(['all', 'prepaid', 'paid', 'online', 'cash'] as const).map((pt) => (
-                <button
-                  key={pt}
-                  onClick={() => setPaymentTypeFilter(pt)}
-                  className={`px-3 py-1 rounded-md font-bold uppercase tracking-widest text-[10px] transition-all ${
-                    paymentTypeFilter === pt
-                      ? 'bg-[#C9A227] text-[#0F1419]'
-                      : 'text-[#9C9384] hover:text-[#EDE6D6]'
-                  }`}
-                >
-                  {pt === 'all' ? 'All' : pt === 'prepaid' ? 'Prepaid' : pt === 'paid' ? 'Paid' : pt === 'online' ? 'Online' : 'Cash'}
-                </button>
-              ))}
-            </div>
+            <>
+              {/* Level 1: All | Prepaid | Paid in Camp */}
+              <div className="flex gap-1 bg-[#0F1419]/50 rounded-lg p-1">
+                {(['all', 'prepaid', 'paid_in_camp'] as const).map((pt) => (
+                  <button
+                    key={pt}
+                    onClick={() => {
+                      setPaymentTypeFilterLevel1(pt);
+                      if (pt !== 'paid_in_camp') setPaymentTypeFilterLevel2('all');
+                    }}
+                    className={`px-3 py-1 rounded-md font-bold uppercase tracking-widest text-[10px] transition-all ${
+                      paymentTypeFilterLevel1 === pt
+                        ? 'bg-[#C9A227] text-[#0F1419]'
+                        : 'text-[#9C9384] hover:text-[#EDE6D6]'
+                    }`}
+                  >
+                    {pt === 'all' ? 'All' : pt === 'prepaid' ? 'Prepaid' : 'Paid in Camp'}
+                  </button>
+                ))}
+              </div>
+
+              {/* Level 2: All | Cash | Online (only visible when Level 1 is "Paid in Camp") */}
+              {paymentTypeFilterLevel1 === 'paid_in_camp' && (
+                <div className="flex gap-1 bg-[#0F1419]/50 rounded-lg p-1">
+                  {(['all', 'cash', 'online'] as const).map((pt) => (
+                    <button
+                      key={pt}
+                      onClick={() => setPaymentTypeFilterLevel2(pt)}
+                      className={`px-3 py-1 rounded-md font-bold uppercase tracking-widest text-[10px] transition-all ${
+                        paymentTypeFilterLevel2 === pt
+                          ? 'bg-[#C9A227] text-[#0F1419]'
+                          : 'text-[#9C9384] hover:text-[#EDE6D6]'
+                      }`}
+                    >
+                      {pt === 'all' ? 'All' : pt === 'cash' ? 'Cash' : 'Online'}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
           )}
 
           <input
@@ -698,10 +741,18 @@ export function TransactionLedger() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {t.type === 'income' && getPaymentIconForTxn(t)}
-                    <span className={`text-sm font-bold whitespace-nowrap ${t.type === 'income' ? 'text-[#0B6E4F]' : 'text-[#722F37]'}`}>
-                      {t.type === 'income' ? '+' : '-'}{formatOriginal(t.amount, t.currency)}
-                    </span>
+                    {t.source === 'prepaid_booking' ? (
+                      <span className="inline-block text-[9px] font-black uppercase tracking-widest bg-[#C9A227]/20 text-[#C9A227] px-2 py-0.5 rounded-full">
+                        PREPAID
+                      </span>
+                    ) : (
+                      <>
+                        {t.type === 'income' && getPaymentIconForTxn(t)}
+                        <span className={`text-sm font-bold whitespace-nowrap ${t.type === 'income' ? 'text-[#0B6E4F]' : 'text-[#722F37]'}`}>
+                          {t.type === 'income' ? '+' : '-'}{formatOriginal(t.amount, t.currency)}
+                        </span>
+                      </>
+                    )}
                     <svg
                       className={`w-4 h-4 text-[#9C9384] transition-transform ${expandedId === t.id ? 'rotate-180' : ''}`}
                       fill="none" stroke="currentColor" viewBox="0 0 24 24"
