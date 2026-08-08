@@ -8,6 +8,29 @@ interface ParsedItem {
   unit_price: number;
 }
 
+// Uzbek Cyrillic-to-Latin transliteration mapping (official standard)
+const CYRILLIC_TO_LATIN_MAP: Record<string, string> = {
+  'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'ғ': "g'",
+  'д': 'd', 'е': 'e', 'ё': 'yo', 'ж': 'j', 'з': 'z',
+  'и': 'i', 'й': 'y', 'к': 'k', 'қ': 'q', 'л': 'l',
+  'м': 'm', 'н': 'n', 'о': 'o', 'ў': "o'", 'п': 'p',
+  'р': 'r', 'с': 's', 'т': 't', 'у': 'u', 'ф': 'f',
+  'х': 'x', 'ҳ': 'h', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh',
+  'щ': 'shch', 'ъ': "'", 'ь': "'", 'э': 'e', 'ю': 'yu', 'я': 'ya',
+  // Uppercase variants
+  'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'G', 'Ғ': "G'",
+  'Д': 'D', 'Е': 'E', 'Ё': 'Yo', 'Ж': 'J', 'З': 'Z',
+  'И': 'I', 'Й': 'Y', 'К': 'K', 'Қ': 'Q', 'Л': 'L',
+  'М': 'M', 'Н': 'N', 'О': 'O', 'Ў': "O'", 'П': 'P',
+  'Р': 'R', 'С': 'S', 'Т': 'T', 'У': 'U', 'Ф': 'F',
+  'Х': 'X', 'Ҳ': 'H', 'Ц': 'Ts', 'Ч': 'Ch', 'Ш': 'Sh',
+  'Щ': 'Shch', 'Ъ': "'", 'Ь': "'", 'Э': 'E', 'Ю': 'Yu', 'Я': 'Ya',
+};
+
+function transliterateUzbek(text: string): string {
+  return text.split('').map(char => CYRILLIC_TO_LATIN_MAP[char] || char).join('');
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { image } = await req.json();
@@ -77,11 +100,14 @@ export async function POST(req: NextRequest) {
 
     const text: string = data.responses?.[0]?.fullTextAnnotation?.text ?? '';
 
+    // Transliterate Cyrillic to Latin script
+    const transliteratedText = transliterateUzbek(text);
+
     console.log('=== RAW OCR TEXT ===');
-    console.log(text);
+    console.log(transliteratedText);
     console.log('=== END RAW OCR TEXT ===');
 
-    const lines = text.split('\n').map((l: string) => l.trim()).filter(Boolean);
+    const lines = transliteratedText.split('\n').map((l: string) => l.trim()).filter(Boolean);
     
     // Parse each line to extract item, quantity, and unit price
     const parsedItems: ParsedItem[] = [];
