@@ -12,7 +12,7 @@ interface TeamSettings {
   team_id: string;
   google_calendar_id: string;
   google_service_account_email: string;
-  google_private_key: string;
+  google_private_key_secret_id?: string | null; // Vault reference
   google_calendar_integration_method: 'api' | 'ical' | 'oauth';
   google_ical_url: string;
   google_oauth_access_token?: string;
@@ -79,6 +79,7 @@ export function TeamIntegrationSettings() {
   const [calendarId, setCalendarId] = useState('');
   const [serviceAccountEmail, setServiceAccountEmail] = useState('');
   const [privateKey, setPrivateKey] = useState('');
+  const [hasExistingKey, setHasExistingKey] = useState(false);
   const [integrationMethod, setIntegrationMethod] = useState<'api' | 'ical' | 'oauth'>('api');
   const [icalUrl, setIcalUrl] = useState('');
   const [teamId, setTeamId] = useState<string | null>(null);
@@ -135,7 +136,10 @@ export function TeamIntegrationSettings() {
       if (data) {
         setCalendarId((data as TeamSettings).google_calendar_id ?? '');
         setServiceAccountEmail((data as TeamSettings).google_service_account_email ?? '');
-        setPrivateKey((data as TeamSettings).google_private_key ?? '');
+        // Private key is no longer fetched/displayed here — it lives in Vault now.
+        // hasExistingKey tracks whether one is set, without ever loading its value into the browser.
+        setHasExistingKey(Boolean((data as TeamSettings).google_private_key_secret_id));
+        setPrivateKey('');
         setIntegrationMethod((data as TeamSettings).google_calendar_integration_method ?? 'api');
         setIcalUrl((data as TeamSettings).google_ical_url ?? '');
         setLastSaved((data as TeamSettings).updated_at ?? null);
@@ -165,7 +169,7 @@ export function TeamIntegrationSettings() {
       return;
     }
 
-    if (integrationMethod === 'api' && (!serviceAccountEmail.trim() || !privateKey.trim())) {
+    if (integrationMethod === 'api' && (!serviceAccountEmail.trim() || (!privateKey.trim() && !hasExistingKey))) {
       setSaveStatus('error');
       setSaveMessage('Service Account credentials are required for API mode.');
       setTimeout(() => { setSaveStatus('idle'); setSaveMessage(undefined); }, 4000);
@@ -192,7 +196,6 @@ export function TeamIntegrationSettings() {
         team_id: teamId,
         google_calendar_id: calendarId.trim(),
         google_service_account_email: serviceAccountEmail.trim(),
-        google_private_key: privateKey.trim(),
         google_calendar_integration_method: integrationMethod,
         google_ical_url: icalUrl.trim(),
       };
@@ -204,6 +207,23 @@ export function TeamIntegrationSettings() {
         .upsert(payload, { onConflict: 'team_id' });
 
       if (error) throw error;
+
+      // Only send a new private key if the CEO actually typed one in.
+      // The real key is never fetched back into the browser, so an empty
+      // field here just means "keep the existing key" — not "clear it".
+      if (privateKey.trim()) {
+        const keyRes = await fetch('/api/team-settings/set-google-key', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ privateKey: privateKey.trim() }),
+        });
+        if (!keyRes.ok) {
+          const body = await keyRes.json().catch(() => ({}));
+          throw new Error(body.error || 'Failed to save private key');
+        }
+        setHasExistingKey(true);
+        setPrivateKey('');
+      }
 
       fetch('/api/calendar/invalidate-cache', { method: 'POST' }).catch(() => {});
 
@@ -366,14 +386,25 @@ export function TeamIntegrationSettings() {
                 {fetchLoading ? (
                   <FieldSkeleton />
                 ) : (
-                  <textarea
-                    id="private-key"
-                    value={privateKey}
-                    onChange={(e) => setPrivateKey(e.target.value)}
-                    placeholder={"-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----"}
-                    autoComplete="new-password"
-                    className="w-full h-32 px-5 py-[14px] bg-[#0F1419]/60 border-2 border-[#5C4A2E]/30 rounded-[18px] text-sm font-semibold text-[#EDE6D6] placeholder-[#5C4A2E]/60 focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/15 outline-none transition-all duration-200 font-mono tracking-wider resize-none"
-                  />
+                  <>
+                    <textarea
+                      id="private-key"
+                      value={privateKey}
+                      onChange={(e) => setPrivateKey(e.target.value)}
+                      placeholder={
+                        hasExistingKey
+                          ? '•••••••• Key is set — leave blank to keep it, or paste a new key to rotate it'
+                          : '-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----'
+                      }
+                      autoComplete="new-password"
+                      className="w-full h-32 px-5 py-[14px] bg-[#0F1419]/60 border-2 border-[#5C4A2E]/30 rounded-[18px] text-sm font-semibold text-[#EDE6D6] placeholder-[#5C4A2E]/60 focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/15 outline-none transition-all duration-200 font-mono tracking-wider resize-none"
+                    />
+                    {hasExistingKey && (
+                      <p className="text-[10px] text-[#9C9384] mt-1">
+                        For security, the current key is never shown here. It's stored encrypted in Vault.
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             </>

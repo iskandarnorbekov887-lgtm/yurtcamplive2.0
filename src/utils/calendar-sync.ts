@@ -93,7 +93,7 @@ async function getCalendarClient(teamId: string) {
   // 1. Query team_settings securely via the service role client
   const { data: settings, error } = await supabaseAdmin
     .from('team_settings')
-    .select('google_service_account_email, google_private_key, google_calendar_id, google_calendar_integration_method, google_ical_url, google_oauth_access_token, google_oauth_refresh_token, google_oauth_token_expiry')
+    .select('google_service_account_email, google_calendar_id, google_calendar_integration_method, google_ical_url, google_oauth_access_token, google_oauth_refresh_token, google_oauth_token_expiry')
     .eq('team_id', teamId)
     .single();
 
@@ -102,7 +102,17 @@ async function getCalendarClient(teamId: string) {
   }
 
   const email = settings.google_service_account_email;
-  let key = settings.google_private_key;
+
+  // Private key now lives in Vault, not on this row — fetch via the restricted RPC
+  let key: string | null = null;
+  if (settings.google_calendar_integration_method === 'api' || !settings.google_calendar_integration_method) {
+    const { data: vaultKey, error: vaultError } = await supabaseAdmin
+      .rpc('get_team_google_private_key', { p_team_id: teamId });
+    if (vaultError) {
+      throw new Error('Failed to retrieve Google Calendar credentials from Vault');
+    }
+    key = vaultKey;
+  }
   const calendarId = settings.google_calendar_id;
   const integrationMethod = settings.google_calendar_integration_method || 'api';
   const icalUrl = settings.google_ical_url;
