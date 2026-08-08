@@ -38,6 +38,7 @@ interface BookingDetail {
   guest_name: string;
   total_price: number;
   collected_amount: number;
+  collected_currency: string;
   currency: string;
   payment_status: string | null;
   is_prepaid: boolean;
@@ -291,7 +292,7 @@ export function TransactionLedger() {
       if (bookingIds.length > 0) {
         const { data: bookingsData } = await supabase
           .from('bookings')
-          .select('id, guest_name, total_price, collected_amount, currency, payment_status, is_prepaid, is_accommodation_prepaid, is_food_prepaid')
+          .select('id, guest_name, total_price, collected_amount, collected_currency, currency, payment_status, is_prepaid, is_accommodation_prepaid, is_food_prepaid')
           .in('id', bookingIds);
 
         const freshBookingCache: Record<number, BookingDetail | null> = {};
@@ -301,6 +302,7 @@ export function TransactionLedger() {
             guest_name: b.guest_name,
             total_price: Number(b.total_price) || 0,
             collected_amount: Number(b.collected_amount) || 0,
+            collected_currency: b.collected_currency || b.currency || 'USD',
             currency: b.currency || 'USD',
             payment_status: b.payment_status,
             is_prepaid: !!b.is_prepaid,
@@ -457,10 +459,10 @@ export function TransactionLedger() {
         try {
           const { data } = await supabase
             .from('bookings')
-            .select('id, guest_name, total_price, collected_amount, currency, payment_status, is_prepaid, is_accommodation_prepaid, is_food_prepaid')
+            .select('id, guest_name, total_price, collected_amount, collected_currency, currency, payment_status, is_prepaid, is_accommodation_prepaid, is_food_prepaid')
             .eq('id', txn.booking_id)
             .single();
-          setBookingCache((prev) => ({
+          setBookingCache((prev) => (({
             ...prev,
             [txn.booking_id!]: data
               ? {
@@ -468,6 +470,7 @@ export function TransactionLedger() {
                   guest_name: data.guest_name,
                   total_price: Number(data.total_price) || 0,
                   collected_amount: Number(data.collected_amount) || 0,
+                  collected_currency: data.collected_currency || data.currency || 'USD',
                   currency: data.currency || 'USD',
                   payment_status: data.payment_status,
                   is_prepaid: !!data.is_prepaid,
@@ -475,7 +478,7 @@ export function TransactionLedger() {
                   is_food_prepaid: !!data.is_food_prepaid,
                 }
               : null,
-          }));
+          })));
         } catch (error) {
           console.error('Error fetching booking detail:', error);
           setBookingCache((prev) => ({ ...prev, [txn.booking_id!]: null }));
@@ -825,12 +828,6 @@ export function TransactionLedger() {
                                 return <Globe size={12} className="text-[#9C9384]" />;
                               };
                               
-                              // Calculate total paid USD from payments
-                              const totalPaidUsd = paymentsToShow.reduce((sum, p) => {
-                                const usdEquiv = (p as any).amount_usd_equivalent;
-                                return sum + (typeof usdEquiv === 'number' ? usdEquiv : 0);
-                              }, 0);
-                              
                               return (
                                 <div className="space-y-3">
                                   {/* Amount breakdown from receipt snapshot - only if real data exists */}
@@ -870,6 +867,7 @@ export function TransactionLedger() {
                                         <div key={idx} className="flex justify-between text-xs items-baseline">
                                           <div className="flex items-center gap-2">
                                             {getPaymentIcon(p.method)}
+                                            <span className="text-[#EDE6D6]">{p.method}</span>
                                             {p.currency_original !== 'USD' && p.exchange_rate_used && (
                                               <span className="text-[#9C9384]">
                                                 @{formatPlainNumber(p.exchange_rate_used)} UZS/USD
@@ -882,8 +880,8 @@ export function TransactionLedger() {
                                         </div>
                                       ))}
                                       <div className="flex justify-between text-xs pt-1 border-t border-[#5C4A2E]/20">
-                                        <span className="text-[#9C9384] font-black uppercase tracking-widest">Total Paid (USD equiv)</span>
-                                        <span className="text-[#0B6E4F] font-bold">{formatPlainNumber(totalPaidUsd)} USD</span>
+                                        <span className="text-[#9C9384] font-black uppercase tracking-widest">Total Paid ({b.collected_currency} equiv)</span>
+                                        <span className="text-[#0B6E4F] font-bold">{formatPlainNumber(b.collected_amount)} {b.collected_currency}</span>
                                       </div>
                                     </div>
                                   )}
