@@ -93,7 +93,7 @@ async function getCalendarClient(teamId: string) {
   // 1. Query team_settings securely via the service role client
   const { data: settings, error } = await supabaseAdmin
     .from('team_settings')
-    .select('google_service_account_email, google_private_key, google_calendar_id, google_calendar_integration_method, google_ical_url, google_oauth_access_token, google_oauth_refresh_token, google_oauth_token_expiry')
+    .select('google_service_account_email, google_private_key_secret_id, google_calendar_id, google_calendar_integration_method, google_ical_url, google_oauth_access_token, google_oauth_refresh_token, google_oauth_token_expiry')
     .eq('team_id', teamId)
     .single();
 
@@ -102,7 +102,6 @@ async function getCalendarClient(teamId: string) {
   }
 
   const email = settings.google_service_account_email;
-  let key = settings.google_private_key;
   const calendarId = settings.google_calendar_id;
   const integrationMethod = settings.google_calendar_integration_method || 'api';
   const icalUrl = settings.google_ical_url;
@@ -111,6 +110,20 @@ async function getCalendarClient(teamId: string) {
   const tokenExpiry = settings.google_oauth_token_expiry;
 
   if (integrationMethod === 'api') {
+    // Fetch the service-account private key from Vault (never stored in plaintext)
+    let key: string | null = null;
+    if (settings.google_private_key_secret_id) {
+      const { data: vaultKey, error: vaultError } = await supabaseAdmin.rpc(
+        'get_team_google_private_key',
+        { p_team_id: teamId },
+      );
+      if (vaultError) {
+        console.error('[calendar-sync] Failed to read private key from Vault:', vaultError);
+      } else {
+        key = vaultKey;
+      }
+    }
+
     if (key) {
       key = key.replace(/\\n/g, '\n');
       if (key.startsWith('"') && key.endsWith('"')) {

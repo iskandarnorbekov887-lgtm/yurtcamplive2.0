@@ -167,6 +167,7 @@ function TeamSettingsContent() {
   const [calendarId, setCalendarId] = useState('');
   const [serviceAccountEmail, setServiceAccountEmail] = useState('');
   const [privateKey, setPrivateKey] = useState('');
+  const [hasExistingKey, setHasExistingKey] = useState(false);
   const [showPrivateKey, setShowPrivateKey] = useState(false);
   const [integrationMethod, setIntegrationMethod] = useState<'api' | 'ical' | 'oauth'>('api');
   const [icalUrl, setIcalUrl] = useState('');
@@ -217,7 +218,7 @@ function TeamSettingsContent() {
 
       const { data, error } = await supabase
         .from('team_settings')
-        .select('google_calendar_id, google_service_account_email, google_private_key, google_calendar_integration_method, google_ical_url, updated_at')
+        .select('google_calendar_id, google_service_account_email, google_private_key_secret_id, google_calendar_integration_method, google_ical_url, updated_at')
         .eq('team_id', resolved)
         .maybeSingle();
 
@@ -234,7 +235,8 @@ function TeamSettingsContent() {
       if (data) {
         setCalendarId((data as any).google_calendar_id ?? '');
         setServiceAccountEmail((data as any).google_service_account_email ?? '');
-        setPrivateKey((data as any).google_private_key ?? '');
+        setHasExistingKey(!!(data as any).google_private_key_secret_id);
+        setPrivateKey('');
         setIntegrationMethod((data as any).google_calendar_integration_method ?? 'api');
         setIcalUrl((data as any).google_ical_url ?? '');
         setLastSaved((data as any).updated_at ?? null);
@@ -259,7 +261,7 @@ function TeamSettingsContent() {
       return;
     }
 
-    if (integrationMethod === 'api' && (!serviceAccountEmail.trim() || !privateKey.trim())) {
+    if (integrationMethod === 'api' && (!serviceAccountEmail.trim() || (!privateKey.trim() && !hasExistingKey))) {
       showAlert({ kind: 'warning', title: 'Validation', message: 'Service Account credentials are required for API mode.' });
       return;
     }
@@ -283,16 +285,30 @@ function TeamSettingsContent() {
           team_id: teamId,
           google_calendar_id: calendarId.trim(),
           google_service_account_email: serviceAccountEmail.trim(),
-          google_private_key: privateKey.trim(),
           google_calendar_integration_method: integrationMethod,
           google_ical_url: icalUrl.trim(),
         },
         { onConflict: 'team_id' },
       );
 
-      console.log('[TeamSettings] Saving integration_method:', integrationMethod);
-
       if (error) throw error;
+
+      // Only hit the key-rotation endpoint if the CEO actually typed a new key
+      if (integrationMethod === 'api' && privateKey.trim()) {
+        const keyRes = await fetch('/api/team-settings/private-key', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ teamId, privateKey: privateKey.trim() }),
+        });
+        if (!keyRes.ok) {
+          const body = await keyRes.json().catch(() => ({}));
+          throw new Error(body.error || 'Failed to save private key');
+        }
+        setHasExistingKey(true);
+        setPrivateKey('');
+      }
+
+      console.log('[TeamSettings] Saving integration_method:', integrationMethod);
 
       fetch('/api/calendar/invalidate-cache', { method: 'POST' }).catch(() => {});
 
@@ -546,7 +562,11 @@ function TeamSettingsContent() {
                         id="private-key"
                         value={privateKey}
                         onChange={(e) => setPrivateKey(e.target.value)}
-                        placeholder={"-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----"}
+                        placeholder={
+                          hasExistingKey
+                            ? '•••••••• Key is set — leave blank to keep it, or paste a new key to rotate it'
+                            : '-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----'
+                        }
                         autoComplete="new-password"
                         className={`w-full ${showPrivateKey ? 'h-48' : 'h-14 truncate'} pl-5 pr-14 py-[15px] bg-[#0F1419]/70 border-2 border-[#5C4A2E]/30 rounded-[18px] text-sm font-semibold text-[#EDE6D6] placeholder-[#5C4A2E]/50 focus:border-[#C9A227] focus:ring-2 focus:ring-[#C9A227]/15 outline-none transition-all duration-200 font-mono tracking-wider resize-none`}
                       />
@@ -662,7 +682,7 @@ function TeamSettingsContent() {
                 id="test-connection-btn"
                 type="button"
                 onClick={handleTestConnection}
-                disabled={fetchLoading || saving || connectionStatus === 'testing' || !calendarId.trim() || (integrationMethod === 'api' && (!serviceAccountEmail.trim() || !privateKey.trim())) || (integrationMethod === 'ical' && !icalUrl.trim()) || (integrationMethod === 'oauth' && false)}
+                disabled={fetchLoading || saving || connectionStatus === 'testing' || !calendarId.trim() || (integrationMethod === 'api' && (!serviceAccountEmail.trim() || (!privateKey.trim() && !hasExistingKey))) || (integrationMethod === 'ical' && !icalUrl.trim()) || (integrationMethod === 'oauth' && false)}
                 className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-[#C9A227]/15 border-2 border-[#C9A227]/30 text-[#C9A227] text-xs font-black uppercase tracking-[0.15em] hover:bg-[#C9A227]/25 active:scale-[0.98] transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {connectionStatus === 'testing' ? (
