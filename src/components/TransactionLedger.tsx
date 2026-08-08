@@ -44,6 +44,8 @@ interface BookingDetail {
   is_prepaid: boolean;
   is_accommodation_prepaid: boolean;
   is_food_prepaid: boolean;
+  number_of_adults: number;
+  number_of_children: number;
 }
 
 interface BookingReceipt {
@@ -292,7 +294,7 @@ export function TransactionLedger() {
       if (bookingIds.length > 0) {
         const { data: bookingsData } = await supabase
           .from('bookings')
-          .select('id, guest_name, total_price, collected_amount, collected_currency, currency, payment_status, is_prepaid, is_accommodation_prepaid, is_food_prepaid')
+          .select('id, guest_name, total_price, collected_amount, collected_currency, currency, payment_status, is_prepaid, is_accommodation_prepaid, is_food_prepaid, number_of_adults, number_of_children')
           .in('id', bookingIds);
 
         const freshBookingCache: Record<number, BookingDetail | null> = {};
@@ -308,6 +310,8 @@ export function TransactionLedger() {
             is_prepaid: !!b.is_prepaid,
             is_accommodation_prepaid: !!b.is_accommodation_prepaid,
             is_food_prepaid: !!b.is_food_prepaid,
+            number_of_adults: Number(b.number_of_adults) || 0,
+            number_of_children: Number(b.number_of_children) || 0,
           };
         });
         setBookingCache((prev) => ({ ...prev, ...freshBookingCache }));
@@ -325,7 +329,7 @@ export function TransactionLedger() {
       // Fetch prepaid bookings separately
       const { data: prepaidBookingsData } = await supabase
         .from('bookings')
-        .select('id, guest_name, check_in, total_price, collected_amount, currency, payment_status, is_prepaid, is_accommodation_prepaid, is_food_prepaid')
+        .select('id, guest_name, check_in, total_price, collected_amount, currency, payment_status, is_prepaid, is_accommodation_prepaid, is_food_prepaid, number_of_adults, number_of_children')
         .or('is_prepaid.eq.true,is_accommodation_prepaid.eq.true,is_food_prepaid.eq.true')
         .gte('check_in', from)
         .lte('check_in', to);
@@ -459,7 +463,7 @@ export function TransactionLedger() {
         try {
           const { data } = await supabase
             .from('bookings')
-            .select('id, guest_name, total_price, collected_amount, collected_currency, currency, payment_status, is_prepaid, is_accommodation_prepaid, is_food_prepaid')
+            .select('id, guest_name, total_price, collected_amount, collected_currency, currency, payment_status, is_prepaid, is_accommodation_prepaid, is_food_prepaid, number_of_adults, number_of_children')
             .eq('id', txn.booking_id)
             .single();
           setBookingCache((prev) => (({
@@ -476,6 +480,8 @@ export function TransactionLedger() {
                   is_prepaid: !!data.is_prepaid,
                   is_accommodation_prepaid: !!data.is_accommodation_prepaid,
                   is_food_prepaid: !!data.is_food_prepaid,
+                  number_of_adults: Number(data.number_of_adults) || 0,
+                  number_of_children: Number(data.number_of_children) || 0,
                 }
               : null,
           })));
@@ -521,7 +527,7 @@ export function TransactionLedger() {
         try {
           const { data } = await supabase
             .from('bookings')
-            .select('id, guest_name, total_price, collected_amount, collected_currency, currency, payment_status, is_prepaid, is_accommodation_prepaid, is_food_prepaid')
+            .select('id, guest_name, total_price, collected_amount, collected_currency, currency, payment_status, is_prepaid, is_accommodation_prepaid, is_food_prepaid, number_of_adults, number_of_children')
             .eq('id', txn.booking_id)
             .single();
           setBookingCache((prev) => (({
@@ -538,6 +544,8 @@ export function TransactionLedger() {
                   is_prepaid: !!data.is_prepaid,
                   is_accommodation_prepaid: !!data.is_accommodation_prepaid,
                   is_food_prepaid: !!data.is_food_prepaid,
+                  number_of_adults: Number(data.number_of_adults) || 0,
+                  number_of_children: Number(data.number_of_children) || 0,
                 }
               : null,
           })));
@@ -803,6 +811,15 @@ export function TransactionLedger() {
                     </div>
                     <p className="text-[10px] text-[#9C9384] mt-0.5">
                       {t.txn_date}{t.description ? ` · ${t.description}` : ''}
+                      {(t.source === 'prepaid_booking' || t.source === 'booking_payment') && t.booking_id && bookingCache[t.booking_id] && (() => {
+                        const b = bookingCache[t.booking_id!]!;
+                        const adults = b.number_of_adults || 0;
+                        const children = b.number_of_children || 0;
+                        const paxStr = children === 0 
+                          ? `${adults} pax` 
+                          : `${adults} adults, ${children} kids`;
+                        return ` · ${paxStr}`;
+                      })()}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
