@@ -488,7 +488,69 @@ export function TransactionLedger() {
       }
 
       // Lazy-load booking receipts
-      if (!(txn.booking_id in bookingReceiptsCache)) {
+      if (txn.booking_id && !(txn.booking_id in bookingReceiptsCache)) {
+        setDetailLoading(txn.id);
+        try {
+          const { data } = await supabase
+            .from('booking_receipts')
+            .select('*')
+            .eq('booking_id', txn.booking_id);
+          setBookingReceiptsCache((prev) => (({
+            ...prev,
+            [txn.booking_id!]: (data || []).map((r: any) => ({
+              id: r.id,
+              booking_id: r.booking_id,
+              snapshot: r.snapshot,
+              total_usd: r.total_usd ? Number(r.total_usd) : undefined,
+              created_at: r.created_at,
+            })),
+          })));
+        } catch (error) {
+          console.error('Error fetching booking receipts:', error);
+          setBookingReceiptsCache((prev) => ({ ...prev, [txn.booking_id!]: [] }));
+        } finally {
+          setDetailLoading(null);
+        }
+      }
+    }
+
+    // Lazy-load booking detail for prepaid booking rows
+    if (txn.source === 'prepaid_booking' && txn.booking_id) {
+      if (!(txn.booking_id in bookingCache)) {
+        setDetailLoading(txn.id);
+        try {
+          const { data } = await supabase
+            .from('bookings')
+            .select('id, guest_name, total_price, collected_amount, collected_currency, currency, payment_status, is_prepaid, is_accommodation_prepaid, is_food_prepaid')
+            .eq('id', txn.booking_id)
+            .single();
+          setBookingCache((prev) => (({
+            ...prev,
+            [txn.booking_id!]: data
+              ? {
+                  id: data.id,
+                  guest_name: data.guest_name,
+                  total_price: Number(data.total_price) || 0,
+                  collected_amount: Number(data.collected_amount) || 0,
+                  collected_currency: data.collected_currency || data.currency || 'USD',
+                  currency: data.currency || 'USD',
+                  payment_status: data.payment_status,
+                  is_prepaid: !!data.is_prepaid,
+                  is_accommodation_prepaid: !!data.is_accommodation_prepaid,
+                  is_food_prepaid: !!data.is_food_prepaid,
+                }
+              : null,
+          })));
+        } catch (error) {
+          console.error('Error fetching booking detail:', error);
+          setBookingCache((prev) => ({ ...prev, [txn.booking_id!]: null }));
+        } finally {
+          setDetailLoading(null);
+        }
+      }
+
+      // Lazy-load booking receipts
+      if (txn.booking_id && !(txn.booking_id in bookingReceiptsCache)) {
         setDetailLoading(txn.id);
         try {
           const { data } = await supabase
@@ -514,7 +576,7 @@ export function TransactionLedger() {
       }
 
       // Lazy-load booking payments
-      if (!(txn.booking_id in bookingPaymentsCache)) {
+      if (txn.booking_id && !(txn.booking_id in bookingPaymentsCache)) {
         setDetailLoading(txn.id);
         try {
           const { data } = await supabase
@@ -551,7 +613,7 @@ export function TransactionLedger() {
     if (t.source === 'booking_payment' && t.booking_id) {
       const receipts = bookingReceiptsCache[t.booking_id] || [];
       const latestReceipt = receipts.length > 0 
-        ? receipts.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+        ? receipts.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
         : null;
       const paymentsFromSnapshot = latestReceipt?.snapshot?.payments || [];
       const method = paymentsFromSnapshot.length > 0 
@@ -883,6 +945,100 @@ export function TransactionLedger() {
                                         <span className="text-[#9C9384] font-black uppercase tracking-widest">Total Paid ({b.collected_currency} equiv)</span>
                                         <span className="text-[#0B6E4F] font-bold">{formatPlainNumber(b.collected_amount)} {b.collected_currency}</span>
                                       </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()
+                          ) : (
+                            <p className="text-xs text-[#9C9384]">No linked booking found.</p>
+                          )
+                        )}
+
+                        {/* Prepaid booking detail */}
+                        {t.source === 'prepaid_booking' && t.booking_id && (
+                          bookingCache[t.booking_id] ? (
+                            (() => {
+                              const b = bookingCache[t.booking_id!]!;
+                              const receipts = bookingReceiptsCache[t.booking_id] || [];
+                              
+                              // Get latest receipt
+                              const latestReceipt = receipts.length > 0 
+                                ? receipts.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+                                : null;
+                              
+                              const formatPlainNumber = (num: number | undefined | null) => 
+                                (num ?? 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+                              
+                              // PREPAID badge component
+                              const PrepaidBadge = () => (
+                                <span className="inline-block text-[9px] font-black uppercase tracking-widest bg-[#C9A227]/20 text-[#C9A227] px-2 py-0.5 rounded-full">
+                                  PREPAID
+                                </span>
+                              );
+                              
+                              return (
+                                <div className="space-y-3">
+                                  {latestReceipt ? (
+                                    // Has receipt - render from snapshot
+                                    <div className="space-y-1.5 pt-2 border-t border-[#5C4A2E]/20">
+                                      {/* Accommodation */}
+                                      {(b.is_accommodation_prepaid || latestReceipt.snapshot?.items?.accommodation) && (
+                                        <div className="flex justify-between text-xs">
+                                          <span className="text-[#9C9384]">Accommodation</span>
+                                          <PrepaidBadge />
+                                        </div>
+                                      )}
+                                      
+                                      {/* Meals from snapshot */}
+                                      {latestReceipt.snapshot?.items?.meals && typeof latestReceipt.snapshot.items.meals === 'object' && (latestReceipt.snapshot.items.meals as any).mealDetails && (
+                                        (() => {
+                                          const mealDetails = (latestReceipt.snapshot.items.meals as any).mealDetails;
+                                          const mealsByType: Record<string, number> = {};
+                                          
+                                          mealDetails.forEach((meal: any) => {
+                                            if (meal.prepaid) {
+                                              const qty = (meal.adult_qty || 0) + (meal.child_qty || 0);
+                                              if (qty > 0) {
+                                                mealsByType[meal.meal_type] = (mealsByType[meal.meal_type] || 0) + qty;
+                                              }
+                                            }
+                                          });
+                                          
+                                          return Object.entries(mealsByType).map(([mealType, qty]) => (
+                                            <div key={mealType} className="flex justify-between text-xs">
+                                              <span className="text-[#9C9384]">{mealType} x{qty}</span>
+                                              <PrepaidBadge />
+                                            </div>
+                                          ));
+                                        })()
+                                      )}
+                                      
+                                      {/* Total */}
+                                      <div className="flex justify-between text-xs pt-1 border-t border-[#5C4A2E]/20">
+                                        <span className="text-[#9C9384] font-black uppercase tracking-widest">Total</span>
+                                        <span className="text-[#EDE6D6] font-bold">
+                                          {latestReceipt.snapshot?.total 
+                                            ? formatPlainNumber(latestReceipt.snapshot.total) + ' USD'
+                                            : '$0.00'}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    // No receipt - fallback to booking flags
+                                    <div className="space-y-1.5 pt-2 border-t border-[#5C4A2E]/20">
+                                      {b.is_accommodation_prepaid && (
+                                        <div className="flex justify-between text-xs">
+                                          <span className="text-[#9C9384]">Accommodation</span>
+                                          <PrepaidBadge />
+                                        </div>
+                                      )}
+                                      {b.is_food_prepaid && (
+                                        <div className="flex justify-between text-xs">
+                                          <span className="text-[#9C9384]">Food</span>
+                                          <PrepaidBadge />
+                                        </div>
+                                      )}
                                     </div>
                                   )}
                                 </div>
