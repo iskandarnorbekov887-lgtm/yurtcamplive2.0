@@ -275,6 +275,30 @@ function CEOFinancialCalendar() {
 
     }, { USD: 0, UZS: 0, EUR: 0 }) || { USD: 0, UZS: 0, EUR: 0 };
 
+    // Start with online payments summary (sale adds, expense subtracts)
+
+    const onlineSummary = onlinePaymentsData?.reduce((acc: any, p: any) => {
+
+      const amount = Number(p.amount_original) || 0;
+
+      const currency = p.currency_original || 'USD';
+
+      if (p.type === 'expense') {
+
+        acc[currency] = (acc[currency] || 0) - amount;
+
+      } else {
+
+        // Default to 'sale' or treat as income
+
+        acc[currency] = (acc[currency] || 0) + amount;
+
+      }
+
+      return acc;
+
+    }, { USD: 0, UZS: 0, EUR: 0 }) || { USD: 0, UZS: 0, EUR: 0 };
+
     
 
     // Add camp_finances (income adds, expense subtracts)
@@ -289,7 +313,7 @@ function CEOFinancialCalendar() {
 
         const paymentMethod = f.payment_method || 'Cash'; // treat null as Cash for backward compatibility
         
-        if (onlinePaymentMethods.includes(paymentMethod)) {
+        if (paymentMethod === 'Online') {
           // Online branch
           if (f.type === 'income') {
             onlineSummary[currency] = (onlineSummary[currency] || 0) + amount;
