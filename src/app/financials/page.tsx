@@ -760,8 +760,8 @@ function ManagerFinancials() {
       }
 
       const amountValue = parseFloat(amount);
-      if (isNaN(amountValue) || amountValue <= 0) {
-        setMessage(t('msg.please_enter_valid_amount'));
+      if (isNaN(amountValue) || amountValue < 0) {
+        setMessage('Enter a valid amount');
         setSubmitting(false);
         return;
       }
@@ -1630,21 +1630,23 @@ function ManagerFinancials() {
               </div>
             )}
 
-            {/* Unified Item List - shows when items exist from any source */}
-            {type === 'expense' && category === 'groceries' && parsedItems.length > 0 && (
+            {/* Unified Item List - always visible for groceries category */}
+            {type === 'expense' && category === 'groceries' && (
               <div className="bg-[#1C232E] rounded-xl p-4 space-y-4">
                 <div className="flex justify-between items-center">
                   <h3 className="text-sm font-black text-[#C9A227]">Items ({parsedItems.length})</h3>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setParsedItems([]);
-                      setReceiptUrl(null);
-                    }}
-                    className="text-xs text-[#9C9384] hover:text-[#EDE6D6]"
-                  >
-                    Clear All
-                  </button>
+                  {parsedItems.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setParsedItems([]);
+                        setReceiptUrl(null);
+                      }}
+                      className="text-xs text-[#9C9384] hover:text-[#EDE6D6]"
+                    >
+                      Clear All
+                    </button>
+                  )}
                 </div>
 
                 {/* Receipt Image - if available from scan */}
@@ -1819,23 +1821,6 @@ function ManagerFinancials() {
               </div>
             )}
 
-            {/* Manual Item Entry Button - only when no items yet */}
-            {type === 'expense' && category === 'groceries' && parsedItems.length === 0 && (
-              <div className="bg-[#1C232E] rounded-xl p-4 space-y-3">
-                <p className="text-sm text-[#9C9384]">{t('receipt.manual_entry') || 'Or add items manually'}</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setParsedItems([{ item_name: '', quantity: 1, unit: '', unit_price: 0 }]);
-                    setEditingItemIndex(0);
-                  }}
-                  className="w-full py-2 px-3 rounded-lg bg-[#5C4A2E] text-[#C9A227] font-bold text-sm hover:bg-[#5C4A2E]/80 transition-all"
-                >
-                  + Add Manual Item
-                </button>
-              </div>
-            )}
-
             {/* Worker Name - only for workers income category */}
             {type === 'expense' && category === 'workers income' && (
               <div>
@@ -1905,7 +1890,7 @@ function ManagerFinancials() {
                 <input
                   type="number"
                   step="0.01"
-                  min="0.01"
+                  min="0"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder={t('form.enter_amount_uzs')}

@@ -78,8 +78,8 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
     const isFinancial = mainCategory === 'local' || mainCategory === 'pool';
     if (isFinancial) {
       const parsedAmount = parseFloat(amountUZS);
-      if (!amountUZS.trim() || isNaN(parsedAmount) || parsedAmount <= 0) {
-        setMessage('Error: Payment Amount is required for Local/Pool bookings');
+      if (!amountUZS.trim() || isNaN(parsedAmount) || parsedAmount < 0) {
+        setMessage('Enter a valid amount');
         isSubmittingRef.current = false;
         return;
       }
@@ -317,7 +317,7 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
                   <label className="text-[10px] font-black text-[#9C9384] uppercase tracking-widest ml-1">{t('manager_booking.payment_amount')} *</label>
                   <div className="relative">
                     <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[#9C9384] font-black text-xs">{t('manager_booking.currency_suffix')}</span>
-                    <input type="number" required value={amountUZS} onChange={e => setAmountUZS(e.target.value)} placeholder={t('manager_booking.amount_placeholder')}
+                    <input type="number" min="0" required value={amountUZS} onChange={e => setAmountUZS(e.target.value)} placeholder={t('manager_booking.amount_placeholder')}
                       className="w-full px-5 py-4 bg-[#1C232E]/50 border-2 border-[#5C4A2E]/30 rounded-[20px] text-xl font-black text-[#EDE6D6] focus:border-[#0B6E4F] outline-none transition-all" />
                   </div>
                 </div>
