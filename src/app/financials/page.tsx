@@ -107,7 +107,14 @@ function ManagerFinancials() {
   const [receiptError, setReceiptError] = useState<string | null>(null);
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [parsedItems, setParsedItems] = useState<Array<{ item_name: string; quantity: number; unit: string; unit_price: number }>>([]);
-  const [showReviewMode, setShowReviewMode] = useState(false);
+  const [useFallbackOCR, setUseFallbackOCR] = useState(false); // false = use Groq Vision (default), true = use OCR.space
+
+  // Item name autocomplete state
+  const [itemSuggestions, setItemSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeItemIndex, setActiveItemIndex] = useState(0);
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
 
   // Drinks state - new normalized structure
   const [drinks, setDrinks] = useState<any[]>([]);
@@ -198,19 +205,19 @@ function ManagerFinancials() {
   const fetchCashBox = async () => {
     // Fetch cash payments from payments table
     const { data: paymentsData } = await supabase.from('payments').select('*').eq('method', 'Cash');
-    
+
     // Fetch online payments from payments table
     const { data: onlinePaymentsData } = await supabase.from('payments').select('*').eq('method', 'Online');
-    
+
     // Fetch income/expense from camp_finances
     const { data: financesData } = await supabase.from('camp_finances').select('*');
-    
+
     // Fetch currency exchanges
     const { data: exchangesData } = await supabase
       .from('currency_exchanges')
       .select('*')
       .eq('team_id', user?.team_id);
-    
+
     // Start with payments summary (sale adds, expense subtracts)
     const summary = paymentsData?.reduce((acc: any, p: any) => {
       const amount = Number(p.amount_original) || 0;
@@ -278,6 +285,7 @@ function ManagerFinancials() {
     return summary;
   };
 
+
   const formatCurrency = (value: number) => {
     const absValue = Math.abs(value);
     if (absValue >= 1000000) {
@@ -286,6 +294,90 @@ function ManagerFinancials() {
       return `${(value / 1000).toFixed(0)}K`;
     } else {
       return value.toFixed(0);
+    }
+  };
+
+  // Debounced item name search for autocomplete
+  const searchItemNames = async (query: string, itemIndex: number) => {
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+
+    if (!query.trim()) {
+      setItemSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    setSearchTimeout(
+      setTimeout(async () => {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('team_id')
+              .eq('id', session.user.id)
+              .single();
+
+            if (profile?.team_id) {
+              // Query distinct item names from item_units
+              const { data: items } = await supabase
+                .from('item_units')
+                .select('item_name')
+                .ilike('item_name', `%${query}%`)
+                .eq('team_id', profile.team_id)
+                .limit(10);
+
+              // Get distinct names
+              const distinctNames = Array.from(
+                new Set((items || []).map(i => i.item_name))
+              );
+              setItemSuggestions(distinctNames);
+              setShowSuggestions(distinctNames.length > 0);
+              setActiveItemIndex(0);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to search item names:', error);
+        }
+      }, 300)
+    );
+  };
+
+  const selectItemSuggestion = async (itemName: string, itemIndex: number) => {
+    const newItems = [...parsedItems];
+    newItems[itemIndex].item_name = itemName;
+    setParsedItems(newItems);
+    setShowSuggestions(false);
+    setItemSuggestions([]);
+
+    // Auto-fill unit from item_units if available
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('team_id')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profile?.team_id) {
+          const { data: unitData } = await supabase
+            .from('item_units')
+            .select('unit')
+            .eq('item_name', itemName.toLowerCase().trim())
+            .eq('team_id', profile.team_id)
+            .single();
+
+          if (unitData?.unit) {
+            newItems[itemIndex].unit = unitData.unit;
+            setParsedItems([...newItems]);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch item unit:', error);
     }
   };
 
@@ -628,17 +720,24 @@ function ManagerFinancials() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Route to drink purchase handler if drinks tab
     if (type === 'drinks') {
       handleDrinkPurchase(e);
       return;
     }
-    
+
     if (!user) return;
+
+    // Prevent double-submit
+    if (submitting) {
+      console.log('=== Double-submit prevented ===');
+      return;
+    }
 
     setSubmitting(true);
     setMessage('');
+    console.log('=== handleSubmit called ===', { type, category, parsedItemsLength: parsedItems.length });
 
     try {
       // Validate worker name for workers income category
@@ -687,7 +786,11 @@ function ManagerFinancials() {
       if (insertError) throw insertError;
 
       // Insert line items for groceries category
+      console.log('=== Checking camp_finance_items insert condition ===', { type, category, parsedItemsLength: parsedItems.length });
       if (type === 'expense' && category === 'groceries' && parsedItems.length > 0) {
+        console.log('=== Inserting camp_finance_items ===');
+        console.log('parsedItems:', parsedItems);
+        console.log('financeData.id:', financeData.id);
         const itemsToInsert = parsedItems.map(item => ({
           finance_id: financeData.id,
           item_name: item.item_name,
@@ -695,14 +798,152 @@ function ManagerFinancials() {
           unit: item.unit,
           unit_price: item.unit_price,
         }));
+        console.log('itemsToInsert:', itemsToInsert);
 
         const { error: itemsError } = await supabase.from('camp_finance_items').insert(itemsToInsert);
-        if (itemsError) throw itemsError;
+        if (itemsError) {
+          console.error('=== camp_finance_items insert error ===', itemsError);
+          throw itemsError;
+        }
+        console.log('=== camp_finance_items insert success ===');
+
+        // Upsert item units for future autofill
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('team_id')
+              .eq('id', session.user.id)
+              .single();
+
+            if (profile?.team_id) {
+              for (const item of parsedItems) {
+                if (item.item_name && item.unit) {
+                  await supabase
+                    .from('item_units')
+                    .upsert({
+                      item_name: item.item_name.toLowerCase().trim(),
+                      unit: item.unit,
+                      team_id: profile.team_id,
+                    }, {
+                      onConflict: 'item_name,team_id',
+                    });
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Failed to upsert item units:', error);
+        }
+      } else {
+        console.log('=== camp_finance_items insert skipped ===', { type, category, parsedItemsLength: parsedItems.length });
+      }
+
+      // Auto-upsert inventory on grocery purchase
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('team_id')
+            .eq('id', session.user.id)
+            .single();
+
+          if (profile?.team_id) {
+            for (const item of parsedItems) {
+              if (item.item_name && item.unit) {
+                const itemName = item.item_name.toLowerCase().trim();
+
+                // Get current inventory item
+                const { data: existingItem } = await supabase
+                  .from('inventory')
+                  .select('id, current_stock')
+                  .eq('item_name', itemName)
+                  .eq('team_id', profile.team_id)
+                  .single();
+
+                const currentQty = existingItem?.current_stock || 0;
+
+                // Map unit to unit_type enum and convert quantity
+                let convertedQty = item.quantity;
+                let unitType: 'kg' | 'l' | 'unit' = 'unit';
+
+                const unitLower = item.unit.toLowerCase();
+                if (['kg', 'gramm', 'g'].includes(unitLower)) {
+                  unitType = 'kg';
+                  if (unitLower === 'gramm' || unitLower === 'g') {
+                    convertedQty = item.quantity / 1000; // Convert grams to kg
+                  }
+                } else if (['litr', 'l', 'ml'].includes(unitLower)) {
+                  unitType = 'l';
+                  if (unitLower === 'ml') {
+                    convertedQty = item.quantity / 1000; // Convert ml to l
+                  }
+                } else {
+                  unitType = 'unit';
+                }
+
+                const newQty = currentQty + convertedQty;
+
+                if (existingItem) {
+                  // Update existing inventory item
+                  await supabase
+                    .from('inventory')
+                    .update({ current_stock: newQty })
+                    .eq('id', existingItem.id);
+                } else {
+                  // Insert new inventory item
+                  await supabase
+                    .from('inventory')
+                    .insert({
+                      item_name: itemName,
+                      unit_type: unitType,
+                      current_stock: newQty,
+                      min_threshold: 10,
+                      team_id: profile.team_id,
+                    });
+                }
+
+                // Log purchase in usage_logs
+                const itemId = existingItem?.id;
+                if (itemId) {
+                  await supabase
+                    .from('usage_logs')
+                    .insert({
+                      item_id: itemId,
+                      amount_used: item.quantity,
+                      change_type: 'purchase',
+                      resulting_quantity: newQty,
+                      logged_by: session.user.id,
+                      team_id: profile.team_id,
+                      source: 'financials',
+                    });
+                }
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to upsert inventory:', error);
+        // Don't throw - this is a nice-to-have feature
       }
 
       setMessage(t('msg.record_saved'));
+      
+      // Add warning if groceries saved with no items
+      if (type === 'expense' && category === 'groceries' && parsedItems.length === 0) {
+        setTimeout(() => {
+          setMessage(`${t('msg.record_saved')} — Saved, but no items were added — inventory was not updated.`);
+        }, 100);
+      }
+      
       fetchRecentExpenses();
       fetchWorkerNames();
+      fetchCashBox();
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setMessage(''), 3000);
       
       // Reset form
       setCategory('');
@@ -716,7 +957,6 @@ function ManagerFinancials() {
       setPeriodEnd('');
       setReceiptUrl(null);
       setParsedItems([]);
-      setShowReviewMode(false);
     } catch (err: any) {
       setMessage(`${t('msg.error')}: ${err.message}`);
     } finally {
@@ -923,7 +1163,7 @@ function ManagerFinancials() {
       img.onload = () => {
         let width = img.width;
         let height = img.height;
-        const maxDimension = 1800; // Target max dimension for OCR readability
+        const maxDimension = 1500; // Target max dimension for OCR readability
 
         // Resize if exceeds max dimension
         if (width > maxDimension || height > maxDimension) {
@@ -941,7 +1181,7 @@ function ManagerFinancials() {
 
         ctx?.drawImage(img, 0, 0, width, height);
 
-        let quality = 0.8;
+        let quality = 0.75; // ~75% JPEG quality as requested
         let blob: Blob | null = null;
         let attempts = 0;
         const maxAttempts = 5;
@@ -986,7 +1226,7 @@ function ManagerFinancials() {
     });
   };
 
-  const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>, useGroqVision = false) => {
+  const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -1021,8 +1261,8 @@ function ManagerFinancials() {
         reader.readAsDataURL(compressedFile);
       });
 
-      // Call OCR API (with optional Groq Vision test path)
-      const url = useGroqVision ? '/api/receipt-ocr?provider=groq_vision' : '/api/receipt-ocr';
+      // Call OCR API - Groq Vision by default, OCR.space if fallback enabled
+      const url = useFallbackOCR ? '/api/receipt-ocr' : '/api/receipt-ocr?provider=groq_vision';
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1032,10 +1272,9 @@ function ManagerFinancials() {
       if (!res.ok) throw new Error('Failed to read receipt');
       const data = await res.json();
 
-      // Set parsed items and show review mode
+      // Set parsed items
       setParsedItems(data.items || []);
-      setShowReviewMode(true);
-      
+
       // Calculate total from parsed items
       const total = data.items?.reduce((sum: number, item: any) => sum + (item.quantity * item.unit_price), 0) || 0;
       setAmount(String(total));
@@ -1362,47 +1601,53 @@ function ManagerFinancials() {
             )}
 
             {/* Receipt OCR - only for groceries category */}
-            {type === 'expense' && category === 'groceries' && !showReviewMode && (
+            {type === 'expense' && category === 'groceries' && (
               <div className="bg-[#1C232E] rounded-xl p-4 space-y-3">
-                <p className="text-sm text-[#9C9384]">{t('receipt.prompt') || 'Scan a receipt to auto-fill'}</p>
+                <div className="flex justify-between items-center">
+                  <p className="text-sm text-[#9C9384]">{t('receipt.prompt') || 'Scan a receipt to auto-fill'}</p>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={useFallbackOCR}
+                      onChange={(e) => setUseFallbackOCR(e.target.checked)}
+                      className="w-4 h-4 rounded border-[#5C4A2E]/30 bg-[#1C232E] text-[#0B6E4F] focus:ring-[#0B6E4F]"
+                    />
+                    <span className="text-xs text-[#9C9384]">Use OCR.space instead</span>
+                  </label>
+                </div>
                 <div className="flex gap-3">
                   <label className="flex-1 text-center py-2 px-3 rounded-lg bg-[#722F37] text-[#C9A227] font-bold text-sm cursor-pointer">
                     {t('receipt.take_photo') || 'Take Photo'}
-                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleReceiptUpload(e, false)} />
+                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleReceiptUpload} />
                   </label>
                   <label className="flex-1 text-center py-2 px-3 rounded-lg bg-[#0B6E4F] text-[#C9A227] font-bold text-sm cursor-pointer">
                     {t('receipt.upload_photo') || 'Upload Photo'}
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleReceiptUpload(e, false)} />
+                    <input type="file" accept="image/*" className="hidden" onChange={handleReceiptUpload} />
                   </label>
                 </div>
-                <label className="w-full text-center py-2 px-3 rounded-lg bg-[#C9A227] text-[#0F1419] font-bold text-sm cursor-pointer hover:bg-[#C9A227]/80 transition-all">
-                  Test with Groq Vision
-                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleReceiptUpload(e, true)} />
-                </label>
                 {receiptLoading && <p className="text-xs text-[#9C9384]">{t('receipt.scanning') || 'Scanning...'}</p>}
                 {receiptError && <p className="text-xs text-red-400">{receiptError}</p>}
               </div>
             )}
 
-            {/* Receipt Review Mode - only for groceries category */}
-            {type === 'expense' && category === 'groceries' && showReviewMode && (
+            {/* Unified Item List - shows when items exist from any source */}
+            {type === 'expense' && category === 'groceries' && parsedItems.length > 0 && (
               <div className="bg-[#1C232E] rounded-xl p-4 space-y-4">
                 <div className="flex justify-between items-center">
-                  <h3 className="text-sm font-black text-[#C9A227]">Review Receipt Items</h3>
+                  <h3 className="text-sm font-black text-[#C9A227]">Items ({parsedItems.length})</h3>
                   <button
                     type="button"
                     onClick={() => {
-                      setShowReviewMode(false);
-                      setReceiptUrl(null);
                       setParsedItems([]);
+                      setReceiptUrl(null);
                     }}
                     className="text-xs text-[#9C9384] hover:text-[#EDE6D6]"
                   >
-                    Cancel
+                    Clear All
                   </button>
                 </div>
 
-                {/* Receipt Image */}
+                {/* Receipt Image - if available from scan */}
                 {receiptUrl && (
                   <div className="rounded-lg overflow-hidden border border-[#5C4A2E]/30">
                     <img src={receiptUrl} alt="Receipt" className="w-full h-auto max-h-48 object-contain" />
@@ -1418,75 +1663,128 @@ function ManagerFinancials() {
                         <th className="text-center py-2 px-3 font-black text-[#9C9384] uppercase tracking-widest w-20">Quantity</th>
                         <th className="text-center py-2 px-3 font-black text-[#9C9384] uppercase tracking-widest w-16">Unit</th>
                         <th className="text-right py-2 px-3 font-black text-[#9C9384] uppercase tracking-widest w-28">Price (UZS)</th>
-                        <th className="text-center py-2 px-3 font-black text-[#9C9384] uppercase tracking-widest w-16">Action</th>
+                        <th className="text-center py-2 px-3 font-black text-[#9C9384] uppercase tracking-widest w-24">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {parsedItems.map((item, index) => (
                         <tr key={index} className="border-b border-[#5C4A2E]/20 hover:bg-[#1C232E]/50">
-                          <td className="py-2 px-3">
-                            <input
-                              type="text"
-                              value={item.item_name}
-                              onChange={(e) => {
-                                const newItems = [...parsedItems];
-                                newItems[index].item_name = e.target.value;
-                                setParsedItems(newItems);
-                              }}
-                              className="w-full px-2 py-1 bg-[#0F1419] border border-[#5C4A2E]/30 rounded text-xs text-[#EDE6D6] focus:border-[#0B6E4F] focus:outline-none"
-                              placeholder="Item name"
-                            />
+                          <td className="py-2 px-3 relative">
+                            {editingItemIndex === index ? (
+                              <input
+                                type="text"
+                                value={item.item_name}
+                                onChange={(e) => {
+                                  const newItems = [...parsedItems];
+                                  newItems[index].item_name = e.target.value;
+                                  setParsedItems(newItems);
+                                  searchItemNames(e.target.value, index);
+                                }}
+                                onFocus={() => {
+                                  if (item.item_name) {
+                                    searchItemNames(item.item_name, index);
+                                  }
+                                }}
+                                onBlur={() => {
+                                  setTimeout(() => setShowSuggestions(false), 200);
+                                }}
+                                className="w-full px-2 py-1 bg-[#0F1419] border border-[#0B6E4F] rounded text-xs text-[#EDE6D6] focus:border-[#0B6E4F] focus:outline-none"
+                                placeholder="Item name"
+                              />
+                            ) : (
+                              <span className="text-xs text-[#EDE6D6]">{item.item_name}</span>
+                            )}
+                            {editingItemIndex === index && showSuggestions && itemSuggestions.length > 0 && (
+                              <div className="absolute z-10 w-full mt-1 bg-[#1C232E] border border-[#5C4A2E]/30 rounded shadow-lg max-h-32 overflow-y-auto">
+                                {itemSuggestions.map((suggestion, idx) => (
+                                  <div
+                                    key={idx}
+                                    onClick={() => selectItemSuggestion(suggestion, index)}
+                                    className="px-2 py-1 text-xs text-[#EDE6D6] hover:bg-[#0B6E4F]/20 cursor-pointer"
+                                  >
+                                    {suggestion}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </td>
                           <td className="py-2 px-3">
-                            <input
-                              type="number"
-                              value={item.quantity}
-                              onChange={(e) => {
-                                const newItems = [...parsedItems];
-                                newItems[index].quantity = parseFloat(e.target.value) || 1;
-                                setParsedItems(newItems);
-                              }}
-                              className="w-full px-2 py-1 bg-[#0F1419] border border-[#5C4A2E]/30 rounded text-xs text-[#EDE6D6] text-center focus:border-[#0B6E4F] focus:outline-none"
-                              placeholder="Qty"
-                            />
+                            {editingItemIndex === index ? (
+                              <input
+                                type="number"
+                                value={item.quantity}
+                                onChange={(e) => {
+                                  const newItems = [...parsedItems];
+                                  newItems[index].quantity = parseFloat(e.target.value) || 1;
+                                  setParsedItems(newItems);
+                                }}
+                                className="w-full px-2 py-1 bg-[#0F1419] border border-[#0B6E4F] rounded text-xs text-[#EDE6D6] text-center focus:border-[#0B6E4F] focus:outline-none"
+                                placeholder="Qty"
+                              />
+                            ) : (
+                              <span className="text-xs text-[#EDE6D6] text-center">{item.quantity}</span>
+                            )}
                           </td>
                           <td className="py-2 px-3">
-                            <input
-                              type="text"
-                              value={item.unit}
-                              onChange={(e) => {
-                                const newItems = [...parsedItems];
-                                newItems[index].unit = e.target.value;
-                                setParsedItems(newItems);
-                              }}
-                              className="w-full px-2 py-1 bg-[#0F1419] border border-[#5C4A2E]/30 rounded text-xs text-[#EDE6D6] text-center focus:border-[#0B6E4F] focus:outline-none"
-                              placeholder="Unit"
-                            />
+                            {editingItemIndex === index ? (
+                              <select
+                                value={item.unit}
+                                onChange={(e) => {
+                                  const newItems = [...parsedItems];
+                                  newItems[index].unit = e.target.value;
+                                  setParsedItems(newItems);
+                                }}
+                                className="w-full px-2 py-1 bg-[#0F1419] border border-[#0B6E4F] rounded text-xs text-[#EDE6D6] text-center focus:border-[#0B6E4F] focus:outline-none"
+                              >
+                                <option value="">Unit</option>
+                                <option value="kg">kg</option>
+                                <option value="gramm">gramm</option>
+                                <option value="litr">litr</option>
+                                <option value="ml">ml</option>
+                                <option value="dona">dona</option>
+                              </select>
+                            ) : (
+                              <span className="text-xs text-[#EDE6D6] text-center">{item.unit}</span>
+                            )}
                           </td>
                           <td className="py-2 px-3">
-                            <input
-                              type="number"
-                              value={item.unit_price}
-                              onChange={(e) => {
-                                const newItems = [...parsedItems];
-                                newItems[index].unit_price = parseFloat(e.target.value) || 0;
-                                setParsedItems(newItems);
-                              }}
-                              className="w-full px-2 py-1 bg-[#0F1419] border border-[#5C4A2E]/30 rounded text-xs text-[#EDE6D6] text-right focus:border-[#0B6E4F] focus:outline-none"
-                              placeholder="Price"
-                            />
+                            {editingItemIndex === index ? (
+                              <input
+                                type="number"
+                                value={item.unit_price}
+                                onChange={(e) => {
+                                  const newItems = [...parsedItems];
+                                  newItems[index].unit_price = parseFloat(e.target.value) || 0;
+                                  setParsedItems(newItems);
+                                }}
+                                className="w-full px-2 py-1 bg-[#0F1419] border border-[#0B6E4F] rounded text-xs text-[#EDE6D6] text-right focus:border-[#0B6E4F] focus:outline-none"
+                                placeholder="Price"
+                              />
+                            ) : (
+                              <span className="text-xs text-[#EDE6D6] text-right">{item.unit_price.toLocaleString()}</span>
+                            )}
                           </td>
                           <td className="py-2 px-3 text-center">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newItems = parsedItems.filter((_, i) => i !== index);
-                                setParsedItems(newItems);
-                              }}
-                              className="px-2 py-1 bg-[#722F37] text-[#C9A227] rounded text-xs hover:bg-[#722F37]/80 transition-all"
-                            >
-                              ✕
-                            </button>
+                            <div className="flex gap-1 justify-center">
+                              <button
+                                type="button"
+                                onClick={() => setEditingItemIndex(editingItemIndex === index ? null : index)}
+                                className="px-2 py-1 bg-[#0B6E4F] text-[#C9A227] rounded text-xs hover:bg-[#0B6E4F]/80 transition-all"
+                              >
+                                {editingItemIndex === index ? 'Save' : 'Edit'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newItems = parsedItems.filter((_, i) => i !== index);
+                                  setParsedItems(newItems);
+                                  if (editingItemIndex === index) setEditingItemIndex(null);
+                                }}
+                                className="px-2 py-1 bg-[#722F37] text-[#C9A227] rounded text-xs hover:bg-[#722F37]/80 transition-all"
+                              >
+                                ✕
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -1498,6 +1796,7 @@ function ManagerFinancials() {
                             type="button"
                             onClick={() => {
                               setParsedItems([...parsedItems, { item_name: '', quantity: 1, unit: '', unit_price: 0 }]);
+                              setEditingItemIndex(parsedItems.length);
                             }}
                             className="w-full py-2 bg-[#0B6E4F]/20 text-[#0B6E4F] rounded-lg text-xs font-bold hover:bg-[#0B6E4F]/30 transition-all"
                           >
@@ -1512,23 +1811,27 @@ function ManagerFinancials() {
                             {parsedItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0).toLocaleString()} UZS
                           </span>
                         </td>
+                        <td></td>
                       </tr>
                     </tfoot>
                   </table>
                 </div>
+              </div>
+            )}
 
-                {/* Confirm & Save Button */}
+            {/* Manual Item Entry Button - only when no items yet */}
+            {type === 'expense' && category === 'groceries' && parsedItems.length === 0 && (
+              <div className="bg-[#1C232E] rounded-xl p-4 space-y-3">
+                <p className="text-sm text-[#9C9384]">{t('receipt.manual_entry') || 'Or add items manually'}</p>
                 <button
                   type="button"
                   onClick={() => {
-                    const total = parsedItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
-                    setAmount(String(total));
-                    setDescription(parsedItems.map(i => i.item_name).join(', '));
-                    setShowReviewMode(false);
+                    setParsedItems([{ item_name: '', quantity: 1, unit: '', unit_price: 0 }]);
+                    setEditingItemIndex(0);
                   }}
-                  className="w-full py-3 bg-[#0B6E4F] text-[#C9A227] rounded-xl font-bold text-sm hover:bg-[#0B6E4F]/80 transition-all"
+                  className="w-full py-2 px-3 rounded-lg bg-[#5C4A2E] text-[#C9A227] font-bold text-sm hover:bg-[#5C4A2E]/80 transition-all"
                 >
-                  Confirm & Save to Form
+                  + Add Manual Item
                 </button>
               </div>
             )}
@@ -1790,6 +2093,7 @@ function ManagerFinancials() {
             </button>
           </form>
           </div>
+
 
           {/* Add Drink Modal */}
           {showAddDrinkModal && (

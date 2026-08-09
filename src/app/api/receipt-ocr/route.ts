@@ -155,6 +155,7 @@ async function callGroqVision(image: string, apiKey: string): Promise<{ items: P
         },
       ],
       response_format: { type: 'json_object' },
+      max_tokens: 4096,
     }),
   });
 
@@ -179,7 +180,16 @@ async function callGroqVision(image: string, apiKey: string): Promise<{ items: P
       return null;
     }
 
-    const parsed: GroqParsedResponse = JSON.parse(content);
+    let parsed: GroqParsedResponse;
+    try {
+      parsed = JSON.parse(content);
+    } catch (parseError) {
+      console.log('=== GROQ VISION RAW RESPONSE CONTENT (JSON PARSE FAILED) ===');
+      console.log(content);
+      console.log('=== END GROQ VISION RAW RESPONSE CONTENT ===');
+      console.log('JSON parse error:', parseError);
+      throw parseError;
+    }
     
     // Convert Groq format to ParsedItem format with unit normalization
     const items: ParsedItem[] = parsed.items.map(item => ({

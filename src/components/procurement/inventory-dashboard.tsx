@@ -7,14 +7,14 @@ import { supabase, type InventoryItem, type InventoryLedger } from '@/lib/supaba
 import { Box, Activity, AlertCircle, TrendingUp, Search, Clock, ShieldCheck, DollarSign, PieChart } from 'lucide-react';
 
 const fetchInventory = async () => {
-  const { data } = await supabase.from('inventory_items').select('*').order('item_name');
+  const { data } = await supabase.from('inventory').select('*').order('item_name');
   return (data || []) as InventoryItem[];
 };
 
 const fetchLedger = async () => {
   const { data } = await supabase
     .from('inventory_ledger')
-    .select('*, inventory:inventory_items(*)')
+    .select('*, inventory:inventory(*)')
     .order('created_at', { ascending: false })
     .limit(100);
   return (data || []) as (InventoryLedger & { inventory: InventoryItem })[];

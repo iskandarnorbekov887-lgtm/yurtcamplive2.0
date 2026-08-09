@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { ProtectedRoute } from '@/components/protected-route';
-import { supabase, type Booking, type Profile, type Finance, type Notification, type BookingEditRequest } from '@/lib/supabase';
+import { supabase, type Booking, type Profile, type Finance, type Notification, type BookingEditRequest, type InventoryItem } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { useImpersonation } from '@/lib/impersonation-context';
 import { useLanguage } from '@/lib/language-context';
@@ -12,6 +12,7 @@ import { ManagerIncomeForm } from '@/components/manager-income-form';
 import { ManagerMealRequests } from '@/components/manager/manager-meal-requests';
 import { EditApprovalQueue } from '@/components/EditApprovalQueue';
 import { DrinkTransactionLog } from '@/components/DrinkTransactionLog';
+import { Box, AlertCircle } from 'lucide-react';
 import type { UserRole } from '@/lib/supabase';
 
 // Force dynamic rendering to avoid SSR issues with auth
@@ -35,7 +36,8 @@ function CEODashboard() {
   const { t } = useLanguage();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [staff, setStaff] = useState<Profile[]>([]);
-  const [activeTab, setActiveTab] = useState<'checkin' | 'team' | 'financials' | 'pricing' | 'meals' | 'approvals'>('checkin');
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [activeTab, setActiveTab] = useState<'checkin' | 'team' | 'financials' | 'pricing' | 'meals' | 'approvals' | 'inventory'>('checkin');
   const [loading, setLoading] = useState(true);
   const [pendingEditCount, setPendingEditCount] = useState(0);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -125,7 +127,7 @@ function CEODashboard() {
 
     try {
       console.log('🔄 Dashboard: Fetching data...');
-      const [bookingsData, staffData, notificationsData, pendingEditsData] = await Promise.all([
+      const [bookingsData, staffData, notificationsData, pendingEditsData, inventoryData] = await Promise.all([
         supabase.from('bookings').select('*, meal_requests(*)').order('check_in', { ascending: false }),
         supabase.from('profiles').select('*'),
         supabase
@@ -137,6 +139,7 @@ function CEODashboard() {
           .from('booking_edit_requests')
           .select('id', { count: 'exact', head: true })
           .eq('status', 'pending'),
+        supabase.from('inventory').select('*').order('item_name'),
       ]);
 
       // Check for 403 Forbidden errors
@@ -165,6 +168,7 @@ function CEODashboard() {
 
       setBookings(deDuplicate(bookingsData.data || []));
       setStaff(staffData.data || []);
+      setInventory(inventoryData.data || []);
       setNotifications((notificationsData.data || []).slice(0, 10) || []);
       setPendingEditCount((pendingEditsData as any)?.count ?? 0);
     } catch (error: any) {
@@ -694,6 +698,17 @@ function CEODashboard() {
               </span>
             )}
           </button>
+          {/* Inventory tab */}
+          <button
+            key="inventory"
+            onClick={() => setActiveTab('inventory')}
+            className={`px-6 py-2.5 rounded-lg font-bold capitalize transition-all text-xs flex items-center gap-2 ${
+              activeTab === 'inventory' ? 'bg-[#0B6E4F] text-[#C9A227] shadow-lg' : 'text-[#9C9384] hover:text-[#EDE6D6] hover:bg-[#2A1518]'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+            Inventory
+          </button>
           {/* Team Settings — navigates to its own CEO-only page */}
           <a
             href="/ceo/team-settings"
@@ -744,6 +759,73 @@ function CEODashboard() {
               </a>
             </div>
             <DrinkTransactionLog />
+          </div>
+        )}
+        {activeTab === 'inventory' && (
+          <div className="animate-in fade-in duration-500 space-y-6">
+            <div className="bg-[#1C232E] rounded-[2.5rem] shadow-xl border border-[#5C4A2E]/30 p-8">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h2 className="text-2xl font-black text-[#EDE6D6] font-heading">Inventory Overview</h2>
+                  <p className="text-[#9C9384]">Read-only view of current inventory levels</p>
+                </div>
+                <div className="flex gap-4">
+                  <div className="px-4 py-2 bg-[#0B6E4F]/20 rounded-lg">
+                    <p className="text-[10px] font-black text-[#9C9384] uppercase">Total Items</p>
+                    <p className="text-xl font-black text-[#0B6E4F]">{inventory.length}</p>
+                  </div>
+                  <div className="px-4 py-2 bg-[#722F37]/20 rounded-lg">
+                    <p className="text-[10px] font-black text-[#9C9384] uppercase">Low Stock</p>
+                    <p className="text-xl font-black text-[#722F37]">{inventory.filter(i => i.current_stock < i.min_threshold).length}</p>
+                  </div>
+                </div>
+              </div>
+              {inventory.length === 0 ? (
+                <div className="text-center py-12 text-[#9C9384]">
+                  <Box className="mx-auto mb-4 w-16 h-16 opacity-50" />
+                  <p className="font-bold">No inventory items found</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-[#1C232E]/50 border-b border-[#5C4A2E]/30">
+                      <tr>
+                        <th className="px-6 py-4 text-left text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Item Name</th>
+                        <th className="px-6 py-4 text-left text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Unit</th>
+                        <th className="px-6 py-4 text-left text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Current Stock</th>
+                        <th className="px-6 py-4 text-left text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Min Threshold</th>
+                        <th className="px-6 py-4 text-left text-[10px] font-black text-[#9C9384] uppercase tracking-widest">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#5C4A2E]/20">
+                      {inventory.map((item) => {
+                        const isLow = item.current_stock < item.min_threshold;
+                        return (
+                          <tr key={item.id} className={`hover:bg-[#2A1518] transition-colors ${isLow ? 'bg-[#722F37]/10' : ''}`}>
+                            <td className="px-6 py-4 font-bold text-[#EDE6D6]">{item.item_name}</td>
+                            <td className="px-6 py-4 text-[#9C9384]">{(item as any).unit_type || 'unit'}</td>
+                            <td className="px-6 py-4 font-mono font-black text-[#EDE6D6]">{item.current_stock.toFixed(2)}</td>
+                            <td className="px-6 py-4 text-[#9C9384]">{item.min_threshold}</td>
+                            <td className="px-6 py-4">
+                              {isLow ? (
+                                <span className="inline-flex items-center gap-2 px-3 py-1 bg-[#722F37]/20 text-[#722F37] rounded-lg text-[10px] font-black uppercase tracking-wider">
+                                  <AlertCircle size={12} />
+                                  Low Stock
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-2 px-3 py-1 bg-[#0B6E4F]/20 text-[#0B6E4F] rounded-lg text-[10px] font-black uppercase tracking-wider">
+                                  ✓ OK
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         )}
         {activeTab === 'team' && (
@@ -1035,62 +1117,6 @@ function CEODashboard() {
           </div>
         </div>
       )}
-
-        {activeTab === 'meals' && (
-          <div className="animate-in fade-in duration-500 space-y-6">
-            <div className="bg-[#1C232E] rounded-[2.5rem] shadow-xl shadow-[#5C4A2E]/30 border border-[#5C4A2E]/30 p-8">
-              <h2 className="text-2xl font-black text-[#EDE6D6] mb-6 flex items-center gap-3">
-                <span className="p-2 bg-[#C9A227]/20 text-[#C9A227] rounded-xl">🍽️</span>
-                Active Stays — Meal Requests
-              </h2>
-              {(() => {
-                const activeBookings = bookings.filter(b => b.status === 'checked_in' || b.status === 'confirmed');
-                if (activeBookings.length === 0) {
-                  return <p className="text-[#9C9384]">No active stays</p>;
-                }
-                return (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {activeBookings.map((booking) => {
-                      const meals = booking.meal_requests || [];
-                      const pendingMeals = meals.filter(m => m.status === 'Pending').length;
-                      const acceptedMeals = meals.filter(m => m.status === 'Accepted').length;
-                      const servedMeals = meals.filter(m => m.status === 'Served').length;
-                      return (
-                        <div key={booking.id} className="border-2 border-[#5C4A2E]/30 rounded-2xl p-5 bg-[#1C232E] hover:border-[#C9A227]/50 transition-all">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-bold text-[#EDE6D6]">{booking.guest_name}</p>
-                              <p className="text-sm text-[#9C9384]">{booking.check_in} → {booking.check_out}</p>
-                              <p className="text-sm text-[#9C9384]">{(booking.number_of_adults || 0) + (booking.number_of_children || 0) || booking.guest_count || 1} guests</p>
-                            </div>
-                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                              booking.status === 'checked_in' ? 'bg-[#0B6E4F]/20 text-[#0B6E4F]' : 'bg-[#C9A227]/20 text-[#C9A227]'
-                            }`}>
-                              {booking.status === 'checked_in' ? 'Checked In' : 'Upcoming'}
-                            </span>
-                          </div>
-                          {meals.length > 0 && (
-                            <div className="flex gap-4 mt-4 text-xs font-black uppercase tracking-wider">
-                              <span className="text-[#722F37] bg-[#722F37]/10 px-2 py-1 rounded-lg">{pendingMeals} Pending</span>
-                              <span className="text-[#0B6E4F] bg-[#0B6E4F]/10 px-2 py-1 rounded-lg">{acceptedMeals} Accepted</span>
-                              <span className="text-[#9C9384] bg-[#1C232E]/50 px-2 py-1 rounded-lg">{servedMeals} Served</span>
-                            </div>
-                          )}
-                          <button
-                            onClick={() => setSelectedMealBooking(booking)}
-                            className="w-full mt-4 bg-[#C9A227] text-[#1C232E] py-2.5 rounded-xl hover:bg-[#C9A227]/80 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-[#C9A227]/20 active:scale-95"
-                          >
-                            {meals.length > 0 ? 'Edit Meal Requests' : 'Request Food'}
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-        )}
 
       <ManagerMealRequests
         booking={selectedMealBooking}

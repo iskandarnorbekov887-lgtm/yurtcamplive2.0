@@ -491,6 +491,7 @@ const translations = {
     'receipt.upload_photo': 'Upload Photo',
     'receipt.scanning': 'Scanning...',
     'receipt.error': 'Could not read receipt',
+    'receipt.manual_entry': 'Or add items manually',
     'txn.no_payments_found': 'No payments found for this worker',
 
     // Calendar
@@ -1005,6 +1006,7 @@ const translations = {
     'receipt.upload_photo': 'Rasm yuklash',
     'receipt.scanning': 'Skanerlanmoqda...',
     'receipt.error': 'Chekni oʻqib boʻlmadi',
+    'receipt.manual_entry': 'Yoki mahsulotlarni qo\'lda qo\'shing',
     'txn.no_payments_found': 'Bu ishchi uchun to\'lovlar topilmadi',
 
     // Calendar
