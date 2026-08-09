@@ -133,6 +133,28 @@ export function DrinksPOS() {
 
   const cartTotalUzs = cart.reduce((sum, item) => sum + (item.quantity * (item.variant.sell_price || 0)), 0);
 
+  const fetchCashBox = async () => {
+    try {
+      const { data: payments } = await supabase
+        .from('payments')
+        .select('*')
+        .order('transaction_date', { ascending: false });
+
+      const summary: any = { 'UZS': 0, 'USD': 0 };
+      (payments || []).forEach((p: any) => {
+        if (p.type === 'expense') {
+          summary[p.currency_original] = (summary[p.currency_original] || 0) - p.amount_original;
+        } else {
+          summary[p.currency_original] = (summary[p.currency_original] || 0) + p.amount_original;
+        }
+      });
+      return summary;
+    } catch (error) {
+      console.error('Failed to fetch cash box:', error);
+      return { 'UZS': 0, 'USD': 0 };
+    }
+  };
+
   const handleCheckout = async () => {
     if (cart.length === 0) return;
     
@@ -193,6 +215,9 @@ export function DrinksPOS() {
       // Refresh drinks and sales history to show updated stock
       await fetchDrinks();
       await fetchSalesHistory();
+      
+      // Refresh cash box to show updated balance
+      await fetchCashBox();
     } catch (error) {
       setMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
