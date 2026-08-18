@@ -2129,14 +2129,15 @@ export function GoogleGuestAgenda({
       // ── Calculate is_prepaid correctly: true if entire tab has zero outstanding balance ──
 
       // is_prepaid = (food is prepaid OR no food charges) AND (accommodation is prepaid OR stay_price = 0)
-
+      // IMPORTANT: Trust both the DB flags (is_accommodation_prepaid, is_food_prepaid) AND local state (isPrepaid)
       const hasFoodCharges = activeMeals.some((m: any) => !m.prepaid && (m.status === 'confirmed' || m.status === 'served'));
-
       const hasAccommodationCharges = (sel.total_price || 0) > 0;
+      const accommodationPrepaid = sel.is_accommodation_prepaid || isPrepaid;
+      const foodPrepaid = sel.is_food_prepaid || !hasFoodCharges;
+      const calculatedIsPrepaid = foodPrepaid && (!hasAccommodationCharges || accommodationPrepaid);
 
-      const calculatedIsPrepaid = (!hasFoodCharges || activeMeals.every((m: any) => m.prepaid)) && 
-
-                                   (!hasAccommodationCharges || isPrepaid);
+      // Build converted payments array for snapshot (same shape as payments table)
+      const convertedPayments: any[] = [];
 
 
 
@@ -2149,8 +2150,9 @@ export function GoogleGuestAgenda({
         settled_at: now.toISOString(),
 
         items: {
-
-          accommodation: svcAmount,
+          // For prepaid accommodation, use the actual booking total_price instead of svcAmount (which is 0 when prepaid toggle is on)
+          // This ensures the receipt shows the actual accommodation value even when it was prepaid
+          accommodation: accommodationPrepaid ? (sel.total_price || 0) : svcAmount,
 
           isPrepaid: calculatedIsPrepaid,
 
@@ -2232,7 +2234,7 @@ export function GoogleGuestAgenda({
 
         total: receiptTotals.grandTotal,
 
-        payments: receiptTotals.grandTotal === 0 ? [] : svcPayList.filter(p => parseFloat(p.amount) !== 0)
+        payments: convertedPayments
 
       };
 
@@ -2314,6 +2316,15 @@ export function GoogleGuestAgenda({
 
         });
 
+        // Build converted payment object for snapshot (same shape as payments table)
+        convertedPayments.push({
+          amount_original: amt,
+          currency_original: p.currency,
+          method: p.method,
+          exchange_rate_used: rate,
+          amount_usd_equivalent: usdEquiv
+        });
+
         if (payErr) {
 
           console.error('[finalizeTab] Payment insert failed:', payErr);
@@ -2346,13 +2357,17 @@ export function GoogleGuestAgenda({
 
           total_usd: realTotal,
 
-          settled_at: sel.check_out?.split('T')[0],
-
         });
 
         if (receiptErr) {
 
-          console.error('[finalizeTab] Receipt archive failed:', receiptErr);
+          console.error('[finalizeTab] Receipt archive failed:', {
+            message: receiptErr?.message,
+            details: receiptErr?.details,
+            hint: receiptErr?.hint,
+            code: receiptErr?.code,
+            raw: JSON.stringify(receiptErr, Object.getOwnPropertyNames(receiptErr ?? {})),
+          });
 
         } else {
 
@@ -2382,10 +2397,14 @@ export function GoogleGuestAgenda({
 
         }
 
-      } catch (e) {
-
-        console.error('[finalizeTab] Receipt archive threw:', e);
-
+      } catch (e: any) {
+        console.error('[finalizeTab] Receipt archive threw:', {
+          message: e?.message,
+          details: e?.details,
+          hint: e?.hint,
+          code: e?.code,
+          raw: JSON.stringify(e, Object.getOwnPropertyNames(e ?? {})),
+        });
       }
 
 
@@ -2622,14 +2641,12 @@ export function GoogleGuestAgenda({
 
     if (!sel || !onUpdateBooking) return false;
 
+    // is_prepaid is NOT trustworthy as a settlement signal because it's auto-calculated by DB trigger
+    // based on stay_price=0, which can be true for bookings that were never actually paid.
+    // Only trust: existing receipts, collected_amount > 0, or explicit is_accommodation_prepaid flag.
     const isAccommodationSettled = getSettledReceiptsForSel().length > 0 ||
-
       (sel.collected_amount || 0) > 0 ||
-
-      sel.is_prepaid ||
-
       sel.is_accommodation_prepaid ||
-
       isPrepaid;
 
 
@@ -2667,6 +2684,169 @@ export function GoogleGuestAgenda({
     setLoadingAction('guestcheckout');
 
     try {
+      // Check if a receipt already exists for this booking (prevent duplicate empty receipts)
+      const { data: existingReceipts } = await supabase
+        .from('booking_receipts')
+        .select('id')
+        .eq('booking_id', sel.id)
+        .limit(1);
+
+      // If receipt already exists, just update booking status without creating duplicate receipt
+      if (existingReceipts && existingReceipts.length > 0) {
+        console.log('[handleGuestCheckOut] Receipt already exists, skipping receipt creation');
+        await onUpdateBooking(sel.id, { status: 'completed', checked_out_at: sel.check_out });
+        flash('✓ Guest checked out.');
+        if (onRefresh) await onRefresh();
+        setLoadingAction('');
+        return true;
+      }
+
+      // Build receipt snapshot before updating status
+      const now = new Date();
+      const datePart = now.toISOString().split('T')[0].replace(/-/g, '').slice(2);
+      const randPart = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const receiptId = `RCP-${datePart}-${randPart}`;
+
+      // Get settled meals (confirmed/served and not prepaid)
+      const mealsToPay = activeMeals.filter((m: any) => 
+        !m.is_paid && (m.status === 'confirmed' || m.status === 'served')
+      );
+      const mealIds = mealsToPay.map((m: any) => m.id).filter(Boolean);
+
+      // ── Pre-insert duplicate check ──
+      const { data: recentReceipts } = await supabase
+        .from('booking_receipts')
+        .select('id, snapshot, created_at')
+        .eq('booking_id', sel.id)
+        .gte('created_at', new Date(Date.now() - 15000).toISOString());
+      const isDuplicate = (recentReceipts || []).some(r => {
+        const existingIds = r.snapshot?.items?.settled_meal_ids || [];
+        return existingIds.length === mealIds.length && 
+               existingIds.every((id: number) => mealIds.includes(id));
+      });
+      if (isDuplicate) {
+        flash('⚠ Duplicate checkout detected and blocked.');
+        setLoadingAction('');
+        return false;
+      }
+
+      // Calculate meal totals
+      const lunchMeals = mealsToPay.filter((m: any) => m.meal_type === 'Lunch');
+      const lunchTotal = lunchMeals.reduce((sum: number, m: any) => sum + (m.adult_qty || 0) + (m.child_qty || 0), 0);
+      const lunchCharged = lunchMeals.reduce((sum: number, m: any) => {
+        if (m.prepaid) return sum;
+        const ap = pricing.lunch_price || 10, cp = pricing.lunch_child_price || 5;
+        return sum + (m.adult_qty || 0) * ap + (m.child_qty || 0) * cp;
+      }, 0);
+
+      const dinnerMeals = mealsToPay.filter((m: any) => m.meal_type === 'Dinner');
+      const dinnerTotal = dinnerMeals.reduce((sum: number, m: any) => sum + (m.adult_qty || 0) + (m.child_qty || 0), 0);
+      const dinnerCharged = dinnerMeals.reduce((sum: number, m: any) => {
+        if (m.prepaid) return sum;
+        const ap = pricing.dinner_price || 10, cp = pricing.dinner_child_price || 5;
+        return sum + (m.adult_qty || 0) * ap + (m.child_qty || 0) * cp;
+      }, 0);
+
+      // Get extra services
+      const activePaidServices = activeServices.filter((s: any) => s.is_paid);
+
+      // Calculate total
+      // is_prepaid is NOT trustworthy as a settlement signal because it's auto-calculated by DB trigger
+      // based on stay_price=0, which can be true for bookings that were never actually paid.
+      // IMPORTANT: Trust both the DB flags (is_accommodation_prepaid, is_food_prepaid) AND local state (isPrepaid)
+      const hasFoodCharges = activeMeals.some((m: any) => !m.prepaid && (m.status === 'confirmed' || m.status === 'served'));
+      const hasAccommodationCharges = (sel.total_price || 0) > 0;
+      const accommodationPrepaid = sel.is_accommodation_prepaid || isPrepaid;
+      const foodPrepaid = sel.is_food_prepaid || !hasFoodCharges;
+      // For prepaid accommodation, use the actual booking total_price instead of svcAmount (which is 0 when prepaid toggle is on)
+      // This ensures the receipt shows the actual accommodation value even when it was prepaid
+      const accommodationAmount = accommodationPrepaid ? (sel.total_price || 0) : svcAmount;
+      const mealDebt = lunchCharged + dinnerCharged;
+      const otherServices = activePaidServices.reduce((sum: number, s: any) => sum + (s.unit_price * s.quantity), 0);
+      // For handleGuestCheckOut, always store the full value in snapshot.total (including prepaid accommodation)
+      // This ensures financial reports see the actual stay value, not $0 for prepaid stays
+      const grandTotal = accommodationAmount + mealDebt + otherServices + svcDateAdjustment - svcDiscount;
+
+      const snapshot = {
+        id: receiptId,
+        date: now.toISOString(),
+        settled_at: now.toISOString(),
+        items: {
+          accommodation: accommodationAmount,
+          isPrepaid: foodPrepaid && (!hasAccommodationCharges || accommodationPrepaid),
+          settled_meal_ids: mealIds,
+          meals: {
+            lunch: lunchTotal,
+            dinner: dinnerTotal,
+            lunchCharged,
+            dinnerCharged,
+            mealDetails: mealsToPay.map((m: any) => ({
+              id: m.id,
+              meal_type: m.meal_type,
+              meal_date: m.meal_date,
+              adult_qty: m.adult_qty,
+              child_qty: m.child_qty,
+              prepaid: m.prepaid || false
+            }))
+          },
+          services: Object.fromEntries(
+            activePaidServices
+              .map((s: any) => [
+                s.details?.name || 'Extra',
+                s.unit_price * s.quantity
+              ])
+          ),
+          service_details: Object.fromEntries(
+            activePaidServices
+              .map((s: any) => [
+                s.details?.name || 'Extra',
+                s.details || {}
+              ])
+          ),
+          stay_adjustment: svcDateAdjustment,
+          extras: [],
+          drinks: [],
+          discount: svcDiscount > 0 ? { amount: svcDiscount, reason: svcDiscountReason } : null
+        },
+        total: grandTotal,
+        payments: []
+      };
+
+      // Insert booking_receipts BEFORE status update
+      // Receipt failure should never prevent checkout from completing, but should be loud in logs
+      console.log('[handleGuestCheckOut] Inserting booking_receipts with receipt_id:', receiptId);
+      try {
+        const { error: receiptErr } = await supabase.from('booking_receipts').insert({
+          booking_id: sel.id,
+          receipt_id: receiptId,
+          snapshot,
+          total_usd: grandTotal,
+        });
+
+        if (receiptErr) {
+          console.error('[handleGuestCheckOut] Receipt archive failed:', {
+            message: receiptErr?.message,
+            details: receiptErr?.details,
+            hint: receiptErr?.hint,
+            code: receiptErr?.code,
+            booking_id: sel.id,
+            receipt_id: receiptId,
+          });
+        } else {
+          console.log('[handleGuestCheckOut] Receipt archive succeeded:', receiptId);
+        }
+      } catch (receiptErr: any) {
+        // Catch any unexpected errors (network, etc.) - log loudly but don't block checkout
+        console.error('[handleGuestCheckOut] Receipt archive threw unexpected error:', {
+          message: receiptErr?.message,
+          details: receiptErr?.details,
+          hint: receiptErr?.hint,
+          code: receiptErr?.code,
+          booking_id: sel.id,
+          receipt_id: receiptId,
+          raw: JSON.stringify(receiptErr, Object.getOwnPropertyNames(receiptErr ?? {})),
+        });
+      }
 
       await onUpdateBooking(sel.id, { status: 'completed', checked_out_at: sel.check_out });
 

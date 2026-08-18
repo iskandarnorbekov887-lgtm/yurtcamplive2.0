@@ -60,6 +60,7 @@ export interface Booking {
   payments?: any[];
   is_prepaid?: boolean;
   is_accommodation_prepaid?: boolean;
+  is_food_prepaid?: boolean;
   guest_count_confirmed?: boolean;
   checked_out_at?: string;
   /** Joined meal_requests from the normalized table (not a DB column) */
