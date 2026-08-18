@@ -49,7 +49,11 @@ function BookingPortal() {
 
   const fetchData = async () => {
     try {
-      const { data: bookingsData } = await supabase.from('bookings').select('*');
+      const { data: bookingsData } = await supabase
+        .from('bookings')
+        .select('*')
+        .is('google_event_id', null)
+        .order('checked_out_at', { ascending: true, nullsFirst: true });
       setBookings(bookingsData || []);
       console.log('🔄 Booking Portal Fetched bookings:', bookingsData?.length);
     } catch (err) {

@@ -119,6 +119,11 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
         }
       };
 
+      // Auto-checkout pool/local bookings (same-day walk-ins)
+      if (isFinancial) {
+        payload.checked_out_at = new Date().toISOString();
+      }
+
       if (isFinancial) {
         payload.collected_amount = price;
         payload.collected_currency = 'UZS';
@@ -153,8 +158,8 @@ export function ManagerIncomeForm({ isOpen, selectedDate, onClose, onSuccess, is
             amount_original: price,
             currency_original: 'UZS',
             method: paymentMethod === 'cash' ? 'Cash' : 'Online',
-            exchange_rate_used: 12500,
-            amount_usd_equivalent: price / 12500,
+            exchange_rate_used: 1,
+            amount_usd_equivalent: price,
             note: `Manager registration - ${mainCategory}`,
           });
         } catch (e: any) {

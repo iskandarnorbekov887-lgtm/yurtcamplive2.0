@@ -127,86 +127,110 @@ interface GroqParsedResponse {
   currency: string;
 }
 
-async function callGroqVision(image: string, apiKey: string): Promise<{ items: ParsedItem[]; total: number } | null> {
+async function callGroqVision(images: string[], apiKey: string): Promise<{ items: ParsedItem[]; total: number } | null> {
   console.log('=== OCR PROVIDER: Groq Vision (qwen/qwen3.6-27b) ===');
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
+  console.log(`=== NUMBER OF IMAGES: ${images.length} ===`);
+  
+  const content: any[] = [
+    {
+      type: 'text',
+      text: 'These images show different sections of the same receipt, in order from top to bottom. Extract all items across all images as one combined list, avoiding duplicates from any overlapping sections between images. Return ONLY valid JSON in this exact shape: { "items": [{ "name": string, "quantity": number, "unit": string, "price": number }], "total": number, "currency": string }. Include the unit as printed on the receipt (кг, г, д., л, мл, шт, etc.) - do not normalize. Ignore tax breakdown sub-lines (e.g. containing QQS/ҚҚС, VAT, tax) - those are not separate items. The total should come from the final/total amount line regardless of language — common labels include ЖАМИ (Uzbek), Итого/Сумма (Russian), Total (English), or similar. Use whichever total line represents the final amount actually paid. Translate all item names into Uzbek language regardless of the receipt\'s original language (e.g., "огурцы" → "bodring", "milk" → "sut", "хлеб" → "non"). Do not transliterate — translate to Uzbek.',
     },
-    body: JSON.stringify({
-      model: 'qwen/qwen3.6-27b',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: 'Extract purchased items from this Uzbek receipt image. Return ONLY valid JSON in this exact shape: { "items": [{ "name": string, "quantity": number, "unit": string, "price": number }], "total": number, "currency": string }. Include the unit as printed on the receipt (кг, г, д., л, мл, шт, etc.) - do not normalize. Ignore tax breakdown sub-lines (e.g. containing QQS/ҚҚС) - those are not separate items. The total should come from the line marked ЖАМИ or similar. Transliterate any Cyrillic text in item names to Latin script.',
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: `data:image/jpeg;base64,${image}`,
-              },
-            },
-          ],
-        },
-      ],
-      response_format: { type: 'json_object' },
-      max_tokens: 4096,
-    }),
+  ];
+  
+  // Add all images to the content array
+  images.forEach((image, index) => {
+    content.push({
+      type: 'image_url',
+      image_url: {
+        url: `data:image/jpeg;base64,${image}`,
+      },
+    });
   });
-
-  console.log('=== GROQ VISION API STATUS CODE ===');
-  console.log(res.status);
-  console.log('=== END GROQ VISION API STATUS CODE ===');
-
-  const data = await res.json();
-
-  console.log('=== FULL GROQ VISION API RESPONSE ===');
-  console.log(JSON.stringify(data, null, 2));
-  console.log('=== END FULL GROQ VISION API RESPONSE ===');
-
-  if (!res.ok) {
-    throw new Error(`Groq Vision failed: ${res.status}`);
-  }
-
+  
+  // Create AbortController for 30-second timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  
   try {
-    const content = data.choices?.[0]?.message?.content;
-    if (!content) {
-      console.log('Groq Vision returned no content');
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'qwen/qwen3.6-27b',
+        messages: [
+          {
+            role: 'user',
+            content,
+          },
+        ],
+        response_format: { type: 'json_object' },
+        max_tokens: 4096,
+      }),
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+
+    console.log('=== GROQ VISION API STATUS CODE ===');
+    console.log(res.status);
+    console.log('=== END GROQ VISION API STATUS CODE ===');
+
+    const data = await res.json();
+
+    console.log('=== FULL GROQ VISION API RESPONSE ===');
+    console.log(JSON.stringify(data, null, 2));
+    console.log('=== END FULL GROQ VISION API RESPONSE ===');
+
+    if (!res.ok) {
+      throw new Error(`Groq Vision failed: ${res.status}`);
+    }
+
+    try {
+      const content = data.choices?.[0]?.message?.content;
+      if (!content) {
+        console.log('Groq Vision returned no content');
+        return null;
+      }
+
+      let parsed: GroqParsedResponse;
+      try {
+        parsed = JSON.parse(content);
+      } catch (parseError) {
+        console.log('=== GROQ VISION RAW RESPONSE CONTENT (JSON PARSE FAILED) ===');
+        console.log(content);
+        console.log('=== END GROQ VISION RAW RESPONSE CONTENT ===');
+        console.log('JSON parse error:', parseError);
+        throw parseError;
+      }
+      
+      // Convert Groq format to ParsedItem format with unit normalization
+      const items: ParsedItem[] = parsed.items.map(item => ({
+        item_name: item.name,
+        quantity: item.quantity,
+        unit: normalizeUnit(item.unit || ''),
+        unit_price: item.price,
+      }));
+
+      console.log('=== GROQ VISION PARSED ITEMS ===');
+      console.log(JSON.stringify(items, null, 2));
+      console.log('=== END GROQ VISION PARSED ITEMS ===');
+
+      return { items, total: parsed.total };
+    } catch (error) {
+      console.log('Failed to parse Groq Vision response as JSON:', error);
       return null;
     }
-
-    let parsed: GroqParsedResponse;
-    try {
-      parsed = JSON.parse(content);
-    } catch (parseError) {
-      console.log('=== GROQ VISION RAW RESPONSE CONTENT (JSON PARSE FAILED) ===');
-      console.log(content);
-      console.log('=== END GROQ VISION RAW RESPONSE CONTENT ===');
-      console.log('JSON parse error:', parseError);
-      throw parseError;
-    }
-    
-    // Convert Groq format to ParsedItem format with unit normalization
-    const items: ParsedItem[] = parsed.items.map(item => ({
-      item_name: item.name,
-      quantity: item.quantity,
-      unit: normalizeUnit(item.unit || ''),
-      unit_price: item.price,
-    }));
-
-    console.log('=== GROQ VISION PARSED ITEMS ===');
-    console.log(JSON.stringify(items, null, 2));
-    console.log('=== END GROQ VISION PARSED ITEMS ===');
-
-    return { items, total: parsed.total };
   } catch (error) {
-    console.log('Failed to parse Groq Vision response as JSON:', error);
-    return null;
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.log('Groq Vision request timed out after 30 seconds');
+      throw new Error('Receipt scan timed out — please try again');
+    }
+    throw error;
   }
 }
 
@@ -274,13 +298,24 @@ async function callGroqParsing(text: string, apiKey: string): Promise<{ items: P
 
 export async function POST(req: NextRequest) {
   try {
-    const { image } = await req.json();
+    const { images } = await req.json();
     const url = new URL(req.url);
     const testProvider = url.searchParams.get('provider');
 
-    console.log('=== BASE64 IMAGE LENGTH ===');
-    console.log(image.length);
-    console.log('=== END BASE64 IMAGE LENGTH ===');
+    // Support both single image (backward compatibility) and multiple images
+    const imageArray = Array.isArray(images) ? images : (images ? [images] : []);
+
+    if (imageArray.length === 0) {
+      return NextResponse.json({ error: 'No images provided' }, { status: 400 });
+    }
+
+    console.log('=== NUMBER OF IMAGES RECEIVED ===');
+    console.log(imageArray.length);
+    console.log('=== END NUMBER OF IMAGES RECEIVED ===');
+
+    console.log('=== BASE64 IMAGE LENGTHS ===');
+    imageArray.forEach((img: string, i: number) => console.log(`Image ${i + 1}: ${img.length}`));
+    console.log('=== END BASE64 IMAGE LENGTHS ===');
 
     let teamId: string | null = null;
     let provider: string = 'none';
@@ -317,7 +352,7 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: 'Groq API key not configured for vision test' }, { status: 500 });
         }
 
-        const groqResult = await callGroqVision(image, groqKey);
+        const groqResult = await callGroqVision(imageArray, groqKey);
         if (!groqResult) {
           return NextResponse.json({ error: 'Groq Vision failed to parse' }, { status: 500 });
         }
@@ -338,7 +373,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Try Google Vision first
+    // Try Google Vision first (use first image for OCR providers)
     let text = '';
     try {
       let googleKey = process.env.GOOGLE_VISION_API_KEY;
@@ -347,16 +382,16 @@ export async function POST(req: NextRequest) {
         if (vaultKey) googleKey = vaultKey;
       }
 
-      if (googleKey) {
-        text = await callGoogleVision(image, googleKey);
+      if (googleKey && imageArray.length > 0) {
+        text = await callGoogleVision(imageArray[0], googleKey);
         provider = 'google_vision';
       }
     } catch (error) {
       console.log('Google Vision failed, falling back to OCR.space:', error);
     }
 
-    // Fall back to OCR.space if Google Vision failed or no key
-    if (!text) {
+    // Fall back to OCR.space if Google Vision failed or no key (use first image)
+    if (!text && imageArray.length > 0) {
       try {
         let ocrSpaceKey = process.env.OCR_SPACE_API_KEY;
         if (teamId) {
@@ -365,7 +400,7 @@ export async function POST(req: NextRequest) {
         }
 
         if (ocrSpaceKey) {
-          text = await callOCRSpace(image, ocrSpaceKey);
+          text = await callOCRSpace(imageArray[0], ocrSpaceKey);
           provider = 'ocr_space';
         }
       } catch (error) {

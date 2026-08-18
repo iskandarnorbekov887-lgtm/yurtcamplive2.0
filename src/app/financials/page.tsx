@@ -106,8 +106,11 @@ function ManagerFinancials() {
   const [receiptLoading, setReceiptLoading] = useState(false);
   const [receiptError, setReceiptError] = useState<string | null>(null);
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
+  const [receiptImages, setReceiptImages] = useState<Array<{ id: string; url: string; base64: string }>>([]);
   const [parsedItems, setParsedItems] = useState<Array<{ item_name: string; quantity: number; unit: string; unit_price: number }>>([]);
   const [useFallbackOCR, setUseFallbackOCR] = useState(false); // false = use Groq Vision (default), true = use OCR.space
+  const [ocrBlockingWarnings, setOcrBlockingWarnings] = useState<string[]>([]);
+  const [ocrInformationalWarnings, setOcrInformationalWarnings] = useState<string[]>([]);
 
   // Item name autocomplete state
   const [itemSuggestions, setItemSuggestions] = useState<string[]>([]);
@@ -766,6 +769,13 @@ function ManagerFinancials() {
         return;
       }
 
+      // Prevent saving if OCR blocking warnings exist
+      if (ocrBlockingWarnings.length > 0) {
+        setMessage('Please fix the validation warnings before saving');
+        setSubmitting(false);
+        return;
+      }
+
       const { error: insertError, data: financeData } = await supabase.from('camp_finances').insert({
         transaction_date: date,
         type,
@@ -1227,63 +1237,137 @@ function ManagerFinancials() {
   };
 
   const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
     setReceiptLoading(true);
     setReceiptError(null);
 
     try {
-      // Compress image client-side
-      const compressedBlob = await compressImage(file, 1); // Target under 1MB
-      const compressedFile = new File([compressedBlob], file.name, { type: 'image/jpeg' });
+      // Process all selected files
+      const newImages: Array<{ id: string; url: string; base64: string }> = [];
 
-      // Upload compressed image to Supabase Storage
-      const fileName = `${Date.now()}_${file.name.replace(/\.[^/.]+$/, '.jpg')}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('receipts')
-        .upload(fileName, compressedFile);
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        // Compress image client-side
+        const compressedBlob = await compressImage(file, 1); // Target under 1MB
+        const compressedFile = new File([compressedBlob], file.name, { type: 'image/jpeg' });
 
-      if (uploadError) throw uploadError;
+        // Upload compressed image to Supabase Storage
+        const fileName = `${Date.now()}_${i}_${file.name.replace(/\.[^/.]+$/, '.jpg')}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('receipts')
+          .upload(fileName, compressedFile);
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('receipts')
-        .getPublicUrl(fileName);
+        if (uploadError) throw uploadError;
 
-      setReceiptUrl(publicUrl);
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('receipts')
+          .getPublicUrl(fileName);
 
-      // Convert compressed image to base64 for OCR
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve((reader.result as string).split(',')[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(compressedFile);
-      });
+        // Convert compressed image to base64 for OCR
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve((reader.result as string).split(',')[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(compressedFile);
+        });
 
-      // Call OCR API - Groq Vision by default, OCR.space if fallback enabled
+        newImages.push({
+          id: `${Date.now()}_${i}`,
+          url: publicUrl,
+          base64
+        });
+      }
+
+      setReceiptImages(prev => [...prev, ...newImages]);
+      
+      // Set first image as receiptUrl for display
+      if (newImages.length > 0 && !receiptUrl) {
+        setReceiptUrl(newImages[0].url);
+      }
+    } catch (err) {
+      setReceiptError(t('receipt.error') || 'Could not read receipt');
+    } finally {
+      setReceiptLoading(false);
+      e.target.value = '';
+    }
+  };
+
+  const removeReceiptImage = (id: string) => {
+    setReceiptImages(prev => {
+      const filtered = prev.filter(img => img.id !== id);
+      // Update receiptUrl to first remaining image or null
+      if (filtered.length > 0) {
+        setReceiptUrl(filtered[0].url);
+      } else {
+        setReceiptUrl(null);
+      }
+      return filtered;
+    });
+  };
+
+  const processReceiptImages = async () => {
+    if (receiptImages.length === 0) return;
+
+    setReceiptLoading(true);
+    setReceiptError(null);
+    setOcrBlockingWarnings([]);
+    setOcrInformationalWarnings([]);
+
+    try {
+      // Call OCR API with all images - Groq Vision by default, OCR.space if fallback enabled
       const url = useFallbackOCR ? '/api/receipt-ocr' : '/api/receipt-ocr?provider=groq_vision';
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64 }),
+        body: JSON.stringify({ images: receiptImages.map(img => img.base64) }),
       });
 
       if (!res.ok) throw new Error('Failed to read receipt');
       const data = await res.json();
 
       // Set parsed items
-      setParsedItems(data.items || []);
+      const items = data.items || [];
+      setParsedItems(items);
 
-      // Calculate total from parsed items
-      const total = data.items?.reduce((sum: number, item: any) => sum + (item.quantity * item.unit_price), 0) || 0;
+      // Validate OCR results
+      const blockingWarnings: string[] = [];
+      const informationalWarnings: string[] = [];
+
+      // Check if items array is empty (informational only)
+      if (items.length === 0) {
+        informationalWarnings.push('No items were detected — please check the photo or add items manually.');
+      }
+
+      // Check total
+      const total = items.reduce((sum: number, item: any) => sum + (item.quantity * item.unit_price), 0) || 0;
+      if (total === 0 && items.length > 0) {
+        blockingWarnings.push('Total amount is 0 — please verify item prices.');
+      }
+
+      // Check for invalid quantities or prices (blocking)
+      items.forEach((item: any, index: number) => {
+        if (item.quantity <= 0) {
+          blockingWarnings.push(`Item ${index + 1} (${item.item_name}) has invalid quantity (${item.quantity}).`);
+        }
+        if (item.unit_price < 0) {
+          blockingWarnings.push(`Item ${index + 1} (${item.item_name}) has negative price (${item.unit_price}).`);
+        }
+      });
+
+      setOcrBlockingWarnings(blockingWarnings);
+      setOcrInformationalWarnings(informationalWarnings);
+
+      // Set amount and description
       setAmount(String(total));
-      setDescription(data.items?.map((i: any) => i.item_name).join(', ') || '');
+      setDescription(items.map((i: any) => i.item_name).join(', ') || '');
     } catch (err) {
       setReceiptError(t('receipt.error') || 'Could not read receipt');
     } finally {
       setReceiptLoading(false);
-      e.target.value = '';
     }
   };
 
@@ -1618,15 +1702,83 @@ function ManagerFinancials() {
                 <div className="flex gap-3">
                   <label className="flex-1 text-center py-2 px-3 rounded-lg bg-[#722F37] text-[#C9A227] font-bold text-sm cursor-pointer">
                     {t('receipt.take_photo') || 'Take Photo'}
-                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleReceiptUpload} />
+                    <input type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={handleReceiptUpload} />
                   </label>
                   <label className="flex-1 text-center py-2 px-3 rounded-lg bg-[#0B6E4F] text-[#C9A227] font-bold text-sm cursor-pointer">
                     {t('receipt.upload_photo') || 'Upload Photo'}
-                    <input type="file" accept="image/*" className="hidden" onChange={handleReceiptUpload} />
+                    <input type="file" accept="image/*" multiple className="hidden" onChange={handleReceiptUpload} />
                   </label>
                 </div>
+                
+                {/* Photo Preview Thumbnails */}
+                {receiptImages.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {receiptImages.map((img, index) => (
+                      <div key={img.id} className="relative group">
+                        <img 
+                          src={img.url} 
+                          alt={`Receipt ${index + 1}`} 
+                          className="w-16 h-16 object-cover rounded-lg border border-[#5C4A2E]/30"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeReceiptImage(img.id)}
+                          className="absolute -top-2 -right-2 w-5 h-5 bg-[#722F37] text-white rounded-full text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          ✕
+                        </button>
+                        <span className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[8px] text-center rounded-b-lg">
+                          {index + 1}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Process Receipt Button */}
+                {receiptImages.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={processReceiptImages}
+                    disabled={receiptLoading}
+                    className="w-full py-2 px-3 rounded-lg bg-[#0B6E4F] text-[#C9A227] font-bold text-sm hover:bg-[#0B6E4F]/80 transition-all disabled:opacity-50"
+                  >
+                    {receiptLoading ? 'Processing...' : 'Process Receipt'}
+                  </button>
+                )}
+                
                 {receiptLoading && <p className="text-xs text-[#9C9384]">{t('receipt.scanning') || 'Scanning...'}</p>}
                 {receiptError && <p className="text-xs text-red-400">{receiptError}</p>}
+                
+                {/* OCR Blocking Warnings */}
+                {ocrBlockingWarnings.length > 0 && (
+                  <div className="mt-3 p-3 bg-[#722F37]/20 border border-[#722F37]/40 rounded-lg">
+                    <p className="text-xs font-bold text-[#722F37] mb-2">Please fix before saving:</p>
+                    <ul className="text-xs text-[#722F37] space-y-1">
+                      {ocrBlockingWarnings.map((warning: string, index: number) => (
+                        <li key={index} className="flex items-start gap-2">
+                          <span className="text-[#722F37]">✕</span>
+                          <span>{warning}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                {/* OCR Informational Warnings */}
+                {ocrInformationalWarnings.length > 0 && (
+                  <div className="mt-3 p-3 bg-[#B8860B]/20 border border-[#B8860B]/40 rounded-lg">
+                    <p className="text-xs font-bold text-[#B8860B] mb-2">Information:</p>
+                    <ul className="text-xs text-[#B8860B] space-y-1">
+                      {ocrInformationalWarnings.map((warning: string, index: number) => (
+                        <li key={index} className="flex items-start gap-2">
+                          <span className="text-[#B8860B]">⚠</span>
+                          <span>{warning}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1641,6 +1793,9 @@ function ManagerFinancials() {
                       onClick={() => {
                         setParsedItems([]);
                         setReceiptUrl(null);
+                        setReceiptImages([]);
+                        setOcrBlockingWarnings([]);
+                        setOcrInformationalWarnings([]);
                       }}
                       className="text-xs text-[#9C9384] hover:text-[#EDE6D6]"
                     >
